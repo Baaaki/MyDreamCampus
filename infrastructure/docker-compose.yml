@@ -1,0 +1,292 @@
+# Docker Compose configuration for MyDreamCampus infrastructure
+#
+# Services:
+# - PostgreSQL (databases for each microservice)
+# - RabbitMQ (message broker)
+# - Redis (cache)
+# - Traefik (API Gateway / Reverse Proxy)
+# - Grafana Loki (log aggregation) - Faz 1 sonrası
+# - Promtail (log scraper) - Faz 1 sonrası
+# - Grafana (visualization) - Faz 1 sonrası
+#
+# Usage:
+#   docker-compose up -d         # Start all services
+#   docker-compose down          # Stop all services
+#   docker-compose logs -f       # View logs
+
+version: '3.9'
+
+services:
+  # PostgreSQL - Auth Service Database
+  postgres-auth:
+    image: postgres:18-alpine
+    container_name: mydreamcampus-postgres-auth
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+      POSTGRES_DB: mydreamcampus_auth
+    volumes:
+      - postgres_auth_data:/var/lib/postgresql/data
+    ports:
+      - "5432:5432"
+    networks:
+      - mydreamcampus-network
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  # PostgreSQL - Staff Service Database
+  postgres-staff:
+    image: postgres:18-alpine
+    container_name: mydreamcampus-postgres-staff
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+      POSTGRES_DB: mydreamcampus_staff
+    volumes:
+      - postgres_staff_data:/var/lib/postgresql/data
+    ports:
+      - "5433:5432"
+    networks:
+      - mydreamcampus-network
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  # PostgreSQL - Student Service Database
+  postgres-student:
+    image: postgres:18-alpine
+    container_name: mydreamcampus-postgres-student
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+      POSTGRES_DB: mydreamcampus_student
+    volumes:
+      - postgres_student_data:/var/lib/postgresql/data
+    ports:
+      - "5434:5432"
+    networks:
+      - mydreamcampus-network
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  # PostgreSQL - Catalog Service Database
+  postgres-catalog:
+    image: postgres:18-alpine
+    container_name: mydreamcampus-postgres-catalog
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+      POSTGRES_DB: mydreamcampus_catalog
+    volumes:
+      - postgres_catalog_data:/var/lib/postgresql/data
+    ports:
+      - "5435:5432"
+    networks:
+      - mydreamcampus-network
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  # PostgreSQL - Enrollment Service Database
+  postgres-enrollment:
+    image: postgres:18-alpine
+    container_name: mydreamcampus-postgres-enrollment
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+      POSTGRES_DB: mydreamcampus_enrollment
+    volumes:
+      - postgres_enrollment_data:/var/lib/postgresql/data
+    ports:
+      - "5436:5432"
+    networks:
+      - mydreamcampus-network
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  # PostgreSQL - Attendance Service Database
+  postgres-attendance:
+    image: postgres:18-alpine
+    container_name: mydreamcampus-postgres-attendance
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+      POSTGRES_DB: mydreamcampus_attendance
+    volumes:
+      - postgres_attendance_data:/var/lib/postgresql/data
+    ports:
+      - "5437:5432"
+    networks:
+      - mydreamcampus-network
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  # PostgreSQL - Meal Service Database
+  postgres-meal:
+    image: postgres:18-alpine
+    container_name: mydreamcampus-postgres-meal
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+      POSTGRES_DB: mydreamcampus_meal
+    volumes:
+      - postgres_meal_data:/var/lib/postgresql/data
+    ports:
+      - "5438:5432"
+    networks:
+      - mydreamcampus-network
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  # RabbitMQ - Message Broker
+  rabbitmq:
+    image: rabbitmq:4.0-management-alpine
+    container_name: mydreamcampus-rabbitmq
+    restart: unless-stopped
+    environment:
+      RABBITMQ_DEFAULT_USER: rabbitmq
+      RABBITMQ_DEFAULT_PASS: rabbitmq
+    volumes:
+      - rabbitmq_data:/var/lib/rabbitmq
+      - ./rabbitmq/rabbitmq.conf:/etc/rabbitmq/rabbitmq.conf
+    ports:
+      - "5672:5672"    # AMQP
+      - "15672:15672"  # Management UI
+    networks:
+      - mydreamcampus-network
+    healthcheck:
+      test: ["CMD", "rabbitmq-diagnostics", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  # Redis - Cache
+  redis:
+    image: redis:7.2-alpine
+    container_name: mydreamcampus-redis
+    restart: unless-stopped
+    command: redis-server /usr/local/etc/redis/redis.conf
+    volumes:
+      - redis_data:/data
+      - ./redis/redis.conf:/usr/local/etc/redis/redis.conf
+    ports:
+      - "6379:6379"
+    networks:
+      - mydreamcampus-network
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  # Traefik - API Gateway / Reverse Proxy
+  traefik:
+    image: traefik:v3.2
+    container_name: mydreamcampus-traefik
+    restart: unless-stopped
+    command:
+      - "--configFile=/etc/traefik/traefik.yml"
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock:ro
+      - ./traefik/traefik.yml:/etc/traefik/traefik.yml
+      - ./traefik/dynamic.yml:/etc/traefik/dynamic.yml
+    ports:
+      - "80:80"      # HTTP
+      - "443:443"    # HTTPS
+      - "8080:8080"  # Traefik Dashboard
+    networks:
+      - mydreamcampus-network
+
+  # Grafana Loki - Log Aggregation (Faz 1 sonrası)
+  loki:
+    image: grafana/loki:3.2.0
+    container_name: mydreamcampus-loki
+    restart: unless-stopped
+    volumes:
+      - ./loki/loki-config.yml:/etc/loki/local-config.yaml
+      - loki_data:/loki
+    ports:
+      - "3100:3100"
+    networks:
+      - mydreamcampus-network
+    # Uncomment when ready to use
+    # profiles:
+    #   - observability
+
+  # Promtail - Log Scraper (Faz 1 sonrası)
+  promtail:
+    image: grafana/promtail:3.2.0
+    container_name: mydreamcampus-promtail
+    restart: unless-stopped
+    volumes:
+      - ./promtail/promtail-config.yml:/etc/promtail/config.yml
+      - /var/lib/docker/containers:/var/lib/docker/containers:ro
+      - /var/run/docker.sock:/var/run/docker.sock
+    networks:
+      - mydreamcampus-network
+    # Uncomment when ready to use
+    # profiles:
+    #   - observability
+
+  # Grafana - Visualization (Faz 1 sonrası)
+  grafana:
+    image: grafana/grafana:11.4.0
+    container_name: mydreamcampus-grafana
+    restart: unless-stopped
+    environment:
+      GF_SECURITY_ADMIN_USER: admin
+      GF_SECURITY_ADMIN_PASSWORD: admin
+      GF_USERS_ALLOW_SIGN_UP: false
+    volumes:
+      - grafana_data:/var/lib/grafana
+      - ./grafana/provisioning:/etc/grafana/provisioning
+    ports:
+      - "3000:3000"
+    networks:
+      - mydreamcampus-network
+    # Uncomment when ready to use
+    # profiles:
+    #   - observability
+
+networks:
+  mydreamcampus-network:
+    driver: bridge
+
+volumes:
+  postgres_auth_data:
+  postgres_staff_data:
+  postgres_student_data:
+  postgres_catalog_data:
+  postgres_enrollment_data:
+  postgres_attendance_data:
+  postgres_meal_data:
+  rabbitmq_data:
+  redis_data:
+  loki_data:
+  grafana_data:

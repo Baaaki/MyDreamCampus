@@ -1,0 +1,36 @@
+# Traefik Static Configuration
+#
+# This is the main configuration file for Traefik v3.2
+#
+# Documentation: https://doc.traefik.io/traefik/
+
+# API and Dashboard
+api:
+  dashboard: true
+  insecure: true  # Enable dashboard on :8080 without auth (development only)
+
+# Entry Points
+entryPoints:
+  web:
+    address: ":80"
+  # websecure:
+  #   address: ":443"
+
+# Providers
+providers:
+  docker:
+    endpoint: "unix:///var/run/docker.sock"
+    exposedByDefault: false
+    network: mydreamcampus-network
+  file:
+    filename: /etc/traefik/dynamic.yml
+    watch: true
+
+# Logging
+log:
+  level: INFO  # DEBUG, INFO, WARN, ERROR, FATAL, PANIC
+
+# Access Logs
+accessLog:
+  filePath: /var/log/traefik/access.log
+  format: json

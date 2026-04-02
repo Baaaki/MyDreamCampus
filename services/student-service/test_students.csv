@@ -1,0 +1,9 @@
+student_number,first_name,last_name,email,faculty,department,enrollment_year,class_level
+2021001,Ahmet,Yılmaz,ahmet.yilmaz@university.edu.tr,Engineering,Computer Engineering,2021,3
+2021002,Ayşe,Kaya,ayse.kaya@university.edu.tr,Engineering,Computer Engineering,2021,3
+2021003,Mehmet,Demir,mehmet.demir@university.edu.tr,Engineering,Electrical Engineering,2021,3
+2022001,Fatma,Çelik,fatma.celik@university.edu.tr,Engineering,Computer Engineering,2022,2
+2022002,Ali,Şahin,ali.sahin@university.edu.tr,Engineering,Mechanical Engineering,2022,2
+2023001,Zeynep,Yıldız,zeynep.yildiz@university.edu.tr,Science,Mathematics,2023,1
+2023002,Burak,Aydın,burak.aydin@university.edu.tr,Science,Physics,2023,1
+2023003,Elif,Özdemir,elif.ozdemir@university.edu.tr,Science,Chemistry,2023,1
