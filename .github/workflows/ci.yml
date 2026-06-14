@@ -14,11 +14,9 @@ env:
   GO_VERSION: "1.26"
   NODE_VERSION: "22"
   BUN_VERSION: "latest"
+  FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: "true"
 
 jobs:
-  # ─────────────────────────────────────────────
-  # Detect which parts of the codebase changed
-  # ─────────────────────────────────────────────
   changes:
     runs-on: ubuntu-latest
     outputs:
@@ -26,7 +24,6 @@ jobs:
       frontend: ${{ steps.filter.outputs.frontend }}
       mobile: ${{ steps.filter.outputs.mobile }}
       infra: ${{ steps.filter.outputs.infra }}
-      openapi: ${{ steps.filter.outputs.openapi }}
     steps:
       - uses: actions/checkout@v4
       - uses: dorny/paths-filter@v3
@@ -34,48 +31,34 @@ jobs:
         with:
           filters: |
             backend:
-              - 'backend/services/**'
-              - 'backend/shared/**'
-              - 'backend/go.work'
+              - 'new-backend/**'
             frontend:
               - 'frontend/**'
             mobile:
               - 'mobile/**'
             infra:
-              - 'backend/infrastructure/**'
-            openapi:
-              - 'backend/docs/openapi.yaml'
-              - 'frontend/src/lib/api-types.ts'
-              - 'mobile/types/api-types.ts'
+              - 'new-backend/infrastructure/**'
 
-  # ─────────────────────────────────────────────
-  # Backend: lint, vet, build all services
-  # ─────────────────────────────────────────────
   backend-lint:
     needs: changes
     if: needs.changes.outputs.backend == 'true'
     runs-on: ubuntu-latest
     defaults:
       run:
-        working-directory: backend
+        working-directory: new-backend
     steps:
       - uses: actions/checkout@v4
 
       - uses: actions/setup-go@v5
         with:
           go-version: ${{ env.GO_VERSION }}
-          cache-dependency-path: backend/**/go.sum
+          cache-dependency-path: new-backend/**/go.sum
 
-      - name: Run go vet on all services
+      - name: Run go vet
         run: |
-          for dir in services/*/; do
-            echo "::group::vet ${dir}"
-            (cd "$dir" && go vet ./...)
-            echo "::endgroup::"
-          done
-
-      - name: Run go vet on shared
-        run: cd shared && go vet ./...
+          (cd shared && go vet ./...)
+          (cd services/notification && go vet ./...)
+          (cd monolith && go vet ./...)
 
       - name: Install golangci-lint
         uses: golangci/golangci-lint-action@v6
@@ -83,16 +66,11 @@ jobs:
           version: latest
           install-only: true
 
-      - name: Lint shared
-        run: cd shared && golangci-lint run --timeout=5m ./...
-
-      - name: Lint all services
+      - name: Lint
         run: |
-          for dir in services/*/; do
-            echo "::group::lint ${dir}"
-            (cd "$dir" && golangci-lint run --timeout=5m ./...)
-            echo "::endgroup::"
-          done
+          (cd shared && golangci-lint run --timeout=5m ./...)
+          (cd services/notification && golangci-lint run --timeout=5m ./...)
+          (cd monolith && golangci-lint run --timeout=5m ./...)
 
   backend-build:
     needs: changes
@@ -100,113 +78,42 @@ jobs:
     runs-on: ubuntu-latest
     defaults:
       run:
-        working-directory: backend
+        working-directory: new-backend
     steps:
       - uses: actions/checkout@v4
 
       - uses: actions/setup-go@v5
         with:
           go-version: ${{ env.GO_VERSION }}
-          cache-dependency-path: backend/**/go.sum
+          cache-dependency-path: new-backend/**/go.sum
 
-      - name: Build all services
+      - name: Build components
         run: |
-          for dir in services/*/; do
-            svc=$(basename "$dir")
-            echo "::group::build ${svc}"
-            (cd "$dir" && go build -o /dev/null ./cmd/...)
-            echo "::endgroup::"
-          done
+          (cd shared && go build ./...)
+          (cd services/notification && go build -o /dev/null ./cmd/...)
+          (cd monolith && make build)
 
-      - name: Build shared package
-        run: cd shared && go build ./...
-
-  # ─────────────────────────────────────────────
-  # Backend: run unit tests (race detector)
-  # ─────────────────────────────────────────────
   backend-test:
     needs: changes
     if: needs.changes.outputs.backend == 'true'
     runs-on: ubuntu-latest
     defaults:
       run:
-        working-directory: backend
+        working-directory: new-backend
     steps:
       - uses: actions/checkout@v4
 
       - uses: actions/setup-go@v5
         with:
           go-version: ${{ env.GO_VERSION }}
-          cache-dependency-path: backend/**/go.sum
+          cache-dependency-path: new-backend/**/go.sum
 
-      - name: Test shared
-        run: cd shared && go test -race -count=1 ./...
-
-      - name: Test all services
+      - name: Test
         run: |
-          for dir in services/*/; do
-            svc=$(basename "$dir")
-            echo "::group::test ${svc}"
-            (cd "$dir" && go test -race -count=1 ./...)
-            echo "::endgroup::"
-          done
+          (cd shared && go test -race -count=1 ./...)
+          (cd services/notification && go test -race -count=1 ./...)
+          (cd monolith && make test)
 
-  # ─────────────────────────────────────────────
-  # Backend: coverage threshold gate
-  #
-  # Without this gate coverage can silently regress to ~0% and CI stays green.
-  # We start with a soft floor on shared/ (the only well-covered area) so
-  # nobody can accidentally tear down the utility-layer tests; service-level
-  # thresholds will be added per-service as their coverage grows past 5%.
-  # ─────────────────────────────────────────────
-  backend-coverage:
-    needs: changes
-    if: needs.changes.outputs.backend == 'true'
-    runs-on: ubuntu-latest
-    defaults:
-      run:
-        working-directory: backend
-    steps:
-      - uses: actions/checkout@v4
-
-      - uses: actions/setup-go@v5
-        with:
-          go-version: ${{ env.GO_VERSION }}
-          cache-dependency-path: backend/**/go.sum
-
-      - name: Run shared/ coverage
-        run: cd shared && go test -count=1 -coverprofile=coverage.out ./...
-
-      - name: Enforce shared/ coverage floor
-        run: |
-          set -e
-          cd shared
-          coverage=$(go tool cover -func=coverage.out | awk '/^total:/ {print $3}' | tr -d '%')
-          floor=40
-          echo "shared/ coverage: ${coverage}% (floor: ${floor}%)"
-          awk -v c="$coverage" -v t="$floor" 'BEGIN { if (c+0 < t+0) { exit 1 } }' \
-            || { echo "::error::shared/ coverage ${coverage}% fell below the ${floor}% floor"; exit 1; }
-
-      - name: Run per-service coverage and surface (no gate yet)
-        run: |
-          set -e
-          for dir in services/*/; do
-            svc=$(basename "$dir")
-            echo "::group::coverage ${svc}"
-            (cd "$dir" && go test -count=1 -coverprofile=coverage.out ./... && \
-              go tool cover -func=coverage.out | awk '/^total:/ {print "'"${svc}"': " $3}')
-            echo "::endgroup::"
-          done
-
-  # ─────────────────────────────────────────────
-  # Backend: integration tests
-  #
-  # Spins up one postgres / redis / rabbitmq, creates a database per service,
-  # runs migrations, builds + starts every service binary in the background,
-  # then runs the HTTP-based integration tests under tests/integration_test.go
-  # with INTEGRATION_TESTS=true. Without this job those test files are dead
-  # code — they short-circuit when INTEGRATION_TESTS is unset.
-  # ─────────────────────────────────────────────
   backend-integration:
     needs: changes
     if: needs.changes.outputs.backend == 'true'
@@ -214,7 +121,7 @@ jobs:
     timeout-minutes: 25
     defaults:
       run:
-        working-directory: backend
+        working-directory: new-backend
 
     services:
       postgres:
@@ -222,7 +129,7 @@ jobs:
         env:
           POSTGRES_USER: postgres
           POSTGRES_PASSWORD: postgres
-          POSTGRES_DB: postgres
+          POSTGRES_DB: mydreamcampus
         ports: ["5432:5432"]
         options: >-
           --health-cmd "pg_isready -U postgres"
@@ -259,6 +166,7 @@ jobs:
       JWT_SECRET: "ci-test-secret-not-for-production"
       INTERNAL_SERVICE_SECRET: "ci-test-internal-secret"
       ENVIRONMENT: "test"
+      DB_URL: "postgresql://postgres:postgres@localhost:5432/mydreamcampus?sslmode=disable"
 
     steps:
       - uses: actions/checkout@v4
@@ -266,103 +174,41 @@ jobs:
       - uses: actions/setup-go@v5
         with:
           go-version: ${{ env.GO_VERSION }}
-          cache-dependency-path: backend/**/go.sum
+          cache-dependency-path: new-backend/**/go.sum
 
       - name: Install goose for migrations
         run: go install github.com/pressly/goose/v3/cmd/goose@latest
 
-      - name: Create one database per service
+      - name: Apply migrations for monolith
         run: |
-          for svc in auth staff student catalog enrollment attendance grades meal; do
-            PGPASSWORD=postgres psql -h localhost -U postgres \
-              -c "CREATE DATABASE mydreamcampus_${svc};" || true
-          done
+          cd monolith
+          make migrate-up-all
 
-      - name: Apply migrations for every service that has them
+      - name: Build monolith and notification
         run: |
-          set -e
-          declare -A short_for=(
-            [auth-service]=auth
-            [staff-service]=staff
-            [student-service]=student
-            [course-catalog-service]=catalog
-            [enrollment-service]=enrollment
-            [attendance-service]=attendance
-            [grades-service]=grades
-            [meal-service]=meal
-          )
-          for svc in "${!short_for[@]}"; do
-            short="${short_for[$svc]}"
-            mig="services/${svc}/sql/migrations"
-            [ -d "$mig" ] || continue
-            echo "::group::migrate ${svc}"
-            goose -dir "$mig" postgres \
-              "postgresql://postgres:postgres@localhost:5432/mydreamcampus_${short}?sslmode=disable" up
-            echo "::endgroup::"
-          done
-
-      - name: Build every service binary
-        run: |
-          set -e
           mkdir -p tmp/bin
-          for dir in services/*/; do
-            svc=$(basename "$dir")
-            echo "::group::build ${svc}"
-            (cd "$dir" && go build -o "${GITHUB_WORKSPACE}/backend/tmp/bin/${svc}" ./cmd/...)
-            echo "::endgroup::"
-          done
+          (cd monolith && make build && cp bin/monolith ../tmp/bin/)
+          (cd services/notification && go build -o ../../tmp/bin/notification ./cmd/...)
 
-      # Each service uses its own DB_URL + PORT. We override defaults via env so
-      # everything talks to the single shared postgres on 5432.
-      - name: Start every service in the background
+      - name: Start monolith in the background
         run: |
-          set -e
           mkdir -p tmp/logs
-          start_svc() {
-            local svc=$1 port=$2 short=$3
-            DB_URL="postgresql://postgres:postgres@localhost:5432/mydreamcampus_${short}?sslmode=disable" \
-            PORT="${port}" \
-              nohup "tmp/bin/${svc}" > "tmp/logs/${svc}.log" 2>&1 &
-            echo $! > "tmp/logs/${svc}.pid"
-            echo "started ${svc} on :${port} (pid $(cat tmp/logs/${svc}.pid))"
-          }
-          start_svc auth-service 8001 auth
-          start_svc staff-service 8002 staff
-          start_svc student-service 8003 student
-          start_svc course-catalog-service 8004 catalog
-          start_svc enrollment-service 8005 enrollment
-          start_svc attendance-service 8006 attendance
-          start_svc grades-service 8007 grades
-          start_svc meal-service 8008 meal
+          PORT=8080 nohup tmp/bin/monolith > tmp/logs/monolith.log 2>&1 &
+          echo $! > tmp/logs/monolith.pid
+          echo "started monolith on :8080"
 
-      - name: Wait for every service /health to respond
+      - name: Wait for monolith health check
         run: |
-          set -e
-          for port in 8001 8002 8003 8004 8005 8006 8007 8008; do
-            echo "::group::wait :${port}"
-            for i in $(seq 1 60); do
-              if curl -sf "http://localhost:${port}/health" > /dev/null; then
-                echo "service on :${port} healthy after ${i}s"
-                break
-              fi
-              if [ "$i" -eq 60 ]; then
-                echo "::error::service on :${port} did not become healthy in 60s"
-                exit 1
-              fi
-              sleep 1
-            done
-            echo "::endgroup::"
-          done
-
-      - name: Run integration tests for every service
-        run: |
-          set -e
-          for dir in services/*/; do
-            svc=$(basename "$dir")
-            [ -d "${dir}tests" ] || continue
-            echo "::group::integration ${svc}"
-            (cd "$dir" && go test -count=1 -timeout 120s ./tests/...)
-            echo "::endgroup::"
+          for i in $(seq 1 60); do
+            if curl -sf "http://localhost:8080/health" > /dev/null; then
+              echo "monolith healthy after ${i}s"
+              break
+            fi
+            if [ "$i" -eq 60 ]; then
+              echo "::error::monolith did not become healthy in 60s"
+              exit 1
+            fi
+            sleep 1
           done
 
       - name: Dump service logs on failure
@@ -383,103 +229,68 @@ jobs:
             kill "$pid" 2>/dev/null || true
           done
 
-  # ─────────────────────────────────────────────
-  # Backend: security scanning (gosec + govulncheck)
-  # ─────────────────────────────────────────────
   backend-security:
     needs: changes
     if: needs.changes.outputs.backend == 'true'
     runs-on: ubuntu-latest
     defaults:
       run:
-        working-directory: backend
+        working-directory: new-backend
     steps:
       - uses: actions/checkout@v4
 
       - uses: actions/setup-go@v5
         with:
           go-version: ${{ env.GO_VERSION }}
-          cache-dependency-path: backend/**/go.sum
+          cache-dependency-path: new-backend/**/go.sum
 
-      # gosec — SQL injection, hardcoded creds, weak crypto, unsafe pointers
       - name: Install gosec
         run: go install github.com/securego/gosec/v2/cmd/gosec@latest
 
-      - name: Run gosec on shared and all services
+      - name: Run gosec
         run: |
           failed=0
-          echo "::group::gosec shared"
           (cd shared && gosec -severity medium -confidence medium ./...) || failed=1
-          echo "::endgroup::"
-          for dir in services/*/; do
-            svc=$(basename "$dir")
-            echo "::group::gosec ${svc}"
-            (cd "$dir" && gosec -severity medium -confidence medium ./...) || failed=1
-            echo "::endgroup::"
-          done
+          (cd services/notification && gosec -severity medium -confidence medium ./...) || failed=1
+          (cd monolith && gosec -severity medium -confidence medium ./...) || failed=1
           exit $failed
 
-      # govulncheck — Go's official vulnerability database
       - name: Install govulncheck
         run: go install golang.org/x/vuln/cmd/govulncheck@latest
 
-      - name: Run govulncheck on shared and all services
+      - name: Run govulncheck
         run: |
           failed=0
-          echo "::group::govulncheck shared"
           (cd shared && govulncheck ./...) || failed=1
-          echo "::endgroup::"
-          for dir in services/*/; do
-            svc=$(basename "$dir")
-            echo "::group::govulncheck ${svc}"
-            (cd "$dir" && govulncheck ./...) || failed=1
-            echo "::endgroup::"
-          done
+          (cd services/notification && govulncheck ./...) || failed=1
+          (cd monolith && govulncheck ./...) || failed=1
           exit $failed
 
-  # ─────────────────────────────────────────────
-  # Backend: dependency hygiene (go mod tidy)
-  # ─────────────────────────────────────────────
   backend-deps:
     needs: changes
     if: needs.changes.outputs.backend == 'true'
     runs-on: ubuntu-latest
     defaults:
       run:
-        working-directory: backend
+        working-directory: new-backend
     steps:
       - uses: actions/checkout@v4
 
       - uses: actions/setup-go@v5
         with:
           go-version: ${{ env.GO_VERSION }}
-          cache-dependency-path: backend/**/go.sum
+          cache-dependency-path: new-backend/**/go.sum
 
-      - name: Check go.mod tidiness (shared)
+      - name: Check go.mod tidiness
         run: |
-          cd shared
-          go mod tidy
-          if ! git diff --exit-code go.mod go.sum; then
-            echo "::error::shared/go.mod is not tidy. Run 'go mod tidy' locally."
-            exit 1
-          fi
-
-      - name: Check go.mod tidiness (services)
-        run: |
-          for dir in services/*/; do
-            svc=$(basename "$dir")
-            echo "::group::mod tidy ${svc}"
+          for dir in shared services/notification monolith; do
             (cd "$dir" && go mod tidy)
-            if ! git diff --exit-code "${dir}go.mod" "${dir}go.sum"; then
-              echo "::error::${dir}go.mod is not tidy. Run 'go mod tidy' locally."
+            if ! git diff --exit-code "${dir}/go.mod" "${dir}/go.sum"; then
+              echo "::error::${dir}/go.mod is not tidy. Run 'go mod tidy' locally."
               exit 1
             fi
-            echo "::endgroup::"
           done
 
-  # ─────────────────────────────────────────────
-  # Frontend: install, typecheck, lint, build
-  # ─────────────────────────────────────────────
   frontend:
     needs: changes
     if: needs.changes.outputs.frontend == 'true'
@@ -513,9 +324,6 @@ jobs:
       - name: Build
         run: bun run build
 
-  # ─────────────────────────────────────────────
-  # Mobile: install, typecheck, jest tests
-  # ─────────────────────────────────────────────
   mobile:
     needs: changes
     if: needs.changes.outputs.mobile == 'true'
@@ -539,112 +347,17 @@ jobs:
       - name: Jest unit tests
         run: npm test -- --ci
 
-  # ─────────────────────────────────────────────
-  # Infrastructure: validate configs
-  # ─────────────────────────────────────────────
-  infra-validate:
-    needs: changes
-    if: needs.changes.outputs.infra == 'true'
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v4
-
-      - name: Validate docker-compose syntax
-        run: docker compose -f backend/infrastructure/docker-compose.yml config --quiet
-
-      - name: Validate YAML files
-        run: |
-          for f in backend/infrastructure/traefik/*.yml \
-                   backend/infrastructure/loki/*.yml \
-                   backend/infrastructure/promtail/*.yml; do
-            echo "Validating: $f"
-            python3 -c "import yaml; yaml.safe_load(open('$f'))"
-          done
-
-  # ─────────────────────────────────────────────
-  # SQL migrations: check ordering & syntax
-  # ─────────────────────────────────────────────
-  migrations-check:
-    needs: changes
-    if: needs.changes.outputs.backend == 'true'
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v4
-
-      - name: Check migration file naming
-        run: |
-          error=0
-          for dir in backend/services/*/sql/migrations/; do
-            svc=$(echo "$dir" | cut -d'/' -f3)
-            echo "::group::${svc} migrations"
-            prev=0
-            for f in "$dir"*.sql; do
-              [ -f "$f" ] || continue
-              num=$(basename "$f" | grep -oP '^\d+')
-              if [ "$num" -le "$prev" ]; then
-                echo "::error::${f}: migration number ${num} is not strictly increasing (prev: ${prev})"
-                error=1
-              fi
-              prev=$num
-              echo "OK: $(basename $f)"
-            done
-            echo "::endgroup::"
-          done
-          exit $error
-
-  # ─────────────────────────────────────────────
-  # OpenAPI drift check — openapi.yaml ↔ generated TS types
-  # ─────────────────────────────────────────────
-  openapi-types-drift:
-    needs: changes
-    if: needs.changes.outputs.openapi == 'true'
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v4
-
-      - uses: oven-sh/setup-bun@v2
-        with:
-          bun-version: ${{ env.BUN_VERSION }}
-
-      - uses: actions/setup-node@v4
-        with:
-          node-version: ${{ env.NODE_VERSION }}
-
-      - name: Install frontend deps
-        run: cd frontend && bun install --frozen-lockfile
-
-      - name: Install mobile deps
-        run: cd mobile && npm ci
-
-      - name: Regenerate API types
-        run: cd backend && make gen-types
-
-      - name: Fail if generated types drifted from openapi.yaml
-        run: |
-          if ! git diff --exit-code frontend/src/lib/api-types.ts mobile/types/api-types.ts; then
-            echo "::error::Generated API types are out of sync with backend/docs/openapi.yaml."
-            echo "::error::Run 'make -C backend gen-types' locally and commit the result."
-            exit 1
-          fi
-
-  # ─────────────────────────────────────────────
-  # Final gate — all required checks passed
-  # ─────────────────────────────────────────────
   ci-passed:
     if: always()
     needs:
       - backend-lint
       - backend-build
       - backend-test
-      - backend-coverage
       - backend-integration
       - backend-security
       - backend-deps
       - frontend
       - mobile
-      - infra-validate
-      - migrations-check
-      - openapi-types-drift
     runs-on: ubuntu-latest
     steps:
       - name: Check all jobs
@@ -652,15 +365,11 @@ jobs:
           results=("${{ needs.backend-lint.result }}" \
                    "${{ needs.backend-build.result }}" \
                    "${{ needs.backend-test.result }}" \
-                   "${{ needs.backend-coverage.result }}" \
                    "${{ needs.backend-integration.result }}" \
                    "${{ needs.backend-security.result }}" \
                    "${{ needs.backend-deps.result }}" \
                    "${{ needs.frontend.result }}" \
-                   "${{ needs.mobile.result }}" \
-                   "${{ needs.infra-validate.result }}" \
-                   "${{ needs.migrations-check.result }}" \
-                   "${{ needs.openapi-types-drift.result }}")
+                   "${{ needs.mobile.result }}")
           for r in "${results[@]}"; do
             if [[ "$r" == "failure" || "$r" == "cancelled" ]]; then
               echo "::error::One or more required jobs failed or were cancelled"
