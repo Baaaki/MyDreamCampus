@@ -17,7 +17,13 @@ import (
 var (
 	ErrInvalidToken = errors.New("invalid token")
 	ErrExpiredToken = errors.New("token has expired")
+	jwtSecret       []byte
 )
+
+// InitJWTSecret sets the global JWT secret.
+func InitJWTSecret(secret string) {
+	jwtSecret = []byte(secret)
+}
 
 // TokenType represents the type of JWT token
 type TokenType string
@@ -43,9 +49,12 @@ type Claims struct {
 // DEPRECATED: Use GenerateAccessTokenWithSecret or ValidateTokenWithSecret instead
 // This function is kept for backward compatibility only
 func GetJWTSecret() []byte {
+	if len(jwtSecret) > 0 {
+		return jwtSecret
+	}
 	secret := os.Getenv("JWT_SECRET")
 	if secret == "" {
-		panic("JWT_SECRET environment variable is not set")
+		panic("JWT_SECRET environment variable is not set and InitJWTSecret was not called")
 	}
 	return []byte(secret)
 }

@@ -10,8 +10,8 @@ services:
     container_name: mydreamcampus-postgres
     restart: unless-stopped
     environment:
-      POSTGRES_USER: postgres
-      POSTGRES_PASSWORD: postgres
+      POSTGRES_USER: ${POSTGRES_USER:-postgres}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-postgres}
       POSTGRES_DB: mydreamcampus
       PGDATA: /var/lib/postgresql/data/pgdata
     ports:
@@ -30,8 +30,8 @@ services:
     container_name: mydreamcampus-notification-postgres
     restart: unless-stopped
     environment:
-      POSTGRES_USER: postgres
-      POSTGRES_PASSWORD: postgres
+      POSTGRES_USER: ${POSTGRES_USER:-postgres}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-postgres}
       POSTGRES_DB: notification
       PGDATA: /var/lib/postgresql/data/pgdata
     ports:

@@ -31,8 +31,7 @@ type Module struct {
 
 	paymentClient service.PaymentClient
 
-	studentConsumer   *worker.StudentEventConsumer
-	paymentConsumer   *worker.PaymentEventConsumer
+	eventConsumer     *worker.EventConsumer
 	reservationWorker *worker.ReservationWorker
 
 	mealHandler       *handler.MealHandler
@@ -97,56 +96,18 @@ func (m *Module) Bootstrap(ctx context.Context) error {
 	m.closedDaysHandler = handler.NewClosedDaysHandler(closedDaysRepo, m.logger, m.auditLogger)
 
 	// Workers
-	m.studentConsumer = worker.NewStudentEventConsumer(studentCacheRepo, processedEventsRepo, m.logger)
-	m.paymentConsumer = worker.NewPaymentEventConsumer(reservationRepo, processedEventsRepo, m.logger)
+	studentConsumer := worker.NewStudentEventConsumer(studentCacheRepo, processedEventsRepo, m.logger)
+	paymentConsumer := worker.NewPaymentEventConsumer(reservationRepo, processedEventsRepo, m.logger)
 	m.reservationWorker = worker.NewReservationWorker(reservationRepo, m.logger)
+	
+	consumer := rabbitmq.NewConsumer(m.rabbitConn)
+	m.eventConsumer = worker.NewEventConsumer(consumer, studentConsumer, paymentConsumer)
 
 	// Start reservation worker jobs
 	m.reservationWorker.Start(ctx)
 
-	consumer := rabbitmq.NewConsumer(m.rabbitConn)
-
-	// Subscribe to student events
-	err := consumer.DeclareQueue("meal.student_created_queue")
-	if err != nil { return err }
-	err = consumer.BindQueue("meal.student_created_queue", "student.events", "student.created")
-	if err != nil { return err }
-	err = consumer.Consume("meal.student_created_queue", func(body []byte) error { return m.studentConsumer.HandleStudentCreated(ctx, body) })
-	if err != nil {
-		return err
-	}
-	err = consumer.DeclareQueue("meal.student_updated_queue")
-	if err != nil { return err }
-	err = consumer.BindQueue("meal.student_updated_queue", "student.events", "student.updated")
-	if err != nil { return err }
-	err = consumer.Consume("meal.student_updated_queue", func(body []byte) error { return m.studentConsumer.HandleStudentUpdated(ctx, body) })
-	if err != nil {
-		return err
-	}
-	err = consumer.DeclareQueue("meal.student_deactivated_queue")
-	if err != nil { return err }
-	err = consumer.BindQueue("meal.student_deactivated_queue", "student.events", "student.deactivated")
-	if err != nil { return err }
-	err = consumer.Consume("meal.student_deactivated_queue", func(body []byte) error { return m.studentConsumer.HandleStudentDeactivated(ctx, body) })
-	if err != nil {
-		return err
-	}
-
-	// Subscribe to payment events
-	err = consumer.DeclareQueue("meal.payment_completed_queue")
-	if err != nil { return err }
-	err = consumer.BindQueue("meal.payment_completed_queue", "payment.events", "payment.completed")
-	if err != nil { return err }
-	err = consumer.Consume("meal.payment_completed_queue", func(body []byte) error { return m.paymentConsumer.HandlePaymentCompleted(ctx, body) })
-	if err != nil {
-		return err
-	}
-	err = consumer.DeclareQueue("meal.payment_failed_queue")
-	if err != nil { return err }
-	err = consumer.BindQueue("meal.payment_failed_queue", "payment.events", "payment.failed")
-	if err != nil { return err }
-	err = consumer.Consume("meal.payment_failed_queue", func(body []byte) error { return m.paymentConsumer.HandlePaymentFailed(ctx, body) })
-	if err != nil {
+	// Start event consumer
+	if err := m.eventConsumer.Start(ctx); err != nil {
 		return err
 	}
 

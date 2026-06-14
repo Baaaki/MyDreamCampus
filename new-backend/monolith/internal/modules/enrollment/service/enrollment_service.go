@@ -78,11 +78,18 @@ func (s *EnrollmentService) GetAvailableCourses(ctx context.Context, studentID u
 	availableCourses := make([]dto.AvailableCourse, 0, len(courses))
 	for _, course := range courses {
 
-		// Convert to DTO format via JSON
+		// Map course catalog sessions to enrollment DTO
 		var scheduleSessions []dto.ScheduleSession
-		if len(course.ScheduleSessions) > 0 {
-			b, _ := json.Marshal(course.ScheduleSessions)
-			_ = json.Unmarshal(b, &scheduleSessions)
+		for _, s := range course.ScheduleSessions {
+			var intSlots []int
+			for _, sl := range s.SlotNumbers {
+				intSlots = append(intSlots, int(sl))
+			}
+			scheduleSessions = append(scheduleSessions, dto.ScheduleSession{
+				DayOfWeek:   s.DayOfWeek,
+				SlotNumbers: intSlots,
+				SessionType: s.SessionType,
+			})
 		}
 
 		// Count active enrollments via repository to check available seats
@@ -313,11 +320,14 @@ func (s *EnrollmentService) CreateEnrollmentProgram(ctx context.Context, req dto
 
 // Helper: Check prerequisites for a course
 func (s *EnrollmentService) checkPrerequisites(ctx context.Context, studentID uuid.UUID, course catalogDTO.SemesterCourseResponse) error {
-	// Parse prerequisites from JSONB - actually it's now a struct array in DTO
+	// Map prerequisites
 	var prerequisites []dto.PrerequisiteCourse
-	if len(course.Prerequisites) > 0 {
-		b, _ := json.Marshal(course.Prerequisites)
-		_ = json.Unmarshal(b, &prerequisites)
+	for _, p := range course.Prerequisites {
+		prerequisites = append(prerequisites, dto.PrerequisiteCourse{
+			ID:         p.ID,
+			CourseCode: p.CourseCode,
+			CourseName: p.CourseName,
+		})
 	}
 
 	// Check each prerequisite

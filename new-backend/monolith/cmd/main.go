@@ -30,6 +30,7 @@ import (
 	"github.com/baaaki/mydreamcampus/monolith/internal/platform/rabbitmq"
 	platformRedis "github.com/baaaki/mydreamcampus/monolith/internal/platform/redis"
 	"go.uber.org/zap"
+	"github.com/baaaki/mydreamcampus/monolith/internal/platform/utils"
 )
 
 func main() {
@@ -38,8 +39,8 @@ func main() {
 		panic(fmt.Sprintf("failed to load config: %v", err))
 	}
 	
-	// Export JWT_SECRET to environment for backward compatibility with utils.GetJWTSecret()
-	os.Setenv("JWT_SECRET", cfg.JWT.Secret)
+	// Initialize JWT secret globally to avoid os.Setenv anti-pattern
+	utils.InitJWTSecret(cfg.JWT.Secret)
 
 	if err := logger.Init(cfg.Server.Environment); err != nil {
 		panic(fmt.Sprintf("failed to initialize logger: %v", err))

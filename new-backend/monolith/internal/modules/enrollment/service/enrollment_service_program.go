@@ -69,15 +69,19 @@ func (s *EnrollmentService) GetMyEnrollments(ctx context.Context, studentID uuid
 
 			var scheduleSessions []dto.ScheduleSession
 			if val, ok := catalogMap[cID]; ok {
-				// Convert catalog ScheduleSession to enrollment ScheduleSession
-				// catalog uses course_catalog/dto.ScheduleSession
-				// enrollment uses enrollment/dto.ScheduleSession
-				// we use reflection or just parse via JSON for simplicity, 
-				// or better yet, since both are defined locally, we map them manually.
-				// Since we don't import course_catalog/dto here, we assume it has the same structure.
-				// Let's use JSON marshal/unmarshal for safe conversion between identical structs in different packages.
-				b, _ := json.Marshal(val)
-				_ = json.Unmarshal(b, &scheduleSessions)
+				if catalogSessions, ok := val.([]catalogDTO.ScheduleSession); ok {
+					for _, s := range catalogSessions {
+						var intSlots []int
+						for _, sl := range s.SlotNumbers {
+							intSlots = append(intSlots, int(sl))
+						}
+						scheduleSessions = append(scheduleSessions, dto.ScheduleSession{
+							DayOfWeek:   s.DayOfWeek,
+							SlotNumbers: intSlots,
+							SessionType: s.SessionType,
+						})
+					}
+				}
 			}
 
 			coursesDTO = append(coursesDTO, dto.CourseBasic{

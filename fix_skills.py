@@ -1,4 +1,6 @@
-# Frontend — React + Vite (AI Talimati)
+path = "/home/nautilus/Desktop/Playground/mydreamcampus/frontend/skills.md"
+
+new_content = """# Frontend — React + Vite (AI Talimati)
 
 React 19 + Vite + react-router v7 + TanStack Query + ky + shadcn/ui + Tailwind 4. `frontend/src/**` icinde calisirken bu dosya zorunlu okumadir.
 
@@ -89,3 +91,8 @@ React 19 + Vite + react-router v7 + TanStack Query + ky + shadcn/ui + Tailwind 4
 | Type error | Tip tanimini duzelt | `as any`, `@ts-ignore` |
 | Form duplicate submit | `disabled={isSubmitting}` | Throttle manuel yaz |
 | shadcn bozuk | `bunx shadcn add <c>` ile yenile | Manuel duzenle |
+"""
+
+with open(path, "w") as f:
+    f.write(new_content)
+print("skills.md shortened")

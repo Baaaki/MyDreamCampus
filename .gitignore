@@ -47,6 +47,8 @@ dist/
 # `go build` output at service root (no extension on linux)
 backend/services/*/main
 backend/cmd/*/main
+new-backend/monolith/main
+new-backend/monolith/cmd/monolith_bin
 
 # Test & Coverage
 *.test

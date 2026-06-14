@@ -85,16 +85,6 @@ Bu kapsamdaki bir projeyi tek kişi geliştirmek — AI yardımıyla da olsa —
 - CI/CD pipeline `.github` altında ama incelemem gereken içeriği göremedim — muhtemelen minimal veya yok.
 - Projenin gerçekten uçtan uca çalışıp çalışmadığı belli değil.
 
-### Bazı Teknik Sorunlar
-- `main.go`'da `os.Setenv("JWT_SECRET", cfg.JWT.Secret)` — env variable'ı runtime'da set etmek anti-pattern. Config struct zaten var, neden env'e geri yazıyorsun?
-- `json.Marshal` → `json.Unmarshal` ile DTO dönüşümü (enrollment service, line 83-85) — bu bir code smell. Aynı yapıyı paylaşan iki DTO varsa, ortak bir interface veya mapper kullanılmalı.
-- Docker compose'da `postgres:postgres` credentials — development için sorun yok ama `.env.example` ile secrets management'ın gösterilmesi beklenirdi.
-- Compiled binary (`main`, `monolith_bin`) git'e push edilmiş — 47MB'lık bir binary. Bu ciddi bir hata. `.gitignore`'a eklenmeli.
-
-### Mimari Tutarsızlıklar
-- `CLAUDE.md` mikroservis port tablosu veriyor (8001-8008) ama proje artık monolith. Eski dökümantasyon temizlenmemiş.
-- Bazı modüller RabbitMQ consumer'ı `Bootstrap`'ta kuruyor (meal), bazıları `New`'da (auth). Tutarlılık yok.
-- `frontend/skills.md` 19.000 satır — bu, AI'a verilen talimat dosyasının aşırı büyümesi anlamına geliyor. Normal bir projede bu kadar büyük bir instruction dosyası olmaz.
 
 ---
 
