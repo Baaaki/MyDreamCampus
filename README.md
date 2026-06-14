@@ -1,135 +1,70 @@
 # MyDreamCampus
 
-A full-stack university management platform built with a **Modular Monolith** architecture. Handles student enrollment, course scheduling, attendance tracking, grading, and cafeteria operations across web and mobile.
+**MyDreamCampus**, öğrencilerin ders kayıtlarından yoklamalara, not girişlerinden kafeterya işlemlerine kadar tüm üniversite süreçlerini yöneten tam kapsamlı bir platformdur. Hem **Web** hem de **Mobil** uygulama olarak hizmet verir.
 
-## Screenshots
+Bu proje, hem hızlı geliştirme yapılabilmesi hem de ileride kolayca ölçeklenebilmesi için **Modüler Monolit (Modular Monolith)** mimarisiyle sıfırdan, modern teknolojilerle geliştirilmiştir.
 
-> _Placeholders — drop your captures into `docs/screenshots/` and update the paths._
+## Ekran Görüntüleri
 
-| Web | Mobile |
+> _Yer tutucular — proje içi ekran görüntülerini `docs/screenshots/` altına ekleyebilirsiniz._
+
+| Web Arayüzü | Mobil Uygulama |
 |-----|--------|
 | ![Web dashboard](docs/screenshots/web-dashboard.png) | ![Mobile attendance](docs/screenshots/mobile-attendance.png) |
 
-## Architecture
+## Mimari ve Vizyon (Neden Bu Altyapı Seçildi?)
 
-The project recently migrated from a highly fragmented microservices architecture to a robust **Modular Monolith** for simpler deployment, better performance, and easier maintenance. 
+Proje, yönetimi ve dağıtımı zor olan parçalı mikroservis mimarisinden, daha sağlam ve yönetilebilir olan **Modüler Monolit** mimariye geçirilmiştir.
 
-```mermaid
-flowchart LR
-    subgraph Clients
-        Web[Web<br/>React + Vite]
-        Mobile[Mobile<br/>React Native + Expo]
-    end
+**1. İnsan Kaynakları ve Proje Yönetimi İçin Avantajları:**
+- **Hızlı Geliştirme:** Tek bir kod tabanı sayesinde yeni özellikler çok daha hızlı eklenir, ürün pazara daha çabuk çıkar.
+- **Düşük Maliyet:** Sunucu maliyetleri ve bakım eforu minimuma indirilmiştir. Sistem az kaynakla çok iş yapar.
+- **Mobil ve Web Uyumu:** Tüm platformlar aynı güçlü arka ucu (backend) kullanır, böylece veri tutarsızlığı yaşanmaz.
 
-    subgraph Backend[Go Modular Monolith]
-        Auth[Auth Module]
-        Staff[Staff Module]
-        Student[Student Module]
-        Catalog[Course Catalog Module]
-        Enrollment[Enrollment Module]
-        Attendance[Attendance Module]
-        Grades[Grades Module]
-        Meal[Meal Module]
-    end
+**2. Yazılım Uzmanları İçin Teknik Detaylar (Geleceğe Hazır Yapı):**
+- **Mantıksal İzolasyon:** Her modül (Auth, Öğrenci, Notlar) kendi paketi içinde tamamen izoledir (`internal/modules/`). "Spagetti kod" oluşumu engellenmiştir.
+- **Veritabanı İzolasyonu:** Tek bir PostgreSQL veritabanı çalışsa da, her modülün kendi şeması (Schema) vardır. Modüller arası sıkı bağ (Foreign Key) kurulmamıştır.
+- **Mikroservise Geçiş (Future-Proof):** Eğer ileride sistem çok büyürse (örn: Ders Kayıt dönemi yoğunluğu), bu mimari sayesinde istenilen modül birkaç saat içinde koparılıp ayrı bir **Mikroservis** olarak dışarı çıkartılabilir. Modüller arası iletişim halihazırda asenkron olarak **RabbitMQ** (Event-Driven) ile sağlanmaktadır.
 
-    subgraph Notification[Notification Service]
-        Email[SMTP / Mailhog]
-        Push[Firebase Cloud Messaging]
-    end
+## Kullanılan Modern Teknolojiler (Tech Stack)
 
-    RMQ[(RabbitMQ<br/>events)]
-    Redis[(Redis<br/>cache + rate limit)]
-    PG[(PostgreSQL<br/>1 Instance / Multiple Schemas)]
+Sistem tamamen sektör standartlarında, güncel ve yüksek performanslı araçlarla inşa edilmiştir:
 
-    Web --> Backend
-    Mobile --> Backend
-    Backend --> Redis
-    Backend --> PG
-    Backend -- Publishes Events --> RMQ
-    RMQ -- Consumes Events --> Notification
-    Notification --> Email
-    Notification --> Push
-```
+*   **Arka Uç (Backend):** Go 1.26, Gin, PostgreSQL 18, RabbitMQ 4.0, Redis 7.2
+*   **Ön Yüz (Web):** React 19, Vite, Tailwind CSS v4, shadcn/ui
+*   **Mobil Uygulama:** React Native 0.81, Expo 54
+*   **Bildirim Sistemi:** E-posta (MailHog ile test) ve Mobil Anlık Bildirim (Push Notification) altyapısı ayrı bir servis olarak asenkron çalışır.
 
-### Path to Microservices (Future-Proofing)
-While the core backend runs as a single monolithic application, it is designed strictly as a **Modular Monolith**:
-1. **Logical Separation:** Each module (Auth, Staff, Student) resides in its own isolated package under `internal/modules/`. Modules do not share state and communicate via clean Go interfaces.
-2. **Database Isolation:** Even though there is only one PostgreSQL instance, each module owns its own **Database Schema** (e.g., `auth.users`, `course_catalog.courses`). There are no foreign keys across schemas.
-3. **Event-Driven Communication:** Cross-boundary interactions (like notifying the system when a student enrolls) are handled asynchronously via **RabbitMQ**.
+## Yerel Ortamda Çalıştırma (Geliştiriciler İçin)
 
-**How to split into Microservices?**
-If a module (e.g., Enrollment) starts receiving massive traffic, you can easily extract its folder into a separate Go binary, spin up a dedicated PostgreSQL instance, and copy the `enrollment` schema. Since the code already respects module boundaries and uses RabbitMQ for cross-communication, extracting a service takes hours instead of months.
+Projeyi kendi bilgisayarınızda test etmek oldukça basittir. 
 
-### Notification Mechanism (Email + Mobile Push)
-The architecture includes an independent **Notification Service** that listens to RabbitMQ events. It acts as an intelligent dispatcher:
-- **Important Events (e.g., Enrollment Complete, Graduation):** Dispatched via **Email** (Persistent) and **Mobile Push** (Instant).
-- **Standard Events (e.g., Midterm Grade Entered):** Dispatched via **Mobile Push ONLY** (Fire & Forget) to optimize storage and avoid inbox spam.
-- **MailHog:** Integrated into the Docker Compose stack for safely catching and viewing outgoing emails during local development.
-
-## Tech Stack
-
-**Backend**
-- Go 1.26, Gin, pgx/v5, sqlc, goose
-- PostgreSQL 18, RabbitMQ 4.0, Redis 7.2
-- JWT + Argon2, Zap structured logging
-
-**Frontend**
-- React 19, Vite, Tailwind CSS v4, shadcn/ui
-- TanStack React Query, React Hook Form + Zod
-- React Router v7, ky HTTP client
-
-**Mobile**
-- React Native 0.81, Expo 54, Expo Router
-- TanStack React Query, Axios, expo-secure-store
-
-**Infrastructure**
-- Docker Compose
-- MailHog (Email testing)
-
-## Project Structure
-
-```
-mydreamcampus/
-├── new-backend/
-│   ├── monolith/           # Modular Monolith core application
-│   │   ├── internal/modules/ # Isolated domain modules (auth, staff, student, etc.)
-│   ├── services/           # Independent asynchronous services
-│   │   └── notification/   # RabbitMQ consumer for Email & FCM
-│   └── infrastructure/     # Docker Compose (Postgres, Redis, RMQ, MailHog)
-├── frontend/               # React + Vite web application
-└── backend/                # Legacy microservices codebase (deprecated)
-```
-
-## Running Locally
-
-**Prerequisites:** Docker (with the compose plugin), Go 1.26+, Node 20+, and `air` on `$PATH` for backend hot-reload (`go install github.com/air-verse/air@latest`).
+**Gereksinimler:** Docker, Go 1.26+ ve Node 20+
 
 ```bash
-# 1. Start Infrastructure (Postgres, Redis, RabbitMQ, Mailhog)
+# 1. Altyapıyı ayağa kaldırın (Veritabanı, Redis, RabbitMQ vb.)
 cd new-backend/infrastructure
 docker compose up -d
 
-# 2. Run the Monolith Backend (in a new terminal)
+# 2. Ana Uygulamayı (Backend) başlatın
 cd ../monolith
 make run
 
-# 3. Run the Notification Service (in a new terminal)
+# 3. Bildirim Servisini (E-posta ve Push) başlatın (Yeni bir terminalde)
 cd ../services/notification
 go run cmd/main.go
 
-# 4. Frontend (in a new terminal)
+# 4. Web Arayüzünü başlatın (Yeni bir terminalde)
 cd ../../../frontend
 npm install
 npm run dev
 ```
 
-### Endpoints
-
-- Web (Vite dev server): http://localhost:3000
-- Backend API: http://localhost:8080/api/v1/*
-- MailHog (Email Inbox): http://localhost:8025
-- RabbitMQ management: http://localhost:15672 (`guest` / `guest`)
+**Erişim Noktaları:**
+- Web Arayüzü: `http://localhost:3000`
+- Giden E-postaları Görme (MailHog): `http://localhost:8025`
+- Backend API: `http://localhost:8080`
+- RabbitMQ Yönetim Paneli: `http://localhost:15672`
 
 ## Lisans
-
 GNU General Public License v3.0 (GPL-3.0)
