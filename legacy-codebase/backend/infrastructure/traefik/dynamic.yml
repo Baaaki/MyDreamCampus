@@ -1,0 +1,367 @@
+# Traefik Dynamic Configuration
+#
+# MyDreamCampus Microservices Routing
+# All services are accessible via http://localhost/api/...
+#
+# IMPORTANT: Services are running on the HOST machine (via `air`), not in Docker.
+# We use `host.docker.internal` to reach services on the host from Traefik container.
+#
+# NOTE: Services already have /api/... routes, so we DON'T strip the prefix.
+
+http:
+  # ==========================================
+  # ROUTERS
+  # ==========================================
+  routers:
+    # ------------------------------------------
+    # CORS PREFLIGHT HANDLERS (OPTIONS requests)
+    # These MUST have higher priority and bypass auth
+    # ------------------------------------------
+    cors-preflight-staff:
+      rule: "PathPrefix(`/api/staff`) && Method(`OPTIONS`)"
+      service: staff-service
+      entryPoints:
+        - web
+      middlewares:
+        - cors-headers
+      priority: 200
+
+    # Public teacher profile endpoint (GET only, no auth required)
+    staff-profile-public:
+      rule: "PathPrefix(`/api/staff/profile`) && Method(`GET`)"
+      service: staff-service
+      entryPoints:
+        - web
+      middlewares:
+        - cors-headers
+      priority: 150
+
+    cors-preflight-students:
+      rule: "PathPrefix(`/api/students`) && Method(`OPTIONS`)"
+      service: student-service
+      entryPoints:
+        - web
+      middlewares:
+        - cors-headers
+      priority: 200
+
+    cors-preflight-catalog:
+      rule: "PathPrefix(`/api/catalog`) && Method(`OPTIONS`)"
+      service: catalog-service
+      entryPoints:
+        - web
+      middlewares:
+        - cors-headers
+      priority: 200
+
+    cors-preflight-semesters:
+      rule: "PathPrefix(`/api/semesters`) && Method(`OPTIONS`)"
+      service: catalog-service
+      entryPoints:
+        - web
+      middlewares:
+        - cors-headers
+      priority: 200
+
+    cors-preflight-enrollment:
+      rule: "PathPrefix(`/api/enrollment`) && Method(`OPTIONS`)"
+      service: enrollment-service
+      entryPoints:
+        - web
+      middlewares:
+        - cors-headers
+      priority: 200
+
+    cors-preflight-attendance:
+      rule: "PathPrefix(`/api/attendance`) && Method(`OPTIONS`)"
+      service: attendance-service
+      entryPoints:
+        - web
+      middlewares:
+        - cors-headers
+      priority: 200
+
+    cors-preflight-grades:
+      rule: "PathPrefix(`/api/grades`) && Method(`OPTIONS`)"
+      service: grades-service
+      entryPoints:
+        - web
+      middlewares:
+        - cors-headers
+      priority: 200
+
+    cors-preflight-meals:
+      rule: "PathPrefix(`/api/meals`) && Method(`OPTIONS`)"
+      service: meal-service
+      entryPoints:
+        - web
+      middlewares:
+        - cors-headers
+      priority: 200
+
+    cors-preflight-auth:
+      rule: "PathPrefix(`/api/auth`) && Method(`OPTIONS`)"
+      service: auth-service
+      entryPoints:
+        - web
+      middlewares:
+        - cors-headers
+      priority: 200
+
+    # ------------------------------------------
+    # AUTH SERVICE (Port 8001)
+    # Public: /login, /refresh
+    # Protected: /logout, /sessions, /verify, etc.
+    # ------------------------------------------
+    auth-admin:
+      rule: "PathPrefix(`/api/auth/admin`)"
+      service: auth-service
+      entryPoints:
+        - web
+      middlewares:
+        - cors-headers
+        - forward-auth
+      priority: 120
+
+    auth-service:
+      rule: "PathPrefix(`/api/auth`)"
+      service: auth-service
+      entryPoints:
+        - web
+      middlewares:
+        - cors-headers
+
+    # Health check endpoint (direct, no /api prefix)
+    auth-health:
+      rule: "Path(`/health`)"
+      service: auth-service
+      entryPoints:
+        - web
+
+    # ------------------------------------------
+    # STAFF SERVICE (Port 8002)
+    # All routes require authentication
+    # ------------------------------------------
+    staff-service:
+      rule: "PathPrefix(`/api/staff`)"
+      service: staff-service
+      entryPoints:
+        - web
+      middlewares:
+        - cors-headers
+        - forward-auth
+
+    # ------------------------------------------
+    # STUDENT SERVICE (Port 8003)
+    # All routes require authentication
+    # ------------------------------------------
+    student-service:
+      rule: "PathPrefix(`/api/students`)"
+      service: student-service
+      entryPoints:
+        - web
+      middlewares:
+        - cors-headers
+        - forward-auth
+
+    # ------------------------------------------
+    # COURSE CATALOG SERVICE (Port 8004)
+    # Public: GET /api/catalog/courses (list courses)
+    # Protected: POST, PUT, DELETE operations
+    # ------------------------------------------
+    # Admin routes must be protected (higher priority than public GET)
+    catalog-admin:
+      rule: "PathPrefix(`/api/catalog/admin`)"
+      service: catalog-service
+      entryPoints:
+        - web
+      middlewares:
+        - cors-headers
+        - forward-auth
+      priority: 120
+
+    catalog-service-public:
+      rule: "PathPrefix(`/api/catalog`) && Method(`GET`)"
+      service: catalog-service
+      entryPoints:
+        - web
+      middlewares:
+        - cors-headers
+      priority: 100
+
+    catalog-service-protected:
+      rule: "PathPrefix(`/api/catalog`)"
+      service: catalog-service
+      entryPoints:
+        - web
+      middlewares:
+        - cors-headers
+        - forward-auth
+      priority: 50
+
+    catalog-semesters:
+      rule: "PathPrefix(`/api/semesters`)"
+      service: catalog-service
+      entryPoints:
+        - web
+      middlewares:
+        - cors-headers
+        - forward-auth
+
+    # ------------------------------------------
+    # ENROLLMENT SERVICE (Port 8005)
+    # All routes require authentication
+    # ------------------------------------------
+    enrollment-service:
+      rule: "PathPrefix(`/api/enrollment`)"
+      service: enrollment-service
+      entryPoints:
+        - web
+      middlewares:
+        - cors-headers
+        - forward-auth
+
+    # ------------------------------------------
+    # ATTENDANCE SERVICE (Port 8006)
+    # All routes require authentication
+    # ------------------------------------------
+    attendance-service:
+      rule: "PathPrefix(`/api/attendance`)"
+      service: attendance-service
+      entryPoints:
+        - web
+      middlewares:
+        - cors-headers
+        - forward-auth
+
+    # ------------------------------------------
+    # GRADES SERVICE (Port 8007)
+    # All routes require authentication
+    # ------------------------------------------
+    grades-service:
+      rule: "PathPrefix(`/api/grades`)"
+      service: grades-service
+      entryPoints:
+        - web
+      middlewares:
+        - cors-headers
+        - forward-auth
+
+    # ------------------------------------------
+    # MEAL SERVICE (Port 8008)
+    # Public: GET /api/meals/menu/monthly
+    # Protected: All other routes
+    # ------------------------------------------
+    meal-service-public:
+      rule: "PathPrefix(`/api/meals/menu`) && Method(`GET`)"
+      service: meal-service
+      entryPoints:
+        - web
+      middlewares:
+        - cors-headers
+      priority: 100
+
+    meal-service-protected:
+      rule: "PathPrefix(`/api/meals`)"
+      service: meal-service
+      entryPoints:
+        - web
+      middlewares:
+        - cors-headers
+        - forward-auth
+      priority: 50
+
+  # ==========================================
+  # SERVICES (Backend URLs)
+  # Using host.docker.internal to reach services running on host machine
+  # ==========================================
+  services:
+    auth-service:
+      loadBalancer:
+        servers:
+          - url: "http://host.docker.internal:8001"
+
+    staff-service:
+      loadBalancer:
+        servers:
+          - url: "http://host.docker.internal:8002"
+
+    student-service:
+      loadBalancer:
+        servers:
+          - url: "http://host.docker.internal:8003"
+
+    catalog-service:
+      loadBalancer:
+        servers:
+          - url: "http://host.docker.internal:8004"
+
+    enrollment-service:
+      loadBalancer:
+        servers:
+          - url: "http://host.docker.internal:8005"
+
+    attendance-service:
+      loadBalancer:
+        servers:
+          - url: "http://host.docker.internal:8006"
+
+    grades-service:
+      loadBalancer:
+        servers:
+          - url: "http://host.docker.internal:8007"
+
+    meal-service:
+      loadBalancer:
+        servers:
+          - url: "http://host.docker.internal:8008"
+
+  # ==========================================
+  # MIDDLEWARES
+  # ==========================================
+  middlewares:
+    # Forward Auth - Validates JWT tokens via auth-service
+    # On success: Forwards X-User-ID, X-User-Role, X-User-Department headers
+    # On failure: Returns 401 Unauthorized
+    forward-auth:
+      forwardAuth:
+        address: "http://host.docker.internal:8001/api/auth/verify"
+        authRequestHeaders:
+          - "Authorization"
+          - "Content-Type"
+          - "Cookie"
+        authResponseHeaders:
+          - "X-User-ID"
+          - "X-User-Role"
+          - "X-User-Department"
+
+    # Dashboard Basic Auth (for production use)
+    # Generate password hash with: htpasswd -n admin
+    dashboard-auth:
+      basicAuth:
+        users:
+          - "admin:$apr1$changeme" # Generate with: htpasswd -n admin
+
+    # CORS headers for frontend
+    cors-headers:
+      headers:
+        accessControlAllowMethods:
+          - GET
+          - POST
+          - PUT
+          - PATCH
+          - DELETE
+          - OPTIONS
+        accessControlAllowHeaders:
+          - "Authorization"
+          - "Content-Type"
+          - "X-Requested-With"
+          - "X-CSRF-Token"
+          - "Accept"
+          - "Origin"
+        accessControlAllowOriginList:
+          - "http://localhost:3000"
+          - "http://localhost:3002"
+        accessControlAllowCredentials: true
+        accessControlMaxAge: 100
+        addVaryHeader: true

@@ -1,0 +1,25 @@
+version: "2"
+sql:
+  - engine: "postgresql"
+    queries: "./sql/queries"
+    schema: "./sql/migrations"
+    gen:
+      go:
+        package: "db"
+        out: "./db"
+        sql_package: "pgx/v5"
+        emit_json_tags: true
+        emit_prepared_queries: false
+        emit_interface: false
+        emit_exact_table_names: false
+        emit_empty_slices: true
+        # Strip the `enrollment` schema prefix so the existing repository
+        # code keeps compiling. Names match the legacy unprefixed shape.
+        rename:
+          enrollment_enrollment_program: "EnrollmentProgram"
+          enrollment_enrollment_program_course: "EnrollmentProgramCourse"
+          enrollment_enrollment_rejection_log: "EnrollmentRejectionLog"
+          enrollment_outbox_event: "OutboxEvent"
+          enrollment_outbox_status_enum: "OutboxStatusEnum"
+          enrollment_processed_event: "ProcessedEvent"
+          enrollment_enrollment_status_enum: "EnrollmentStatusEnum"

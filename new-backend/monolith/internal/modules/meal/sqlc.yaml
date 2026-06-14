@@ -1,0 +1,32 @@
+version: "2"
+sql:
+  - engine: "postgresql"
+    queries: "./sql/queries"
+    schema: "./sql/migrations"
+    gen:
+      go:
+        package: "db"
+        out: "./db"
+        sql_package: "pgx/v5"
+        emit_json_tags: true
+        emit_prepared_queries: false
+        emit_interface: false
+        emit_exact_table_names: false
+        emit_empty_slices: true
+        rename:
+          meal_students_view: "StudentView"
+          meal_cafeteria: "Cafeteria"
+          meal_cafeterias: "Cafeterias"
+          meal_closed_day: "ClosedDay"
+          meal_monthly_menu: "MonthlyMenu"
+          meal_monthly_menus: "MonthlyMenus"
+          meal_reservation: "Reservation"
+          meal_reservations: "Reservations"
+          meal_outbox_event: "OutboxEvent"
+          meal_outbox_events: "OutboxEvents"
+          meal_processed_event: "ProcessedEvent"
+          meal_processed_events: "ProcessedEvents"
+          meal_reservation_status_enum: "ReservationStatusEnum"
+          meal_meal_time_enum: "MealTimeEnum"
+          meal_menu_type_enum: "MenuTypeEnum"
+          meal_outbox_status_enum: "OutboxStatusEnum"

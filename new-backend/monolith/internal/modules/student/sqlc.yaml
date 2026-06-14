@@ -1,0 +1,25 @@
+version: "2"
+sql:
+  - engine: "postgresql"
+    queries: "./sql/queries"
+    schema: "./sql/migrations"
+    gen:
+      go:
+        package: "db"
+        out: "./db"
+        sql_package: "pgx/v5"
+        emit_json_tags: true
+        emit_prepared_queries: false
+        emit_interface: false
+        emit_exact_table_names: false
+        emit_empty_slices: true
+        # Strip the `student` schema prefix so existing repository code
+        # (db.Student, db.OutboxEvent, db.ImportJob, db.ProcessedEvent)
+        # keeps compiling unchanged.
+        rename:
+          student_student: "Student"
+          student_outbox_event: "OutboxEvent"
+          student_outbox_status_enum: "OutboxStatusEnum"
+          student_processed_event: "ProcessedEvent"
+          student_import_job: "ImportJob"
+          student_import_job_status: "ImportJobStatus"

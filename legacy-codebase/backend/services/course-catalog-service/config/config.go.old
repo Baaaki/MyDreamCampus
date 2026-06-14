@@ -1,0 +1,82 @@
+package config
+
+import (
+	"fmt"
+
+	"github.com/spf13/viper"
+)
+
+type Config struct {
+	Server       ServerConfig
+	Database     DatabaseConfig
+	RabbitMQ     RabbitMQConfig
+	JWT          JWTConfig
+	StaffService StaffServiceConfig
+}
+
+type ServerConfig struct {
+	Port        string
+	Environment string
+}
+
+type DatabaseConfig struct {
+	URL string
+}
+
+type RabbitMQConfig struct {
+	URL string
+}
+
+type JWTConfig struct {
+	Secret string
+}
+
+type StaffServiceConfig struct {
+	BaseURL string
+}
+
+func Load() (*Config, error) {
+	// Set config file
+	viper.SetConfigFile(".env")
+	viper.SetConfigType("env")
+
+	// Read config file (optional, won't error if not found)
+	_ = viper.ReadInConfig()
+
+	// Override with environment variables
+	viper.AutomaticEnv()
+
+	// Set defaults
+	viper.SetDefault("PORT", "8003")
+	viper.SetDefault("ENVIRONMENT", "development")
+	viper.SetDefault("DATABASE_URL", "postgres://postgres:postgres@localhost:5435/mydreamcampus_catalog?sslmode=disable")
+	viper.SetDefault("RABBITMQ_URL", "amqp://guest:guest@localhost:5672/")
+	viper.SetDefault("JWT_SECRET", "your-secret-key")
+	viper.SetDefault("STAFF_SERVICE_URL", "http://localhost:8002")
+
+	config := &Config{
+		Server: ServerConfig{
+			Port:        viper.GetString("PORT"),
+			Environment: viper.GetString("ENVIRONMENT"),
+		},
+		Database: DatabaseConfig{
+			URL: viper.GetString("DATABASE_URL"),
+		},
+		RabbitMQ: RabbitMQConfig{
+			URL: viper.GetString("RABBITMQ_URL"),
+		},
+		JWT: JWTConfig{
+			Secret: viper.GetString("JWT_SECRET"),
+		},
+		StaffService: StaffServiceConfig{
+			BaseURL: viper.GetString("STAFF_SERVICE_URL"),
+		},
+	}
+
+	// Validate required fields
+	if config.Database.URL == "" {
+		return nil, fmt.Errorf("DATABASE_URL is required")
+	}
+
+	return config, nil
+}

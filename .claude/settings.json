@@ -1,0 +1,13 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(RTK_NO_FILTER=1 rtk proxy bash -c 'find /home/nautilus/Desktop/Playground/mydreamcampus/new-backend/monolith/internal/modules/enrollment/repository -name \"*.go\" -exec sed -i \\\\ *)",
+      "Bash(RTK_NO_FILTER=1 rtk proxy bash -c 'grep -E \"ClientHTTP\\\\|http\\\\.Client\\\\|http\\\\.NewRequest\" /home/nautilus/Desktop/Playground/mydreamcampus/new-backend/monolith/internal/modules/enrollment/service/*.go /home/nautilus/Desktop/Playground/mydreamcampus/new-backend/monolith/internal/modules/enrollment/repository/*.go')",
+      "Bash(RTK_NO_FILTER=1 rtk proxy bash -c 'grep \"^func \\\\\\(h \\\\*EnrollmentHandler\\\\\\)\" /home/nautilus/Desktop/Playground/mydreamcampus/new-backend/monolith/internal/modules/enrollment/handler/enrollment_handler.go')",
+      "Bash(RTK_NO_FILTER=1 rtk proxy bash -c \"grep -E '^func \\\\\\(h \\\\*EnrollmentHandler\\\\\\)' /home/nautilus/Desktop/Playground/mydreamcampus/new-backend/monolith/internal/modules/enrollment/handler/enrollment_handler.go\")",
+      "Bash(RTK_NO_FILTER=1 rtk proxy bash -c \"awk '/^func setupRouter/,/^}/' /home/nautilus/Desktop/Playground/mydreamcampus/backend/services/enrollment-service/cmd/main.go | head -60\")",
+      "Bash(RTK_NO_FILTER=1 rtk proxy bash -c 'grep -E \"Queue|RoutingKey|events\\\\.Event\" /home/nautilus/Desktop/Playground/mydreamcampus/new-backend/monolith/internal/modules/enrollment/worker/event_consumer.go | head -20')",
+      "Bash(RTK_NO_FILTER=1 rtk proxy bash -c 'grep -B 1 -A 20 \"func .Start\" /home/nautilus/Desktop/Playground/mydreamcampus/new-backend/monolith/internal/modules/enrollment/worker/event_consumer.go | head -30')"
+    ]
+  }
+}

@@ -1,0 +1,4891 @@
+openapi: 3.0.3
+info:
+  title: MyDreamCampus API
+  description: |
+    Üniversite yönetim sistemi API dokümantasyonu.
+
+    Tüm API'ler Traefik gateway üzerinden `http://localhost/api/...` şeklinde erişilir.
+
+    ## Kimlik Doğrulama
+    - `POST /api/auth/login` ile JWT token alınır
+    - Token `Authorization: Bearer <token>` header'ı ile gönderilir
+    - Traefik forward-auth middleware'i token'ı doğrular ve `X-User-ID`, `X-User-Role`, `X-User-Department` header'larını backend servislere iletir
+    - Refresh token HttpOnly cookie olarak saklanır
+
+    ## Roller
+    - **admin**: Tam yetki
+    - **teacher**: Ders, yoklama, not yönetimi
+    - **student**: Kayıt, yoklama, not görüntüleme
+
+    ## Rate Limiting
+    Tüm endpoint'ler rate limiting ile korunur. Yanıt header'ları:
+    - `X-RateLimit-Limit`: Zaman penceresi başına izin verilen maksimum istek sayısı
+    - `X-RateLimit-Remaining`: Kalan istek sayısı
+    - `X-RateLimit-Reset`: Limit sıfırlanma zamanı (Unix epoch saniye)
+
+    Limit aşıldığında `429 Too Many Requests` döner.
+
+    ## Hata Yönetimi
+    Tüm endpoint'ler aşağıdaki genel hata yanıtlarını dönebilir:
+    - `401 Unauthorized`: Geçersiz veya eksik JWT token
+    - `429 Too Many Requests`: Rate limit aşıldı
+    - `500 Internal Server Error`: Beklenmeyen sunucu hatası
+
+    Hata yanıtları her zaman `ErrorResponse` formatındadır.
+
+    ## Sağlık Kontrolü
+    Her servis `GET /health` endpoint'i sunar. Bu endpoint'ler kimlik doğrulama gerektirmez.
+  version: 1.0.0
+  contact:
+    name: MyDreamCampus Team
+
+servers:
+  - url: http://localhost
+    description: Traefik Gateway (Development)
+
+tags:
+  - name: Auth
+    description: Kimlik doğrulama ve oturum yönetimi (port 8001)
+  - name: Staff
+    description: Personel/öğretim üyesi yönetimi (port 8002)
+  - name: Students
+    description: Öğrenci yönetimi (port 8003)
+  - name: Catalog
+    description: Ders kataloğu yönetimi (port 8004)
+  - name: Semesters
+    description: Dönem ve dönem dersleri yönetimi (port 8004)
+  - name: Enrollment
+    description: Ders kayıt ve onay işlemleri (port 8005)
+  - name: Attendance
+    description: Yoklama yönetimi (port 8006)
+  - name: Grades
+    description: Not yönetimi ve transkript (port 8007)
+  - name: Meals
+    description: Yemekhane ve rezervasyon yönetimi (port 8008)
+  - name: Health
+    description: Servis sağlık kontrol endpoint'leri
+
+security:
+  - BearerAuth: []
+
+paths:
+  # ============================================================
+  # HEALTH CHECKS
+  # ============================================================
+  /api/auth/health:
+    get:
+      operationId: healthAuth
+      tags: [Health]
+      summary: Auth servisi sağlık kontrolü
+      security: []
+      responses:
+        "200":
+          description: Servis sağlıklı
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/HealthResponse"
+
+  /api/staff/health:
+    get:
+      operationId: healthStaff
+      tags: [Health]
+      summary: Staff servisi sağlık kontrolü
+      security: []
+      responses:
+        "200":
+          description: Servis sağlıklı
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/HealthResponse"
+
+  /api/students/health:
+    get:
+      operationId: healthStudent
+      tags: [Health]
+      summary: Student servisi sağlık kontrolü
+      security: []
+      responses:
+        "200":
+          description: Servis sağlıklı
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/HealthResponse"
+
+  /api/catalog/health:
+    get:
+      operationId: healthCatalog
+      tags: [Health]
+      summary: Catalog servisi sağlık kontrolü
+      security: []
+      responses:
+        "200":
+          description: Servis sağlıklı
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/HealthResponse"
+
+  /api/enrollment/health:
+    get:
+      operationId: healthEnrollment
+      tags: [Health]
+      summary: Enrollment servisi sağlık kontrolü
+      security: []
+      responses:
+        "200":
+          description: Servis sağlıklı
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/HealthResponse"
+
+  /api/attendance/health:
+    get:
+      operationId: healthAttendance
+      tags: [Health]
+      summary: Attendance servisi sağlık kontrolü
+      security: []
+      responses:
+        "200":
+          description: Servis sağlıklı
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/HealthResponse"
+
+  /api/grades/health:
+    get:
+      operationId: healthGrades
+      tags: [Health]
+      summary: Grades servisi sağlık kontrolü
+      security: []
+      responses:
+        "200":
+          description: Servis sağlıklı
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/HealthResponse"
+
+  /api/meals/health:
+    get:
+      operationId: healthMeal
+      tags: [Health]
+      summary: Meal servisi sağlık kontrolü
+      security: []
+      responses:
+        "200":
+          description: Servis sağlıklı
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/HealthResponse"
+
+  # ============================================================
+  # AUTH SERVICE
+  # ============================================================
+  /api/auth/login:
+    post:
+      operationId: login
+      tags: [Auth]
+      summary: Giriş yap
+      security: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/LoginRequest"
+      responses:
+        "200":
+          description: Başarılı giriş
+          headers:
+            Set-Cookie:
+              description: refresh_token HttpOnly cookie
+              schema:
+                type: string
+            X-RateLimit-Limit:
+              description: Zaman penceresi başına izin verilen maksimum istek sayısı
+              schema:
+                type: integer
+            X-RateLimit-Remaining:
+              description: Kalan istek sayısı
+              schema:
+                type: integer
+            X-RateLimit-Reset:
+              description: Limit sıfırlanma zamanı (Unix epoch saniye)
+              schema:
+                type: integer
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/LoginResponse"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "429":
+          $ref: "#/components/responses/TooManyRequests"
+        "500":
+          $ref: "#/components/responses/InternalServerError"
+
+  /api/auth/refresh:
+    post:
+      operationId: refreshToken
+      tags: [Auth]
+      summary: Token yenile
+      description: HttpOnly cookie'deki refresh token ile yeni access token alır.
+      security: []
+      responses:
+        "200":
+          description: Yeni access token
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/RefreshResponse"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+
+  /api/auth/logout:
+    post:
+      operationId: logout
+      tags: [Auth]
+      summary: Çıkış yap
+      description: Mevcut oturumu sonlandırır ve token'ı blacklist'e ekler.
+      responses:
+        "200":
+          description: Başarılı çıkış
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/MessageResponse"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+
+  /api/auth/logout-all:
+    post:
+      operationId: logoutAll
+      tags: [Auth]
+      summary: Tüm oturumlardan çıkış
+      description: Kullanıcının tüm aktif oturumlarını sonlandırır.
+      responses:
+        "200":
+          description: Tüm oturumlar sonlandırıldı
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/MessageResponse"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+
+  /api/auth/change-password:
+    post:
+      operationId: changePassword
+      tags: [Auth]
+      summary: Şifre değiştir
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/ChangePasswordRequest"
+      responses:
+        "200":
+          description: Şifre değiştirildi, yeni token döner
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ChangePasswordResponse"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+
+  /api/auth/sessions:
+    get:
+      operationId: listSessions
+      tags: [Auth]
+      summary: Aktif oturumları listele
+      responses:
+        "200":
+          description: Oturum listesi
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SessionsResponse"
+
+  /api/auth/sessions/{id}:
+    delete:
+      operationId: deleteSession
+      tags: [Auth]
+      summary: Belirli bir oturumu sonlandır
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        "200":
+          description: Oturum sonlandırıldı
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/MessageResponse"
+        "404":
+          $ref: "#/components/responses/NotFound"
+
+  /api/auth/verify:
+    get:
+      operationId: verifyToken
+      tags: [Auth]
+      summary: Token doğrula (Traefik forward-auth)
+      description: |
+        Traefik tarafından her istekte çağrılır.
+        Başarılıysa X-User-ID, X-User-Role, X-User-Department header'ları döner.
+      responses:
+        "200":
+          description: Token geçerli
+          headers:
+            X-User-ID:
+              schema:
+                type: string
+                format: uuid
+            X-User-Role:
+              schema:
+                type: string
+                enum: [admin, teacher, student]
+            X-User-Department:
+              schema:
+                type: string
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+
+  # ============================================================
+  # STAFF SERVICE
+  # ============================================================
+  /api/staff:
+    get:
+      operationId: listStaff
+      tags: [Staff]
+      summary: Personel listele
+      parameters:
+        - $ref: "#/components/parameters/Page"
+        - $ref: "#/components/parameters/Limit"
+      responses:
+        "200":
+          description: Personel listesi
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/StaffListResponse"
+
+    post:
+      operationId: createStaff
+      tags: [Staff]
+      summary: Yeni personel oluştur
+      description: Sadece admin yetkisi gerektirir.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CreateStaffRequest"
+      responses:
+        "201":
+          description: Personel oluşturuldu
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/StaffResponse"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "409":
+          $ref: "#/components/responses/Conflict"
+        "500":
+          $ref: "#/components/responses/InternalServerError"
+
+  /api/staff/{id}:
+    get:
+      operationId: getStaff
+      tags: [Staff]
+      summary: Personel detayı
+      parameters:
+        - $ref: "#/components/parameters/ID"
+      responses:
+        "200":
+          description: Personel bilgileri
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/StaffResponse"
+        "404":
+          $ref: "#/components/responses/NotFound"
+
+    put:
+      operationId: updateStaff
+      tags: [Staff]
+      summary: Personel güncelle
+      description: Sadece admin yetkisi gerektirir.
+      parameters:
+        - $ref: "#/components/parameters/ID"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/UpdateStaffRequest"
+      responses:
+        "200":
+          description: Personel güncellendi
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/StaffResponse"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "404":
+          $ref: "#/components/responses/NotFound"
+
+    delete:
+      operationId: deleteStaff
+      tags: [Staff]
+      summary: Personeli pasifleştir
+      description: Soft delete. Sadece admin yetkisi gerektirir.
+      parameters:
+        - $ref: "#/components/parameters/ID"
+      responses:
+        "200":
+          description: Personel pasifleştirildi
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/MessageResponse"
+        "404":
+          $ref: "#/components/responses/NotFound"
+
+  /api/staff/{id}/profile:
+    put:
+      operationId: updateTeacherProfile
+      tags: [Staff]
+      summary: Öğretim üyesi profilini güncelle
+      description: Akademik profil bilgilerini günceller (eğitim, makaleler, projeler vb.).
+      parameters:
+        - $ref: "#/components/parameters/ID"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/UpdateTeacherProfileRequest"
+      responses:
+        "200":
+          description: Profil güncellendi
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/TeacherProfileResponse"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "404":
+          $ref: "#/components/responses/NotFound"
+
+  /api/staff/profile/{id}:
+    get:
+      operationId: getTeacherProfile
+      tags: [Staff]
+      summary: Öğretim üyesi profili görüntüle
+      security: []
+      parameters:
+        - $ref: "#/components/parameters/ID"
+      responses:
+        "200":
+          description: Öğretim üyesi profili
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/TeacherProfileResponse"
+        "404":
+          $ref: "#/components/responses/NotFound"
+
+  /public/teachers:
+    get:
+      operationId: listTeacherProfilesPublic
+      tags: [Staff]
+      summary: Öğretim üyelerini listele (herkese açık)
+      security: []
+      parameters:
+        - $ref: "#/components/parameters/Page"
+        - $ref: "#/components/parameters/Limit"
+      responses:
+        "200":
+          description: Öğretim üyesi profil listesi
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: array
+                    items:
+                      $ref: "#/components/schemas/TeacherProfileResponse"
+                  pagination:
+                    $ref: "#/components/schemas/Pagination"
+
+  /public/teachers/{id}:
+    get:
+      operationId: getTeacherProfilePublic
+      tags: [Staff]
+      summary: Öğretim üyesi profili (herkese açık)
+      security: []
+      parameters:
+        - $ref: "#/components/parameters/ID"
+      responses:
+        "200":
+          description: Öğretim üyesi profili
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/TeacherProfileResponse"
+        "404":
+          $ref: "#/components/responses/NotFound"
+
+  # ============================================================
+  # STUDENT SERVICE
+  # ============================================================
+  /api/students:
+    get:
+      operationId: listStudents
+      tags: [Students]
+      summary: Öğrenci listele
+      parameters:
+        - $ref: "#/components/parameters/Page"
+        - $ref: "#/components/parameters/Limit"
+        - name: department
+          in: query
+          schema:
+            type: string
+        - name: class_level
+          in: query
+          schema:
+            type: integer
+            minimum: 1
+            maximum: 6
+        - name: status
+          in: query
+          schema:
+            type: string
+            enum: [active, graduated, suspended, withdrawn]
+        - name: advisor_id
+          in: query
+          schema:
+            type: string
+            format: uuid
+        - name: sort_by
+          in: query
+          schema:
+            type: string
+            enum: [student_number, last_name, enrollment_year, class_level, created_at]
+        - name: sort_order
+          in: query
+          schema:
+            type: string
+            enum: [asc, desc]
+      responses:
+        "200":
+          description: Öğrenci listesi
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/StudentListResponse"
+
+    post:
+      operationId: createStudent
+      tags: [Students]
+      summary: Yeni öğrenci oluştur
+      description: Sadece admin yetkisi gerektirir.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CreateStudentRequest"
+      responses:
+        "201":
+          description: Öğrenci oluşturuldu
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/StudentResponse"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "409":
+          $ref: "#/components/responses/Conflict"
+        "500":
+          $ref: "#/components/responses/InternalServerError"
+
+  /api/students/{id}:
+    get:
+      operationId: getStudent
+      tags: [Students]
+      summary: Öğrenci detayı
+      parameters:
+        - $ref: "#/components/parameters/ID"
+      responses:
+        "200":
+          description: Öğrenci bilgileri
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/StudentResponse"
+        "404":
+          $ref: "#/components/responses/NotFound"
+
+    put:
+      operationId: updateStudent
+      tags: [Students]
+      summary: Öğrenci güncelle
+      description: Sadece admin yetkisi gerektirir.
+      parameters:
+        - $ref: "#/components/parameters/ID"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/UpdateStudentRequest"
+      responses:
+        "200":
+          description: Öğrenci güncellendi
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/StudentResponse"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "404":
+          $ref: "#/components/responses/NotFound"
+
+    delete:
+      operationId: deleteStudent
+      tags: [Students]
+      summary: Öğrenciyi pasifleştir
+      description: Soft delete. Sadece admin yetkisi gerektirir.
+      parameters:
+        - $ref: "#/components/parameters/ID"
+      responses:
+        "200":
+          description: Öğrenci pasifleştirildi
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/MessageResponse"
+        "404":
+          $ref: "#/components/responses/NotFound"
+
+  /api/students/search:
+    post:
+      operationId: searchStudents
+      tags: [Students]
+      summary: Öğrenci ara
+      description: Full-text arama ve filtreleme ile öğrenci arar. Cursor-based pagination kullanır.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/SearchStudentsRequest"
+      responses:
+        "200":
+          description: Arama sonuçları
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SearchStudentsResponse"
+
+  /api/students/my-advisees:
+    get:
+      operationId: listMyAdvisees
+      tags: [Students]
+      summary: Danışman öğrencilerimi listele
+      description: teacher veya admin rolü gerektirir.
+      responses:
+        "200":
+          description: Danışman öğrenci listesi
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/MyAdviseesResponse"
+
+  /api/students/orphaned:
+    get:
+      operationId: listOrphanedStudents
+      tags: [Students]
+      summary: Danışmansız öğrencileri listele
+      description: Sadece admin yetkisi gerektirir.
+      parameters:
+        - $ref: "#/components/parameters/Page"
+        - $ref: "#/components/parameters/Limit"
+      responses:
+        "200":
+          description: Danışmansız öğrenci listesi
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/StudentListResponse"
+
+  /api/students/bulk-advisor-assign:
+    put:
+      operationId: bulkAdvisorAssign
+      tags: [Students]
+      summary: Toplu danışman atama
+      description: Birden fazla öğrenciye aynı anda danışman atar. Sadece admin.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/BulkAdvisorAssignRequest"
+      responses:
+        "200":
+          description: Toplu atama sonucu
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/BulkAdvisorAssignResponse"
+
+  /api/students/bulk-import:
+    post:
+      operationId: bulkImportStudents
+      tags: [Students]
+      summary: CSV ile toplu öğrenci aktarımı
+      description: |
+        CSV dosyası yükleyerek toplu öğrenci oluşturur. Asenkron çalışır. Sadece admin.
+
+        **Dosya kısıtlamaları:**
+        - Format: `text/csv` (UTF-8 encoding)
+        - Maksimum boyut: 5 MB
+        - Zorunlu sütunlar: `student_number, first_name, last_name, email, faculty, department, enrollment_year, class_level, advisor_id`
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema:
+              type: object
+              required: [file]
+              properties:
+                file:
+                  type: string
+                  format: binary
+                  description: CSV dosyası (max 5MB, text/csv)
+      responses:
+        "202":
+          description: İmport işi oluşturuldu
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/BulkImportResponse"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "500":
+          $ref: "#/components/responses/InternalServerError"
+
+    get:
+      operationId: listImportJobs
+      tags: [Students]
+      summary: İmport işlerini listele
+      description: Sadece admin.
+      parameters:
+        - $ref: "#/components/parameters/Page"
+        - $ref: "#/components/parameters/Limit"
+        - name: status
+          in: query
+          schema:
+            type: string
+            enum: [pending, processing, completed, failed]
+      responses:
+        "200":
+          description: İmport iş listesi
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ImportJobListResponse"
+
+  /api/students/bulk-import/{job_id}:
+    get:
+      operationId: getImportJob
+      tags: [Students]
+      summary: İmport iş durumu
+      description: Sadece admin.
+      parameters:
+        - name: job_id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        "200":
+          description: İmport iş detayı
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ImportJobResponse"
+        "404":
+          $ref: "#/components/responses/NotFound"
+
+  # ============================================================
+  # COURSE CATALOG SERVICE
+  # ============================================================
+  /api/catalog/courses:
+    get:
+      operationId: listCourses
+      tags: [Catalog]
+      summary: Ders kataloğunu listele
+      security: []
+      parameters:
+        - $ref: "#/components/parameters/Page"
+        - $ref: "#/components/parameters/Limit"
+        - name: faculty
+          in: query
+          schema:
+            type: string
+        - name: department
+          in: query
+          schema:
+            type: string
+        - name: course_type
+          in: query
+          schema:
+            type: string
+            enum: [mandatory, elective]
+        - name: course_category
+          in: query
+          schema:
+            type: string
+            enum: [theoretical, practical, internship, project, seminar]
+        - name: education_level
+          in: query
+          schema:
+            type: string
+            enum: [undergraduate, graduate, doctorate]
+        - name: status
+          in: query
+          schema:
+            type: string
+            enum: [active, draft, pending_approval, under_revision, archived, suspended]
+        - name: class_level
+          in: query
+          schema:
+            type: integer
+            minimum: 1
+            maximum: 6
+        - name: semester
+          in: query
+          schema:
+            type: integer
+            minimum: 1
+            maximum: 8
+        - name: language
+          in: query
+          schema:
+            type: string
+        - name: search
+          in: query
+          description: Ders adı veya kodu ile arama
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Ders listesi
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/CourseListResponse"
+
+    post:
+      operationId: createCourse
+      tags: [Catalog]
+      summary: Yeni ders oluştur
+      description: Sadece admin yetkisi gerektirir.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CreateCourseRequest"
+      responses:
+        "201":
+          description: Ders oluşturuldu
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/CourseResponse"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "409":
+          $ref: "#/components/responses/Conflict"
+        "500":
+          $ref: "#/components/responses/InternalServerError"
+
+  /api/catalog/courses/{course_code}:
+    get:
+      operationId: getCourse
+      tags: [Catalog]
+      summary: Ders detayı
+      security: []
+      parameters:
+        - name: course_code
+          in: path
+          required: true
+          schema:
+            type: string
+          example: "BIL101"
+      responses:
+        "200":
+          description: Ders bilgileri
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/CourseResponse"
+        "404":
+          $ref: "#/components/responses/NotFound"
+
+    put:
+      operationId: updateCourse
+      tags: [Catalog]
+      summary: Ders güncelle
+      description: Sadece admin yetkisi gerektirir.
+      parameters:
+        - name: course_code
+          in: path
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/UpdateCourseRequest"
+      responses:
+        "200":
+          description: Ders güncellendi
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/CourseResponse"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "404":
+          $ref: "#/components/responses/NotFound"
+
+  # ============================================================
+  # SEMESTER MANAGEMENT
+  # ============================================================
+  /api/catalog/admin/semesters:
+    post:
+      operationId: createSemester
+      tags: [Semesters]
+      summary: Yeni dönem oluştur
+      description: Sadece admin.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [name, hard_deadline]
+              properties:
+                name:
+                  type: string
+                  example: "2025-2026-spring"
+                  description: "Format: YYYY-YYYY-Fall veya YYYY-YYYY-Spring"
+                hard_deadline:
+                  type: string
+                  format: date-time
+                  description: Gelecekte bir tarih olmalı
+      responses:
+        "201":
+          description: Dönem oluşturuldu
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SemesterResponse"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "409":
+          $ref: "#/components/responses/Conflict"
+        "500":
+          $ref: "#/components/responses/InternalServerError"
+
+    get:
+      operationId: listSemesters
+      tags: [Semesters]
+      summary: Dönemleri listele
+      description: Sadece admin.
+      responses:
+        "200":
+          description: Dönem listesi
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/SemesterResponse"
+
+  /api/catalog/admin/semesters/active:
+    get:
+      operationId: getActiveSemester
+      tags: [Semesters]
+      summary: Aktif dönemi getir
+      description: Sadece admin.
+      responses:
+        "200":
+          description: Aktif dönem bilgisi
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SemesterResponse"
+        "404":
+          $ref: "#/components/responses/NotFound"
+
+  /api/catalog/admin/semesters/{id}/activate:
+    put:
+      operationId: activateSemester
+      tags: [Semesters]
+      summary: Dönemi aktifleştir
+      description: Sadece admin. Aynı anda sadece bir dönem aktif olabilir. Dönem "planned" durumunda olmalı.
+      parameters:
+        - $ref: "#/components/parameters/ID"
+      responses:
+        "200":
+          description: Dönem aktifleştirildi
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SemesterResponse"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+
+  /api/catalog/admin/semesters/{id}/complete:
+    put:
+      operationId: completeSemester
+      tags: [Semesters]
+      summary: Dönemi tamamla
+      description: Sadece admin. Dönem "active" durumunda olmalı.
+      parameters:
+        - $ref: "#/components/parameters/ID"
+      responses:
+        "200":
+          description: Dönem tamamlandı
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SemesterResponse"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+
+  /api/semesters/{semester_id}/courses:
+    get:
+      operationId: listSemesterCourses
+      tags: [Semesters]
+      summary: Dönem derslerini listele
+      parameters:
+        - name: semester_id
+          in: path
+          required: true
+          schema:
+            type: string
+          example: "2025-2026-spring"
+        - $ref: "#/components/parameters/Page"
+        - $ref: "#/components/parameters/Limit"
+        - name: faculty
+          in: query
+          schema:
+            type: string
+        - name: department
+          in: query
+          schema:
+            type: string
+        - name: instructor_id
+          in: query
+          schema:
+            type: string
+            format: uuid
+        - name: course_type
+          in: query
+          schema:
+            type: string
+            enum: [mandatory, elective]
+        - name: class_level
+          in: query
+          schema:
+            type: integer
+            minimum: 1
+            maximum: 6
+      responses:
+        "200":
+          description: Dönem ders listesi
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SemesterCourseListResponse"
+
+    post:
+      operationId: createSemesterCourse
+      tags: [Semesters]
+      summary: Döneme ders ekle
+      description: Sadece admin.
+      parameters:
+        - name: semester_id
+          in: path
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CreateSemesterCourseRequest"
+      responses:
+        "201":
+          description: Dönem dersi oluşturuldu
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SemesterCourseResponse"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+
+  /api/semesters/{semester_id}/courses/{course_id}:
+    get:
+      operationId: getSemesterCourse
+      tags: [Semesters]
+      summary: Dönem ders detayı
+      parameters:
+        - name: semester_id
+          in: path
+          required: true
+          schema:
+            type: string
+        - name: course_id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        "200":
+          description: Dönem ders bilgisi
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SemesterCourseResponse"
+        "404":
+          $ref: "#/components/responses/NotFound"
+
+    delete:
+      operationId: deleteSemesterCourse
+      tags: [Semesters]
+      summary: Dönemden ders sil
+      description: Sadece admin.
+      parameters:
+        - name: semester_id
+          in: path
+          required: true
+          schema:
+            type: string
+        - name: course_id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        "200":
+          description: Dönem dersi silindi
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/DeleteSemesterCourseResponse"
+
+  /api/semesters/teacher/courses:
+    get:
+      operationId: getTeacherCourses
+      tags: [Semesters]
+      summary: Öğretmenin derslerini getir
+      description: teacher rolü gerektirir.
+      parameters:
+        - name: semester
+          in: query
+          schema:
+            type: string
+          description: Belirtilmezse aktif dönem kullanılır
+      responses:
+        "200":
+          description: Öğretmen ders listesi
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/TeacherCoursesResponse"
+
+  # ============================================================
+  # ENROLLMENT SERVICE
+  # ============================================================
+  /api/enrollment/available-courses:
+    get:
+      operationId: listAvailableCourses
+      tags: [Enrollment]
+      summary: Kayıt olunabilecek dersleri listele
+      description: student rolü gerektirir.
+      parameters:
+        - name: semester
+          in: query
+          required: true
+          schema:
+            type: string
+          example: "2025-2026-spring"
+      responses:
+        "200":
+          description: Mevcut dersler
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AvailableCoursesResponse"
+
+  /api/enrollment/programs:
+    post:
+      operationId: createEnrollmentProgram
+      tags: [Enrollment]
+      summary: Ders kayıt programı oluştur
+      description: student rolü gerektirir. Öğrenci seçtiği dersleri danışman onayına sunar.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CreateEnrollmentRequest"
+            example:
+              semester: "2025-2026-spring"
+              course_ids:
+                - "550e8400-e29b-41d4-a716-446655440001"
+                - "550e8400-e29b-41d4-a716-446655440002"
+      responses:
+        "201":
+          description: Kayıt programı oluşturuldu
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/EnrollmentProgramResponse"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "409":
+          $ref: "#/components/responses/Conflict"
+        "500":
+          $ref: "#/components/responses/InternalServerError"
+
+    delete:
+      operationId: cancelEnrollment
+      tags: [Enrollment]
+      summary: Ders kaydını iptal et
+      description: student rolü gerektirir.
+      parameters:
+        - name: semester
+          in: query
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Kayıt iptal edildi
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/MessageResponse"
+        "404":
+          $ref: "#/components/responses/NotFound"
+
+  /api/enrollment/my-enrollments:
+    get:
+      operationId: getMyEnrollments
+      tags: [Enrollment]
+      summary: Kayıtlarımı görüntüle
+      description: student rolü gerektirir.
+      parameters:
+        - name: semester
+          in: query
+          schema:
+            type: string
+        - name: status
+          in: query
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Öğrenci kayıtları
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/MyEnrollmentsResponse"
+
+  /api/enrollment/latest-rejection:
+    get:
+      operationId: getLatestRejection
+      tags: [Enrollment]
+      summary: Son red bilgisi
+      description: student rolü gerektirir.
+      parameters:
+        - name: semester
+          in: query
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Son red detayı
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/LatestRejectionResponse"
+
+  /api/enrollment/my-rejections:
+    get:
+      operationId: listMyRejections
+      tags: [Enrollment]
+      summary: Red geçmişi
+      description: student rolü gerektirir.
+      parameters:
+        - name: semester
+          in: query
+          schema:
+            type: string
+        - $ref: "#/components/parameters/Page"
+        - $ref: "#/components/parameters/Limit"
+      responses:
+        "200":
+          description: Red listesi
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/MyRejectionsResponse"
+
+  /api/enrollment/advisor/pending-programs:
+    get:
+      operationId: listPendingPrograms
+      tags: [Enrollment]
+      summary: Onay bekleyen kayıt programları
+      description: teacher veya admin rolü gerektirir.
+      responses:
+        "200":
+          description: Bekleyen programlar
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AdvisorPendingProgramsResponse"
+
+  /api/enrollment/advisor/programs/{program_id}/approve:
+    post:
+      operationId: approveProgram
+      tags: [Enrollment]
+      summary: Kayıt programını onayla
+      description: teacher veya admin rolü gerektirir.
+      parameters:
+        - name: program_id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        "200":
+          description: Program onaylandı
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/EnrollmentProgramResponse"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "404":
+          $ref: "#/components/responses/NotFound"
+
+  /api/enrollment/advisor/programs/{program_id}/reject:
+    post:
+      operationId: rejectProgram
+      tags: [Enrollment]
+      summary: Kayıt programını reddet
+      description: teacher veya admin rolü gerektirir.
+      parameters:
+        - name: program_id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/RejectEnrollmentRequest"
+      responses:
+        "200":
+          description: Program reddedildi
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/MessageResponse"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "404":
+          $ref: "#/components/responses/NotFound"
+
+  # ============================================================
+  # ATTENDANCE SERVICE
+  # ============================================================
+  /api/attendance/sessions:
+    post:
+      operationId: createAttendanceSession
+      tags: [Attendance]
+      summary: Yoklama oturumu oluştur
+      description: teacher rolü gerektirir. QR kodu otomatik oluşturulur.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CreateAttendanceSessionRequest"
+      responses:
+        "201":
+          description: Oturum oluşturuldu
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/CreateAttendanceSessionResponse"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "409":
+          $ref: "#/components/responses/Conflict"
+        "500":
+          $ref: "#/components/responses/InternalServerError"
+
+  /api/attendance/sessions/{session_id}:
+    get:
+      operationId: getAttendanceSession
+      tags: [Attendance]
+      summary: Oturum detayları
+      description: teacher rolü gerektirir.
+      parameters:
+        - $ref: "#/components/parameters/SessionID"
+      responses:
+        "200":
+          description: Oturum detayı
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SessionDetailsResponse"
+        "404":
+          $ref: "#/components/responses/NotFound"
+
+  /api/attendance/sessions/{session_id}/qr:
+    get:
+      operationId: getSessionQR
+      tags: [Attendance]
+      summary: QR kodu al
+      description: teacher rolü gerektirir. Aktif oturum için QR payload döner.
+      parameters:
+        - $ref: "#/components/parameters/SessionID"
+      responses:
+        "200":
+          description: QR payload
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/GetQRResponse"
+
+  /api/attendance/sessions/{session_id}/records:
+    get:
+      operationId: getSessionRecords
+      tags: [Attendance]
+      summary: Oturum yoklama kayıtları
+      description: teacher rolü gerektirir.
+      parameters:
+        - $ref: "#/components/parameters/SessionID"
+      responses:
+        "200":
+          description: Yoklama kayıtları
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SessionRecordsResponse"
+
+  /api/attendance/sessions/{session_id}/students:
+    get:
+      operationId: getSessionStudents
+      tags: [Attendance]
+      summary: Oturumdaki öğrenciler
+      description: teacher rolü gerektirir. Kayıtlı öğrenciler ve yoklama durumları.
+      parameters:
+        - $ref: "#/components/parameters/SessionID"
+        - name: search
+          in: query
+          schema:
+            type: string
+          description: Öğrenci adı veya numarası ile arama
+      responses:
+        "200":
+          description: Öğrenci listesi
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SessionStudentsResponse"
+
+  /api/attendance/sessions/{session_id}/manual:
+    post:
+      operationId: createManualAttendance
+      tags: [Attendance]
+      summary: Manuel yoklama işaretle
+      description: teacher rolü gerektirir. QR okutamayan öğrenciler için.
+      parameters:
+        - $ref: "#/components/parameters/SessionID"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/ManualAttendanceRequest"
+      responses:
+        "201":
+          description: Yoklama işaretlendi
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ManualAttendanceResponse"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "404":
+          $ref: "#/components/responses/NotFound"
+
+  /api/attendance/sessions/{session_id}/close:
+    post:
+      operationId: closeAttendanceSession
+      tags: [Attendance]
+      summary: Oturumu kapat
+      description: teacher rolü gerektirir. Kapatılan oturumda artık QR okutulamaz.
+      parameters:
+        - $ref: "#/components/parameters/SessionID"
+      responses:
+        "200":
+          description: Oturum kapatıldı
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/CloseSessionResponse"
+        "404":
+          $ref: "#/components/responses/NotFound"
+
+  /api/attendance/scan:
+    post:
+      operationId: scanQR
+      tags: [Attendance]
+      summary: QR kod okut (yoklama ver)
+      description: student rolü gerektirir. Mobil uygulamadan QR okutarak yoklama verir.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/ScanQRRequest"
+      responses:
+        "200":
+          description: Yoklama verildi
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ScanQRResponse"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "500":
+          $ref: "#/components/responses/InternalServerError"
+
+  /api/attendance/my:
+    get:
+      operationId: getMyAttendance
+      tags: [Attendance]
+      summary: Yoklama durumumu görüntüle
+      description: student rolü gerektirir.
+      parameters:
+        - name: semester
+          in: query
+          schema:
+            type: string
+          description: Belirtilmezse aktif dönem kullanılır
+      responses:
+        "200":
+          description: Öğrenci yoklama özeti
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/MyAttendanceResponse"
+
+  /api/attendance/courses/{course_id}/finalize:
+    post:
+      operationId: finalizeAttendance
+      tags: [Attendance]
+      summary: Yoklamayı kesinleştir
+      description: |
+        teacher rolü gerektirir. Dönem sonunda yoklamayı kesinleştirir.
+        Devamsızlık sınırını aşan öğrenciler belirlenir ve grades servisine event gönderilir.
+      parameters:
+        - name: course_id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+        - name: semester
+          in: query
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Yoklama kesinleştirildi
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/FinalizeAttendanceResponse"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "500":
+          $ref: "#/components/responses/InternalServerError"
+
+  # ============================================================
+  # GRADES SERVICE
+  # ============================================================
+  /api/grades/course/{course_id}/status:
+    get:
+      operationId: getCourseGradeStatus
+      tags: [Grades]
+      summary: Ders not durumu
+      description: teacher veya admin rolü gerektirir.
+      parameters:
+        - name: course_id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        "200":
+          description: Ders not durumu ve istatistikler
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/CourseStatusResponse"
+
+  /api/grades/course/{course_id}/students:
+    get:
+      operationId: getCourseStudentGrades
+      tags: [Grades]
+      summary: Ders öğrenci notları
+      description: teacher veya admin rolü gerektirir.
+      parameters:
+        - name: course_id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        "200":
+          description: Öğrenci not listesi
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/CourseStudentsGradesResponse"
+
+  /api/grades/course/{course_id}/scores:
+    post:
+      operationId: submitScore
+      tags: [Grades]
+      summary: Not gir
+      description: teacher veya admin rolü gerektirir. Tek öğrenci için not girişi.
+      parameters:
+        - name: course_id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/SubmitScoreRequest"
+      responses:
+        "200":
+          description: Not girildi
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SubmitScoreResponse"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "500":
+          $ref: "#/components/responses/InternalServerError"
+
+  /api/grades/course/{course_id}/scores/bulk:
+    post:
+      operationId: bulkSubmitScores
+      tags: [Grades]
+      summary: Toplu not gir
+      description: teacher veya admin rolü gerektirir. Birden fazla öğrenci için aynı assessment'a not girişi.
+      parameters:
+        - name: course_id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/BulkSubmitScoresRequest"
+      responses:
+        "200":
+          description: Toplu not girişi sonucu
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/BulkSubmitScoresResponse"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "500":
+          $ref: "#/components/responses/InternalServerError"
+
+  /api/grades/student/my:
+    get:
+      operationId: getMyGrades
+      tags: [Grades]
+      summary: Notlarımı görüntüle
+      description: student rolü gerektirir.
+      responses:
+        "200":
+          description: Öğrenci notları (aktif ve tamamlanmış dersler)
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/MyGradesResponse"
+
+  /api/grades/transcript/{student_id}:
+    get:
+      operationId: getTranscript
+      tags: [Grades]
+      summary: Transkript
+      description: |
+        Öğrenci kendi transkriptini, öğretmen danışan öğrencisinin transkriptini,
+        admin herkesin transkriptini görüntüleyebilir.
+      parameters:
+        - name: student_id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        "200":
+          description: Transkript
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/TranscriptResponse"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+
+  /api/grades/admin/appeal:
+    post:
+      operationId: processAppeal
+      tags: [Grades]
+      summary: Not itirazı işle
+      description: Sadece admin. Kesinleşmiş notu değiştirir.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/AppealScoreRequest"
+      responses:
+        "200":
+          description: İtiraz sonucu
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AppealScoreResponse"
+
+  /api/grades/admin/scores/unlock:
+    post:
+      operationId: unlockScore
+      tags: [Grades]
+      summary: Notu kilidi aç
+      description: Sadece admin.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/ScoreLockRequest"
+      responses:
+        "200":
+          description: Kilit açıldı
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/MessageResponse"
+
+  /api/grades/admin/scores/lock:
+    post:
+      operationId: lockScore
+      tags: [Grades]
+      summary: Notu kilitle
+      description: Sadece admin.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/ScoreLockRequest"
+      responses:
+        "200":
+          description: Kilitlendi
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/MessageResponse"
+
+  # ============================================================
+  # MEAL SERVICE
+  # ============================================================
+  /api/meals/menu/monthly:
+    get:
+      operationId: getMonthlyMenu
+      tags: [Meals]
+      summary: Aylık menü
+      security: []
+      parameters:
+        - name: year
+          in: query
+          schema:
+            type: integer
+            example: 2026
+        - name: month
+          in: query
+          schema:
+            type: integer
+            minimum: 1
+            maximum: 12
+      responses:
+        "200":
+          description: Aylık menü
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/MonthlyMenuResponse"
+
+    post:
+      operationId: createMonthlyMenu
+      tags: [Meals]
+      summary: Aylık menü oluştur
+      description: Sadece admin.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CreateMonthlyMenuRequest"
+      responses:
+        "201":
+          description: Menü oluşturuldu
+
+  /api/meals/cafeterias:
+    get:
+      operationId: listCafeterias
+      tags: [Meals]
+      summary: Yemekhane listele
+      description: Rol bazlı filtreleme uygulanır (öğrenciler sadece aktif yemekhane görür).
+      responses:
+        "200":
+          description: Yemekhane listesi
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/CafeteriaListResponse"
+
+    post:
+      operationId: createCafeteria
+      tags: [Meals]
+      summary: Yemekhane oluştur
+      description: Sadece admin.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CreateCafeteriaRequest"
+      responses:
+        "201":
+          description: Yemekhane oluşturuldu
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/CafeteriaResponse"
+
+  /api/meals/cafeterias/{cafeteria_id}:
+    put:
+      operationId: updateCafeteria
+      tags: [Meals]
+      summary: Yemekhane güncelle
+      description: Sadece admin.
+      parameters:
+        - name: cafeteria_id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CreateCafeteriaRequest"
+      responses:
+        "200":
+          description: Yemekhane güncellendi
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/CafeteriaResponse"
+
+    delete:
+      operationId: deleteCafeteria
+      tags: [Meals]
+      summary: Yemekhane sil
+      description: Sadece admin.
+      parameters:
+        - name: cafeteria_id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        "200":
+          description: Yemekhane silindi
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/MessageResponse"
+
+  /api/meals/cafeterias/{cafeteria_id}/qr:
+    get:
+      operationId: getCafeteriaQR
+      tags: [Meals]
+      summary: Yemekhane QR kodu oluştur
+      description: Sadece admin. Belirli tarih ve öğün için QR oluşturur.
+      parameters:
+        - name: cafeteria_id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+        - name: date
+          in: query
+          schema:
+            type: string
+            format: date
+        - name: meal_time
+          in: query
+          required: true
+          schema:
+            type: string
+            enum: [lunch, dinner]
+      responses:
+        "200":
+          description: QR payload
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/MealQRResponse"
+
+  /api/meals/reservations:
+    post:
+      operationId: createReservation
+      tags: [Meals]
+      summary: Yemek rezervasyonu oluştur
+      description: student rolü gerektirir.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CreateReservationRequest"
+      responses:
+        "201":
+          description: Rezervasyon oluşturuldu, ödeme URL'i döner
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/CreateReservationResponse"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "409":
+          $ref: "#/components/responses/Conflict"
+        "500":
+          $ref: "#/components/responses/InternalServerError"
+
+  /api/meals/reservations/batch:
+    post:
+      operationId: createBatchReservation
+      tags: [Meals]
+      summary: Toplu yemek rezervasyonu
+      description: student rolü gerektirir. Birden fazla gün/öğün için tek seferde.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/BatchReservationRequest"
+      responses:
+        "201":
+          description: Toplu rezervasyon oluşturuldu
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/CreateBatchReservationResponse"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+
+  /api/meals/reservations/my:
+    get:
+      operationId: getMyReservations
+      tags: [Meals]
+      summary: Rezervasyonlarımı görüntüle
+      parameters:
+        - name: from_date
+          in: query
+          schema:
+            type: string
+            format: date
+        - name: to_date
+          in: query
+          schema:
+            type: string
+            format: date
+        - name: status
+          in: query
+          schema:
+            type: string
+            enum: [pending, confirmed, cancelled, expired]
+        - $ref: "#/components/parameters/Page"
+        - $ref: "#/components/parameters/Limit"
+      responses:
+        "200":
+          description: Rezervasyon listesi
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/MyReservationsResponse"
+
+  /api/meals/reservations/{reservation_id}:
+    delete:
+      operationId: cancelReservation
+      tags: [Meals]
+      summary: Rezervasyon iptal et
+      parameters:
+        - name: reservation_id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        "200":
+          description: Rezervasyon iptal edildi
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/MessageResponse"
+        "404":
+          $ref: "#/components/responses/NotFound"
+
+  /api/meals/reservations/use:
+    post:
+      operationId: useReservation
+      tags: [Meals]
+      summary: Rezervasyon kullan (QR okut)
+      description: Öğrenci yemekhane QR'ını okutarak rezervasyonunu kullanır.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/UseReservationRequest"
+      responses:
+        "200":
+          description: Rezervasyon kullanıldı
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/MessageResponse"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "404":
+          $ref: "#/components/responses/NotFound"
+
+  /api/meals/closed-days:
+    post:
+      operationId: createClosedDay
+      tags: [Meals]
+      summary: Kapalı gün oluştur
+      description: |
+        Belirtilen tarihi yemekhane kapalı günü olarak işaretler.
+        Aynı tarih için tekrar eklenmeye çalışılırsa 409 döner.
+        **Yetki: admin**
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CreateClosedDayRequest"
+      responses:
+        "201":
+          description: Kapalı gün oluşturuldu
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ClosedDayResponse"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "409":
+          $ref: "#/components/responses/Conflict"
+    get:
+      operationId: listClosedDays
+      tags: [Meals]
+      summary: Kapalı günleri listele
+      description: |
+        Opsiyonel tarih aralığı filtresi ile kapalı günleri listeler.
+        **Yetki: admin**
+      parameters:
+        - name: from
+          in: query
+          schema:
+            type: string
+            format: date
+          description: "Başlangıç tarihi (YYYY-MM-DD)"
+        - name: to
+          in: query
+          schema:
+            type: string
+            format: date
+          description: "Bitiş tarihi (YYYY-MM-DD)"
+      responses:
+        "200":
+          description: Kapalı gün listesi
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/ClosedDayResponse"
+
+  /api/meals/closed-days/{id}:
+    delete:
+      operationId: deleteClosedDay
+      tags: [Meals]
+      summary: Kapalı gün sil
+      description: |
+        Kapalı günü kaldırır.
+        **Yetki: admin**
+      parameters:
+        - $ref: "#/components/parameters/ID"
+      responses:
+        "200":
+          description: Kapalı gün silindi
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/MessageResponse"
+        "404":
+          $ref: "#/components/responses/NotFound"
+
+# ============================================================
+# COMPONENTS
+# ============================================================
+components:
+  securitySchemes:
+    BearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+      description: "JWT access token. `POST /api/auth/login` ile alınır."
+
+  parameters:
+    ID:
+      name: id
+      in: path
+      required: true
+      schema:
+        type: string
+        format: uuid
+
+    SessionID:
+      name: session_id
+      in: path
+      required: true
+      schema:
+        type: string
+        format: uuid
+
+    Page:
+      name: page
+      in: query
+      schema:
+        type: integer
+        minimum: 1
+        default: 1
+
+    Limit:
+      name: limit
+      in: query
+      schema:
+        type: integer
+        minimum: 1
+        maximum: 100
+        default: 20
+
+  responses:
+    BadRequest:
+      description: Geçersiz istek
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/ErrorResponse"
+
+    Unauthorized:
+      description: Kimlik doğrulama gerekli
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/ErrorResponse"
+
+    Forbidden:
+      description: Yetkisiz erişim
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/ErrorResponse"
+
+    NotFound:
+      description: Kayıt bulunamadı
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/ErrorResponse"
+
+    Conflict:
+      description: Kayıt zaten mevcut
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/ErrorResponse"
+
+    InternalServerError:
+      description: Beklenmeyen sunucu hatası
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/ErrorResponse"
+          example:
+            code: "INTERNAL_ERROR"
+            error: "INTERNAL_ERROR"
+            message: "Beklenmeyen bir hata oluştu"
+
+    TooManyRequests:
+      description: Rate limit aşıldı
+      headers:
+        X-RateLimit-Limit:
+          description: Zaman penceresi başına izin verilen maksimum istek sayısı
+          schema:
+            type: integer
+            example: 100
+        X-RateLimit-Remaining:
+          description: Kalan istek sayısı
+          schema:
+            type: integer
+            example: 0
+        X-RateLimit-Reset:
+          description: Limit sıfırlanma zamanı (Unix epoch saniye)
+          schema:
+            type: integer
+            example: 1711209600
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/ErrorResponse"
+          example:
+            code: "RATE_LIMIT_EXCEEDED"
+            error: "RATE_LIMIT_EXCEEDED"
+            message: "İstek limiti aşıldı, lütfen daha sonra tekrar deneyin"
+
+  schemas:
+    # ---- Common ----
+    ErrorResponse:
+      type: object
+      properties:
+        code:
+          type: string
+          example: "VALIDATION_ERROR"
+        error:
+          type: string
+          example: "VALIDATION_ERROR"
+        message:
+          type: string
+          example: "email alanı gereklidir"
+
+    MessageResponse:
+      type: object
+      properties:
+        message:
+          type: string
+          example: "işlem başarılı"
+
+    HealthResponse:
+      type: object
+      properties:
+        status:
+          type: string
+          enum: [ok, degraded]
+          example: "ok"
+        service:
+          type: string
+          example: "auth-service"
+        timestamp:
+          type: string
+          format: date-time
+
+    Pagination:
+      type: object
+      properties:
+        page:
+          type: integer
+          example: 1
+        limit:
+          type: integer
+          example: 20
+        total:
+          type: integer
+          example: 150
+        total_pages:
+          type: integer
+          example: 8
+
+    # ---- Auth ----
+    LoginRequest:
+      type: object
+      required: [email, password]
+      properties:
+        email:
+          type: string
+          format: email
+          example: "admin@mydreamcampus.com"
+        password:
+          type: string
+          minLength: 8
+          example: "password123"
+
+    LoginResponse:
+      type: object
+      properties:
+        access_token:
+          type: string
+        expires_in:
+          type: integer
+          description: Token süresi (saniye)
+          example: 900
+        user:
+          $ref: "#/components/schemas/UserResponse"
+        force_password_change:
+          type: boolean
+        message:
+          type: string
+
+    UserResponse:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+          example: "550e8400-e29b-41d4-a716-446655440000"
+        email:
+          type: string
+          format: email
+          example: "admin@mydreamcampus.com"
+        role:
+          type: string
+          enum: [admin, teacher, student]
+          example: "admin"
+        department:
+          type: string
+          nullable: true
+          example: "Bilgisayar Mühendisliği"
+
+    RefreshResponse:
+      type: object
+      properties:
+        access_token:
+          type: string
+        expires_in:
+          type: integer
+
+    ChangePasswordRequest:
+      type: object
+      required: [old_password, new_password]
+      properties:
+        old_password:
+          type: string
+          minLength: 8
+        new_password:
+          type: string
+          minLength: 8
+
+    ChangePasswordResponse:
+      type: object
+      properties:
+        message:
+          type: string
+        access_token:
+          type: string
+        expires_in:
+          type: integer
+
+    SessionResponse:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        device_info:
+          type: string
+          nullable: true
+          example: "Chrome 120 / macOS"
+        ip_address:
+          type: string
+          nullable: true
+          example: "192.168.1.100"
+        created_at:
+          type: string
+          format: date-time
+        last_used_at:
+          type: string
+          format: date-time
+        is_current:
+          type: boolean
+          example: true
+
+    SessionsResponse:
+      type: object
+      properties:
+        sessions:
+          type: array
+          items:
+            $ref: "#/components/schemas/SessionResponse"
+
+    # ---- Staff ----
+    CreateStaffRequest:
+      type: object
+      required: [email, first_name, last_name, role]
+      properties:
+        email:
+          type: string
+          format: email
+          example: "ahmet.yilmaz@mydreamcampus.com"
+        first_name:
+          type: string
+          example: "Ahmet"
+        last_name:
+          type: string
+          example: "Yılmaz"
+        role:
+          type: string
+          enum: [teacher]
+          example: "teacher"
+        department:
+          type: string
+          example: "Bilgisayar Mühendisliği"
+        phone:
+          type: string
+          example: "+905551234567"
+        office_location:
+          type: string
+          example: "A Blok 301"
+
+    UpdateStaffRequest:
+      type: object
+      properties:
+        department:
+          type: string
+          nullable: true
+        phone:
+          type: string
+          nullable: true
+        office_location:
+          type: string
+          nullable: true
+
+    StaffResponse:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+          example: "550e8400-e29b-41d4-a716-446655440000"
+        email:
+          type: string
+          format: email
+          example: "ahmet.yilmaz@mydreamcampus.com"
+        first_name:
+          type: string
+          example: "Ahmet"
+        last_name:
+          type: string
+          example: "Yılmaz"
+        role:
+          type: string
+          example: "teacher"
+        department:
+          type: string
+          example: "Bilgisayar Mühendisliği"
+        phone:
+          type: string
+          example: "+905551234567"
+        office_location:
+          type: string
+          example: "A Blok 301"
+        status:
+          type: string
+          example: "active"
+        created_at:
+          type: string
+          format: date-time
+          example: "2026-01-15T10:30:00Z"
+        updated_at:
+          type: string
+          format: date-time
+          example: "2026-01-15T10:30:00Z"
+
+    StaffListResponse:
+      type: object
+      properties:
+        data:
+          type: array
+          items:
+            $ref: "#/components/schemas/StaffResponse"
+        pagination:
+          $ref: "#/components/schemas/Pagination"
+
+    Education:
+      type: object
+      properties:
+        id:
+          type: string
+        degree:
+          type: string
+        institution:
+          type: string
+        department:
+          type: string
+        year:
+          type: integer
+
+    Article:
+      type: object
+      properties:
+        id:
+          type: string
+        title:
+          type: string
+        journal:
+          type: string
+        year:
+          type: integer
+        authors:
+          type: string
+        doi:
+          type: string
+        journalType:
+          type: string
+        domesticInternational:
+          type: string
+        publishingMonth:
+          type: string
+        issuePageYear:
+          type: string
+        language:
+          type: string
+        articleType:
+          type: string
+
+    Bulletin:
+      type: object
+      properties:
+        id:
+          type: string
+        title:
+          type: string
+        conference:
+          type: string
+        year:
+          type: integer
+        location:
+          type: string
+
+    Project:
+      type: object
+      properties:
+        id:
+          type: string
+        title:
+          type: string
+        role:
+          type: string
+        funder:
+          type: string
+        startYear:
+          type: integer
+        endYear:
+          type: integer
+          nullable: true
+        status:
+          type: string
+
+    Award:
+      type: object
+      properties:
+        id:
+          type: string
+        title:
+          type: string
+        institution:
+          type: string
+        year:
+          type: integer
+
+    Scholarship:
+      type: object
+      properties:
+        id:
+          type: string
+        title:
+          type: string
+        institution:
+          type: string
+        year:
+          type: integer
+
+    AdminAssignment:
+      type: object
+      properties:
+        id:
+          type: string
+        title:
+          type: string
+        institution:
+          type: string
+        startYear:
+          type: integer
+        endYear:
+          type: integer
+          nullable: true
+
+    UpdateTeacherProfileRequest:
+      type: object
+      properties:
+        academic_title:
+          type: string
+          nullable: true
+        faculty:
+          type: string
+          nullable: true
+        profile_image_url:
+          type: string
+          nullable: true
+        education:
+          type: array
+          nullable: true
+          items:
+            $ref: "#/components/schemas/Education"
+        articles:
+          type: array
+          nullable: true
+          items:
+            $ref: "#/components/schemas/Article"
+        bulletins:
+          type: array
+          nullable: true
+          items:
+            $ref: "#/components/schemas/Bulletin"
+        projects:
+          type: array
+          nullable: true
+          items:
+            $ref: "#/components/schemas/Project"
+        awards:
+          type: array
+          nullable: true
+          items:
+            $ref: "#/components/schemas/Award"
+        scholarships:
+          type: array
+          nullable: true
+          items:
+            $ref: "#/components/schemas/Scholarship"
+        admin_assignments:
+          type: array
+          nullable: true
+          items:
+            $ref: "#/components/schemas/AdminAssignment"
+
+    TeacherProfileResponse:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        staff_id:
+          type: string
+          format: uuid
+        academic_title:
+          type: string
+        first_name:
+          type: string
+        last_name:
+          type: string
+        faculty:
+          type: string
+        department:
+          type: string
+        email:
+          type: string
+          format: email
+        phone:
+          type: string
+        office_location:
+          type: string
+        profile_image_url:
+          type: string
+        education:
+          type: array
+          items:
+            $ref: "#/components/schemas/Education"
+        articles:
+          type: array
+          items:
+            $ref: "#/components/schemas/Article"
+        bulletins:
+          type: array
+          items:
+            $ref: "#/components/schemas/Bulletin"
+        projects:
+          type: array
+          items:
+            $ref: "#/components/schemas/Project"
+        awards:
+          type: array
+          items:
+            $ref: "#/components/schemas/Award"
+        scholarships:
+          type: array
+          items:
+            $ref: "#/components/schemas/Scholarship"
+        admin_assignments:
+          type: array
+          items:
+            $ref: "#/components/schemas/AdminAssignment"
+        created_at:
+          type: string
+          format: date-time
+        updated_at:
+          type: string
+          format: date-time
+
+    # ---- Student ----
+    CreateStudentRequest:
+      type: object
+      required:
+        - student_number
+        - first_name
+        - last_name
+        - email
+        - faculty
+        - department
+        - enrollment_year
+        - class_level
+        - advisor_id
+      properties:
+        student_number:
+          type: string
+          example: "2024010001"
+        first_name:
+          type: string
+        last_name:
+          type: string
+        email:
+          type: string
+          format: email
+        faculty:
+          type: string
+        department:
+          type: string
+        enrollment_year:
+          type: integer
+          minimum: 1900
+          maximum: 2100
+        class_level:
+          type: integer
+          minimum: 1
+          maximum: 6
+        advisor_id:
+          type: string
+          format: uuid
+
+    UpdateStudentRequest:
+      type: object
+      properties:
+        class_level:
+          type: integer
+          minimum: 1
+          maximum: 6
+          nullable: true
+        advisor_id:
+          type: string
+          format: uuid
+          nullable: true
+        status:
+          type: string
+          enum: [active, graduated, suspended, withdrawn]
+          nullable: true
+
+    StudentResponse:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+          example: "660e8400-e29b-41d4-a716-446655440001"
+        student_number:
+          type: string
+          example: "2024010001"
+        first_name:
+          type: string
+          example: "Elif"
+        last_name:
+          type: string
+          example: "Demir"
+        email:
+          type: string
+          format: email
+          example: "elif.demir@stu.mydreamcampus.com"
+        faculty:
+          type: string
+          example: "Mühendislik Fakültesi"
+        department:
+          type: string
+          example: "Bilgisayar Mühendisliği"
+        enrollment_year:
+          type: integer
+          example: 2024
+        class_level:
+          type: integer
+          example: 1
+        advisor_id:
+          type: string
+          format: uuid
+          nullable: true
+        advisor_name:
+          type: string
+          nullable: true
+          example: "Ahmet Yılmaz"
+        status:
+          type: string
+          enum: [active, graduated, suspended, withdrawn]
+          example: "active"
+        created_at:
+          type: string
+          format: date-time
+          example: "2024-09-01T08:00:00Z"
+        updated_at:
+          type: string
+          format: date-time
+          example: "2024-09-01T08:00:00Z"
+
+    StudentListResponse:
+      type: object
+      properties:
+        data:
+          type: array
+          items:
+            $ref: "#/components/schemas/StudentResponse"
+        pagination:
+          $ref: "#/components/schemas/Pagination"
+
+    SearchStudentsRequest:
+      type: object
+      properties:
+        query:
+          type: string
+          description: Aranacak metin (ad, soyad, öğrenci numarası)
+        filters:
+          type: object
+          properties:
+            department:
+              type: array
+              items:
+                type: string
+            class_level:
+              type: array
+              items:
+                type: integer
+            status:
+              type: array
+              items:
+                type: string
+            enrollment_year:
+              type: array
+              items:
+                type: integer
+            advisor_id:
+              type: string
+              format: uuid
+              nullable: true
+        sort:
+          type: object
+          properties:
+            field:
+              type: string
+              enum: [student_number, last_name, enrollment_year, class_level]
+            order:
+              type: string
+              enum: [asc, desc]
+        pagination:
+          type: object
+          properties:
+            cursor:
+              type: string
+            limit:
+              type: integer
+              minimum: 1
+              maximum: 100
+
+    SearchStudentsResponse:
+      type: object
+      properties:
+        data:
+          type: array
+          items:
+            $ref: "#/components/schemas/StudentResponse"
+        pagination:
+          type: object
+          properties:
+            next_cursor:
+              type: string
+            has_more:
+              type: boolean
+            total_count:
+              type: integer
+
+    BulkAdvisorAssignRequest:
+      type: object
+      required: [student_ids, advisor_id]
+      properties:
+        student_ids:
+          type: array
+          minItems: 1
+          items:
+            type: string
+            format: uuid
+        advisor_id:
+          type: string
+          format: uuid
+
+    BulkAdvisorAssignResponse:
+      type: object
+      properties:
+        message:
+          type: string
+        updated_count:
+          type: integer
+        advisor:
+          type: object
+          properties:
+            advisor_id:
+              type: string
+            advisor_name:
+              type: string
+        students:
+          type: array
+          items:
+            type: object
+            properties:
+              id:
+                type: string
+              student_number:
+                type: string
+
+    MyAdviseesResponse:
+      type: object
+      properties:
+        advisor:
+          type: object
+          properties:
+            advisor_id:
+              type: string
+            advisor_name:
+              type: string
+        students:
+          type: array
+          items:
+            $ref: "#/components/schemas/StudentResponse"
+        total_count:
+          type: integer
+
+    BulkImportResponse:
+      type: object
+      properties:
+        job_id:
+          type: string
+          format: uuid
+        status:
+          type: string
+        message:
+          type: string
+        total_records:
+          type: integer
+        estimated_completion:
+          type: string
+          format: date-time
+
+    ImportJobResponse:
+      type: object
+      properties:
+        job_id:
+          type: string
+          format: uuid
+        file_name:
+          type: string
+        status:
+          type: string
+          enum: [pending, processing, completed, failed]
+        total_records:
+          type: integer
+        processed_records:
+          type: integer
+        successful_records:
+          type: integer
+        failed_records:
+          type: integer
+        progress_percentage:
+          type: integer
+        errors:
+          type: array
+          items:
+            type: object
+            properties:
+              row:
+                type: integer
+              student_number:
+                type: string
+              error_code:
+                type: string
+              message:
+                type: string
+        created_by:
+          type: string
+        started_at:
+          type: string
+          format: date-time
+          nullable: true
+        completed_at:
+          type: string
+          format: date-time
+          nullable: true
+        created_at:
+          type: string
+          format: date-time
+
+    ImportJobListResponse:
+      type: object
+      properties:
+        data:
+          type: array
+          items:
+            type: object
+            properties:
+              job_id:
+                type: string
+                format: uuid
+              file_name:
+                type: string
+              status:
+                type: string
+              total_records:
+                type: integer
+              successful_records:
+                type: integer
+              failed_records:
+                type: integer
+              created_at:
+                type: string
+                format: date-time
+              completed_at:
+                type: string
+                format: date-time
+                nullable: true
+        pagination:
+          $ref: "#/components/schemas/Pagination"
+
+    # ---- Course Catalog ----
+    Prerequisite:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        course_code:
+          type: string
+        course_name:
+          type: string
+
+    CourseCoordinator:
+      type: object
+      properties:
+        title:
+          type: string
+        name:
+          type: string
+        email:
+          type: string
+        phone:
+          type: string
+        office:
+          type: string
+
+    WeeklyTopic:
+      type: object
+      properties:
+        week:
+          type: integer
+          minimum: 1
+          maximum: 14
+          example: 1
+        topic:
+          type: string
+          example: "Derse Giriş ve Temel Kavramlar"
+        description:
+          type: string
+          example: "Dersin amacı, kapsamı ve temel kavramların tanıtılması"
+
+    CreateCourseRequest:
+      type: object
+      required: [course_code, name, faculty, department, class_level, course_type]
+      properties:
+        course_code:
+          type: string
+          minLength: 2
+          maxLength: 50
+          example: "BIL101"
+        name:
+          type: string
+          minLength: 3
+          maxLength: 255
+        faculty:
+          type: string
+        department:
+          type: string
+        offering_unit:
+          type: string
+          nullable: true
+        class_level:
+          type: integer
+          minimum: 1
+          maximum: 6
+        semester:
+          type: integer
+          minimum: 1
+          maximum: 8
+          nullable: true
+        credits:
+          type: integer
+          minimum: 0
+          maximum: 30
+        ects:
+          type: integer
+          minimum: 0
+          maximum: 60
+          nullable: true
+        theoretical_hours:
+          type: integer
+          minimum: 0
+          maximum: 20
+        lab_hours:
+          type: integer
+          minimum: 0
+          maximum: 20
+        course_type:
+          type: string
+          enum: [mandatory, elective]
+        course_category:
+          type: string
+          enum: [theoretical, practical, internship, project, seminar]
+        education_level:
+          type: string
+          enum: [undergraduate, graduate, doctorate]
+        teaching_type:
+          type: string
+          enum: [on_campus, online, hybrid]
+        language:
+          type: string
+        prerequisites:
+          type: array
+          items:
+            $ref: "#/components/schemas/Prerequisite"
+        coordinator:
+          $ref: "#/components/schemas/CourseCoordinator"
+        purpose:
+          type: string
+          nullable: true
+        description:
+          type: string
+          nullable: true
+        learning_outcomes:
+          type: string
+          nullable: true
+        learning_outcomes_list:
+          type: array
+          items:
+            type: string
+        weekly_topics:
+          type: array
+          items:
+            $ref: "#/components/schemas/WeeklyTopic"
+        recommended_sources:
+          type: array
+          items:
+            type: string
+        syllabus:
+          type: string
+          nullable: true
+        status:
+          type: string
+          enum: [active, draft, pending_approval, under_revision, archived, suspended]
+
+    UpdateCourseRequest:
+      type: object
+      description: Tüm alanlar opsiyoneldir. Sadece gönderilen alanlar güncellenir.
+      properties:
+        name:
+          type: string
+          nullable: true
+        faculty:
+          type: string
+          nullable: true
+        department:
+          type: string
+          nullable: true
+        credits:
+          type: integer
+          nullable: true
+        course_type:
+          type: string
+          enum: [mandatory, elective]
+          nullable: true
+        status:
+          type: string
+          enum: [active, draft, pending_approval, under_revision, archived, suspended]
+          nullable: true
+
+    CourseResponse:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        course_code:
+          type: string
+          example: "BIL101"
+        name:
+          type: string
+          example: "Bilgisayar Mühendisliğine Giriş"
+        faculty:
+          type: string
+          example: "Mühendislik Fakültesi"
+        department:
+          type: string
+          example: "Bilgisayar Mühendisliği"
+        offering_unit:
+          type: string
+          nullable: true
+        class_level:
+          type: integer
+        semester:
+          type: integer
+          nullable: true
+        credits:
+          type: integer
+        ects:
+          type: integer
+          nullable: true
+        theoretical_hours:
+          type: integer
+        lab_hours:
+          type: integer
+        course_type:
+          type: string
+        course_category:
+          type: string
+        education_level:
+          type: string
+        teaching_type:
+          type: string
+        language:
+          type: string
+        prerequisites:
+          type: array
+          items:
+            $ref: "#/components/schemas/Prerequisite"
+        coordinator:
+          $ref: "#/components/schemas/CourseCoordinator"
+        purpose:
+          type: string
+          nullable: true
+        description:
+          type: string
+          nullable: true
+        learning_outcomes:
+          type: string
+          nullable: true
+        learning_outcomes_list:
+          type: array
+          items:
+            type: string
+        weekly_topics:
+          type: array
+          items:
+            $ref: "#/components/schemas/WeeklyTopic"
+        recommended_sources:
+          type: array
+          items:
+            type: string
+        syllabus:
+          type: string
+          nullable: true
+        status:
+          type: string
+        created_at:
+          type: string
+          format: date-time
+        updated_at:
+          type: string
+          format: date-time
+
+    CourseListResponse:
+      type: object
+      properties:
+        data:
+          type: array
+          items:
+            $ref: "#/components/schemas/CourseResponse"
+        pagination:
+          $ref: "#/components/schemas/Pagination"
+
+    # ---- Semester ----
+    SemesterResponse:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+          example: "a1b2c3d4-e5f6-7890-abcd-ef1234567890"
+        name:
+          type: string
+          example: "2025-2026-spring"
+        status:
+          type: string
+          enum: [planned, active, completed]
+          example: "active"
+        hard_deadline:
+          type: string
+          format: date-time
+          example: "2026-02-15T23:59:59Z"
+        activated_at:
+          type: string
+          format: date-time
+          nullable: true
+        completed_at:
+          type: string
+          format: date-time
+          nullable: true
+        created_at:
+          type: string
+          format: date-time
+        updated_at:
+          type: string
+          format: date-time
+
+    # ---- Semester Courses ----
+    ScheduleSession:
+      type: object
+      required: [day_of_week, slot_numbers, session_type]
+      properties:
+        day_of_week:
+          type: string
+          enum: [monday, tuesday, wednesday, thursday, friday]
+          example: "monday"
+        slot_numbers:
+          type: array
+          items:
+            type: integer
+            minimum: 1
+            maximum: 12
+          example: [1, 2]
+        session_type:
+          type: string
+          enum: [theory, lab]
+          example: "theory"
+      example:
+        day_of_week: "monday"
+        slot_numbers: [1, 2]
+        session_type: "theory"
+
+    AssessmentItem:
+      type: object
+      required: [slug, name, weight]
+      properties:
+        slug:
+          type: string
+          example: "midterm"
+          description: Değerlendirme tanımlayıcısı (benzersiz, slug formatında)
+        name:
+          type: string
+          example: "Ara Sınav"
+        weight:
+          type: integer
+          minimum: 1
+          maximum: 100
+          description: Yüzde ağırlık (toplam 100 olmalı)
+          example: 40
+      example:
+        slug: "midterm"
+        name: "Ara Sınav"
+        weight: 40
+
+    CreateSemesterCourseRequest:
+      type: object
+      required:
+        - course_code
+        - class_level
+        - instructor_id
+        - instructor_fullname
+        - classroom_location
+        - max_capacity
+        - assessment_schema
+        - schedule_sessions
+      properties:
+        course_code:
+          type: string
+        class_level:
+          type: integer
+          minimum: 1
+          maximum: 6
+        instructor_id:
+          type: string
+          format: uuid
+        instructor_fullname:
+          type: string
+        classroom_location:
+          type: string
+        max_capacity:
+          type: integer
+          minimum: 1
+          maximum: 1000
+        assessment_schema:
+          type: array
+          minItems: 1
+          items:
+            $ref: "#/components/schemas/AssessmentItem"
+        schedule_sessions:
+          type: array
+          minItems: 1
+          items:
+            $ref: "#/components/schemas/ScheduleSession"
+
+    SemesterCourseResponse:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        semester:
+          type: string
+        course_code:
+          type: string
+        course_name:
+          type: string
+        credits:
+          type: integer
+        class_level:
+          type: integer
+        instructor_id:
+          type: string
+          format: uuid
+        instructor_fullname:
+          type: string
+        classroom_location:
+          type: string
+        max_capacity:
+          type: integer
+        assessment_schema:
+          type: array
+          items:
+            $ref: "#/components/schemas/AssessmentItem"
+        schedule_sessions:
+          type: array
+          items:
+            $ref: "#/components/schemas/ScheduleSession"
+        prerequisites:
+          type: array
+          items:
+            $ref: "#/components/schemas/Prerequisite"
+        created_at:
+          type: string
+          format: date-time
+        updated_at:
+          type: string
+          format: date-time
+
+    SemesterCourseListResponse:
+      type: object
+      properties:
+        data:
+          type: array
+          items:
+            $ref: "#/components/schemas/SemesterCourseResponse"
+        pagination:
+          $ref: "#/components/schemas/Pagination"
+
+    DeleteSemesterCourseResponse:
+      type: object
+      properties:
+        message:
+          type: string
+        semester_course_id:
+          type: string
+        course_code:
+          type: string
+        semester:
+          type: string
+
+    TeacherCoursesResponse:
+      type: object
+      properties:
+        instructor_id:
+          type: string
+          format: uuid
+        total_courses:
+          type: integer
+        courses:
+          type: array
+          items:
+            type: object
+            properties:
+              id:
+                type: string
+                format: uuid
+              course_code:
+                type: string
+              course_name:
+                type: string
+              faculty:
+                type: string
+              department:
+                type: string
+              semester:
+                type: string
+              credits:
+                type: integer
+              theoretical_hours:
+                type: integer
+              lab_hours:
+                type: integer
+              classroom_location:
+                type: string
+              max_capacity:
+                type: integer
+              schedule:
+                type: array
+                items:
+                  type: object
+                  properties:
+                    day:
+                      type: string
+                    time:
+                      type: string
+                    room:
+                      type: string
+                    session_type:
+                      type: string
+
+    # ---- Enrollment ----
+    AvailableCourse:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        course_code:
+          type: string
+        course_name:
+          type: string
+        credits:
+          type: integer
+        schedule_sessions:
+          type: array
+          items:
+            $ref: "#/components/schemas/ScheduleSession"
+        max_capacity:
+          type: integer
+        current_enrollment:
+          type: integer
+        available_seats:
+          type: integer
+        instructor:
+          type: string
+
+    AvailableCoursesResponse:
+      type: object
+      properties:
+        student_id:
+          type: string
+          format: uuid
+        department:
+          type: string
+        class_level:
+          type: integer
+        semester:
+          type: string
+        available_courses:
+          type: array
+          items:
+            $ref: "#/components/schemas/AvailableCourse"
+
+    CreateEnrollmentRequest:
+      type: object
+      required: [semester, course_ids]
+      properties:
+        student_id:
+          type: string
+          format: uuid
+          description: Opsiyonel, header'dan alınır
+        semester:
+          type: string
+          example: "2025-2026-spring"
+        course_ids:
+          type: array
+          minItems: 1
+          items:
+            type: string
+            format: uuid
+
+    CourseBasic:
+      type: object
+      properties:
+        id:
+          type: string
+        course_code:
+          type: string
+        course_name:
+          type: string
+        credits:
+          type: integer
+        instructor:
+          type: string
+        schedule_sessions:
+          type: array
+          items:
+            $ref: "#/components/schemas/ScheduleSession"
+
+    EnrollmentProgramResponse:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        student_id:
+          type: string
+          format: uuid
+        student_number:
+          type: string
+        student_name:
+          type: string
+        department:
+          type: string
+        class_level:
+          type: integer
+        semester:
+          type: string
+        status:
+          type: string
+          enum: [pending, approved, rejected]
+        courses:
+          type: array
+          items:
+            $ref: "#/components/schemas/CourseBasic"
+        created_at:
+          type: string
+          format: date-time
+
+    MyEnrollmentsResponse:
+      type: object
+      properties:
+        student_id:
+          type: string
+          format: uuid
+        programs:
+          type: array
+          items:
+            $ref: "#/components/schemas/EnrollmentProgramResponse"
+
+    RejectEnrollmentRequest:
+      type: object
+      required: [rejection_reason]
+      properties:
+        program_id:
+          type: string
+          format: uuid
+        rejection_reason:
+          type: string
+
+    RejectionDetail:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        advisor_id:
+          type: string
+          format: uuid
+        advisor_fullname:
+          type: string
+        rejection_reason:
+          type: string
+        rejected_courses:
+          type: object
+          properties:
+            courses:
+              type: array
+              items:
+                type: object
+                properties:
+                  course_id:
+                    type: string
+                    format: uuid
+                  course_code:
+                    type: string
+                  course_name:
+                    type: string
+                  credits:
+                    type: integer
+                  instructor:
+                    type: string
+            total_credits:
+              type: integer
+            submitted_at:
+              type: string
+              format: date-time
+        rejected_at:
+          type: string
+          format: date-time
+
+    LatestRejectionResponse:
+      type: object
+      properties:
+        student_id:
+          type: string
+          format: uuid
+        semester:
+          type: string
+        has_rejection:
+          type: boolean
+        latest_rejection:
+          $ref: "#/components/schemas/RejectionDetail"
+        total_rejections:
+          type: integer
+
+    MyRejectionsResponse:
+      type: object
+      properties:
+        student_id:
+          type: string
+          format: uuid
+        rejections:
+          type: array
+          items:
+            $ref: "#/components/schemas/RejectionDetail"
+        pagination:
+          $ref: "#/components/schemas/Pagination"
+
+    AdvisorPendingProgramsResponse:
+      type: object
+      properties:
+        advisor_id:
+          type: string
+          format: uuid
+        programs:
+          type: array
+          items:
+            $ref: "#/components/schemas/EnrollmentProgramResponse"
+
+    # ---- Attendance ----
+    CreateAttendanceSessionRequest:
+      type: object
+      required: [course_id, week_number, duration_minutes, session_type]
+      properties:
+        course_id:
+          type: string
+          format: uuid
+        week_number:
+          type: integer
+          minimum: 1
+          maximum: 14
+        duration_minutes:
+          type: integer
+          minimum: 5
+          maximum: 120
+        session_type:
+          type: string
+          enum: [theory, lab]
+
+    CreateAttendanceSessionResponse:
+      type: object
+      properties:
+        session_id:
+          type: string
+          format: uuid
+        course_id:
+          type: string
+          format: uuid
+        course_code:
+          type: string
+        course_name:
+          type: string
+        week_number:
+          type: integer
+        session_type:
+          type: string
+        session_date:
+          type: string
+        started_at:
+          type: string
+          format: date-time
+        expires_at:
+          type: string
+          format: date-time
+        enrolled_student_count:
+          type: integer
+
+    QRPayload:
+      type: object
+      properties:
+        sid:
+          type: string
+          description: Session ID
+        sig:
+          type: string
+          description: HMAC imzası
+
+    GetQRResponse:
+      type: object
+      properties:
+        session_id:
+          type: string
+          format: uuid
+        qr_payload:
+          $ref: "#/components/schemas/QRPayload"
+        valid_until:
+          type: string
+          format: date-time
+
+    ScanQRRequest:
+      type: object
+      required: [qr_payload]
+      properties:
+        qr_payload:
+          $ref: "#/components/schemas/QRPayload"
+
+    ScanQRResponse:
+      type: object
+      properties:
+        message:
+          type: string
+        course_code:
+          type: string
+        course_name:
+          type: string
+        week_number:
+          type: integer
+        session_type:
+          type: string
+        marked_at:
+          type: string
+          format: date-time
+
+    ManualAttendanceRequest:
+      type: object
+      required: [student_id]
+      properties:
+        student_id:
+          type: string
+          format: uuid
+        note:
+          type: string
+
+    ManualAttendanceResponse:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        session_id:
+          type: string
+          format: uuid
+        student_id:
+          type: string
+          format: uuid
+        student_number:
+          type: string
+        student_name:
+          type: string
+        marked_via:
+          type: string
+          enum: [manual, qr]
+        note:
+          type: string
+          nullable: true
+        marked_at:
+          type: string
+          format: date-time
+          nullable: true
+
+    CloseSessionResponse:
+      type: object
+      properties:
+        session_id:
+          type: string
+          format: uuid
+        closed_at:
+          type: string
+          format: date-time
+        summary:
+          type: object
+          properties:
+            total_enrolled:
+              type: integer
+            present_count:
+              type: integer
+            absent_count:
+              type: integer
+
+    SessionDetailsResponse:
+      type: object
+      properties:
+        session_id:
+          type: string
+          format: uuid
+        course_id:
+          type: string
+          format: uuid
+        course_code:
+          type: string
+        course_name:
+          type: string
+        week_number:
+          type: integer
+        session_type:
+          type: string
+        session_date:
+          type: string
+        semester:
+          type: string
+        is_active:
+          type: boolean
+        started_at:
+          type: string
+          format: date-time
+        expires_at:
+          type: string
+          format: date-time
+        enrolled_student_count:
+          type: integer
+        present_count:
+          type: integer
+        absent_count:
+          type: integer
+
+    SessionRecordsResponse:
+      type: object
+      properties:
+        session_id:
+          type: string
+          format: uuid
+        week_number:
+          type: integer
+        present_count:
+          type: integer
+        records:
+          type: array
+          items:
+            type: object
+            properties:
+              id:
+                type: string
+                format: uuid
+              student_id:
+                type: string
+                format: uuid
+              student_number:
+                type: string
+              student_name:
+                type: string
+              marked_via:
+                type: string
+              marked_at:
+                type: string
+                format: date-time
+                nullable: true
+              note:
+                type: string
+                nullable: true
+
+    SessionStudentsResponse:
+      type: object
+      properties:
+        session_id:
+          type: string
+          format: uuid
+        course_id:
+          type: string
+          format: uuid
+        total_enrolled:
+          type: integer
+        marked_count:
+          type: integer
+        students:
+          type: array
+          items:
+            type: object
+            properties:
+              student_id:
+                type: string
+                format: uuid
+              student_number:
+                type: string
+              first_name:
+                type: string
+              last_name:
+                type: string
+              email:
+                type: string
+              is_marked:
+                type: boolean
+
+    SessionTypeAttendance:
+      type: object
+      properties:
+        present_count:
+          type: integer
+        absent_count:
+          type: integer
+        total_sessions:
+          type: integer
+        min_required:
+          type: integer
+        passed:
+          type: boolean
+
+    MyAttendanceResponse:
+      type: object
+      properties:
+        student_id:
+          type: string
+          format: uuid
+        student_number:
+          type: string
+        semester:
+          type: string
+        courses:
+          type: array
+          items:
+            type: object
+            properties:
+              course_id:
+                type: string
+                format: uuid
+              course_code:
+                type: string
+              course_name:
+                type: string
+              instructor:
+                type: string
+              total_weeks:
+                type: integer
+              theory:
+                $ref: "#/components/schemas/SessionTypeAttendance"
+              lab:
+                $ref: "#/components/schemas/SessionTypeAttendance"
+              weekly_records:
+                type: array
+                items:
+                  type: object
+                  properties:
+                    week:
+                      type: integer
+                    session_type:
+                      type: string
+                    date:
+                      type: string
+                    marked_via:
+                      type: string
+                    note:
+                      type: string
+                      nullable: true
+
+    FinalizeAttendanceResponse:
+      type: object
+      properties:
+        course_id:
+          type: string
+          format: uuid
+        course_code:
+          type: string
+        semester:
+          type: string
+        total_students:
+          type: integer
+        total_weeks:
+          type: integer
+        thresholds:
+          type: object
+          properties:
+            theory_min_required:
+              type: integer
+            lab_min_required:
+              type: integer
+        finalization_summary:
+          type: object
+          properties:
+            passing_count:
+              type: integer
+            failing_count:
+              type: integer
+        failed_students:
+          type: array
+          items:
+            type: object
+            properties:
+              student_id:
+                type: string
+                format: uuid
+              student_number:
+                type: string
+              student_name:
+                type: string
+              failed_type:
+                type: string
+              theory:
+                $ref: "#/components/schemas/SessionTypeAttendance"
+              lab:
+                $ref: "#/components/schemas/SessionTypeAttendance"
+        events_published:
+          type: integer
+        finalized_at:
+          type: string
+          format: date-time
+
+    # ---- Grades ----
+    SubmitScoreRequest:
+      type: object
+      required: [registration_id, slug]
+      properties:
+        registration_id:
+          type: string
+          format: uuid
+        slug:
+          type: string
+          example: "midterm"
+        score:
+          type: number
+          format: float
+          nullable: true
+          minimum: 0
+          maximum: 100
+        is_absent:
+          type: boolean
+          default: false
+
+    BulkScoreEntry:
+      type: object
+      required: [registration_id]
+      properties:
+        registration_id:
+          type: string
+          format: uuid
+        score:
+          type: number
+          format: float
+          nullable: true
+        is_absent:
+          type: boolean
+          default: false
+
+    BulkSubmitScoresRequest:
+      type: object
+      required: [slug, scores]
+      properties:
+        slug:
+          type: string
+        scores:
+          type: array
+          items:
+            $ref: "#/components/schemas/BulkScoreEntry"
+
+    FinalizeResult:
+      type: object
+      properties:
+        grading_type:
+          type: string
+        class_mean:
+          type: number
+          format: float
+        total_students:
+          type: integer
+        passing_count:
+          type: integer
+        failing_count:
+          type: integer
+        attendance_failed_count:
+          type: integer
+
+    SubmitScoreResponse:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        student_number:
+          type: string
+        slug:
+          type: string
+        score:
+          type: number
+          format: float
+          nullable: true
+        is_absent:
+          type: boolean
+        graded_at:
+          type: string
+          format: date-time
+        auto_finalized:
+          type: boolean
+        finalize_result:
+          $ref: "#/components/schemas/FinalizeResult"
+
+    BulkSubmitScoresResponse:
+      type: object
+      properties:
+        slug:
+          type: string
+        success_count:
+          type: integer
+        auto_finalized:
+          type: boolean
+        finalize_result:
+          $ref: "#/components/schemas/FinalizeResult"
+
+    ScoreDetail:
+      type: object
+      properties:
+        score:
+          type: number
+          format: float
+          nullable: true
+        is_absent:
+          type: boolean
+        is_locked:
+          type: boolean
+
+    AssessmentStatus:
+      type: object
+      properties:
+        slug:
+          type: string
+        name:
+          type: string
+        weight:
+          type: integer
+        graded_count:
+          type: integer
+        pending_count:
+          type: integer
+        is_complete:
+          type: boolean
+
+    CourseStatusResponse:
+      type: object
+      properties:
+        course_id:
+          type: string
+          format: uuid
+        course_code:
+          type: string
+        course_name:
+          type: string
+        semester:
+          type: string
+        total_students:
+          type: integer
+        assessments:
+          type: array
+          items:
+            $ref: "#/components/schemas/AssessmentStatus"
+        is_finalized:
+          type: boolean
+        pending_message:
+          type: string
+        finalized_at:
+          type: string
+          format: date-time
+          nullable: true
+        grading_type:
+          type: string
+        class_statistics:
+          type: object
+          nullable: true
+          properties:
+            mean:
+              type: number
+              format: float
+            stddev:
+              type: number
+              format: float
+            passing_count:
+              type: integer
+            failing_count:
+              type: integer
+            attendance_failed_count:
+              type: integer
+
+    CourseStudentsGradesResponse:
+      type: object
+      properties:
+        course_id:
+          type: string
+          format: uuid
+        course_code:
+          type: string
+        students:
+          type: array
+          items:
+            type: object
+            properties:
+              registration_id:
+                type: string
+                format: uuid
+              student_id:
+                type: string
+                format: uuid
+              student_number:
+                type: string
+              first_name:
+                type: string
+              last_name:
+                type: string
+              scores:
+                type: object
+                additionalProperties:
+                  $ref: "#/components/schemas/ScoreDetail"
+              current_average:
+                type: number
+                format: float
+                nullable: true
+              is_attendance_failed:
+                type: boolean
+
+    MyGradesResponse:
+      type: object
+      properties:
+        student_id:
+          type: string
+          format: uuid
+        student_number:
+          type: string
+        active_courses:
+          type: array
+          items:
+            type: object
+            properties:
+              course_code:
+                type: string
+              course_name:
+                type: string
+              semester:
+                type: string
+              credits:
+                type: integer
+              scores:
+                type: object
+                additionalProperties:
+                  $ref: "#/components/schemas/ScoreDetail"
+        completed_courses:
+          type: array
+          items:
+            type: object
+            properties:
+              course_code:
+                type: string
+              course_name:
+                type: string
+              semester:
+                type: string
+              credits:
+                type: integer
+              weighted_average:
+                type: number
+                format: float
+              grade_point:
+                type: string
+                example: "AA"
+              assessment_scores:
+                type: object
+                additionalProperties:
+                  type: number
+                  format: float
+        cumulative_gpa:
+          type: number
+          format: float
+        total_credits:
+          type: integer
+
+    TranscriptResponse:
+      type: object
+      properties:
+        student:
+          type: object
+          properties:
+            student_number:
+              type: string
+            first_name:
+              type: string
+            last_name:
+              type: string
+            department:
+              type: string
+            enrollment_year:
+              type: integer
+        semesters:
+          type: array
+          items:
+            type: object
+            properties:
+              semester:
+                type: string
+              semester_display:
+                type: string
+              courses:
+                type: array
+                items:
+                  type: object
+                  properties:
+                    course_code:
+                      type: string
+                    course_name:
+                      type: string
+                    credits:
+                      type: integer
+                    grade_point:
+                      type: string
+              semester_credits:
+                type: integer
+              semester_gpa:
+                type: number
+                format: float
+        summary:
+          type: object
+          properties:
+            total_credits:
+              type: integer
+            cumulative_gpa:
+              type: number
+              format: float
+        generated_at:
+          type: string
+          format: date-time
+
+    AppealScoreRequest:
+      type: object
+      required: [student_id, course_id, slug, new_score, reason]
+      properties:
+        student_id:
+          type: string
+          format: uuid
+        course_id:
+          type: string
+          format: uuid
+        slug:
+          type: string
+        new_score:
+          type: number
+          format: float
+          minimum: 0
+          maximum: 100
+        reason:
+          type: string
+          minLength: 10
+
+    AppealScoreResponse:
+      type: object
+      properties:
+        student_id:
+          type: string
+          format: uuid
+        course_code:
+          type: string
+        slug:
+          type: string
+        old_score:
+          type: number
+          format: float
+        new_score:
+          type: number
+          format: float
+        old_weighted_average:
+          type: number
+          format: float
+        new_weighted_average:
+          type: number
+          format: float
+        old_grade_point:
+          type: string
+        new_grade_point:
+          type: string
+        grading_type:
+          type: string
+        frozen_class_mean:
+          type: number
+          format: float
+        frozen_class_stddev:
+          type: number
+          format: float
+
+    ScoreLockRequest:
+      type: object
+      required: [registration_id, slug]
+      properties:
+        registration_id:
+          type: string
+          format: uuid
+        slug:
+          type: string
+
+    # ---- Meal ----
+    CreateCafeteriaRequest:
+      type: object
+      required: [name, location]
+      properties:
+        name:
+          type: string
+        location:
+          type: string
+        has_vegan_menu:
+          type: boolean
+          default: false
+        serves_dinner:
+          type: boolean
+          default: false
+        is_active:
+          type: boolean
+          default: true
+
+    CafeteriaResponse:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        name:
+          type: string
+          example: "Merkez Yemekhane"
+        location:
+          type: string
+          example: "Kampüs Merkezi, A Blok"
+        has_vegan_menu:
+          type: boolean
+          example: true
+        serves_dinner:
+          type: boolean
+          example: false
+        is_active:
+          type: boolean
+          example: true
+        created_at:
+          type: string
+          format: date-time
+        updated_at:
+          type: string
+          format: date-time
+
+    CafeteriaListResponse:
+      type: object
+      properties:
+        cafeterias:
+          type: array
+          items:
+            $ref: "#/components/schemas/CafeteriaResponse"
+
+    MealQRResponse:
+      type: object
+      properties:
+        cafeteria_id:
+          type: string
+        cafeteria_name:
+          type: string
+        date:
+          type: string
+        meal_time:
+          type: string
+        qr_payload:
+          type: string
+        valid_time_window:
+          type: object
+          properties:
+            start:
+              type: string
+            end:
+              type: string
+
+    CreateMonthlyMenuRequest:
+      type: object
+      required: [year, month, menu_data]
+      properties:
+        year:
+          type: integer
+          minimum: 2020
+          maximum: 2100
+        month:
+          type: integer
+          minimum: 1
+          maximum: 12
+        menu_data:
+          type: object
+          description: Günlük menü verileri (JSONB)
+          additionalProperties: true
+
+    MonthlyMenuResponse:
+      type: object
+      properties:
+        year:
+          type: integer
+        month:
+          type: integer
+        menu_data:
+          type: object
+          additionalProperties: true
+        created_at:
+          type: string
+          format: date-time
+        updated_at:
+          type: string
+          format: date-time
+
+    CreateReservationRequest:
+      type: object
+      required: [cafeteria_id, date, meal_time, menu_type]
+      properties:
+        cafeteria_id:
+          type: string
+          format: uuid
+        date:
+          type: string
+          format: date
+        meal_time:
+          type: string
+          enum: [lunch, dinner]
+        menu_type:
+          type: string
+          enum: [normal, vegan]
+
+    BatchReservationRequest:
+      type: object
+      required: [reservations]
+      properties:
+        reservations:
+          type: array
+          minItems: 1
+          maxItems: 10
+          items:
+            $ref: "#/components/schemas/CreateReservationRequest"
+
+    ReservationResponse:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        date:
+          type: string
+          example: "2026-03-18"
+        meal_time:
+          type: string
+          example: "lunch"
+        menu_type:
+          type: string
+          example: "normal"
+        cafeteria_name:
+          type: string
+          example: "Merkez Yemekhane"
+        cafeteria:
+          type: object
+          nullable: true
+          properties:
+            id:
+              type: string
+            name:
+              type: string
+            location:
+              type: string
+        status:
+          type: string
+          enum: [pending, confirmed, cancelled, expired]
+        is_used:
+          type: boolean
+        created_at:
+          type: string
+          format: date-time
+
+    CreateReservationResponse:
+      type: object
+      properties:
+        reservation_id:
+          type: string
+        payment_url:
+          type: string
+        amount:
+          type: number
+          format: float
+        currency:
+          type: string
+          example: "TRY"
+        expires_at:
+          type: string
+          format: date-time
+        reservation:
+          $ref: "#/components/schemas/ReservationResponse"
+
+    CreateBatchReservationResponse:
+      type: object
+      properties:
+        batch_id:
+          type: string
+        payment_url:
+          type: string
+        total_amount:
+          type: number
+          format: float
+        currency:
+          type: string
+        expires_at:
+          type: string
+          format: date-time
+        reservations:
+          type: array
+          items:
+            $ref: "#/components/schemas/ReservationResponse"
+
+    CreateClosedDayRequest:
+      type: object
+      required: [date, reason]
+      properties:
+        date:
+          type: string
+          format: date
+          example: "2026-04-23"
+          description: "YYYY-MM-DD formatında tarih"
+        reason:
+          type: string
+          minLength: 1
+          maxLength: 500
+          example: "Ulusal Egemenlik ve Çocuk Bayramı"
+
+    UseReservationRequest:
+      type: object
+      required: [qr_payload]
+      properties:
+        qr_payload:
+          type: string
+          description: Yemekhane QR kodundan okunan payload
+
+    MyReservationsResponse:
+      type: object
+      properties:
+        reservations:
+          type: array
+          items:
+            $ref: "#/components/schemas/ReservationResponse"
+        pagination:
+          $ref: "#/components/schemas/Pagination"
+
+    ClosedDayResponse:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        date:
+          type: string
+          format: date
+          example: "2026-04-23"
+        reason:
+          type: string
+          example: "Ulusal Egemenlik ve Çocuk Bayramı"
+        created_at:
+          type: string
+          format: date-time

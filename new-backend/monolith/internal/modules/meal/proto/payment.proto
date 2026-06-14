@@ -1,0 +1,52 @@
+syntax = "proto3";
+
+package payment;
+
+option go_package = "github.com/baaaki/mydreamcampus/meal-service/proto";
+
+// PaymentService handles payment operations
+service PaymentService {
+  // InitiatePayment starts a new payment process
+  rpc InitiatePayment(InitiatePaymentRequest) returns (InitiatePaymentResponse);
+
+  // RequestRefund processes a refund for a cancelled reservation
+  rpc RequestRefund(RefundRequest) returns (RefundResponse);
+}
+
+// InitiatePaymentRequest is sent when creating a new payment
+message InitiatePaymentRequest {
+  string reference_id = 1;  // "res_uuid" or "bat_uuid"
+  double amount = 2;
+  string currency = 3;
+  string description = 4;
+  string student_id = 5;
+}
+
+// InitiatePaymentResponse is returned after payment initiation
+message InitiatePaymentResponse {
+  bool success = 1;
+  string payment_id = 2;
+  string payment_url = 3;
+  double amount = 4;
+  string currency = 5;
+  string expires_at = 6;
+  string error_message = 7;
+}
+
+// RefundRequest is sent when requesting a refund
+message RefundRequest {
+  string reference_id = 1;
+  double amount = 2;
+  string currency = 3;
+  string reason = 4;
+}
+
+// RefundResponse is returned after refund processing
+message RefundResponse {
+  bool success = 1;
+  string refund_id = 2;
+  double amount = 3;
+  string currency = 4;
+  string status = 5;  // "completed", "failed", "pending"
+  string message = 6;
+}

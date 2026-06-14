@@ -1,0 +1,106 @@
+run:
+  timeout: 5m
+  go: "1.26"
+
+linters:
+  enable:
+    # ── Bugs & Correctness ──
+    - errcheck          # Unchecked errors (e.g., _ = db.Close())
+    - govet             # Reports suspicious constructs (shadow, printf args)
+    - staticcheck       # Advanced static analysis (SA*, ST*, QF* rules)
+    - bodyclose         # HTTP response body not closed
+    - nilerr            # Returns nil on error path
+    - sqlclosecheck     # sql.Rows and sql.Stmt not closed
+
+    # ── Security ──
+    - gosec             # Security problems (SQL injection, hardcoded creds)
+
+    # ── Performance ──
+    - prealloc          # Slice preallocation suggestions
+    - ineffassign       # Detects useless assignments
+
+    # ── Style & Simplification ──
+    - goimports         # Checks import ordering (goimports style)
+    - gosimple          # Suggests code simplifications
+    - unconvert         # Removes unnecessary type conversions
+    - unparam           # Reports unused function parameters
+    - unused            # Reports unused code
+
+    # ── Error Handling ──
+    - errorlint         # Wrapping errors (Go 1.13+ error handling)
+    - wrapcheck         # Checks errors from external packages are wrapped
+
+linters-settings:
+  errcheck:
+    check-type-assertions: true
+    check-blank: true
+    exclude-functions:
+      - fmt.Fprintf
+      - fmt.Fprintln
+      - (io.Closer).Close
+
+  gosec:
+    excludes:
+      - G104   # Unhandled errors — already covered by errcheck
+    severity: medium
+    confidence: medium
+
+  govet:
+    enable-all: true
+    disable:
+      - fieldalignment   # Noisy, micro-optimization
+
+  staticcheck:
+    checks:
+      - all
+      - -SA1019   # Deprecated usage — enable later for cleanup sprints
+
+  errorlint:
+    errorf: true
+    asserts: true
+    comparison: true
+
+  wrapcheck:
+    ignoreSigs:
+      - .Errorf(
+      - errors.New(
+      - errors.Unwrap(
+      - errors.Join(
+      - .Wrap(
+      - .Wrapf(
+      - .WithMessage(
+      - .WithMessagef(
+      - .WithStack(
+    ignorePackageGlobs:
+      - github.com/mydreamcampus/*/internal/*
+
+  goimports:
+    local-prefixes: github.com/mydreamcampus
+
+issues:
+  exclude-rules:
+    # Test files can be more relaxed
+    - path: _test\.go
+      linters:
+        - errcheck
+        - wrapcheck
+        - gosec
+
+    # Generated code (sqlc) should not be linted
+    - path: internal/db/
+      linters:
+        - errcheck
+        - wrapcheck
+        - gosec
+        - govet
+        - staticcheck
+        - unused
+
+    # main.go often has deferred close without error check
+    - path: cmd/main\.go
+      linters:
+        - errcheck
+      text: "Error return value of .*(Close|Shutdown)"
+
+  max-issues-per-linter: 50
+  max-same-issues: 5

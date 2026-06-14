@@ -1,0 +1,156 @@
+version: 2
+updates:
+  # ─────────── GitHub Actions ───────────
+  - package-ecosystem: "github-actions"
+    directory: "/"
+    schedule:
+      interval: "weekly"
+    commit-message:
+      prefix: "chore(ci)"
+    labels:
+      - "dependencies"
+      - "ci"
+
+  # ─────────── Go: shared ───────────
+  - package-ecosystem: "gomod"
+    directory: "/backend/shared"
+    schedule:
+      interval: "weekly"
+    commit-message:
+      prefix: "chore(shared)"
+    labels:
+      - "dependencies"
+      - "backend"
+    groups:
+      go-minor-patch:
+        update-types:
+          - "minor"
+          - "patch"
+
+  # ─────────── Go: services ───────────
+  - package-ecosystem: "gomod"
+    directory: "/backend/services/auth-service"
+    schedule:
+      interval: "weekly"
+    commit-message:
+      prefix: "chore(auth)"
+    labels: ["dependencies", "backend"]
+    groups:
+      go-minor-patch:
+        update-types: ["minor", "patch"]
+
+  - package-ecosystem: "gomod"
+    directory: "/backend/services/staff-service"
+    schedule:
+      interval: "weekly"
+    commit-message:
+      prefix: "chore(staff)"
+    labels: ["dependencies", "backend"]
+    groups:
+      go-minor-patch:
+        update-types: ["minor", "patch"]
+
+  - package-ecosystem: "gomod"
+    directory: "/backend/services/student-service"
+    schedule:
+      interval: "weekly"
+    commit-message:
+      prefix: "chore(student)"
+    labels: ["dependencies", "backend"]
+    groups:
+      go-minor-patch:
+        update-types: ["minor", "patch"]
+
+  - package-ecosystem: "gomod"
+    directory: "/backend/services/course-catalog-service"
+    schedule:
+      interval: "weekly"
+    commit-message:
+      prefix: "chore(catalog)"
+    labels: ["dependencies", "backend"]
+    groups:
+      go-minor-patch:
+        update-types: ["minor", "patch"]
+
+  - package-ecosystem: "gomod"
+    directory: "/backend/services/enrollment-service"
+    schedule:
+      interval: "weekly"
+    commit-message:
+      prefix: "chore(enrollment)"
+    labels: ["dependencies", "backend"]
+    groups:
+      go-minor-patch:
+        update-types: ["minor", "patch"]
+
+  - package-ecosystem: "gomod"
+    directory: "/backend/services/attendance-service"
+    schedule:
+      interval: "weekly"
+    commit-message:
+      prefix: "chore(attendance)"
+    labels: ["dependencies", "backend"]
+    groups:
+      go-minor-patch:
+        update-types: ["minor", "patch"]
+
+  - package-ecosystem: "gomod"
+    directory: "/backend/services/grades-service"
+    schedule:
+      interval: "weekly"
+    commit-message:
+      prefix: "chore(grades)"
+    labels: ["dependencies", "backend"]
+    groups:
+      go-minor-patch:
+        update-types: ["minor", "patch"]
+
+  - package-ecosystem: "gomod"
+    directory: "/backend/services/meal-service"
+    schedule:
+      interval: "weekly"
+    commit-message:
+      prefix: "chore(meal)"
+    labels: ["dependencies", "backend"]
+    groups:
+      go-minor-patch:
+        update-types: ["minor", "patch"]
+
+  - package-ecosystem: "gomod"
+    directory: "/backend/services/payment-service"
+    schedule:
+      interval: "weekly"
+    commit-message:
+      prefix: "chore(payment)"
+    labels: ["dependencies", "backend"]
+    groups:
+      go-minor-patch:
+        update-types: ["minor", "patch"]
+
+  # ─────────── Frontend (bun/npm registry) ───────────
+  - package-ecosystem: "npm"
+    directory: "/frontend"
+    schedule:
+      interval: "weekly"
+    commit-message:
+      prefix: "chore(frontend)"
+    labels: ["dependencies", "frontend"]
+    groups:
+      frontend-minor-patch:
+        update-types: ["minor", "patch"]
+
+  # ─────────── Mobile (Expo) ───────────
+  - package-ecosystem: "npm"
+    directory: "/mobile"
+    schedule:
+      interval: "weekly"
+    commit-message:
+      prefix: "chore(mobile)"
+    labels: ["dependencies", "mobile"]
+    ignore:
+      # Expo SDK major bumps are manual (require `expo install --fix`)
+      - dependency-name: "expo"
+        update-types: ["version-update:semver-major"]
+    groups:
+      mobile-minor-patch:
+        update-types: ["minor", "patch"]

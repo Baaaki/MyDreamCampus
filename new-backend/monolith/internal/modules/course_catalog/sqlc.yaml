@@ -1,0 +1,36 @@
+version: "2"
+sql:
+  - engine: "postgresql"
+    queries: "./sql/queries"
+    schema: "./sql/migrations"
+    gen:
+      go:
+        package: "db"
+        out: "./db"
+        sql_package: "pgx/v5"
+        emit_json_tags: true
+        emit_prepared_queries: false
+        emit_interface: false
+        emit_exact_table_names: false
+        emit_empty_slices: true
+        # Strip the `course_catalog` schema prefix so existing repository
+        # code (db.CourseCatalog, db.SemesterCourse, db.OutboxEvent, ...)
+        # keeps compiling. Names match what the legacy service generated
+        # against the unprefixed schema.
+        rename:
+          course_catalog_course_catalog: "CourseCatalog"
+          course_catalog_semester_course: "SemesterCourse"
+          course_catalog_course_schedule_session: "CourseScheduleSession"
+          course_catalog_outbox_event: "OutboxEvent"
+          course_catalog_academic_period: "AcademicPeriod"
+          course_catalog_semester: "Semester"
+          course_catalog_audit_log: "AuditLog"
+          course_catalog_course_catalog_status_enum: "CourseCatalogStatusEnum"
+          course_catalog_course_type_enum: "CourseTypeEnum"
+          course_catalog_course_category_enum: "CourseCategoryEnum"
+          course_catalog_education_level_enum: "EducationLevelEnum"
+          course_catalog_teaching_type_enum: "TeachingTypeEnum"
+          course_catalog_day_of_week_enum: "DayOfWeekEnum"
+          course_catalog_outbox_status_enum: "OutboxStatusEnum"
+          course_catalog_schedule_session_type_enum: "ScheduleSessionTypeEnum"
+          course_catalog_semester_status: "SemesterStatus"

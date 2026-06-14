@@ -1,11 +1,36 @@
 ############################
-# OS - LINUX
+# OS
 ############################
 *~
 .fuse_hidden*
 .directory
 .Trash-*
 .nfs*
+.DS_Store
+Thumbs.db
+
+############################
+# IDE
+############################
+.vscode/
+.history/
+.idea/
+*.iml
+*.swp
+*.swo
+
+############################
+# ENVIRONMENT & SECRETS
+############################
+.env
+.env.local
+.env.*.local
+!.env.example
+
+*.key
+*.pem
+*.crt
+*.cer
 
 ############################
 # BACKEND - GO
@@ -14,11 +39,14 @@
 # Binaries
 *.exe
 *.out
-/bin/
-/dist/
-/build/
-main
-backend/cmd/server/server
+*.dll
+*.so
+*.dylib
+bin/
+dist/
+# `go build` output at service root (no extension on linux)
+backend/services/*/main
+backend/cmd/*/main
 
 # Test & Coverage
 *.test
@@ -27,7 +55,6 @@ coverage.out
 
 # Dependencies
 vendor/
-go.work
 go.work.sum
 
 # Air live reload
@@ -35,136 +62,33 @@ tmp/
 build-errors.log
 
 ############################
-# FRONTEND - NEXT.JS + BUN
+# FRONTEND - JS/TS
 ############################
-
-# Build
-.next/
-out/
-build/
-
-# Dependencies
 node_modules/
-
-# Bun specific
-bun.lockb
-
-# TypeScript
 *.tsbuildinfo
-next-env.d.ts
-
-# See https://help.github.com/articles/ignoring-files/ for more about ignoring files.
-
-# dependencies
-/node_modules
-/.pnp
-.pnp.*
-.yarn/*
-!.yarn/patches
-!.yarn/plugins
-!.yarn/releases
-!.yarn/versions
-
-# testing
-/coverage
-
-# next.js
-/.next/
-/out/
-
-# production
-/build
-
-# misc
-.DS_Store
-*.pem
-
-# debug
-npm-debug.log*
-yarn-debug.log*
-yarn-error.log*
-.pnpm-debug.log*
-
-# env files (can opt-in for committing if needed)
-.env*
-
-# vercel
 .vercel
-
-# typescript
-*.tsbuildinfo
-next-env.d.ts
-
 
 ############################
 # DATABASE
 ############################
-
-# PostgreSQL data
 postgres-data/
 pgdata/
 *.dump
 *.backup
-
-# Redis data
 *.rdb
 *.aof
-dump.rdb
 redis-data/
-
-# WAL (Write-Ahead Log)
-data/
-*.wal
-
-############################
-# ENVIRONMENT & SECRETS
-############################
-
-.env
-.env.local
-.env.*.local
-!.env.example
-
-# Certificates
-*.key
-*.pem
-*.crt
-*.cer
-
-############################
-# IDE
-############################
-
-# VSCode
-.vscode/
-.history/
-
-# JetBrains (GoLand/WebStorm)
-.idea/
-*.iml
 
 ############################
 # LOGS & TEMP
 ############################
-
 logs/
 *.log
-tmp/
 temp/
 *.tmp
 
 ############################
 # DOCKER
 ############################
-
 docker/volumes/
 docker-compose.override.yml
-
-############################
-# PROJECT SPECIFIC
-############################
-
-# Claude Code internal files
-CLAUDE.md
-.claude 
-docs/

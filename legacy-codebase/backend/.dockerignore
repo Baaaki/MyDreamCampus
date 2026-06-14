@@ -1,0 +1,34 @@
+# Binary artifacts
+**/bin/
+**/tmp/
+
+# IDE & OS
+**/.idea/
+**/.vscode/
+**/.DS_Store
+
+# Git
+.git
+.gitignore
+
+# Documentation
+**/*.md
+**/LICENSE
+
+# Test files
+**/*_test.go
+**/tests/
+**/test_*.csv
+
+# Development tools
+**/.air.toml
+**/.env
+**/.env.local
+**/.env.example
+
+# SQL source (already compiled via sqlc)
+**/sql/
+**/sqlc.yaml
+
+# Infrastructure configs (not needed in service images)
+infrastructure/
