@@ -71,7 +71,9 @@ func New(
 	}
 }
 
-func (m *Module) Name() string { return "v1/attendance" }
+// "attendance", not "v1/attendance": web and mobile clients both call
+// /api/attendance/* and every other module mounts unversioned.
+func (m *Module) Name() string { return "attendance" }
 
 func (m *Module) OutboxStore() eventbus.OutboxStore { return m.outboxStore }
 
