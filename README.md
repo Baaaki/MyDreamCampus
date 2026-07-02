@@ -35,6 +35,31 @@ Sistem tamamen sektör standartlarında, güncel ve yüksek performanslı araçl
 *   **Mobil Uygulama:** React Native 0.81, Expo 54
 *   **Bildirim Sistemi:** E-posta (MailHog ile test) ve Mobil Anlık Bildirim (Push Notification) altyapısı ayrı bir servis olarak asenkron çalışır.
 
+## Güvenlik (Security by Design)
+
+Sistem, OWASP tavsiyeleri temel alınarak katmanlı savunma (defense in depth) prensibiyle tasarlanmıştır.
+
+**Kimlik Doğrulama ve Oturum Yönetimi**
+- Parolalar **Argon2id** ile hash'lenir (OWASP önerilen parametreler) ve constant-time karşılaştırılır. Var olmayan kullanıcı için de dummy hash doğrulaması çalıştırılır; login yanıt süresi üzerinden **kullanıcı adı sızdırma (user enumeration)** engellenir.
+- **JWT (HS256, algoritma pinlemeli)** + kısa ömürlü access token (15 dk) + **refresh token rotation**. Redis üzerinde JTI blacklist ve token-version takibiyle tek oturum veya tüm oturumlar anında iptal edilebilir (logout-all).
+- Token'lar tarayıcıda **httpOnly + Secure + SameSite=Strict** cookie'lerde taşınır; localStorage'da token tutulmaz.
+- Brute-force'a karşı **hesap kilitleme** ve Redis tabanlı **rate limiting** (IP / kullanıcı / endpoint bazlı; login gibi hassas endpoint'lerde fail-closed).
+
+**Uygulama Katmanı**
+- **RBAC**: admin / teacher / student rolleri route seviyesinde middleware ile zorunlu kılınır.
+- **CSRF** koruması (double-submit cookie) ve **CORS** allow-list; production'da eksik CORS yapılandırmasıyla uygulama açılmayı reddeder.
+- Security header'ları: **Content-Security-Policy**, **HSTS** (production), X-Frame-Options, nosniff, Referrer-Policy, Permissions-Policy.
+- SQL erişimi **sqlc + pgx** ile tamamen parametrize edilir; string birleştirmeli sorgu yoktur (SQL injection yüzeyi kapalı).
+- 1 MB **request body limiti** ve slowloris'e karşı HTTP read/write timeout'ları.
+- Modüller arası loopback çağrılar **X-Internal-Secret** başlığı ile doğrulanır (constant-time compare).
+- Yemekhane QR doğrulaması **HMAC-SHA256** imzalı ve kısa geçerlilik pencereli; imzasız/expired QR reddedilir.
+- Güvenlik olayları (başarısız login, hesap kilitleme, yetki ihlali) **audit log**'a yazılır.
+
+**Yapılandırma ve Tedarik Zinciri**
+- Production ortamında zayıf veya default secret (JWT, Redis, admin parolası, internal secret) tespit edilirse uygulama **başlamayı reddeder**.
+- Altyapı portları (PostgreSQL, Redis, RabbitMQ) yalnızca **127.0.0.1**'e bağlıdır; dışarıya sadece 80/443 açılır.
+- CI/CD'de otomatik güvenlik taramaları: **gitleaks** (secret taraması), **CodeQL** (SAST), **gosec** (Go güvenlik lint'i), **govulncheck** (erişilebilir CVE analizi) — her push'ta ve haftalık zamanlanmış olarak çalışır.
+
 ## Yerel Ortamda Çalıştırma (Geliştiriciler İçin)
 
 Projeyi kendi bilgisayarınızda test etmek oldukça basittir. 
