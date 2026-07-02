@@ -621,6 +621,7 @@ func (s *AuthService) GetUserSessions(ctx context.Context, userID uuid.UUID, cur
 			IPAddress:  session.IpAddress,
 			CreatedAt:  session.CreatedAt.Time,
 			LastUsedAt: session.LastUsedAt.Time,
+			ExpiresAt:  session.ExpiresAt.Time,
 			IsCurrent:  session.RefreshTokenJti == currentJTI,
 		})
 	}
