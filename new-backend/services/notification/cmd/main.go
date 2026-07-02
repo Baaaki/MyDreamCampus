@@ -7,6 +7,7 @@ import (
 	"os"
 	"os/signal"
 	"syscall"
+	"time"
 
 	"github.com/baaaki/mydreamcampus/notification/config"
 	"github.com/baaaki/mydreamcampus/notification/internal/consumer"
@@ -29,7 +30,7 @@ func main() {
 	if err != nil {
 		panic(fmt.Sprintf("failed to init logger: %v", err))
 	}
-	defer logger.Sync()
+	defer func() { _ = logger.Sync() }()
 
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
@@ -46,13 +47,13 @@ func main() {
 	if err != nil {
 		logger.Fatal("failed to connect to RabbitMQ", zap.Error(err))
 	}
-	defer conn.Close()
-	
+	defer func() { _ = conn.Close() }()
+
 	ch, err := conn.Channel()
 	if err != nil {
 		logger.Fatal("failed to open channel", zap.Error(err))
 	}
-	defer ch.Close()
+	defer func() { _ = ch.Close() }()
 
 	// Topology setup
 	if err := consumer.SetupTopology(ch); err != nil {
@@ -76,12 +77,21 @@ func main() {
 
 	// Health endpoint
 	go func() {
-		http.HandleFunc("/health", func(w http.ResponseWriter, r *http.Request) {
+		mux := http.NewServeMux()
+		mux.HandleFunc("/health", func(w http.ResponseWriter, r *http.Request) {
 			w.WriteHeader(http.StatusOK)
-			w.Write([]byte("OK"))
+			_, _ = w.Write([]byte("OK"))
 		})
+		healthServer := &http.Server{
+			Addr:              ":9090",
+			Handler:           mux,
+			ReadHeaderTimeout: 5 * time.Second,
+			ReadTimeout:       10 * time.Second,
+			WriteTimeout:      10 * time.Second,
+			IdleTimeout:       60 * time.Second,
+		}
 		logger.Info("Starting health server on :9090")
-		if err := http.ListenAndServe(":9090", nil); err != nil {
+		if err := healthServer.ListenAndServe(); err != nil {
 			logger.Error("health server error", zap.Error(err))
 		}
 	}()

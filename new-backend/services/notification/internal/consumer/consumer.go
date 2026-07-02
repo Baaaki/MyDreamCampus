@@ -64,7 +64,7 @@ func (c *Consumer) handleMessage(ctx context.Context, msg amqp.Delivery) {
 	var event map[string]any
 	if err := json.Unmarshal(msg.Body, &event); err != nil {
 		c.log.Error("failed to unmarshal message", zap.Error(err))
-		msg.Reject(false) // Drop unparseable messages
+		_ = msg.Reject(false) // Drop unparseable messages
 		return
 	}
 
@@ -73,7 +73,7 @@ func (c *Consumer) handleMessage(ctx context.Context, msg amqp.Delivery) {
 
 	if eventID == "" || eventType == "" {
 		c.log.Error("missing event_id or event_type")
-		msg.Reject(false)
+		_ = msg.Reject(false)
 		return
 	}
 
@@ -81,12 +81,12 @@ func (c *Consumer) handleMessage(ctx context.Context, msg amqp.Delivery) {
 	processed, err := c.repo.IsEventProcessed(ctx, eventID)
 	if err != nil {
 		c.log.Error("failed to check idempotency", zap.Error(err))
-		msg.Nack(false, true) // Requeue on DB error
+		_ = msg.Nack(false, true) // Requeue on DB error
 		return
 	}
 	if processed {
 		c.log.Info("event already processed, skipping", zap.String("event_id", eventID))
-		msg.Ack(false)
+		_ = msg.Ack(false)
 		return
 	}
 
@@ -94,7 +94,7 @@ func (c *Consumer) handleMessage(ctx context.Context, msg amqp.Delivery) {
 	if err := c.dispatch(ctx, eventID, eventType, event); err != nil {
 		c.log.Error("failed to process event", zap.Error(err), zap.String("event_id", eventID))
 		// For now, simple requeue. In production, we'd use DLQ with x-death header to count retries.
-		msg.Nack(false, true)
+		_ = msg.Nack(false, true)
 		return
 	}
 
@@ -105,11 +105,11 @@ func (c *Consumer) handleMessage(ctx context.Context, msg amqp.Delivery) {
 	})
 	if err != nil {
 		c.log.Error("failed to mark event processed", zap.Error(err))
-		msg.Nack(false, true) // Requeue
+		_ = msg.Nack(false, true) // Requeue
 		return
 	}
 
-	msg.Ack(false)
+	_ = msg.Ack(false)
 }
 
 func (c *Consumer) logDelivery(ctx context.Context, eventID, eventType, channel, recipient, template string, status string, err error) {

@@ -48,13 +48,14 @@ func (c *Consumer) dispatch(ctx context.Context, eventID, eventType string, even
 		emailAddr := fmt.Sprint(data["email"])
 		
 		var title, message string
-		if eventType == "student.enrolled" {
+		switch eventType {
+		case "student.enrolled":
 			title = "Okula Kaydınız Yapıldı"
 			message = "Tebrikler, üniversitemize kaydınız başarıyla tamamlanmıştır."
-		} else if eventType == "student.graduated" {
+		case "student.graduated":
 			title = "Mezuniyetiniz Tamamlandı!"
 			message = "Tebrikler, tüm zorunlulukları yerine getirdiniz ve mezun oldunuz!"
-		} else {
+		default:
 			title = "Not İtirazınız Kabul Edildi"
 			message = "Geçen haftaki itirazınız değerlendirildi ve kabul edildi."
 		}
