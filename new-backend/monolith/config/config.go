@@ -204,7 +204,9 @@ func setDefaults() {
 	viper.SetDefault("REDIS_DB", 0)
 
 	viper.SetDefault("JWT_SECRET", "change-this-secret-in-production")
-	viper.SetDefault("JWT_ACCESS_TOKEN_EXPIRY", 600)
+	// Access expiry is in MINUTES (see generateAccessToken), refresh in HOURS.
+	// Keep access short: revocation relies on Redis blacklist + short TTL.
+	viper.SetDefault("JWT_ACCESS_TOKEN_EXPIRY", 15)
 	viper.SetDefault("JWT_REFRESH_TOKEN_EXPIRY", 24)
 
 	viper.SetDefault("ADMIN_EMAIL", "admin@university.edu.tr")
