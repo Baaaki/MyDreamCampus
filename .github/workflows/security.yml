@@ -35,6 +35,67 @@ jobs:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
   # ─────────────────────────────────────────────
+  # gosec — Go SAST (crypto misuse, injection, file perms)
+  # Excluded rules, verified noise-only for this codebase:
+  #   G104 unhandled errors on fire-and-forget cache calls
+  #   G109/G115 int conversions of bounded pagination/count values
+  #   G118 detached contexts in async workers (intentional)
+  # ─────────────────────────────────────────────
+  gosec:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Go
+        uses: actions/setup-go@v5
+        with:
+          go-version-file: new-backend/monolith/go.mod
+          cache-dependency-path: new-backend/**/go.sum
+
+      - name: Install gosec
+        run: go install github.com/securego/gosec/v2/cmd/gosec@latest
+
+      - name: Run gosec
+        working-directory: new-backend
+        run: |
+          for mod in monolith shared services/notification; do
+            echo "::group::gosec $mod"
+            (cd "$mod" && gosec -quiet -exclude-generated -exclude=G104,G109,G115,G118 ./...)
+            echo "::endgroup::"
+          done
+
+  # ─────────────────────────────────────────────
+  # govulncheck — reachable known CVEs in deps + stdlib
+  # Fails only on vulnerabilities the code actually calls.
+  # ─────────────────────────────────────────────
+  govulncheck:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Go
+        uses: actions/setup-go@v5
+        with:
+          go-version-file: new-backend/monolith/go.mod
+          cache-dependency-path: new-backend/**/go.sum
+
+      - name: Install govulncheck
+        run: go install golang.org/x/vuln/cmd/govulncheck@latest
+
+      - name: Run govulncheck
+        working-directory: new-backend
+        run: |
+          for mod in monolith shared services/notification; do
+            echo "::group::govulncheck $mod"
+            (cd "$mod" && govulncheck ./...)
+            echo "::endgroup::"
+          done
+
+  # ─────────────────────────────────────────────
   # CodeQL — SAST for Go and JS/TS
   # ─────────────────────────────────────────────
   codeql:
