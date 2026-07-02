@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 
+	catalogDTO "github.com/baaaki/mydreamcampus/monolith/internal/modules/course_catalog/dto"
 	"github.com/baaaki/mydreamcampus/monolith/internal/modules/enrollment/dto"
 	sharedErrors "github.com/baaaki/mydreamcampus/monolith/internal/platform/errors"
 	"github.com/baaaki/mydreamcampus/monolith/internal/platform/logger"
