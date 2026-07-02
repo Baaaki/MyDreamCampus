@@ -14,8 +14,11 @@ services:
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-postgres}
       POSTGRES_DB: mydreamcampus
       PGDATA: /var/lib/postgresql/data/pgdata
+    # 127.0.0.1 binding: only the host reaches infra ports, so an
+    # exposed VPS doesn't serve Postgres/Redis/RabbitMQ to the internet
+    # even if the cloud firewall is misconfigured.
     ports:
-      - "5432:5432"
+      - "127.0.0.1:5432:5432"
     volumes:
       - postgres-data:/var/lib/postgresql
       - ./postgres/init-dbs.sql:/docker-entrypoint-initdb.d/00-init.sql:ro
@@ -35,7 +38,7 @@ services:
       POSTGRES_DB: notification
       PGDATA: /var/lib/postgresql/data/pgdata
     ports:
-      - "5433:5432"
+      - "127.0.0.1:5433:5432"
     volumes:
       - notification-postgres-data:/var/lib/postgresql
       - ./postgres/init-notification-db.sql:/docker-entrypoint-initdb.d/00-init.sql:ro
@@ -50,11 +53,11 @@ services:
     container_name: mydreamcampus-rabbitmq
     restart: unless-stopped
     environment:
-      RABBITMQ_DEFAULT_USER: rabbitmq
-      RABBITMQ_DEFAULT_PASS: rabbitmq
+      RABBITMQ_DEFAULT_USER: ${RABBITMQ_USER:-rabbitmq}
+      RABBITMQ_DEFAULT_PASS: ${RABBITMQ_PASSWORD:-rabbitmq}
     ports:
-      - "5672:5672"
-      - "15672:15672"
+      - "127.0.0.1:5672:5672"
+      - "127.0.0.1:15672:15672"
     volumes:
       - rabbitmq-data:/var/lib/rabbitmq
       - ./rabbitmq/rabbitmq.conf:/etc/rabbitmq/rabbitmq.conf:ro
@@ -72,7 +75,7 @@ services:
     # REDIS_PASSWORD default — token blacklist lives here, never run open.
     command: ["redis-server", "/usr/local/etc/redis/redis.conf", "--requirepass", "${REDIS_PASSWORD:-changeme_redis_secret}"]
     ports:
-      - "6379:6379"
+      - "127.0.0.1:6379:6379"
     volumes:
       - redis-data:/data
       - ./redis/redis.conf:/usr/local/etc/redis/redis.conf:ro
@@ -89,8 +92,8 @@ services:
     container_name: mydreamcampus-mailhog
     restart: unless-stopped
     ports:
-      - "1025:1025"  # SMTP
-      - "8025:8025"  # Web UI
+      - "127.0.0.1:1025:1025"  # SMTP
+      - "127.0.0.1:8025:8025"  # Web UI
 
 volumes:
   postgres-data:
