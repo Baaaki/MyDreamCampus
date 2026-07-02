@@ -8,7 +8,6 @@ import {
   FileCheck,
   BarChart3,
   UtensilsCrossed,
-  TrendingUp,
   UserCheck,
   Calendar,
 } from 'lucide-react';
@@ -159,7 +158,7 @@ export default function DashboardPage() {
             return (
               <Link
                 key={link.href}
-                href={link.href}
+                to={link.href}
                 className="group block"
               >
                 <Card className="h-full transition-all hover:shadow-lg hover:-translate-y-1 dark:bg-gray-900 dark:border-gray-800 dark:hover:border-gray-700">

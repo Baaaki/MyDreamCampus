@@ -2,8 +2,6 @@
 import { useEffect, useState } from "react";
 import { studentApi } from "@/lib/api-client";
 import type { Student } from "@/lib/types";
-import { format } from "date-fns";
-import { tr } from "date-fns/locale";
 
 export default function StudentProfilePage() {
   const [profile, setProfile] = useState<Student | null>(null);
@@ -16,7 +14,12 @@ export default function StudentProfilePage() {
 
   const fetchProfile = async () => {
     try {
-      const data = await studentApi.get("me").json<Student>();
+      // Backend has no /me route; own record is fetched by the auth user id,
+      // same pattern as the student dashboard.
+      const userStr = localStorage.getItem("user");
+      if (!userStr) throw new Error("Oturum bilgisi bulunamadı");
+      const user = JSON.parse(userStr);
+      const data = await studentApi.get(`${user.id}`).json<Student>();
       setProfile(data);
     } catch (err: any) {
       setError(err.message || "Profil bilgileri yüklenemedi");
@@ -53,7 +56,7 @@ export default function StudentProfilePage() {
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
               <div>
                 <label className="block text-sm font-medium text-gray-700">Öğrenci Numarası</label>
-                <p className="mt-1 text-sm text-gray-900">{profile.student_id}</p>
+                <p className="mt-1 text-sm text-gray-900">{profile.student_number}</p>
               </div>
 
               <div>
@@ -69,8 +72,8 @@ export default function StudentProfilePage() {
               </div>
 
               <div>
-                <label className="block text-sm font-medium text-gray-700">Telefon</label>
-                <p className="mt-1 text-sm text-gray-900">{profile.phone}</p>
+                <label className="block text-sm font-medium text-gray-700">Fakülte</label>
+                <p className="mt-1 text-sm text-gray-900">{profile.faculty}</p>
               </div>
 
               <div>

@@ -58,13 +58,14 @@ function groupCoursesByYear(courses: AvailableCourse[]): AccordionSection[] {
     groups[year].push(course);
   });
 
-  return [
+  const sections: AccordionSection[] = [
     { key: '1', title: '1. Sınıf Dersleri', courses: groups['1'] },
     { key: '2', title: '2. Sınıf Dersleri', courses: groups['2'] },
     { key: '3', title: '3. Sınıf Dersleri', courses: groups['3'] },
     { key: '4', title: '4. Sınıf Dersleri', courses: groups['4'] },
     { key: 'secmeli', title: 'Seçmeli Dersler', courses: groups['secmeli'] },
-  ].filter(section => section.courses.length > 0);
+  ];
+  return sections.filter(section => section.courses.length > 0);
 }
 
 export default function CourseList({ courses, selectedCourseIds, onSelectCourse }: CourseListProps) {

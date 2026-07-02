@@ -21,6 +21,7 @@ export interface Session {
   ip_address?: string;
   created_at: string;
   last_used_at: string;
+  expires_at: string;
   is_current: boolean;
 }
 
@@ -52,6 +53,7 @@ export interface Student {
   enrollment_year: number;
   class_level: number;
   advisor_id?: string | null;
+  advisor_name?: string | null;
   advisor?: AdvisorInfo;
   status: string;
   created_at: string;
@@ -556,6 +558,7 @@ export interface SemesterCourse {
   semester: string;
   course_code: string;
   course_name: string;
+  department: string;
   credits: number;
   class_level: number;
   instructor_id: string;

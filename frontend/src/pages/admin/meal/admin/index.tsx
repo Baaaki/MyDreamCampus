@@ -1,7 +1,7 @@
 
 import { useEffect, useState } from "react";
 import { mealApi } from "@/lib/api-client";
-import type { DailyQRCode, Cafeteria } from "@/lib/types";
+import type { QRResponse, Cafeteria } from "@/lib/types";
 import { QRCodeSVG } from "qrcode.react";
 import { format } from "date-fns";
 import { tr } from "date-fns/locale";
@@ -10,8 +10,8 @@ export default function MealAdminQRPage() {
   const [cafeterias, setCafeterias] = useState<Cafeteria[]>([]);
   const [selectedCafeteria, setSelectedCafeteria] = useState("");
   const [selectedDate, setSelectedDate] = useState(format(new Date(), "yyyy-MM-dd"));
-  const [lunchQR, setLunchQR] = useState<DailyQRCode | null>(null);
-  const [dinnerQR, setDinnerQR] = useState<DailyQRCode | null>(null);
+  const [lunchQR, setLunchQR] = useState<QRResponse | null>(null);
+  const [dinnerQR, setDinnerQR] = useState<QRResponse | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
 
@@ -39,16 +39,18 @@ export default function MealAdminQRPage() {
       setLoading(true);
       setError("");
 
-      const [lunch, dinner] = await Promise.all([
+      // Backend route: GET cafeterias/:id/qr?date=&meal_time= — payload
+      // comes wrapped in SuccessResponse{data}.
+      const fetchQR = (mealTime: "lunch" | "dinner") =>
         mealApi
-          .get(`qr/${selectedCafeteria}/${selectedDate}/lunch`)
-          .json<DailyQRCode>()
-          .catch(() => null),
-        mealApi
-          .get(`qr/${selectedCafeteria}/${selectedDate}/dinner`)
-          .json<DailyQRCode>()
-          .catch(() => null),
-      ]);
+          .get(`cafeterias/${selectedCafeteria}/qr`, {
+            searchParams: { date: selectedDate, meal_time: mealTime },
+          })
+          .json<{ data: QRResponse }>()
+          .then((res) => res.data)
+          .catch(() => null);
+
+      const [lunch, dinner] = await Promise.all([fetchQR("lunch"), fetchQR("dinner")]);
 
       setLunchQR(lunch);
       setDinnerQR(dinner);
@@ -114,7 +116,7 @@ export default function MealAdminQRPage() {
                 </p>
                 {lunchQR ? (
                   <div>
-                    <QRCodeSVG value={lunchQR.qr_data} size={250} className="mx-auto mb-4" />
+                    <QRCodeSVG value={lunchQR.qr_payload} size={250} className="mx-auto mb-4" />
                     <p className="text-xs text-gray-500">
                       {format(new Date(lunchQR.date), "dd MMMM yyyy", { locale: tr })}
                     </p>
@@ -134,7 +136,7 @@ export default function MealAdminQRPage() {
                 </p>
                 {dinnerQR ? (
                   <div>
-                    <QRCodeSVG value={dinnerQR.qr_data} size={250} className="mx-auto mb-4" />
+                    <QRCodeSVG value={dinnerQR.qr_payload} size={250} className="mx-auto mb-4" />
                     <p className="text-xs text-gray-500">
                       {format(new Date(dinnerQR.date), "dd MMMM yyyy", { locale: tr })}
                     </p>

@@ -20,7 +20,7 @@ describe("api-client - CSRF token attachment", () => {
   });
 
   it("reads X-CSRF-Token from csrf_token cookie on state-changing requests", async () => {
-    const fetchSpy = vi.fn(async () => new Response("{}", { status: 200 }));
+    const fetchSpy = vi.fn(async (_input: RequestInfo | URL, _init?: RequestInit) => new Response("{}", { status: 200 }));
     vi.stubGlobal("fetch", fetchSpy);
 
     const { apiClient } = await loadClient();
@@ -34,7 +34,7 @@ describe("api-client - CSRF token attachment", () => {
 
   it("omits X-CSRF-Token when csrf_token cookie missing", async () => {
     document.cookie = "csrf_token=; expires=Thu, 01 Jan 1970 00:00:00 GMT; path=/";
-    const fetchSpy = vi.fn(async () => new Response("{}", { status: 200 }));
+    const fetchSpy = vi.fn(async (_input: RequestInfo | URL, _init?: RequestInit) => new Response("{}", { status: 200 }));
     vi.stubGlobal("fetch", fetchSpy);
 
     const { apiClient } = await loadClient();

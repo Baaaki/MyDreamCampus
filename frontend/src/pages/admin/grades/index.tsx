@@ -149,7 +149,7 @@ export default function AdminGradesPage() {
         setCourseStatus(statusRes);
         setStudents(studentsRes.students || []);
       }
-    } catch (err) {
+    } catch {
       setError('Ders verileri alınamadı.');
     } finally {
       setLoading(false);
@@ -183,7 +183,7 @@ export default function AdminGradesPage() {
         const studentsRes = await gradesService.getCourseStudents(selectedCourse!.id);
         setStudents(studentsRes.students || []);
       }
-    } catch (err) {
+    } catch {
       alert('İşlem başarısız oldu.');
     } finally {
       setActionLoading(null);

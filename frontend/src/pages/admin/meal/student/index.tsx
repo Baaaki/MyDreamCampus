@@ -1,13 +1,12 @@
 
 import { useEffect, useState } from "react";
 import { mealApi } from "@/lib/api-client";
-import type { MealReservation, Cafeteria } from "@/lib/types";
-import { format, addDays, startOfWeek, isBefore, isAfter, setHours, setMinutes } from "date-fns";
+import type { MyReservationsResponse, ReservationResponse, Cafeteria } from "@/lib/types";
+import { format, addDays, startOfWeek } from "date-fns";
 import { tr } from "date-fns/locale";
-import { MEAL_TIMES, MENU_TYPES } from "@/lib/constants";
 
 export default function StudentMealReservationPage() {
-  const [reservations, setReservations] = useState<MealReservation[]>([]);
+  const [reservations, setReservations] = useState<ReservationResponse[]>([]);
   const [cafeterias, setCafeterias] = useState<Cafeteria[]>([]);
   const [selectedCafeteria, setSelectedCafeteria] = useState("");
   const [selectedDate, setSelectedDate] = useState("");
@@ -23,12 +22,13 @@ export default function StudentMealReservationPage() {
 
   const fetchData = async () => {
     try {
+      // reservations/my returns {reservations, summary}, not a bare array.
       const [reservationsData, cafeteriasData] = await Promise.all([
-        mealApi.get("reservations/my").json<MealReservation[]>(),
+        mealApi.get("reservations/my").json<MyReservationsResponse>(),
         mealApi.get("cafeterias").json<Cafeteria[]>(),
       ]);
 
-      setReservations(reservationsData);
+      setReservations(reservationsData.reservations ?? []);
       setCafeterias(cafeteriasData.filter((c) => c.is_active));
     } catch (err: any) {
       setError(err.message || "Veri yüklenemedi");
@@ -262,7 +262,7 @@ export default function StudentMealReservationPage() {
                     <div className="flex-1">
                       <h3 className="font-semibold text-gray-900">{reservation.cafeteria_name}</h3>
                       <p className="text-sm text-gray-600">
-                        {format(new Date(reservation.reservation_date), "dd MMMM yyyy - EEEE", {
+                        {format(new Date(reservation.date), "dd MMMM yyyy - EEEE", {
                           locale: tr,
                         })}
                       </p>
@@ -273,17 +273,17 @@ export default function StudentMealReservationPage() {
                       <div className="mt-2 flex gap-2">
                         <span
                           className={`px-2 py-1 text-xs font-medium rounded ${
-                            reservation.payment_status === "paid"
+                            reservation.status === "confirmed"
                               ? "bg-green-100 text-green-800"
-                              : reservation.payment_status === "refunded"
+                              : reservation.status === "cancelled"
                               ? "bg-gray-100 text-gray-800"
                               : "bg-yellow-100 text-yellow-800"
                           }`}
                         >
-                          {reservation.payment_status === "paid"
+                          {reservation.status === "confirmed"
                             ? "Ödendi"
-                            : reservation.payment_status === "refunded"
-                            ? "İade Edildi"
+                            : reservation.status === "cancelled"
+                            ? "İptal Edildi"
                             : "Ödeme Bekliyor"}
                         </span>
                         {reservation.is_used && (
@@ -293,7 +293,7 @@ export default function StudentMealReservationPage() {
                         )}
                       </div>
                     </div>
-                    {!reservation.is_used && reservation.payment_status === "paid" && (
+                    {!reservation.is_used && reservation.status === "confirmed" && (
                       <button
                         onClick={() => handleCancelReservation(reservation.id)}
                         disabled={!isReservationWindowOpen()}

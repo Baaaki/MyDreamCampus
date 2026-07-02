@@ -1,6 +1,5 @@
 import { gradesApiSafe, enrollmentApiSafe, mealApiSafe, catalogApiSafe, authApiSafe, attendanceApiSafe, studentApiSafe, staffApiSafe } from '@/lib/api-client';
 import type {
-  TimeStatus,
   ServiceTimeStatus,
   AcademicPeriod,
   SimplePeriod,
@@ -52,12 +51,12 @@ export async function getAllTimeStatuses(): Promise<ServiceTimeStatus[]> {
   return SERVICE_KEYS.map(key => ({
     service: key,
     label: SERVICES[key].label,
-    status: { current_time: new Date().toISOString() },
+    status: { mode: 'real' as const, current_time: new Date().toISOString(), simulated_time: null },
     error: null,
   }));
 }
 
-export async function simulateTimeAll(time: string): Promise<{ success: string[]; failed: string[] }> {
+export async function simulateTimeAll(_time: string): Promise<{ success: string[]; failed: string[] }> {
   await MOCK_DELAY();
   return { success: SERVICE_KEYS.map(k => SERVICES[k].label), failed: [] };
 }
@@ -166,7 +165,7 @@ export async function updateSemester(
 export interface AuditLogFilters {
   service?: string; action?: string; actor_id?: string; limit?: number; offset?: number;
 }
-export async function listAuditLog(filters: AuditLogFilters = {}): Promise<AuditLogListResponse> {
+export async function listAuditLog(_filters: AuditLogFilters = {}): Promise<AuditLogListResponse> {
   await MOCK_DELAY();
   const entries: AuditLogEntry[] = [
     { id: 'aud1', timestamp: new Date(Date.now() - 3600000).toISOString(), service: 'catalog', action: 'semester.activated', resource_type: 'semester', resource_id: 'sem2', actor_role: 'admin', actor_id: 'admin-123', details: { note: 'Mock data' } },

@@ -27,7 +27,6 @@ import {
 import { gradesService } from '@/lib/services/grades-service';
 import type {
   CourseStatusResponse,
-  CourseStudentsResponse,
   StudentGrades,
   AssessmentStatus,
 } from '@/lib/types';
@@ -39,8 +38,10 @@ interface LocalScore {
 
 export default function GradeEntryPage() {
   const params = useParams<{ courseId: string; slug: string }>();
-  const courseId = params.courseId;
-  const slug = params.slug;
+  // Route guarantees both params; fall back to '' so a malformed URL fails
+  // into the error state instead of crashing type-narrowing everywhere.
+  const courseId = params.courseId ?? '';
+  const slug = params.slug ?? '';
 
   const [courseStatus, setCourseStatus] = useState<CourseStatusResponse | null>(null);
   const [students, setStudents] = useState<StudentGrades[]>([]);

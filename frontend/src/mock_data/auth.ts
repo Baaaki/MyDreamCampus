@@ -48,6 +48,7 @@ export const mockSessions: Session[] = [
     ip_address: '192.168.1.100',
     created_at: new Date(Date.now() - 2 * 60 * 60 * 1000).toISOString(),
     last_used_at: new Date(Date.now() - 10 * 60 * 1000).toISOString(),
+    expires_at: new Date(Date.now() + 22 * 60 * 60 * 1000).toISOString(),
     is_current: true,
   },
   {
@@ -56,6 +57,7 @@ export const mockSessions: Session[] = [
     ip_address: '192.168.1.105',
     created_at: new Date(Date.now() - 5 * 60 * 60 * 1000).toISOString(),
     last_used_at: new Date(Date.now() - 30 * 60 * 1000).toISOString(),
+    expires_at: new Date(Date.now() + 19 * 60 * 60 * 1000).toISOString(),
     is_current: false,
   },
   {
@@ -64,6 +66,7 @@ export const mockSessions: Session[] = [
     ip_address: '10.0.0.50',
     created_at: new Date(Date.now() - 10 * 60 * 60 * 1000).toISOString(),
     last_used_at: new Date(Date.now() - 2 * 60 * 60 * 1000).toISOString(),
+    expires_at: new Date(Date.now() + 14 * 60 * 60 * 1000).toISOString(),
     is_current: false,
   },
 ];

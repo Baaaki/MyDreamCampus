@@ -82,10 +82,9 @@ export default function StudentsPage() {
   
   // Faculty/Department selection
   const [createDepartments, setCreateDepartments] = useState<Department[]>([])
-  const [editDepartments, setEditDepartments] = useState<Department[]>([])
-  
+
   // Advisors from staff API
-  const [advisors, setAdvisors] = useState<Staff[]>([])
+  const [, setAdvisors] = useState<Staff[]>([])
 
   // Department-specific advisors for create form
   const [departmentAdvisors, setDepartmentAdvisors] = useState<Staff[]>([])
@@ -305,21 +304,16 @@ export default function StudentsPage() {
       const formData = new FormData()
       formData.append('file', selectedFile)
 
-      // Note: Mock API doesn't support FormData, this will work with real backend
-      const response = await fetch('/api/v1/students/import', {
-        method: 'POST',
-        body: formData,
-      })
+      // studentApi (ky) attaches cookies + CSRF header; raw fetch would 403
+      // on the CSRF-protected admin route.
+      const result = await studentApi
+        .post('bulk-import', { body: formData })
+        .json<{ job_id: string }>()
 
-      if (response.ok) {
-        const result = await response.json()
-        alert(`Import job created successfully. Job ID: ${result.job_id}`)
-        setIsImportOpen(false)
-        setSelectedFile(null)
-        fetchStudents()
-      } else {
-        alert('Import failed')
-      }
+      alert(`Import job created successfully. Job ID: ${result.job_id}`)
+      setIsImportOpen(false)
+      setSelectedFile(null)
+      fetchStudents()
     } catch (error) {
       console.error('Failed to import students:', error)
       alert('Import failed: ' + error)
