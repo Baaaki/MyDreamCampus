@@ -12,6 +12,7 @@ import (
 	"github.com/baaaki/mydreamcampus/monolith/internal/modules/meal/service"
 	"github.com/baaaki/mydreamcampus/monolith/internal/modules/meal/worker"
 	"github.com/baaaki/mydreamcampus/monolith/internal/platform/audit"
+	platformMiddleware "github.com/baaaki/mydreamcampus/monolith/internal/platform/middleware"
 	"github.com/baaaki/mydreamcampus/monolith/internal/platform/rabbitmq"
 	"github.com/gin-gonic/gin"
 	"github.com/jackc/pgx/v5/pgxpool"
@@ -115,9 +116,47 @@ func (m *Module) Bootstrap(ctx context.Context) error {
 }
 
 func (m *Module) RegisterRoutes(router *gin.RouterGroup) {
-	m.mealHandler.RegisterRoutes(router)
-	m.closedDaysHandler.RegisterRoutes(router)
-	m.closedDaysHandler.RegisterInternalRoutes(router.Group("/internal"))
+	router.GET("/health", m.mealHandler.Health)
+
+	// Loopback fan-out from course_catalog (semester closed-days
+	// distribution) — shared-secret auth instead of JWT.
+	internal := router.Group("/internal")
+	internal.Use(platformMiddleware.RequireInternalSecret(m.cfg.Server.InternalSecret))
+	m.closedDaysHandler.RegisterInternalRoutes(internal)
+
+	protected := router.Group("")
+	protected.Use(platformMiddleware.JWTAuth())
+	protected.Use(platformMiddleware.CSRFProtection())
+	protected.Use(platformMiddleware.UserRateLimit())
+	{
+		// Reads available to every authenticated role.
+		protected.GET("/cafeterias", m.mealHandler.GetCafeterias)
+		protected.GET("/menu/monthly", m.mealHandler.GetMonthlyMenu)
+
+		// Students manage only their own reservations; handlers take the
+		// student ID from the JWT, never from the request body.
+		reservations := protected.Group("/reservations")
+		reservations.Use(platformMiddleware.RequireStudent())
+		{
+			reservations.POST("", m.mealHandler.CreateReservation)
+			reservations.POST("/batch", m.mealHandler.CreateBatchReservation)
+			reservations.GET("/my", m.mealHandler.GetMyReservations)
+			reservations.DELETE("/:reservation_id", m.mealHandler.CancelReservation)
+			reservations.POST("/use", m.mealHandler.UseReservation)
+		}
+
+		// Cafeteria/menu management is admin-only.
+		protected.POST("/cafeterias", platformMiddleware.RequireAdmin(), m.mealHandler.CreateCafeteria)
+		protected.PUT("/cafeterias/:cafeteria_id", platformMiddleware.RequireAdmin(), m.mealHandler.UpdateCafeteria)
+		protected.DELETE("/cafeterias/:cafeteria_id", platformMiddleware.RequireAdmin(), m.mealHandler.DeleteCafeteria)
+		protected.GET("/cafeterias/:cafeteria_id/qr", platformMiddleware.RequireAdmin(), m.mealHandler.GenerateQR)
+		protected.POST("/menu/monthly", platformMiddleware.RequireAdmin(), m.mealHandler.CreateMonthlyMenu)
+
+		// /admin/closed-days — matches the path the admin frontend calls.
+		admin := protected.Group("/admin")
+		admin.Use(platformMiddleware.RequireAdmin())
+		m.closedDaysHandler.RegisterRoutes(admin)
+	}
 }
 
 func (m *Module) OutboxStore() eventbus.OutboxStore {

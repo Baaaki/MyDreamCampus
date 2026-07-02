@@ -35,34 +35,8 @@ func NewMealHandler(
 	}
 }
 
-// RegisterRoutes mounts all meal-related endpoints under the given router group.
-func (h *MealHandler) RegisterRoutes(rg *gin.RouterGroup) {
-	cafeterias := rg.Group("/cafeterias")
-	{
-		cafeterias.GET("", h.GetCafeterias)
-		cafeterias.POST("", h.CreateCafeteria)
-		cafeterias.PUT("/:cafeteria_id", h.UpdateCafeteria)
-		cafeterias.DELETE("/:cafeteria_id", h.DeleteCafeteria)
-		cafeterias.GET("/:cafeteria_id/qr", h.GenerateQR)
-	}
-
-	reservations := rg.Group("/reservations")
-	{
-		reservations.POST("", h.CreateReservation)
-		reservations.POST("/batch", h.CreateBatchReservation)
-		reservations.GET("/my", h.GetMyReservations)
-		reservations.DELETE("/:reservation_id", h.CancelReservation)
-		reservations.POST("/use", h.UseReservation)
-	}
-
-	menu := rg.Group("/menu")
-	{
-		menu.POST("/monthly", h.CreateMonthlyMenu)
-		menu.GET("/monthly", h.GetMonthlyMenu)
-	}
-
-	rg.GET("/health", h.Health)
-}
+// Route registration lives in the meal module (module.go) so the
+// JWT/CSRF/RBAC middleware chain and the handlers stay in one place.
 
 // ============================================================================
 // CAFETERIA ENDPOINTS

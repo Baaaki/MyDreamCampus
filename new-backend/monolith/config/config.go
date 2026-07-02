@@ -29,6 +29,9 @@ type Config struct {
 type ServerConfig struct {
 	Environment string `mapstructure:"ENVIRONMENT"`
 	Port        string `mapstructure:"PORT"`
+	// InternalSecret authenticates loopback service-to-service calls
+	// (X-Internal-Secret header on /internal/* routes).
+	InternalSecret string `mapstructure:"INTERNAL_SERVICE_SECRET"`
 }
 
 type DatabaseConfig struct {
@@ -137,8 +140,9 @@ func Load() (*Config, error) {
 
 	cfg := &Config{
 		Server: ServerConfig{
-			Environment: viper.GetString("ENVIRONMENT"),
-			Port:        viper.GetString("PORT"),
+			Environment:    viper.GetString("ENVIRONMENT"),
+			Port:           viper.GetString("PORT"),
+			InternalSecret: viper.GetString("INTERNAL_SERVICE_SECRET"),
 		},
 		Database: DatabaseConfig{URL: viper.GetString("DB_URL")},
 		RabbitMQ: RabbitMQConfig{URL: viper.GetString("RABBITMQ_URL")},
@@ -196,6 +200,7 @@ func Load() (*Config, error) {
 func setDefaults() {
 	viper.SetDefault("ENVIRONMENT", "development")
 	viper.SetDefault("PORT", "8080")
+	viper.SetDefault("INTERNAL_SERVICE_SECRET", "change-this-internal-secret-in-production")
 
 	viper.SetDefault("DB_URL", "postgres://postgres:postgres@localhost:5432/mydreamcampus?sslmode=disable")
 	viper.SetDefault("RABBITMQ_URL", "amqp://rabbitmq:rabbitmq@localhost:5672/")
@@ -278,6 +283,9 @@ func (c *Config) Validate() error {
 		}
 		if c.Admin.InitialPassword == "Admin123!" {
 			return fmt.Errorf("ADMIN_INITIAL_PASSWORD must be changed in production")
+		}
+		if c.Server.InternalSecret == "change-this-internal-secret-in-production" || len(c.Server.InternalSecret) < minJWTSecretLength {
+			return fmt.Errorf("INTERNAL_SERVICE_SECRET must be set to a random value of at least %d bytes in production", minJWTSecretLength)
 		}
 	}
 	if c.Admin.Email == "" {

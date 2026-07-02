@@ -73,9 +73,8 @@ func New(
 
 	// SemesterStatusHandler still does HTTP calls to other modules for
 	// period distribution. They all live in the same monolith binary now,
-	// so the URL points at our own port. internal-secret stays empty —
-	// when those modules migrate we'll either tighten this or replace
-	// the HTTP hop with an in-process call (plan section 8).
+	// so the URL points at our own port. The shared internal secret rides
+	// along as X-Internal-Secret; target /internal/* routes verify it.
 	loopback := "http://localhost:" + cfg.Server.Port
 	serviceURLs := handler.ServiceURLs{
 		Enrollment: loopback,
@@ -102,7 +101,7 @@ func New(
 		catalogHandler:     handler.NewCatalogHandler(catalogSvc),
 		semesterHandler:    handler.NewSemesterHandler(semesterSvc),
 		semesterStatusHandler: handler.NewSemesterStatusHandler(
-			semesterStatusRepo, periodRepo, auditLogger, serviceURLs, pool, "",
+			semesterStatusRepo, periodRepo, auditLogger, serviceURLs, pool, cfg.Server.InternalSecret,
 		),
 		auditHandler:  handler.NewAuditHandler(auditRepo),
 		periodHandler: platformHandler.NewSimplePeriodHandler(periodRepo, semesterStatusRepo, auditLogger),
@@ -162,9 +161,11 @@ func (m *Module) RegisterRoutes(rg *gin.RouterGroup) {
 	}
 
 	// Internal sub-tree — service-to-service in the legacy world. Other
-	// modules can still reach these via in-process or loopback HTTP until
-	// the period-distribution flow is rewritten as in-process calls.
+	// modules can still reach these via loopback HTTP until the
+	// period-distribution flow is rewritten as in-process calls.
+	// Shared-secret auth keeps them off the public surface.
 	internal := rg.Group("/internal")
+	internal.Use(platformMiddleware.RequireInternalSecret(m.cfg.Server.InternalSecret))
 	{
 		m.semesterStatusHandler.RegisterInternalRoutes(internal)
 		m.auditHandler.RegisterInternalRoutes(internal)
