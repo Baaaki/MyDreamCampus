@@ -68,17 +68,21 @@ services:
     image: redis:7-alpine
     container_name: mydreamcampus-redis
     restart: unless-stopped
-    command: ["redis-server", "/usr/local/etc/redis/redis.conf"]
+    # requirepass comes from env so it stays in sync with the monolith's
+    # REDIS_PASSWORD default — token blacklist lives here, never run open.
+    command: ["redis-server", "/usr/local/etc/redis/redis.conf", "--requirepass", "${REDIS_PASSWORD:-changeme_redis_secret}"]
     ports:
       - "6379:6379"
     volumes:
       - redis-data:/data
       - ./redis/redis.conf:/usr/local/etc/redis/redis.conf:ro
     healthcheck:
-      test: ["CMD", "redis-cli", "ping"]
+      test: ["CMD-SHELL", "redis-cli -a \"$${REDIS_PASSWORD:-changeme_redis_secret}\" ping | grep PONG"]
       interval: 5s
       timeout: 3s
       retries: 10
+    environment:
+      REDIS_PASSWORD: ${REDIS_PASSWORD:-changeme_redis_secret}
 
   mailhog:
     image: mailhog/mailhog
