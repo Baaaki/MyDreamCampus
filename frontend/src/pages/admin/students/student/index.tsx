@@ -1,22 +1,13 @@
 
-import { useState, useEffect } from "react";
-import { 
-  Users, 
-  Search, 
-  ArrowLeft, 
-  Mail, 
-  Phone, 
-  MapPin, 
-  Calendar, 
-  Book, 
-  GraduationCap, 
-  Award,
-  Edit,
+import { useState } from "react";
+import {
+  Users,
+  Search,
+  ArrowLeft,
+  Mail,
+  GraduationCap,
   Save,
   Printer,
-  Camera,
-  Trash2,
-  Plus,
   User
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -25,7 +16,6 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { studentApi } from "@/lib/api-client";
 import { mockFaculties } from "@/mock_data";
 import type { Student } from "@/lib/types";

@@ -1,11 +1,11 @@
 
-import { useState, useEffect } from 'react';
+import { useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { mealApi } from '@/lib/api-client';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Checkbox } from '@/components/ui/checkbox';
 import {
@@ -136,7 +136,7 @@ export default function CafeteriasPage() {
   const [formData, setFormData] = useState<CafeteriaFormData>(initialFormData);
 
   // Fetch cafeterias - backend'den veri gelmezse mock kullan
-  const { data: apiCafeterias, isLoading, error } = useQuery({
+  const { data: apiCafeterias, isLoading } = useQuery({
     queryKey: ['cafeterias'],
     queryFn: fetchCafeterias,
     retry: 1,

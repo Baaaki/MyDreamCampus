@@ -26,7 +26,6 @@ export default function EnrollmentPage() {
     try {
       setLoading(true);
       const currentSemester = "fall";
-      const currentYear = new Date().getFullYear();
 
       const coursesData = await enrollmentApi
         .get(`available?semester=${currentSemester}`)

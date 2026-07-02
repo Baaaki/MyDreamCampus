@@ -25,7 +25,6 @@ import {
   ArrowLeft,
   BookOpen,
   Building2,
-  Users,
   Plus
 } from "lucide-react";
 

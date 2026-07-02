@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useState } from 'react';
 import { format } from 'date-fns';
 import { tr } from 'date-fns/locale';
-import { CalendarOff, Plus, Pencil, Trash2, RefreshCw, Loader2, AlertTriangle } from 'lucide-react';
+import { Plus, Pencil, Trash2, RefreshCw, Loader2, AlertTriangle } from 'lucide-react';
 
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';

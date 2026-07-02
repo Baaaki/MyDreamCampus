@@ -552,7 +552,8 @@ const sampleMenuItems = {
   friday: ['EZOGELİN ÇORBASI', 'MANTARLI ET SOTE', 'BULGUR PİLAVI', 'KOMPOSTO', 'ÇOBAN SALATA'] as [string, string, string, string, string],
 };
 
-const sampleWeeklyMenu: WeeklyMenu = {
+// Exported so the sample stays available as demo/mock data without tripping noUnusedLocals.
+export const sampleWeeklyMenu: WeeklyMenu = {
   monday: { items: sampleMenuItems.monday, calories: calcCalories(sampleMenuItems.monday) },
   tuesday: { items: sampleMenuItems.tuesday, calories: calcCalories(sampleMenuItems.tuesday) },
   wednesday: { items: sampleMenuItems.wednesday, calories: calcCalories(sampleMenuItems.wednesday) },
@@ -569,7 +570,7 @@ const sampleVeganMenuItems = {
   friday: ['EZOGELİN ÇORBASI', 'SEBZE GÜVEÇ', 'ZEYTİNYAĞLI YEŞİL FASULYE', 'MEVSİM MEYVE', 'FAVA'] as [string, string, string, string, string],
 };
 
-const sampleVeganWeeklyMenu: WeeklyMenu = {
+export const sampleVeganWeeklyMenu: WeeklyMenu = {
   monday: { items: sampleVeganMenuItems.monday, calories: calcVeganCalories(sampleVeganMenuItems.monday) },
   tuesday: { items: sampleVeganMenuItems.tuesday, calories: calcVeganCalories(sampleVeganMenuItems.tuesday) },
   wednesday: { items: sampleVeganMenuItems.wednesday, calories: calcVeganCalories(sampleVeganMenuItems.wednesday) },

@@ -15,7 +15,6 @@ import {
 } from 'lucide-react';
 import {
   getMyReservations,
-  getDisplayStatus,
   getStartOfCurrentWeek,
   getEndOfPreviousWeek,
   formatDateForApi,

@@ -41,10 +41,10 @@ export default function StudentEnrollmentPage() {
   const [courseColorMap, setCourseColorMap] = useState<Record<string, number>>({});
   const [nextColorIndex, setNextColorIndex] = useState(0);
   const [availableCourses, setAvailableCourses] = useState<AvailableCourse[]>([]);
-  const [studentId, setStudentId] = useState<string>('');
+  const [, setStudentId] = useState<string>('');
   const [enrollmentStatus, setEnrollmentStatus] = useState<string | null>(null);
   const [rejectionInfo, setRejectionInfo] = useState<RejectionDetail | null>(null);
-  const [loading, setLoading] = useState(true);
+  const [, setLoading] = useState(true);
   const [toast, setToast] = useState<{ message: string; type: 'error' | 'warning' | 'success' | 'info'; isVisible: boolean }>({
     message: '',
     type: 'warning',

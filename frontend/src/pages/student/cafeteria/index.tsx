@@ -120,18 +120,6 @@ export default function StudentCafeteriaPage() {
 
   const weekDates = getWeekDates();
 
-  // Toggle meal selection
-  const cycleMealType = (day: string) => {
-    setMealSelections(prev => {
-      const current = prev[day];
-      let next: MealType;
-      if (current === 'none') next = 'normal';
-      else if (current === 'normal') next = 'vegan';
-      else next = 'none';
-      return { ...prev, [day]: next };
-    });
-  };
-
   // Set specific meal type
   const setMealType = (day: string, type: MealType) => {
     setMealSelections(prev => ({ ...prev, [day]: type }));
@@ -140,12 +128,6 @@ export default function StudentCafeteriaPage() {
   // Calculate total
   const selectedMealsCount = Object.values(mealSelections).filter(m => m !== 'none').length;
   const totalPrice = selectedMealsCount * MEAL_PRICE;
-
-  // Get cafeteria name by id
-  const getCafeteriaName = (id: string) => {
-    const cafe = cafeterias.find(c => c.id === id);
-    return cafe ? cafe.name : 'Bilinmeyen Yemekhane';
-  };
 
   // Handle payment
   const handlePayment = async () => {

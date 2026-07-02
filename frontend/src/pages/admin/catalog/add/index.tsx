@@ -119,7 +119,7 @@ const initialFormData: FormData = {
 export default function AddCoursePage() {
   const navigate = useNavigate();
   const [formData, setFormData] = useState<FormData>(initialFormData);
-  const [selectedFaculty, setSelectedFaculty] = useState<Faculty | null>(null);
+  const [, setSelectedFaculty] = useState<Faculty | null>(null);
   const [departments, setDepartments] = useState<Department[]>([]);
 
   // Mutation for creating course

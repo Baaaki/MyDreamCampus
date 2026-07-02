@@ -19,7 +19,6 @@ import { Badge } from '@/components/ui/badge';
 import {
   AlertDialog,
   AlertDialogAction,
-  AlertDialogCancel,
   AlertDialogContent,
   AlertDialogDescription,
   AlertDialogFooter,
@@ -27,7 +26,7 @@ import {
   AlertDialogTitle,
 } from '@/components/ui/alert-dialog';
 import { mockFaculties } from '@/mock_data/catalog';
-import type { Faculty, Department, AssessmentItem, ScheduleSessionDTO, CourseCatalog, CreateSemesterCourseRequest, SemesterCourse, Semester } from '@/lib/types';
+import type { Department, AssessmentItem, ScheduleSessionDTO, CourseCatalog, CreateSemesterCourseRequest, SemesterCourse, Semester } from '@/lib/types';
 import { catalogApi, staffApi, semesterApi } from '@/lib/api-client';
 import { listSemesters } from '@/lib/services/system-service';
 import {
@@ -272,7 +271,6 @@ export default function SemesterCoursesPage() {
   // TanStack Query - Fetch existing semester courses for the department
   const {
     data: existingSemesterCourses = [],
-    isLoading: isLoadingExistingCourses,
   } = useQuery({
     queryKey: ['semesterCourses', semester, formData.department_id],
     queryFn: () => fetchSemesterCourses(semester, getDepartmentName(formData.department_id)),
