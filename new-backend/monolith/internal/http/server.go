@@ -129,9 +129,19 @@ func (s *Server) installFrontendFallback() {
 // Run starts ListenAndServe in a goroutine; the call returns immediately.
 // Caller is responsible for invoking Shutdown on signal.
 func (s *Server) Run() {
+	// Without explicit timeouts net/http keeps slow connections open
+	// forever (slowloris). Read/Write derive from REQUEST_TIMEOUT_SECONDS.
+	requestTimeout := time.Duration(s.cfg.Timeout.RequestTimeoutSeconds) * time.Second
+	if requestTimeout <= 0 {
+		requestTimeout = 10 * time.Second
+	}
 	s.httpServer = &http.Server{
-		Addr:    ":" + s.cfg.Server.Port,
-		Handler: s.router,
+		Addr:              ":" + s.cfg.Server.Port,
+		Handler:           s.router,
+		ReadHeaderTimeout: 5 * time.Second,
+		ReadTimeout:       requestTimeout,
+		WriteTimeout:      requestTimeout + 5*time.Second,
+		IdleTimeout:       60 * time.Second,
 	}
 	go func() {
 		logger.Info("http server starting", zap.String("port", s.cfg.Server.Port))
