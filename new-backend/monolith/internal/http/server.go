@@ -51,6 +51,7 @@ func NewServer(cfg *config.Config) *Server {
 	r.Use(platformMiddleware.Recovery())
 	r.Use(platformMiddleware.SecurityHeaders())
 	r.Use(platformMiddleware.CORS())
+	r.Use(platformMiddleware.BodySizeLimit(platformMiddleware.DefaultMaxBodyBytes))
 	r.Use(platformMiddleware.RequestLogger())
 	r.Use(platformMiddleware.IPRateLimit())
 	r.Use(platformMiddleware.SetCSRFToken(cfg.Server.Environment == "production"))

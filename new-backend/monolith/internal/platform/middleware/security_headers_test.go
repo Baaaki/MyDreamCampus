@@ -26,6 +26,9 @@ func TestSecurityHeaders_AlwaysSet(t *testing.T) {
 	assert.Equal(t, "DENY", h.Get("X-Frame-Options"))
 	assert.Equal(t, "strict-origin-when-cross-origin", h.Get("Referrer-Policy"))
 	assert.NotEmpty(t, h.Get("Permissions-Policy"))
+	csp := h.Get("Content-Security-Policy")
+	assert.Contains(t, csp, "default-src 'self'")
+	assert.Contains(t, csp, "frame-ancestors 'none'")
 	assert.Empty(t, h.Get("Strict-Transport-Security"),
 		"HSTS must NOT be set outside production")
 }
