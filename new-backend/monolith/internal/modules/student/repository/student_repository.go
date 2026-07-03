@@ -6,11 +6,11 @@ import (
 	"errors"
 	"fmt"
 
-	"github.com/baaaki/mydreamcampus/shared/events"
-	sharedErrors "github.com/baaaki/mydreamcampus/monolith/internal/platform/errors"
-	"github.com/baaaki/mydreamcampus/monolith/internal/platform/utils"
 	"github.com/baaaki/mydreamcampus/monolith/internal/modules/student/db"
 	serviceErrors "github.com/baaaki/mydreamcampus/monolith/internal/modules/student/errors"
+	sharedErrors "github.com/baaaki/mydreamcampus/monolith/internal/platform/errors"
+	"github.com/baaaki/mydreamcampus/monolith/internal/platform/utils"
+	"github.com/baaaki/mydreamcampus/shared/events"
 	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgconn"
@@ -443,6 +443,16 @@ func (r *StudentRepository) ListStudentsFiltered(ctx context.Context, params db.
 // CountStudents returns total count of active students
 func (r *StudentRepository) CountStudents(ctx context.Context) (int64, error) {
 	count, err := r.queries.CountStudents(ctx)
+	if err != nil {
+		return 0, fmt.Errorf("%w: failed to count students: %v", sharedErrors.ErrQueryFailed, err)
+	}
+	return count, nil
+}
+
+// CountStudentsFiltered mirrors ListStudentsFiltered's predicates so page
+// totals reflect the filtered set, not the whole table.
+func (r *StudentRepository) CountStudentsFiltered(ctx context.Context, params db.CountStudentsFilteredParams) (int64, error) {
+	count, err := r.queries.CountStudentsFiltered(ctx, params)
 	if err != nil {
 		return 0, fmt.Errorf("%w: failed to count students: %v", sharedErrors.ErrQueryFailed, err)
 	}

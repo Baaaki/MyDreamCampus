@@ -50,6 +50,37 @@ func (q *Queries) CountStudents(ctx context.Context) (int64, error) {
 	return count, err
 }
 
+const countStudentsFiltered = `-- name: CountStudentsFiltered :one
+SELECT COUNT(*)
+FROM student.students
+WHERE is_active = true
+  AND ($1::TEXT IS NULL OR department = $1)
+  AND ($2::SMALLINT IS NULL OR class_level = $2)
+  AND ($3::TEXT IS NULL OR status = $3)
+  AND ($4::UUID IS NULL OR advisor_id = $4)
+`
+
+type CountStudentsFilteredParams struct {
+	Department pgtype.Text `json:"department"`
+	ClassLevel pgtype.Int2 `json:"class_level"`
+	Status     pgtype.Text `json:"status"`
+	AdvisorID  pgtype.UUID `json:"advisor_id"`
+}
+
+// Same predicates as ListStudents so paginated totals match the filtered
+// result set instead of the whole table.
+func (q *Queries) CountStudentsFiltered(ctx context.Context, arg CountStudentsFilteredParams) (int64, error) {
+	row := q.db.QueryRow(ctx, countStudentsFiltered,
+		arg.Department,
+		arg.ClassLevel,
+		arg.Status,
+		arg.AdvisorID,
+	)
+	var count int64
+	err := row.Scan(&count)
+	return count, err
+}
+
 const createStudent = `-- name: CreateStudent :one
 INSERT INTO student.students (
     student_number, first_name, last_name, email, faculty, department,

@@ -101,6 +101,17 @@ LIMIT $1 OFFSET $2;
 -- name: CountStudents :one
 SELECT COUNT(*) FROM student.students WHERE is_active = true;
 
+-- name: CountStudentsFiltered :one
+-- Same predicates as ListStudents so paginated totals match the filtered
+-- result set instead of the whole table.
+SELECT COUNT(*)
+FROM student.students
+WHERE is_active = true
+  AND (sqlc.narg('department')::TEXT IS NULL OR department = sqlc.narg('department'))
+  AND (sqlc.narg('class_level')::SMALLINT IS NULL OR class_level = sqlc.narg('class_level'))
+  AND (sqlc.narg('status')::TEXT IS NULL OR status = sqlc.narg('status'))
+  AND (sqlc.narg('advisor_id')::UUID IS NULL OR advisor_id = sqlc.narg('advisor_id'));
+
 -- name: CountOrphanedStudents :one
 SELECT COUNT(*) FROM student.students WHERE advisor_id IS NULL AND is_active = true;
 

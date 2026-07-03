@@ -3,12 +3,12 @@ package service
 import (
 	"context"
 
-	sharedErrors "github.com/baaaki/mydreamcampus/monolith/internal/platform/errors"
-	"github.com/baaaki/mydreamcampus/monolith/internal/platform/logger"
-	"github.com/baaaki/mydreamcampus/monolith/internal/platform/utils"
 	"github.com/baaaki/mydreamcampus/monolith/internal/modules/student/db"
 	"github.com/baaaki/mydreamcampus/monolith/internal/modules/student/dto"
 	serviceErrors "github.com/baaaki/mydreamcampus/monolith/internal/modules/student/errors"
+	sharedErrors "github.com/baaaki/mydreamcampus/monolith/internal/platform/errors"
+	"github.com/baaaki/mydreamcampus/monolith/internal/platform/logger"
+	"github.com/baaaki/mydreamcampus/monolith/internal/platform/utils"
 	"github.com/google/uuid"
 	"go.uber.org/zap"
 )
@@ -23,6 +23,7 @@ type StudentRepositoryInterface interface {
 	SoftDeleteStudentWithEvent(ctx context.Context, id uuid.UUID, eventPayload map[string]any) error
 	ListStudentsFiltered(ctx context.Context, params db.ListStudentsParams) ([]db.Student, error)
 	CountStudents(ctx context.Context) (int64, error)
+	CountStudentsFiltered(ctx context.Context, params db.CountStudentsFilteredParams) (int64, error)
 	ListStudentsByAdvisor(ctx context.Context, advisorID uuid.UUID) ([]db.Student, error)
 	ListOrphanedStudents(ctx context.Context, limit, offset int32) ([]db.Student, int64, error)
 	BulkAssignAdvisor(ctx context.Context, studentIDs []uuid.UUID, advisorID uuid.UUID, advisorName string, eventPayloads []map[string]any) error
@@ -440,8 +441,14 @@ func (s *StudentService) ListStudents(ctx context.Context, query dto.PaginationQ
 		return dto.StudentListResponse{}, sharedErrors.Wrap(sharedErrors.ErrInternal, err)
 	}
 
-	// Get total count (we'll use existing CountStudents for now, ideally should count with filters)
-	total, err := s.studentRepo.CountStudents(ctx)
+	// Total must honor the same filters as the list — otherwise page counts
+	// are computed against the whole table.
+	total, err := s.studentRepo.CountStudentsFiltered(ctx, db.CountStudentsFilteredParams{
+		Department: params.Department,
+		ClassLevel: params.ClassLevel,
+		Status:     params.Status,
+		AdvisorID:  params.AdvisorID,
+	})
 	if err != nil {
 		// Check for query failures - wrap and return, handler will log
 		if sharedErrors.Is(err, sharedErrors.ErrQueryFailed) {
