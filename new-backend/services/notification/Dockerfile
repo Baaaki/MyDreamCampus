@@ -17,6 +17,9 @@ RUN go build -trimpath -ldflags="-s -w" -o /out/notification ./cmd/main.go
 FROM gcr.io/distroless/static-debian12:nonroot
 WORKDIR /app
 COPY --from=build /out/notification /app/notification
+# Email templates are loaded with a CWD-relative glob (internal/templates/*.html),
+# so they must sit next to the binary under /app.
+COPY --from=build /src/services/notification/internal/templates /app/internal/templates
 EXPOSE 9090
 USER nonroot:nonroot
 ENTRYPOINT ["/app/notification"]

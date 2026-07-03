@@ -12,7 +12,7 @@ services:
     restart: unless-stopped
     environment:
       POSTGRES_USER: ${POSTGRES_USER:-postgres}
-      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-postgres}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?POSTGRES_PASSWORD is required — see .env.example}
       POSTGRES_DB: mydreamcampus
       PGDATA: /var/lib/postgresql/data/pgdata
     ports:
@@ -32,7 +32,7 @@ services:
     restart: unless-stopped
     environment:
       POSTGRES_USER: ${POSTGRES_USER:-postgres}
-      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-postgres}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?POSTGRES_PASSWORD is required — see .env.example}
       POSTGRES_DB: notification
       PGDATA: /var/lib/postgresql/data/pgdata
     ports:
@@ -52,7 +52,7 @@ services:
     restart: unless-stopped
     environment:
       RABBITMQ_DEFAULT_USER: ${RABBITMQ_USER:-rabbitmq}
-      RABBITMQ_DEFAULT_PASS: ${RABBITMQ_PASSWORD:-rabbitmq}
+      RABBITMQ_DEFAULT_PASS: ${RABBITMQ_PASSWORD:?RABBITMQ_PASSWORD is required — see .env.example}
     ports:
       - "127.0.0.1:5672:5672"
       - "127.0.0.1:15672:15672"
@@ -69,7 +69,7 @@ services:
     image: redis:7-alpine
     container_name: mydreamcampus-redis
     restart: unless-stopped
-    command: ["redis-server", "/usr/local/etc/redis/redis.conf", "--requirepass", "${REDIS_PASSWORD:-changeme_redis_secret}"]
+    command: ["redis-server", "/usr/local/etc/redis/redis.conf", "--requirepass", "${REDIS_PASSWORD:?REDIS_PASSWORD is required — see .env.example}"]
     ports:
       - "127.0.0.1:6379:6379"
     volumes:
@@ -81,7 +81,7 @@ services:
       timeout: 3s
       retries: 10
     environment:
-      REDIS_PASSWORD: ${REDIS_PASSWORD:-changeme_redis_secret}
+      REDIS_PASSWORD: ${REDIS_PASSWORD:?REDIS_PASSWORD is required — see .env.example}
 
   mailhog:
     image: mailhog/mailhog
@@ -101,8 +101,8 @@ services:
     container_name: mydreamcampus-migrate
     restart: "no"
     environment:
-      DB_URL: postgres://${POSTGRES_USER:-postgres}:${POSTGRES_PASSWORD:-postgres}@postgres:5432/mydreamcampus?sslmode=disable
-      NOTIF_DB_URL: postgres://${POSTGRES_USER:-postgres}:${POSTGRES_PASSWORD:-postgres}@notification-postgres:5432/notification?sslmode=disable
+      DB_URL: postgres://${POSTGRES_USER:-postgres}:${POSTGRES_PASSWORD:?POSTGRES_PASSWORD is required — see .env.example}@postgres:5432/mydreamcampus?sslmode=disable
+      NOTIF_DB_URL: postgres://${POSTGRES_USER:-postgres}:${POSTGRES_PASSWORD:?POSTGRES_PASSWORD is required — see .env.example}@notification-postgres:5432/notification?sslmode=disable
     depends_on:
       postgres:
         condition: service_healthy
@@ -119,8 +119,8 @@ services:
     environment:
       ENVIRONMENT: production
       PORT: "8080"
-      DB_URL: postgres://${POSTGRES_USER:-postgres}:${POSTGRES_PASSWORD:-postgres}@postgres:5432/mydreamcampus?sslmode=disable
-      RABBITMQ_URL: amqp://${RABBITMQ_USER:-rabbitmq}:${RABBITMQ_PASSWORD:-rabbitmq}@rabbitmq:5672/
+      DB_URL: postgres://${POSTGRES_USER:-postgres}:${POSTGRES_PASSWORD:?POSTGRES_PASSWORD is required — see .env.example}@postgres:5432/mydreamcampus?sslmode=disable
+      RABBITMQ_URL: amqp://${RABBITMQ_USER:-rabbitmq}:${RABBITMQ_PASSWORD:?RABBITMQ_PASSWORD is required — see .env.example}@rabbitmq:5672/
       REDIS_ADDR: redis:6379
       REDIS_PASSWORD: ${REDIS_PASSWORD:?set REDIS_PASSWORD in .env}
       JWT_SECRET: ${JWT_SECRET:?set JWT_SECRET in .env}
@@ -152,8 +152,8 @@ services:
     container_name: mydreamcampus-notification
     restart: unless-stopped
     environment:
-      NOTIF_DATABASE_URL: postgres://${POSTGRES_USER:-postgres}:${POSTGRES_PASSWORD:-postgres}@notification-postgres:5432/notification?sslmode=disable
-      NOTIF_RABBITMQ_URL: amqp://${RABBITMQ_USER:-rabbitmq}:${RABBITMQ_PASSWORD:-rabbitmq}@rabbitmq:5672/
+      NOTIF_DATABASE_URL: postgres://${POSTGRES_USER:-postgres}:${POSTGRES_PASSWORD:?POSTGRES_PASSWORD is required — see .env.example}@notification-postgres:5432/notification?sslmode=disable
+      NOTIF_RABBITMQ_URL: amqp://${RABBITMQ_USER:-rabbitmq}:${RABBITMQ_PASSWORD:?RABBITMQ_PASSWORD is required — see .env.example}@rabbitmq:5672/
       NOTIF_SMTP_HOST: mailhog
       NOTIF_SMTP_PORT: "1025"
       NOTIF_APP_URL: ${PUBLIC_ORIGIN:?set PUBLIC_ORIGIN in .env}
@@ -181,7 +181,7 @@ services:
       SEED_DEMO: ${SEED_DEMO:-true}
       ADMIN_EMAIL: ${ADMIN_EMAIL:-admin@university.edu.tr}
       ADMIN_INITIAL_PASSWORD: ${ADMIN_INITIAL_PASSWORD:?set ADMIN_INITIAL_PASSWORD in .env}
-      DB_URL: postgres://${POSTGRES_USER:-postgres}:${POSTGRES_PASSWORD:-postgres}@postgres:5432/mydreamcampus?sslmode=disable
+      DB_URL: postgres://${POSTGRES_USER:-postgres}:${POSTGRES_PASSWORD:?POSTGRES_PASSWORD is required — see .env.example}@postgres:5432/mydreamcampus?sslmode=disable
     depends_on:
       monolith:
         condition: service_started

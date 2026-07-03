@@ -78,9 +78,16 @@ jq -c '.[]' /seed/data/students.json | while IFS= read -r row; do post "api/stud
 if [ -n "${DB_URL:-}" ]; then
 	echo ">> waiting for login projections, then clearing force_password_change"
 	sleep 8
+	# Scope strictly to the exact seeded emails (+ admin). A domain wildcard
+	# would also disable the flag for real users sharing the domain.
+	EMAILS=$(
+		{ jq -rs 'add | map(.email) | .[]' /seed/data/teachers.json /seed/data/students.json
+		  printf '%s\n' "$ADMIN_EMAIL"; } \
+		| while IFS= read -r e; do [ -n "$e" ] && printf "'%s'," "$e"; done \
+		| sed 's/,$//'
+	)
 	psql "$DB_URL" -v ON_ERROR_STOP=1 -c \
-		"UPDATE auth.users SET force_password_change = false
-		 WHERE email = '${ADMIN_EMAIL}' OR email LIKE '%@uni.edu.tr';" \
+		"UPDATE auth.users SET force_password_change = false WHERE email IN ($EMAILS);" \
 		|| echo "   (force_password_change update skipped: $?)"
 fi
 
