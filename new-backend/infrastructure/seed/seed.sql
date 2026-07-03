@@ -113,3 +113,79 @@ CROSS JOIN LATERAL (VALUES
    ('final',   (50 + floor(random() * 45))::numeric(5,2))
  ) AS v(slug, score)
 ON CONFLICT (registration_id, slug) DO NOTHING;
+
+-- ============================================================
+-- 7. Attendance: views, active period, weekly sessions, present records
+-- ============================================================
+INSERT INTO attendance.students_view (id, student_number, first_name, last_name, email, department, is_active)
+SELECT id, student_number, first_name, last_name, email, department, is_active
+FROM student.students
+ON CONFLICT (id) DO NOTHING;
+
+INSERT INTO attendance.courses_view
+  (id, course_code, course_name, credits, semester, department, instructor_id, instructor_fullname, total_weeks, has_lab)
+SELECT sc.id, sc.course_code, c.name, sc.credits, sc.semester, c.department,
+       sc.instructor_id, sc.instructor_fullname, 14, false
+FROM course_catalog.semester_courses sc
+JOIN course_catalog.course_catalog c ON c.course_code = sc.course_code
+WHERE sc.semester = '2025-2026 Güz'
+ON CONFLICT (id) DO NOTHING;
+
+INSERT INTO attendance.enrollments_view (student_id, course_id, semester)
+SELECT sv.id, cv.id, '2025-2026 Güz'
+FROM attendance.students_view sv
+JOIN attendance.courses_view cv
+  ON cv.semester = '2025-2026 Güz' AND cv.course_code IN ('CENG101','CENG102','CENG201')
+ON CONFLICT (student_id, course_id) DO NOTHING;
+
+INSERT INTO attendance.academic_periods (semester, period_start, period_end, is_active)
+VALUES ('2025-2026 Güz', NOW() - INTERVAL '30 days', NOW() + INTERVAL '90 days', true)
+ON CONFLICT (semester) DO NOTHING;
+
+INSERT INTO attendance.attendance_sessions
+  (course_id, instructor_id, semester, week_number, session_date, session_type, qr_secret, expires_at, is_active)
+SELECT cv.id, cv.instructor_id, '2025-2026 Güz', w.week,
+       CURRENT_DATE - ((4 - w.week) * 7), 'theory',
+       substr(md5(random()::text), 1, 32), NOW(), false
+FROM attendance.courses_view cv
+CROSS JOIN (VALUES (1), (2), (3)) AS w(week)
+WHERE cv.semester = '2025-2026 Güz' AND cv.course_code IN ('CENG101','CENG102','CENG201')
+ON CONFLICT (course_id, week_number, session_type) DO NOTHING;
+
+INSERT INTO attendance.attendance_records
+  (session_id, student_id, course_id, semester, week_number, session_type, marked_via, manually_marked_at)
+SELECT s.id, e.student_id, s.course_id, s.semester, s.week_number, s.session_type, 'admin', NOW()
+FROM attendance.attendance_sessions s
+JOIN attendance.enrollments_view e ON e.course_id = s.course_id
+WHERE s.semester = '2025-2026 Güz'
+ON CONFLICT (session_id, student_id) DO NOTHING;
+
+-- ============================================================
+-- 8. Meal: cafeterias, student view, monthly menu, reservations
+-- ============================================================
+INSERT INTO meal.cafeterias (name, location, has_vegan_menu, serves_dinner, is_active)
+SELECT v.name, v.location, v.has_vegan_menu, v.serves_dinner, true
+FROM (VALUES
+   ('Merkez Yemekhane', 'Ana Kampüs A Blok', true,  true),
+   ('Mühendislik Yemekhanesi', 'Mühendislik Fakültesi', false, false)
+ ) AS v(name, location, has_vegan_menu, serves_dinner)
+WHERE NOT EXISTS (SELECT 1 FROM meal.cafeterias c WHERE c.name = v.name);
+
+INSERT INTO meal.students_view (id, student_number, first_name, last_name, is_active)
+SELECT id, student_number, first_name, last_name, is_active
+FROM student.students
+ON CONFLICT (id) DO NOTHING;
+
+INSERT INTO meal.monthly_menus (year, month, menu_data)
+VALUES (2026, 7,
+  '{"2026-07-06":{"lunch":["Mercimek Çorbası","Tavuk Sote","Pilav","Yoğurt"],"dinner":["Ezogelin Çorbası","Izgara Köfte","Bulgur Pilavı","Salata"]},
+    "2026-07-07":{"lunch":["Domates Çorbası","Fırın Makarna","Cacık","Meyve"],"dinner":["Yayla Çorbası","Etli Nohut","Pirinç Pilavı","Turşu"]}}'::jsonb)
+ON CONFLICT (year, month) DO NOTHING;
+
+INSERT INTO meal.reservations (student_id, cafeteria_id, reservation_date, meal_time, menu_type, status)
+SELECT sv.id,
+       (SELECT id FROM meal.cafeterias WHERE name = 'Merkez Yemekhane' LIMIT 1),
+       CURRENT_DATE + d.n, 'lunch', 'normal', 'confirmed'
+FROM meal.students_view sv
+CROSS JOIN (VALUES (1), (2), (3)) AS d(n)
+ON CONFLICT (student_id, reservation_date, meal_time) WHERE status IN ('pending', 'confirmed') DO NOTHING;
