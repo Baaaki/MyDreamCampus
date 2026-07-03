@@ -5,6 +5,7 @@ import (
 
 	"github.com/baaaki/mydreamcampus/monolith/internal/modules/grades/db"
 	"github.com/google/uuid"
+	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgxpool"
 )
 
@@ -53,4 +54,10 @@ func (r *CompletedRepository) GetCompletedCourseByStudentAndCourse(ctx context.C
 
 func (r *CompletedRepository) UpdateCompletedCourseAfterAppeal(ctx context.Context, arg db.UpdateCompletedCourseAfterAppealParams) error {
 	return r.queries.UpdateCompletedCourseAfterAppeal(ctx, arg)
+}
+
+// WithTx returns a copy of the repository whose queries run inside tx —
+// required by AutoFinalize so its multi-table writes commit atomically.
+func (r *CompletedRepository) WithTx(tx pgx.Tx) *CompletedRepository {
+	return &CompletedRepository{queries: r.queries.WithTx(tx), pool: r.pool}
 }

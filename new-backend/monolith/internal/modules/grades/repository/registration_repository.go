@@ -5,6 +5,7 @@ import (
 
 	"github.com/baaaki/mydreamcampus/monolith/internal/modules/grades/db"
 	"github.com/google/uuid"
+	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgxpool"
 )
 
@@ -54,4 +55,10 @@ func (r *RegistrationRepository) DeleteRegistrationsByCourse(ctx context.Context
 
 func (r *RegistrationRepository) GetActiveRegistrationsByStudent(ctx context.Context, studentID uuid.UUID) ([]db.GetActiveRegistrationsByStudentRow, error) {
 	return r.queries.GetActiveRegistrationsByStudent(ctx, studentID)
+}
+
+// WithTx returns a copy of the repository whose queries run inside tx —
+// required by AutoFinalize so its multi-table writes commit atomically.
+func (r *RegistrationRepository) WithTx(tx pgx.Tx) *RegistrationRepository {
+	return &RegistrationRepository{queries: r.queries.WithTx(tx), pool: r.pool}
 }

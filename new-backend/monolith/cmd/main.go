@@ -180,7 +180,7 @@ func main() {
 	}
 
 	gradesAuditLogger := catalogService.NewDirectAuditLogger(catalogModule.AuditRepo(), "grades")
-	gradesModule := grades.New(pool, catalogModule.PeriodRepo(), gradesAuditLogger, catalogModule.SemesterService())
+	gradesModule := grades.New(pool, rabbitConn, catalogModule.PeriodRepo(), gradesAuditLogger, catalogModule.SemesterService())
 	if err := gradesModule.Bootstrap(ctx); err != nil {
 		logger.Fatal("failed to bootstrap grades module", zap.Error(err))
 	}

@@ -418,7 +418,9 @@ func (s *GradeService) AutoFinalize(ctx context.Context, courseID uuid.UUID, ins
 	// 8. Combine all students
 	allStudents := append(regularStudents, attendanceFailedStudents...)
 
-	// 9. Start transaction to save completed courses
+	// 9. Start transaction to save completed courses. Repos are re-bound to
+	// the tx (WithTx) — without that every write below would autocommit on
+	// the pool and a mid-loop failure would leave a half-finalized course.
 	tx, err := s.pool.Begin(ctx)
 	if err != nil {
 		logger.Error("failed to begin transaction", zap.Error(err))
@@ -426,28 +428,31 @@ func (s *GradeService) AutoFinalize(ctx context.Context, courseID uuid.UUID, ins
 	}
 	defer tx.Rollback(ctx)
 
-	completedQtx := s.completedRepo
-	outboxQtx := s.outboxRepo
-	registrationQtx := s.registrationRepo
-	scoreQtx := s.scoreRepo
+	completedQtx := s.completedRepo.WithTx(tx)
+	outboxQtx := s.outboxRepo.WithTx(tx)
+	registrationQtx := s.registrationRepo.WithTx(tx)
+	scoreQtx := s.scoreRepo.WithTx(tx)
 
 	passingCount := 0
 	failingCount := 0
 
 	for _, student := range allStudents {
-		// Delete old completed course record (for retakes)
+		// Delete old completed course record (for retakes). Inside a tx a
+		// failed statement poisons the whole transaction, so errors abort
+		// the finalize instead of skipping a student silently.
 		if err := completedQtx.DeleteCompletedCourse(ctx, db.DeleteCompletedCourseParams{
 			StudentID:  student.Registration.StudentID,
 			CourseCode: course.CourseCode,
 		}); err != nil {
 			logger.Error("failed to delete old completed course", zap.Error(err))
+			return nil, fmt.Errorf("delete old completed course: %w", err)
 		}
 
 		// Marshal scores to JSONB
 		scoresJSON, err := json.Marshal(student.Scores)
 		if err != nil {
 			logger.Error("failed to marshal scores", zap.Error(err))
-			continue
+			return nil, fmt.Errorf("marshal scores: %w", err)
 		}
 
 		// Build grading config
@@ -495,7 +500,7 @@ func (s *GradeService) AutoFinalize(ctx context.Context, courseID uuid.UUID, ins
 		})
 		if err != nil {
 			logger.Error("failed to create completed course", zap.Error(err))
-			continue
+			return nil, fmt.Errorf("create completed course: %w", err)
 		}
 
 		// Count passing/failing
@@ -525,6 +530,7 @@ func (s *GradeService) AutoFinalize(ctx context.Context, courseID uuid.UUID, ins
 					Payload:    prereqPayload,
 				}); err != nil {
 					logger.Error("failed to create prerequisite passed outbox event", zap.Error(err))
+					return nil, fmt.Errorf("create prerequisite outbox event: %w", err)
 				}
 			}
 		} else {
@@ -532,12 +538,15 @@ func (s *GradeService) AutoFinalize(ctx context.Context, courseID uuid.UUID, ins
 		}
 	}
 
-	// 10. Clean up operational tables
+	// 10. Clean up operational tables — same tx, so a failure here rolls
+	// back the completed_courses writes instead of stranding them.
 	if err := scoreQtx.DeleteScoresByCourse(ctx, courseID); err != nil {
 		logger.Error("failed to delete scores", zap.Error(err))
+		return nil, fmt.Errorf("delete scores: %w", err)
 	}
 	if err := registrationQtx.DeleteRegistrationsByCourse(ctx, courseID); err != nil {
 		logger.Error("failed to delete registrations", zap.Error(err))
+		return nil, fmt.Errorf("delete registrations: %w", err)
 	}
 
 	// 11. Publish grade.finalized event
@@ -562,6 +571,7 @@ func (s *GradeService) AutoFinalize(ctx context.Context, courseID uuid.UUID, ins
 		Payload:    finalizedPayload,
 	}); err != nil {
 		logger.Error("failed to create finalized outbox event", zap.Error(err))
+		return nil, fmt.Errorf("create finalized outbox event: %w", err)
 	}
 
 	// 12. Commit transaction

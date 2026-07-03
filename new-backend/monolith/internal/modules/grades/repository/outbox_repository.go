@@ -5,6 +5,7 @@ import (
 
 	"github.com/baaaki/mydreamcampus/monolith/internal/modules/grades/db"
 	"github.com/google/uuid"
+	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgxpool"
 )
 
@@ -38,4 +39,10 @@ func (r *OutboxRepository) MarkOutboxEventFailed(ctx context.Context, arg db.Mar
 
 func (r *OutboxRepository) RetryFailedOutboxEvent(ctx context.Context, id uuid.UUID) error {
 	return r.queries.RetryFailedOutboxEvent(ctx, id)
+}
+
+// WithTx returns a copy of the repository whose queries run inside tx —
+// required by AutoFinalize so its multi-table writes commit atomically.
+func (r *OutboxRepository) WithTx(tx pgx.Tx) *OutboxRepository {
+	return &OutboxRepository{queries: r.queries.WithTx(tx), pool: r.pool}
 }

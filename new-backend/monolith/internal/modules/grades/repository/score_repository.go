@@ -7,6 +7,7 @@ import (
 	"github.com/baaaki/mydreamcampus/monolith/internal/modules/grades/db"
 	sharedErrors "github.com/baaaki/mydreamcampus/monolith/internal/platform/errors"
 	"github.com/google/uuid"
+	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgxpool"
 )
 
@@ -156,4 +157,10 @@ func (r *ScoreRepository) LockScoresByCourseAndSlug(ctx context.Context, courseI
 		CourseID: courseID,
 		Slug:     slug,
 	})
+}
+
+// WithTx returns a copy of the repository whose queries run inside tx —
+// required by AutoFinalize so its multi-table writes commit atomically.
+func (r *ScoreRepository) WithTx(tx pgx.Tx) *ScoreRepository {
+	return &ScoreRepository{queries: r.queries.WithTx(tx), pool: r.pool}
 }

@@ -9,7 +9,9 @@ import (
 	"github.com/baaaki/mydreamcampus/monolith/internal/modules/grades/handler"
 	"github.com/baaaki/mydreamcampus/monolith/internal/modules/grades/repository"
 	"github.com/baaaki/mydreamcampus/monolith/internal/modules/grades/service"
+	"github.com/baaaki/mydreamcampus/monolith/internal/modules/grades/worker"
 	platformMiddleware "github.com/baaaki/mydreamcampus/monolith/internal/platform/middleware"
+	"github.com/baaaki/mydreamcampus/monolith/internal/platform/rabbitmq"
 	platformRepo "github.com/baaaki/mydreamcampus/monolith/internal/platform/repository"
 	"github.com/baaaki/mydreamcampus/monolith/internal/platform/audit"
 	ccService "github.com/baaaki/mydreamcampus/monolith/internal/modules/course_catalog/service"
@@ -31,10 +33,14 @@ type Module struct {
 	gradeService *service.GradeService
 
 	gradeHandler *handler.GradeHandler
+
+	eventConsumer    *worker.EventConsumer
+	finalizeConsumer *worker.FinalizeConsumer
 }
 
 func New(
 	pool *pgxpool.Pool,
+	rabbitConn *rabbitmq.Connection,
 	periodRepo *platformRepo.SimplePeriodRepository,
 	auditLogger audit.Logger,
 	semesterSvc *ccService.SemesterService,
@@ -77,6 +83,8 @@ func New(
 		outboxStore:      repository.NewOutboxStore(outboxRepo),
 		gradeService:     gradeSvc,
 		gradeHandler:     handler.NewGradeHandler(gradeSvc, studentGradeSvc),
+		eventConsumer:    worker.NewEventConsumer(rabbitmq.NewConsumer(rabbitConn), cacheRepo, registrationRepo),
+		finalizeConsumer: worker.NewFinalizeConsumer(rabbitmq.NewConsumer(rabbitConn), gradeSvc, completedRepo),
 	}
 }
 
@@ -86,10 +94,15 @@ func (m *Module) Name() string { return "grades" }
 // OutboxStore for the per-module outbox worker.
 func (m *Module) OutboxStore() eventbus.OutboxStore { return m.outboxStore }
 
-// Bootstrap starts the staff/student/course event consumers
+// Bootstrap starts the RabbitMQ consumers: sync events (student/course/
+// enrollment/attendance projections) and the finalize self-loop. Queue
+// bindings are pre-declared in main.go so events published before this
+// point are not lost.
 func (m *Module) Bootstrap(ctx context.Context) error {
-	// Note: Currently consumers are not wired here yet, they run as separate generic workers
-	return nil
+	if err := m.eventConsumer.Start(ctx); err != nil {
+		return err
+	}
+	return m.finalizeConsumer.Start(ctx)
 }
 
 // RegisterRoutes mounts /api/grades/*. All routes JWT-authed.
@@ -117,7 +130,15 @@ func (m *Module) RegisterRoutes(rg *gin.RouterGroup) {
 		{
 			student.GET("/grades", m.gradeHandler.GetMyGrades)
 			student.GET("/transcript", m.gradeHandler.GetTranscript)
-			student.POST("/appeals", m.gradeHandler.ProcessAppeal)
+		}
+
+		// Admin facing routes. The appeal handler mutates a finalized
+		// grade, so it must never sit behind RequireStudent — the handler
+		// double-checks the admin role itself.
+		admin := rg.Group("/admin")
+		admin.Use(platformMiddleware.RequireAdmin())
+		{
+			admin.POST("/appeals", m.gradeHandler.ProcessAppeal)
 		}
 	}
 }
