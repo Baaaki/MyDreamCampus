@@ -1,0 +1,11 @@
+# Build context is new-backend/. Keep local build artifacts and secrets out of
+# the image and off the daemon transfer.
+**/bin/
+**/main
+**/*_bin
+**/coverage.out
+**/coverage.html
+**/.env
+**/.env.local
+**/*.log
+.git

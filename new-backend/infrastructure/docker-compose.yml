@@ -1,6 +1,7 @@
-# MyDreamCampus modular monolith infrastructure.
-# Plan section 11 Faz 0 — single Postgres for the monolith, separate Postgres
-# for notification, RabbitMQ, Redis, MailHog. No Traefik (plan section 7).
+# MyDreamCampus modular monolith — full stack.
+# Infra (postgres x2, rabbitmq, redis, mailhog) + app (migrate, monolith,
+# notification worker, caddy edge). Infra ports bind to 127.0.0.1 so only the
+# host reaches them; caddy is the single public entrypoint on 80/443.
 
 name: mydreamcampus
 
@@ -14,9 +15,6 @@ services:
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-postgres}
       POSTGRES_DB: mydreamcampus
       PGDATA: /var/lib/postgresql/data/pgdata
-    # 127.0.0.1 binding: only the host reaches infra ports, so an
-    # exposed VPS doesn't serve Postgres/Redis/RabbitMQ to the internet
-    # even if the cloud firewall is misconfigured.
     ports:
       - "127.0.0.1:5432:5432"
     volumes:
@@ -71,8 +69,6 @@ services:
     image: redis:7-alpine
     container_name: mydreamcampus-redis
     restart: unless-stopped
-    # requirepass comes from env so it stays in sync with the monolith's
-    # REDIS_PASSWORD default — token blacklist lives here, never run open.
     command: ["redis-server", "/usr/local/etc/redis/redis.conf", "--requirepass", "${REDIS_PASSWORD:-changeme_redis_secret}"]
     ports:
       - "127.0.0.1:6379:6379"
@@ -95,8 +91,125 @@ services:
       - "127.0.0.1:1025:1025"  # SMTP
       - "127.0.0.1:8025:8025"  # Web UI
 
+  # One-shot: applies every module's goose migrations, then exits. The monolith
+  # and notification wait for this to finish successfully before starting.
+  migrate:
+    build:
+      context: ..
+      dockerfile: infrastructure/migrate/Dockerfile
+    image: mydreamcampus-migrate:latest
+    container_name: mydreamcampus-migrate
+    restart: "no"
+    environment:
+      DB_URL: postgres://${POSTGRES_USER:-postgres}:${POSTGRES_PASSWORD:-postgres}@postgres:5432/mydreamcampus?sslmode=disable
+      NOTIF_DB_URL: postgres://${POSTGRES_USER:-postgres}:${POSTGRES_PASSWORD:-postgres}@notification-postgres:5432/notification?sslmode=disable
+    depends_on:
+      postgres:
+        condition: service_healthy
+      notification-postgres:
+        condition: service_healthy
+
+  monolith:
+    build:
+      context: ..
+      dockerfile: monolith/Dockerfile
+    image: mydreamcampus-monolith:latest
+    container_name: mydreamcampus-monolith
+    restart: unless-stopped
+    environment:
+      ENVIRONMENT: production
+      PORT: "8080"
+      DB_URL: postgres://${POSTGRES_USER:-postgres}:${POSTGRES_PASSWORD:-postgres}@postgres:5432/mydreamcampus?sslmode=disable
+      RABBITMQ_URL: amqp://${RABBITMQ_USER:-rabbitmq}:${RABBITMQ_PASSWORD:-rabbitmq}@rabbitmq:5672/
+      REDIS_ADDR: redis:6379
+      REDIS_PASSWORD: ${REDIS_PASSWORD:?set REDIS_PASSWORD in .env}
+      JWT_SECRET: ${JWT_SECRET:?set JWT_SECRET in .env}
+      INTERNAL_SERVICE_SECRET: ${INTERNAL_SERVICE_SECRET:?set INTERNAL_SERVICE_SECRET in .env}
+      QR_SECRET: ${QR_SECRET:?set QR_SECRET in .env}
+      ADMIN_EMAIL: ${ADMIN_EMAIL:-admin@university.edu.tr}
+      ADMIN_INITIAL_PASSWORD: ${ADMIN_INITIAL_PASSWORD:?set ADMIN_INITIAL_PASSWORD in .env}
+      # SPA is served by caddy, not the monolith. Same origin -> CORS matches
+      # the public URL the browser uses.
+      FRONTEND_STATIC_ENABLED: "false"
+      CORS_ALLOWED_ORIGINS: ${PUBLIC_ORIGIN:?set PUBLIC_ORIGIN in .env}
+    expose:
+      - "8080"
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      rabbitmq:
+        condition: service_healthy
+      migrate:
+        condition: service_completed_successfully
+
+  notification:
+    build:
+      context: ..
+      dockerfile: services/notification/Dockerfile
+    image: mydreamcampus-notification:latest
+    container_name: mydreamcampus-notification
+    restart: unless-stopped
+    environment:
+      NOTIF_DATABASE_URL: postgres://${POSTGRES_USER:-postgres}:${POSTGRES_PASSWORD:-postgres}@notification-postgres:5432/notification?sslmode=disable
+      NOTIF_RABBITMQ_URL: amqp://${RABBITMQ_USER:-rabbitmq}:${RABBITMQ_PASSWORD:-rabbitmq}@rabbitmq:5672/
+      NOTIF_SMTP_HOST: mailhog
+      NOTIF_SMTP_PORT: "1025"
+      NOTIF_APP_URL: ${PUBLIC_ORIGIN:?set PUBLIC_ORIGIN in .env}
+    expose:
+      - "9090"
+    depends_on:
+      notification-postgres:
+        condition: service_healthy
+      rabbitmq:
+        condition: service_healthy
+      migrate:
+        condition: service_completed_successfully
+
+  # One-shot: seeds demo teachers/courses/students via the admin API once the
+  # monolith is up. Idempotent (skips if demo data exists). SEED_DEMO=false in
+  # .env disables it.
+  seed:
+    build:
+      context: ./seed
+    image: mydreamcampus-seed:latest
+    container_name: mydreamcampus-seed
+    restart: "no"
+    environment:
+      API_URL: http://monolith:8080
+      SEED_DEMO: ${SEED_DEMO:-true}
+      ADMIN_EMAIL: ${ADMIN_EMAIL:-admin@university.edu.tr}
+      ADMIN_INITIAL_PASSWORD: ${ADMIN_INITIAL_PASSWORD:?set ADMIN_INITIAL_PASSWORD in .env}
+      DB_URL: postgres://${POSTGRES_USER:-postgres}:${POSTGRES_PASSWORD:-postgres}@postgres:5432/mydreamcampus?sslmode=disable
+    depends_on:
+      monolith:
+        condition: service_started
+
+  # Public edge: serves the SPA and reverse-proxies /api to the monolith.
+  # Fetches a real Let's Encrypt cert for SITE_ADDRESS automatically.
+  caddy:
+    build:
+      context: ../../frontend
+      dockerfile: Dockerfile
+    image: mydreamcampus-caddy:latest
+    container_name: mydreamcampus-caddy
+    restart: unless-stopped
+    environment:
+      SITE_ADDRESS: ${PUBLIC_HOST:-localhost}
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - caddy-data:/data
+      - caddy-config:/config
+    depends_on:
+      - monolith
+
 volumes:
   postgres-data:
   notification-postgres-data:
   rabbitmq-data:
   redis-data:
+  caddy-data:
+  caddy-config:

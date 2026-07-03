@@ -1,0 +1,10 @@
+[
+  { "student_number": "2021510001", "first_name": "Zeynep", "last_name": "Şahin", "email": "zeynep.sahin@uni.edu.tr", "faculty": "Mühendislik Fakültesi", "department": "Bilgisayar Mühendisliği", "enrollment_year": 2021, "class_level": 4 },
+  { "student_number": "2021510002", "first_name": "Emir", "last_name": "Çelik", "email": "emir.celik@uni.edu.tr", "faculty": "Mühendislik Fakültesi", "department": "Bilgisayar Mühendisliği", "enrollment_year": 2021, "class_level": 4 },
+  { "student_number": "2022510010", "first_name": "Elif", "last_name": "Aydın", "email": "elif.aydin@uni.edu.tr", "faculty": "Mühendislik Fakültesi", "department": "Bilgisayar Mühendisliği", "enrollment_year": 2022, "class_level": 3 },
+  { "student_number": "2022510011", "first_name": "Baran", "last_name": "Koç", "email": "baran.koc@uni.edu.tr", "faculty": "Mühendislik Fakültesi", "department": "Bilgisayar Mühendisliği", "enrollment_year": 2022, "class_level": 3 },
+  { "student_number": "2023510020", "first_name": "Deniz", "last_name": "Arslan", "email": "deniz.arslan@uni.edu.tr", "faculty": "Mühendislik Fakültesi", "department": "Bilgisayar Mühendisliği", "enrollment_year": 2023, "class_level": 2 },
+  { "student_number": "2023510021", "first_name": "Selin", "last_name": "Doğan", "email": "selin.dogan@uni.edu.tr", "faculty": "Mühendislik Fakültesi", "department": "Bilgisayar Mühendisliği", "enrollment_year": 2023, "class_level": 2 },
+  { "student_number": "2024510030", "first_name": "Kerem", "last_name": "Yıldız", "email": "kerem.yildiz@uni.edu.tr", "faculty": "Mühendislik Fakültesi", "department": "Bilgisayar Mühendisliği", "enrollment_year": 2024, "class_level": 1 },
+  { "student_number": "2024510031", "first_name": "Naz", "last_name": "Öztürk", "email": "naz.ozturk@uni.edu.tr", "faculty": "Mühendislik Fakültesi", "department": "Bilgisayar Mühendisliği", "enrollment_year": 2024, "class_level": 1 }
+]

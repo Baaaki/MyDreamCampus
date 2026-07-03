@@ -1,0 +1,5 @@
+[
+  { "email": "ahmet.yilmaz@uni.edu.tr", "first_name": "Ahmet", "last_name": "Yılmaz", "role": "teacher", "department": "Bilgisayar Mühendisliği", "phone": "+90 212 555 0101", "office_location": "A-201" },
+  { "email": "ayse.demir@uni.edu.tr", "first_name": "Ayşe", "last_name": "Demir", "role": "teacher", "department": "Bilgisayar Mühendisliği", "phone": "+90 212 555 0102", "office_location": "A-202" },
+  { "email": "mehmet.kaya@uni.edu.tr", "first_name": "Mehmet", "last_name": "Kaya", "role": "teacher", "department": "Elektrik-Elektronik Mühendisliği", "phone": "+90 212 555 0103", "office_location": "B-110" }
+]

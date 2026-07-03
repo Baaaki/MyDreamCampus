@@ -1,0 +1,8 @@
+[
+  { "course_code": "CENG101", "name": "Programlamaya Giriş", "faculty": "Mühendislik Fakültesi", "department": "Bilgisayar Mühendisliği", "class_level": 1, "semester": 1, "credits": 4, "ects": 6, "theoretical_hours": 3, "lab_hours": 2, "course_type": "mandatory", "language": "Türkçe" },
+  { "course_code": "CENG102", "name": "Veri Yapıları", "faculty": "Mühendislik Fakültesi", "department": "Bilgisayar Mühendisliği", "class_level": 1, "semester": 2, "credits": 4, "ects": 6, "theoretical_hours": 3, "lab_hours": 2, "course_type": "mandatory", "language": "Türkçe" },
+  { "course_code": "CENG201", "name": "Algoritmalar", "faculty": "Mühendislik Fakültesi", "department": "Bilgisayar Mühendisliği", "class_level": 2, "semester": 3, "credits": 4, "ects": 6, "theoretical_hours": 3, "lab_hours": 0, "course_type": "mandatory", "language": "Türkçe" },
+  { "course_code": "CENG202", "name": "Veritabanı Sistemleri", "faculty": "Mühendislik Fakültesi", "department": "Bilgisayar Mühendisliği", "class_level": 2, "semester": 4, "credits": 3, "ects": 5, "theoretical_hours": 2, "lab_hours": 2, "course_type": "mandatory", "language": "Türkçe" },
+  { "course_code": "CENG301", "name": "İşletim Sistemleri", "faculty": "Mühendislik Fakültesi", "department": "Bilgisayar Mühendisliği", "class_level": 3, "semester": 5, "credits": 3, "ects": 5, "theoretical_hours": 3, "lab_hours": 0, "course_type": "mandatory", "language": "Türkçe" },
+  { "course_code": "CENG350", "name": "Yapay Zekâya Giriş", "faculty": "Mühendislik Fakültesi", "department": "Bilgisayar Mühendisliği", "class_level": 3, "semester": 6, "credits": 3, "ects": 5, "theoretical_hours": 3, "lab_hours": 0, "course_type": "elective", "language": "Türkçe" }
+]

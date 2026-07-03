@@ -1,0 +1,22 @@
+# SITE_ADDRESS is the public hostname (e.g. 203-0-113-5.sslip.io). Caddy
+# fetches a real Let's Encrypt cert for it automatically. Default localhost
+# lets `docker compose up` work locally with Caddy's internal CA.
+{$SITE_ADDRESS:localhost} {
+	encode gzip zstd
+
+	# API and the monolith's own /health go to the backend.
+	handle /api/* {
+		reverse_proxy monolith:8080
+	}
+	handle /health {
+		reverse_proxy monolith:8080
+	}
+
+	# Everything else is the SPA; unknown paths fall back to index.html so
+	# client-side routes (react-router) resolve on hard refresh.
+	handle {
+		root * /srv
+		try_files {path} /index.html
+		file_server
+	}
+}
