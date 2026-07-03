@@ -89,6 +89,10 @@ if [ -n "${DB_URL:-}" ]; then
 	psql "$DB_URL" -v ON_ERROR_STOP=1 -c \
 		"UPDATE auth.users SET force_password_change = false WHERE email IN ($EMAILS);" \
 		|| echo "   (force_password_change update skipped: $?)"
+
+	echo ">> loading relational demo data (profiles, semester, offerings, enrollments, grades)"
+	psql "$DB_URL" -v ON_ERROR_STOP=1 -f /seed/seed.sql \
+		|| echo "   (relational seed had errors: $?)"
 fi
 
 echo ">> seed complete. Demo login = e-posta / e-posta (ör. zeynep.sahin@uni.edu.tr)."
