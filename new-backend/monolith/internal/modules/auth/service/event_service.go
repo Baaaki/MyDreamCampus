@@ -3,7 +3,11 @@ package service
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
+
+	"github.com/jackc/pgx/v5"
+	"github.com/jackc/pgx/v5/pgconn"
 
 	"github.com/baaaki/mydreamcampus/monolith/internal/modules/auth/db"
 	"github.com/baaaki/mydreamcampus/monolith/internal/modules/auth/dto"
@@ -21,6 +25,19 @@ type EventService struct {
 	authRepo  *repository.AuthRepository
 	eventRepo *repository.EventRepository
 	pool      *pgxpool.Pool
+}
+
+// isDuplicateUser classifies CreateUser failures that mean "the user is
+// already there": pgx.ErrNoRows (ON CONFLICT (id) DO NOTHING swallowed the
+// insert on redelivery) or a 23505 on the email unique index. Anything
+// else is a real failure — the event must be nacked and retried, otherwise
+// a transient DB error would silently leave the person without a login.
+func isDuplicateUser(err error) bool {
+	if errors.Is(err, pgx.ErrNoRows) {
+		return true
+	}
+	var pgErr *pgconn.PgError
+	return errors.As(err, &pgErr) && pgErr.Code == "23505"
 }
 
 func NewEventService(
@@ -82,8 +99,12 @@ func (s *EventService) HandleStudentCreated(ctx context.Context, event dto.Stude
 		ForcePasswordChange: utils.BoolPtr(true),
 	})
 	if err != nil {
-		// ON CONFLICT DO NOTHING - idempotent
-		logger.Warn("failed to create user (might already exist)",
+		if !isDuplicateUser(err) {
+			// Real failure: do NOT mark the event processed — nack so the
+			// broker redelivers and the user eventually gets a login.
+			return fmt.Errorf("%w: failed to create user: %v", sharedErrors.ErrQueryFailed, err)
+		}
+		logger.Warn("user already exists, skipping create",
 			zap.Error(err),
 			zap.String("user_id", userID.String()),
 		)
@@ -180,7 +201,12 @@ func (s *EventService) HandleStaffCreated(ctx context.Context, event dto.StaffCr
 		ForcePasswordChange: utils.BoolPtr(true),
 	})
 	if err != nil {
-		logger.Warn("failed to create user (might already exist)",
+		if !isDuplicateUser(err) {
+			// Real failure: do NOT mark the event processed — nack so the
+			// broker redelivers and the staff member eventually gets a login.
+			return fmt.Errorf("%w: failed to create user: %v", sharedErrors.ErrQueryFailed, err)
+		}
+		logger.Warn("user already exists, skipping create",
 			zap.Error(err),
 			zap.String("user_id", userID.String()),
 		)
