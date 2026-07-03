@@ -22,11 +22,14 @@ import (
 )
 
 const (
-	CacheTTLBuffer          = 5 * time.Minute
-	MinTheoryAttendance     = 10 // 14 haftadan en az 10 teorik yoklama
-	MinLabAttendance        = 11 // 14 haftadan en az 11 uygulama yoklama
-	MaxTheoryAbsences       = 4  // 14 - 10
-	MaxLabAbsences          = 3  // 14 - 11
+	CacheTTLBuffer = 5 * time.Minute
+	// The attendance rule is defined as a ratio over a standard 14-week
+	// semester: at least 10/14 theory and 11/14 lab sessions. Actual
+	// thresholds are scaled to the sessions really held — see
+	// minTheoryRequired / minLabRequired in attendance_finalize_helpers.go.
+	StandardSemesterWeeks = 14
+	MinTheoryAttendance   = 10 // per 14 sessions
+	MinLabAttendance      = 11 // per 14 sessions
 )
 
 type AttendanceService struct {
@@ -383,6 +386,13 @@ func (s *AttendanceService) CloseSession(ctx context.Context, sessionID, instruc
 		return dto.CloseSessionResponse{}, err
 	}
 
+	// Scans still sitting in the Redis buffer haven't reached the DB yet
+	// (BufferFlusher drains it on its own tick); count them so the summary
+	// the instructor sees at close time is complete.
+	if pending, bufErr := s.redisService.GetBuffer(ctx, sessionID.String()); bufErr == nil {
+		presentCount += int64(len(pending))
+	}
+
 	totalEnrolled := len(enrolledStudents)
 
 	return dto.CloseSessionResponse{
@@ -449,22 +459,24 @@ func (s *AttendanceService) GetMyAttendance(ctx context.Context, studentID uuid.
 		}
 
 		if theoryTotal > 0 {
+			minTheory := minTheoryRequired(theoryTotal)
 			detail.Theory = &dto.SessionTypeAttendance{
 				PresentCount:  int(theoryPresent),
 				AbsentCount:   int(theoryTotal) - int(theoryPresent),
 				TotalSessions: int(theoryTotal),
-				MinRequired:   MinTheoryAttendance,
-				Passed:        int(theoryPresent) >= MinTheoryAttendance,
+				MinRequired:   minTheory,
+				Passed:        int(theoryPresent) >= minTheory,
 			}
 		}
 
 		if labTotal > 0 {
+			minLab := minLabRequired(labTotal)
 			detail.Lab = &dto.SessionTypeAttendance{
 				PresentCount:  int(labPresent),
 				AbsentCount:   int(labTotal) - int(labPresent),
 				TotalSessions: int(labTotal),
-				MinRequired:   MinLabAttendance,
-				Passed:        int(labPresent) >= MinLabAttendance,
+				MinRequired:   minLab,
+				Passed:        int(labPresent) >= minLab,
 			}
 		}
 
@@ -496,23 +508,26 @@ func (s *AttendanceService) FinalizeAttendance(ctx context.Context, courseID, in
 		return dto.FinalizeAttendanceResponse{}, errors.ErrForbidden
 	}
 
-	// Get total sessions by type
+	// Get total sessions by type. Thresholds scale with the sessions
+	// actually held (10/14 and 11/14 ratios) instead of flat constants.
 	theoryTotal, _ := s.attendanceRepo.GetTotalSessionsByCourseAndType(ctx, courseID, semester, db.AttendanceSessionTypeEnumTheory)
 	labTotal, _ := s.attendanceRepo.GetTotalSessionsByCourseAndType(ctx, courseID, semester, db.AttendanceSessionTypeEnumLab)
+	minTheory := minTheoryRequired(theoryTotal)
+	minLab := minLabRequired(labTotal)
 
-	// Get failing students for theory (present_count < MinTheoryAttendance)
+	// Get failing students for theory (present_count < minTheory)
 	var theoryFailing []db.GetFailingStudentsByCourseByTypeRow
 	if theoryTotal > 0 {
-		theoryFailing, err = s.attendanceRepo.GetFailingStudentsByCourseByType(ctx, courseID, semester, db.AttendanceSessionTypeEnumTheory, theoryTotal, int64(MinTheoryAttendance))
+		theoryFailing, err = s.attendanceRepo.GetFailingStudentsByCourseByType(ctx, courseID, semester, db.AttendanceSessionTypeEnumTheory, theoryTotal, int64(minTheory))
 		if err != nil {
 			return dto.FinalizeAttendanceResponse{}, err
 		}
 	}
 
-	// Get failing students for lab (present_count < MinLabAttendance)
+	// Get failing students for lab (present_count < minLab)
 	var labFailing []db.GetFailingStudentsByCourseByTypeRow
 	if labTotal > 0 {
-		labFailing, err = s.attendanceRepo.GetFailingStudentsByCourseByType(ctx, courseID, semester, db.AttendanceSessionTypeEnumLab, labTotal, int64(MinLabAttendance))
+		labFailing, err = s.attendanceRepo.GetFailingStudentsByCourseByType(ctx, courseID, semester, db.AttendanceSessionTypeEnumLab, labTotal, int64(minLab))
 		if err != nil {
 			return dto.FinalizeAttendanceResponse{}, err
 		}
@@ -545,7 +560,7 @@ func (s *AttendanceService) FinalizeAttendance(ctx context.Context, courseID, in
 				PresentCount:  info.TheoryPresent,
 				AbsentCount:   info.TheoryAbsent,
 				TotalSessions: int(theoryTotal),
-				MinRequired:   MinTheoryAttendance,
+				MinRequired:   minTheory,
 				Passed:        !info.TheoryFailed,
 			}
 		}
@@ -555,7 +570,7 @@ func (s *AttendanceService) FinalizeAttendance(ctx context.Context, courseID, in
 				PresentCount:  info.LabPresent,
 				AbsentCount:   info.LabAbsent,
 				TotalSessions: int(labTotal),
-				MinRequired:   MinLabAttendance,
+				MinRequired:   minLab,
 				Passed:        !info.LabFailed,
 			}
 		}
@@ -580,7 +595,7 @@ func (s *AttendanceService) FinalizeAttendance(ctx context.Context, courseID, in
 				TotalSessions: int(theoryTotal),
 				PresentCount:  info.TheoryPresent,
 				AbsentCount:   info.TheoryAbsent,
-				MinRequired:   MinTheoryAttendance,
+				MinRequired:   minTheory,
 			}
 		}
 
@@ -589,7 +604,7 @@ func (s *AttendanceService) FinalizeAttendance(ctx context.Context, courseID, in
 				TotalSessions: int(labTotal),
 				PresentCount:  info.LabPresent,
 				AbsentCount:   info.LabAbsent,
-				MinRequired:   MinLabAttendance,
+				MinRequired:   minLab,
 			}
 		}
 
@@ -608,8 +623,8 @@ func (s *AttendanceService) FinalizeAttendance(ctx context.Context, courseID, in
 			TheoryMinRequired int `json:"theory_min_required"`
 			LabMinRequired    int `json:"lab_min_required"`
 		}{
-			TheoryMinRequired: MinTheoryAttendance,
-			LabMinRequired:    MinLabAttendance,
+			TheoryMinRequired: minTheory,
+			LabMinRequired:    minLab,
 		},
 		FinalizationSummary: struct {
 			PassingCount int `json:"passing_count"`

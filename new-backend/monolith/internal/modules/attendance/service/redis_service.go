@@ -83,12 +83,15 @@ func (s *RedisService) GetBuffer(ctx context.Context, sessionID string) (map[str
 	return s.client.HGetAll(ctx, key).Result()
 }
 
-// Clear all session keys
+// ClearSessionKeys removes the session metadata keys. The buffer key is
+// intentionally NOT deleted: scans from the last few seconds may still be
+// waiting for the BufferFlusher tick, and deleting the buffer here would
+// drop them before they ever reach the DB. The flusher drains the buffer
+// and HDELs the flushed fields; an empty hash disappears on its own.
 func (s *RedisService) ClearSessionKeys(ctx context.Context, sessionID string) error {
 	keys := []string{
 		fmt.Sprintf("attendance:session:%s", sessionID),
 		fmt.Sprintf("attendance:session:%s:enrolled", sessionID),
-		fmt.Sprintf("attendance:buffer:%s", sessionID),
 		fmt.Sprintf("attendance:scanned:%s", sessionID),
 	}
 	return s.client.Del(ctx, keys...).Err()

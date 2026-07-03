@@ -23,6 +23,25 @@ type FailureInfo struct {
 	LabFailed     bool
 }
 
+// minTheoryRequired / minLabRequired scale the attendance thresholds to the
+// number of sessions actually held. The historical rule was written for a
+// 14-week semester (theory 10/14, lab 11/14); keeping the same ratios with a
+// ceiling division means a course that only ran e.g. 8 theory sessions
+// requires ceil(8*10/14)=6 instead of a flat 10 — which would fail everyone.
+func minTheoryRequired(totalSessions int64) int {
+	if totalSessions <= 0 {
+		return 0
+	}
+	return int((totalSessions*MinTheoryAttendance + StandardSemesterWeeks - 1) / StandardSemesterWeeks)
+}
+
+func minLabRequired(totalSessions int64) int {
+	if totalSessions <= 0 {
+		return 0
+	}
+	return int((totalSessions*MinLabAttendance + StandardSemesterWeeks - 1) / StandardSemesterWeeks)
+}
+
 // deriveFailedType returns the public-facing failure category for the
 // student's combined theory/lab state.
 //

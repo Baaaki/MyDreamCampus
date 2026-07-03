@@ -122,6 +122,21 @@ func main() {
 		{Queue: "auth_events_queue", Exchange: "student.events", RoutingKey: "student.deactivated"},
 		// student — drops advisor assignment when the staff member is removed.
 		{Queue: "student.staff_events", Exchange: "staff.events", RoutingKey: "staff.deactivated"},
+		// attendance — local student/course/enrollment cache sync.
+		{Queue: "attendance.sync_events", Exchange: "student.events", RoutingKey: "student.created"},
+		{Queue: "attendance.sync_events", Exchange: "student.events", RoutingKey: "student.updated"},
+		{Queue: "attendance.sync_events", Exchange: "student.events", RoutingKey: "student.deactivated"},
+		{Queue: "attendance.sync_events", Exchange: "course_catalog.events", RoutingKey: "course.semester.created"},
+		{Queue: "attendance.sync_events", Exchange: "enrollment.events", RoutingKey: "enrollment.program.approved"},
+		// grades — cache sync, registrations and attendance failures.
+		{Queue: "grades.sync_events", Exchange: "student.events", RoutingKey: "student.created"},
+		{Queue: "grades.sync_events", Exchange: "student.events", RoutingKey: "student.updated"},
+		{Queue: "grades.sync_events", Exchange: "student.events", RoutingKey: "student.deactivated"},
+		{Queue: "grades.sync_events", Exchange: "course_catalog.events", RoutingKey: "course.semester.created"},
+		{Queue: "grades.sync_events", Exchange: "enrollment.events", RoutingKey: "enrollment.program.approved"},
+		{Queue: "grades.sync_events", Exchange: "attendance.events", RoutingKey: "attendance.semester.failed"},
+		// grades — self-loop so AutoFinalize runs off the request path.
+		{Queue: "grades.finalize_requested", Exchange: "grades.events", RoutingKey: "grade.finalize.requested"},
 	}
 	if err := eventbus.DeclareDownstreamBindings(publisher, downstreamBindings); err != nil {
 		logger.Fatal("failed to declare downstream bindings", zap.Error(err))
@@ -159,7 +174,10 @@ func main() {
 		logger.Fatal("failed to bootstrap enrollment module", zap.Error(err))
 	}
 
-	attendanceModule := attendance.New(cfg, pool, redisClient.Client(), catalogModule.SemesterService(), catalogModule.PeriodRepo())
+	attendanceModule := attendance.New(cfg, pool, redisClient.Client(), rabbitConn, catalogModule.SemesterService(), catalogModule.PeriodRepo())
+	if err := attendanceModule.Bootstrap(ctx); err != nil {
+		logger.Fatal("failed to bootstrap attendance module", zap.Error(err))
+	}
 
 	gradesAuditLogger := catalogService.NewDirectAuditLogger(catalogModule.AuditRepo(), "grades")
 	gradesModule := grades.New(pool, catalogModule.PeriodRepo(), gradesAuditLogger, catalogModule.SemesterService())

@@ -14,6 +14,11 @@ import (
 	"go.uber.org/zap"
 )
 
+// QueueSyncEvents is the queue this consumer reads. It is bound (in
+// main.go) to student.events, course_catalog.events and enrollment.events
+// so attendance can keep its local cache tables in sync.
+const QueueSyncEvents = "attendance.sync_events"
+
 type EventConsumer struct {
 	consumer  *rabbitmq.Consumer
 	cacheRepo *repository.CacheRepository
@@ -38,7 +43,9 @@ func (w *EventConsumer) Start(ctx context.Context) error {
 
 	// Start consuming from the queue. The closure captures the root ctx so
 	// in-flight event processing is canceled on graceful shutdown.
-	if err := w.consumer.Consume("attendance.events", func(body []byte) error {
+	// Queue is declared and bound in main.go (DeclareDownstreamBindings);
+	// the name is a queue, distinct from the "attendance.events" exchange.
+	if err := w.consumer.Consume(QueueSyncEvents, func(body []byte) error {
 		return w.handleMessage(ctx, body)
 	}); err != nil {
 		log.Error("failed to start consuming", zap.Error(err))
@@ -221,8 +228,10 @@ func (w *EventConsumer) handleCourseSemesterCreated(ctx context.Context, body []
 		zap.String("method", "handleCourseSemesterCreated"),
 	)
 
-	var eventData dto.CourseSemesterCreatedEventData
-	if err := json.Unmarshal(body, &eventData); err != nil {
+	// Catalog's payload is flat, so after the outbox envelope is peeled the
+	// course fields sit directly under "data".
+	eventData, err := unwrapEventData[dto.CourseSemesterCreatedEventData](body)
+	if err != nil {
 		return err
 	}
 
@@ -236,7 +245,7 @@ func (w *EventConsumer) handleCourseSemesterCreated(ctx context.Context, body []
 	}
 
 	// Upsert course to cache
-	err := w.cacheRepo.UpsertCourseCache(ctx, db.UpsertCourseCacheParams{
+	err = w.cacheRepo.UpsertCourseCache(ctx, db.UpsertCourseCacheParams{
 		ID:                 utils.UUIDToPgUUID(eventData.SemesterCourseID),
 		CourseCode:         eventData.CourseCode,
 		CourseName:         eventData.CourseName,
@@ -267,14 +276,16 @@ func (w *EventConsumer) handleEnrollmentProgramApproved(ctx context.Context, bod
 		zap.String("method", "handleEnrollmentProgramApproved"),
 	)
 
-	// Parse the wrapped event: { event_id, event_type, data: { ... } }
-	var wrapper struct {
+	// Enrollment's outbox payload is itself wrapped ({event_id, ..., data})
+	// and the outbox worker wraps once more, so the useful fields sit two
+	// "data" levels deep: envelope.data.data.
+	inner, err := unwrapEventData[struct {
 		Data dto.EnrollmentProgramApprovedEventData `json:"data"`
-	}
-	if err := json.Unmarshal(body, &wrapper); err != nil {
+	}](body)
+	if err != nil {
 		return err
 	}
-	eventData := wrapper.Data
+	eventData := inner.Data
 
 	// Create enrollment cache entries for each course
 	successCount := 0

@@ -3,13 +3,17 @@
 package attendance
 
 import (
+	"context"
+
 	"github.com/baaaki/mydreamcampus/monolith/config"
 	"github.com/baaaki/mydreamcampus/monolith/internal/eventbus"
 	"github.com/baaaki/mydreamcampus/monolith/internal/modules/attendance/handler"
 	"github.com/baaaki/mydreamcampus/monolith/internal/modules/attendance/repository"
 	"github.com/baaaki/mydreamcampus/monolith/internal/modules/attendance/service"
+	"github.com/baaaki/mydreamcampus/monolith/internal/modules/attendance/worker"
 	ccService "github.com/baaaki/mydreamcampus/monolith/internal/modules/course_catalog/service"
 	platformMiddleware "github.com/baaaki/mydreamcampus/monolith/internal/platform/middleware"
+	"github.com/baaaki/mydreamcampus/monolith/internal/platform/rabbitmq"
 	platformRepo "github.com/baaaki/mydreamcampus/monolith/internal/platform/repository"
 	"github.com/gin-gonic/gin"
 	"github.com/jackc/pgx/v5/pgxpool"
@@ -24,6 +28,7 @@ type Module struct {
 	sessionRepo    *repository.SessionRepository
 	attendanceRepo *repository.AttendanceRepository
 	outboxRepo     *repository.OutboxRepository
+	eventRepo      *repository.EventRepository
 	outboxStore    *repository.OutboxStore
 
 	qrService      *service.QRService
@@ -32,12 +37,17 @@ type Module struct {
 
 	attendanceService *service.AttendanceService
 	attendanceHandler *handler.AttendanceHandler
+
+	eventConsumer *worker.EventConsumer
+	bufferFlusher *worker.BufferFlusher
+	sessionExpiry *worker.SessionExpiryHandler
 }
 
 func New(
 	cfg *config.Config,
 	pool *pgxpool.Pool,
 	redisClient *redis.Client,
+	rabbitConn *rabbitmq.Connection,
 	semesterSvc *ccService.SemesterService,
 	periodRepo *platformRepo.SimplePeriodRepository,
 ) *Module {
@@ -45,6 +55,7 @@ func New(
 	sessionRepo := repository.NewSessionRepository(pool)
 	attendanceRepo := repository.NewAttendanceRepository(pool)
 	outboxRepo := repository.NewOutboxRepository(pool)
+	eventRepo := repository.NewEventRepository(pool)
 
 	qrService := service.NewQRService()
 	redisService := service.NewRedisService(redisClient)
@@ -62,13 +73,31 @@ func New(
 		sessionRepo:       sessionRepo,
 		attendanceRepo:    attendanceRepo,
 		outboxRepo:        outboxRepo,
+		eventRepo:         eventRepo,
 		outboxStore:       repository.NewOutboxStore(outboxRepo),
 		qrService:         qrService,
 		redisService:      redisService,
 		semesterClient:    semesterClient,
 		attendanceService: attendanceSvc,
 		attendanceHandler: handler.NewAttendanceHandler(attendanceSvc),
+		eventConsumer:     worker.NewEventConsumer(rabbitmq.NewConsumer(rabbitConn), cacheRepo, eventRepo),
+		bufferFlusher:     worker.NewBufferFlusher(attendanceRepo, redisService),
+		sessionExpiry:     worker.NewSessionExpiryHandler(sessionRepo, redisService),
 	}
+}
+
+// Bootstrap starts the attendance background workers: the RabbitMQ event
+// consumer (student/course/enrollment cache sync), the Redis buffer
+// flusher (QR scans → DB) and the session expiry handler. Queue bindings
+// are pre-declared in main.go (eventbus.DeclareDownstreamBindings) so
+// events published before this consumer attaches are not lost.
+func (m *Module) Bootstrap(ctx context.Context) error {
+	if err := m.eventConsumer.Start(ctx); err != nil {
+		return err
+	}
+	go m.bufferFlusher.Start(ctx)
+	go m.sessionExpiry.Start(ctx)
+	return nil
 }
 
 // "attendance", not "v1/attendance": web and mobile clients both call
