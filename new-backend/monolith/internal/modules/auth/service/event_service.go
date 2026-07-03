@@ -36,6 +36,13 @@ func isDuplicateUser(err error) bool {
 	if errors.Is(err, pgx.ErrNoRows) {
 		return true
 	}
+	return isEmailConflict(err)
+}
+
+// isEmailConflict is the dangerous duplicate flavor: the email belongs to a
+// DIFFERENT user id. Retrying cannot fix it, but it must be loudly visible —
+// the new person has no login until an operator resolves the collision.
+func isEmailConflict(err error) bool {
 	var pgErr *pgconn.PgError
 	return errors.As(err, &pgErr) && pgErr.Code == "23505"
 }
@@ -104,10 +111,19 @@ func (s *EventService) HandleStudentCreated(ctx context.Context, event dto.Stude
 			// broker redelivers and the user eventually gets a login.
 			return fmt.Errorf("%w: failed to create user: %v", sharedErrors.ErrQueryFailed, err)
 		}
-		logger.Warn("user already exists, skipping create",
-			zap.Error(err),
-			zap.String("user_id", userID.String()),
-		)
+		if isEmailConflict(err) {
+			// Email owned by another user id: permanent conflict, retrying
+			// is pointless — surface loudly for manual resolution.
+			logger.Error("email already belongs to a different user — projection skipped",
+				zap.Error(err),
+				zap.String("user_id", userID.String()),
+			)
+		} else {
+			logger.Warn("user already exists, skipping create",
+				zap.Error(err),
+				zap.String("user_id", userID.String()),
+			)
+		}
 	} else {
 		// Insert outbox event for notification (Welcome email)
 		payloadBytes, _ := json.Marshal(buildUserRegisteredPayload(
@@ -206,10 +222,19 @@ func (s *EventService) HandleStaffCreated(ctx context.Context, event dto.StaffCr
 			// broker redelivers and the staff member eventually gets a login.
 			return fmt.Errorf("%w: failed to create user: %v", sharedErrors.ErrQueryFailed, err)
 		}
-		logger.Warn("user already exists, skipping create",
-			zap.Error(err),
-			zap.String("user_id", userID.String()),
-		)
+		if isEmailConflict(err) {
+			// Email owned by another user id: permanent conflict, retrying
+			// is pointless — surface loudly for manual resolution.
+			logger.Error("email already belongs to a different user — projection skipped",
+				zap.Error(err),
+				zap.String("user_id", userID.String()),
+			)
+		} else {
+			logger.Warn("user already exists, skipping create",
+				zap.Error(err),
+				zap.String("user_id", userID.String()),
+			)
+		}
 	} else {
 		// Insert outbox event for notification (Welcome email)
 		payloadBytes, _ := json.Marshal(buildUserRegisteredPayload(
@@ -308,9 +333,10 @@ func (s *EventService) HandleUserUpdated(ctx context.Context, event dto.UserUpda
 			Email: email,
 		})
 		if err != nil {
-			logger.Warn("failed to sync token version on email change",
-				zap.Error(err),
-			)
+			// Token version bump is the thing that revokes sessions issued
+			// for the old email. Failing silently would leave them valid, so
+			// roll the whole event back and let the broker retry.
+			return fmt.Errorf("%w: failed to sync token version on email change: %v", sharedErrors.ErrQueryFailed, err)
 		}
 	}
 
