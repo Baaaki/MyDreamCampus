@@ -1,6 +1,6 @@
 # MyDreamCampus — AI Asistanı Talimatları
 
-Universite yonetim sistemi. Full-stack monorepo: Go mikroservisler + React+Vite web + React Native (Expo) mobil.
+Universite yonetim sistemi. Full-stack monorepo: Go moduler monolith (`new-backend/`) + React+Vite web + React Native (Expo) mobil. `legacy-codebase/` eski mikroservis kodu — salt-okunur referans.
 
 > Bu dosya **AI'a** talimattir. Kullanici dokumanlari icin bkz. `README.md`.
 
@@ -11,7 +11,7 @@ Universite yonetim sistemi. Full-stack monorepo: Go mikroservisler + React+Vite 
 Cakisma durumunda **yukaridan asagiya** dogru oncelik (1 en yuksek):
 
 1. **Kullanici prompt'u** — en yuksek oncelik
-2. **Ilgili `skills.md`** — `backend/skills.md`, `frontend/skills.md`, `mobile/skills.md`
+2. **Ilgili `skills.md`** — `new-backend/skills.md`, `frontend/skills.md`, `mobile/skills.md`
 3. **Bu dosya (CLAUDE.md)** — proje genel kurallari
 4. **Memory** — gecmis konusmalardan sabitler
 
@@ -23,11 +23,11 @@ Gorev baslamadan **mutlaka oku**:
 
 | Eger suraya dokunacaksan… | Once oku |
 |---|---|
-| `backend/services/**` | `backend/skills.md` |
-| `backend/shared/**` | `backend/skills.md` |
+| `new-backend/monolith/**` | `new-backend/skills.md` |
+| `new-backend/services/**`, `new-backend/shared/**` | `new-backend/skills.md` |
 | `frontend/src/**` | `frontend/skills.md` |
 | `mobile/app/**`, `mobile/services/**`, `mobile/hooks/**` | `mobile/skills.md` |
-| Migration / SQL / sqlc | `backend/skills.md` "Migration" bolumu |
+| Migration / SQL / sqlc | `new-backend/skills.md` §3-4 (make komutlari + workflow) |
 
 Birden fazla katmanda degisiklik varsa **hepsini** oku.
 
@@ -51,7 +51,7 @@ Birden fazla katmanda degisiklik varsa **hepsini** oku.
 |---|---|---|---|
 | `frontend/` | `bun add`, `bun run`, `bun tsc`, `bunx --bun <x>` | `npm`, `npx`, `yarn` | `bun.lock` source-of-truth; `package-lock.json` yok, npm bagimliliklari farkli cozuyor |
 | `mobile/` | `npm install`, `npm run`, `npx expo`, `npx jest` | `bun` (eskiden vardi, kaldirildi) | Expo prebuild scriptleri npm assumption ile yazilmis, `package-lock.json` source |
-| `backend/` | `go mod`, `make sqlc`, `make migrate-up` | dogrudan `goose`, `sqlc generate` | Makefile env ve `sqlc.yaml`/`dbstring` cozumlemesi yapiyor; ciplak komut config bulamaz |
+| `new-backend/monolith/` | `go mod`, `make sqlc-<module>`, `make migrate-up-<module>` (Makefile bu dizinde) | dogrudan `goose`, `sqlc generate` | Makefile `.env` ve modul basina `sqlc.yaml` cozumlemesi yapiyor; ciplak komut config bulamaz |
 
 ---
 
@@ -62,9 +62,9 @@ Birden fazla katmanda degisiklik varsa **hepsini** oku.
 
 ```bash
 # Bunu sen calistirma — kullaniciya goster:
-sudo docker compose -f backend/infrastructure/docker-compose.yml up -d
-sudo docker exec mydreamcampus-postgres-auth psql -U postgres -d mydreamcampus_auth -c "SELECT email FROM users;"
-sudo docker logs -f mydreamcampus-postgres-auth
+sudo docker compose -f new-backend/infrastructure/docker-compose.yml up -d
+sudo docker exec mydreamcampus-postgres psql -U postgres -d mydreamcampus -c "SELECT email FROM auth_users;"
+sudo docker logs -f mydreamcampus-monolith
 ```
 
 ---
@@ -75,17 +75,17 @@ sudo docker logs -f mydreamcampus-postgres-auth
 - HTTP status code secimi (REST standardi: 200/201/204/400/401/403/404/409/422/500)
 - Sifre hash (Argon2id), JWT (HS256) — sabit
 - Migration **yazma** (dosya olusturma)
-- sqlc query yazma + `make sqlc` calistirma
+- sqlc query yazma + `make sqlc-<module>` calistirma
 - DTO/Repository/Service/Handler iskeleti (skills.md sablonlarini izle)
 - Test isimlendirme: `TestXxx_Scenario_ExpectedResult`
 - Commit atma (atomic, feature bittiginde)
-- Hata mesaji standardi (`shared/errors.AppError`)
+- Hata mesaji standardi (`platform/errors.AppError`)
 
 ### SOR, dogrudan UYGULAMA:
 - **Yeni kutuphane** ekleme (ornek: validator icin go-playground vs ozzo)
-- **Yeni servis** olusturma (port, scope, event semasi)
+- **Yeni modul veya servis** olusturma (scope, event semasi, main.go wiring)
 - **Yeni event** semasi veya mevcut event payload degisikligi (geriye uyumsuzluk)
-- **Migration CALISTIRMA** (`make migrate-up`) — yazma degil, calistirma sor
+- **Migration CALISTIRMA** (`make migrate-up-<module>`) — yazma degil, calistirma sor
 - **Sema breaking change** (kolon silme, NOT NULL ekleme, type degisikligi)
 - **Frontend route silme** veya yeniden adlandirma
 - Onemli refactor (3+ dosya etkileyen, davranis degisikligi)
@@ -108,7 +108,7 @@ sudo docker logs -f mydreamcampus-postgres-auth
 | `docs` | Dokumantasyon |
 | `test` | Sadece test ekleme |
 
-**Scope:** `auth`, `staff`, `student`, `catalog`, `enrollment`, `attendance`, `grades`, `meal`, `payment`, `shared`, `frontend`, `mobile`, `infra`
+**Scope:** `auth`, `staff`, `student`, `catalog`, `enrollment`, `attendance`, `grades`, `meal`, `payment`, `notification`, `shared`, `frontend`, `mobile`, `infra`
 
 **Ornekler:**
 ```
@@ -134,11 +134,11 @@ feat(mobile): implement attendance screen
 
 ```
 Backend feature:
-- [ ] Migration yazildi + `make migrate-up` test edildi (kullanici calistirir)
-- [ ] sqlc query yazildi + `make sqlc` calisti
+- [ ] Migration yazildi + `make migrate-up-<module>` test edildi (kullanici calistirir)
+- [ ] sqlc query yazildi + `make sqlc-<module>` calisti
 - [ ] Repository / Service / Handler / DTO yazildi
-- [ ] Route `cmd/main.go`'ya baglandi
-- [ ] Event publish ediliyorsa, consumer service'lerin DTO'lari guncellendi
+- [ ] Route modulun `module.go` RegisterRoutes'una baglandi
+- [ ] Event publish ediliyorsa outbox'a yaziliyor + consumer'larin (diger modul worker'lari, notification) DTO'lari guncellendi
 - [ ] Service-level test yazildi (kritik path'ler — happy + 1 error)
 - [ ] `go build ./...` hatasiz
 - [ ] Atomic commit atildi
@@ -179,7 +179,7 @@ Mobile feature:
 
 ### sqlc generate hata verirse
 **YAPMA:** Generated dosyalari manuel duzenleme.
-**YAP:** Query SQL'ini duzelt, tekrar `make sqlc`.
+**YAP:** Query SQL'ini duzelt, tekrar `make sqlc-<module>`.
 
 ### Lint/format hata
 **YAP:** Otomatik duzeltilebilenleri duzelt (`gofmt`, `bun tsc`). Logic degisimi gerekirse kullaniciya sor.
@@ -199,9 +199,9 @@ Mobile feature:
 ## 11. Subagent Kullanimi
 
 **Ne zaman kullan:**
-- 3+ servisi tarayan arastirma
+- 3+ modulu tarayan arastirma
 - Tum kod tabaninda pattern arama
-- Karsilastirma analizi (servis A vs servis B'deki yaklasim)
+- Karsilastirma analizi (modul A vs modul B'deki yaklasim)
 
 **Ne zaman KULLANMA:**
 - Tek dosya okuma
@@ -218,8 +218,9 @@ Bu kararlar verilmis — yeniden sorma:
 
 | Konu | Karar |
 |---|---|
-| Inter-service iletisim | **Tercih: RabbitMQ event-driven** (notify, side-effect, eventual consistency). **Sync HTTP kabul:** read-only lookup, anlik validasyon, fan-out orkestrasyon — `internal/...` route + `X-Internal-Secret` header zorunlu. **Client -> servis** HTTP (Traefik uzerinden). JWT'yi her servis kendi `JWTAuth` middleware'i ile dogrular — auth servisine HTTP RPC yok. |
-| Database | PostgreSQL 18+, her servise ayri DB |
+| Mimari | **Moduler monolith** (`new-backend/monolith`) — tek binary, 9 modul. Notification tek ayri servis (RabbitMQ consumer). |
+| Moduller arasi iletisim | **Sync okuma/validasyon:** in-process client interface (HTTP YOK, `X-Internal-Secret` YOK). **Side-effect/notify:** RabbitMQ event + outbox. Client -> backend HTTP, Caddy uzerinden. JWT dogrulamasi `platform/middleware.JWTAuth` ile process icinde. |
+| Database | PostgreSQL 18+. Monolith: tek DB, modul basina ayri schema + ayri goose version tablosu. Notification: kendi ayri DB'si (port 5433). |
 | ORM/Query | sqlc + pgx/v5 (raw SQL yok, GORM yok) |
 | Migration | goose |
 | HTTP framework (Go) | Gin v1.11 |
@@ -231,23 +232,23 @@ Bu kararlar verilmis — yeniden sorma:
 | State (web+mobile) | TanStack Query (server state), Context (UI state) |
 | Logging | Zap (backend), console (frontend, debug icin) |
 | Outbox pattern | Tum event publish'lerde zorunlu |
-| API gateway | Traefik v3 (port 80) |
+| Edge / reverse proxy | Caddy (80/443) — `/api/*` -> monolith:8080, geri kalani SPA static (Traefik KALDIRILDI) |
 
 ---
 
-## 13. Servis Portlari (referans)
-
-**Monolit Mimari**
-Proje artik bir modular monolith yapisindadir. Tüm modüller tek bir backend process icinde birleştirilmiştir.
+## 13. Portlar (referans — `new-backend/infrastructure/docker-compose.yml`)
 
 | Bilesen | Port | Aciklama |
 |---|---|---|
-| Monolit Backend | 8080 | Tum moduller (auth, student, meal vb.) tek process icinde calisir. |
-| PostgreSQL | 5432 | Tüm modüller aynı DB instance üzerinde kendi schemalarında çalışır. |
-| RabbitMQ | 5672/15672 | Asenkron event mesajlaşması için. |
-| Redis | 6379 | Token blacklist ve rate limiting vb. işlemler için. |
+| Monolith backend | 8080 | 9 modul tek process icinde. |
+| PostgreSQL (monolith) | 5432 | Tek instance, modul basina ayri schema. |
+| PostgreSQL (notification) | 5433 | Notification servisinin ayri DB'si. |
+| RabbitMQ | 5672/15672 | Event mesajlasmasi + management UI. |
+| Redis | 6379 | Token blacklist + rate limit. |
+| MailHog | 1025/8025 | Dev SMTP (notification e-postalari). |
+| Caddy | 80/443 | Tek public giris: `/api/*` -> monolith, geri kalani SPA. |
 
-Frontend dev: `3000`. Traefik gateway: `80`. Tum `/api/*` Traefik uzerinden.
+Infra portlari `127.0.0.1`'e bind'li — disaridan sadece Caddy erisilir. Frontend dev: `3000` (Vite proxy `/api` -> 8080).
 
 ---
 
@@ -257,8 +258,9 @@ Bu yollardaki dosyalari **manuel duzenleme**. Kaynak dosyayi guncelle ve generat
 
 | Yol | Kaynak | Regenerate |
 |---|---|---|
-| `backend/services/*/internal/db/*.go` | `sql/queries/*.sql` | `make sqlc` |
-| `backend/services/*/sql/migrations/*.sql` (uygulanmis) | — | Yeni migration ekle, eskisini degistirme |
+| `new-backend/monolith/internal/modules/*/db/*.go` | `internal/modules/*/sql/queries/*.sql` | `make sqlc-<module>` |
+| `new-backend/**/sql/migrations/*.sql` (uygulanmis) | — | Yeni migration ekle, eskisini degistirme |
+| `new-backend/services/notification/internal/db/*.go` | `sql/queries/*.sql` | servis dizininde `sqlc generate` |
 | `frontend/src/lib/api-types.ts` | Backend OpenAPI | `bun run gen:api-types` |
 | `frontend/src/components/ui/*` | shadcn CLI | `bunx --bun shadcn@latest add <c>` |
 | `mobile/types/api-types.ts` | Backend OpenAPI | `npm run gen:api-types` |
@@ -268,10 +270,10 @@ Bu yollardaki dosyalari **manuel duzenleme**. Kaynak dosyayi guncelle ve generat
 
 ## 15. Detayli Rehberler
 
-- Backend: [`backend/skills.md`](backend/skills.md)
+- Backend: [`new-backend/skills.md`](new-backend/skills.md)
 - Frontend: [`frontend/skills.md`](frontend/skills.md)
 - Mobile: [`mobile/skills.md`](mobile/skills.md)
-- Moduler monolith migration plan: [`architecture/README.md`](architecture/README.md) — index. AI yeni oturumda once `architecture/00-ai-rules.md` okur.
+- Moduler monolith migration plani (tarihsel referans, migration tamamlandi): [`legacy-codebase/architecture/`](legacy-codebase/architecture/)
 
 ## 16. Dis Referanslar
 
@@ -279,7 +281,7 @@ Bu yollardaki dosyalari **manuel duzenleme**. Kaynak dosyayi guncelle ve generat
 - [sqlc Docs](https://docs.sqlc.dev/en/latest/)
 - [pgx Docs](https://pkg.go.dev/github.com/jackc/pgx/v5)
 - [goose Docs](https://pressly.github.io/goose/)
-- [Traefik v3 Docs](https://doc.traefik.io/traefik/)
+- [Caddy Docs](https://caddyserver.com/docs/)
 - [Expo Router Docs](https://docs.expo.dev/router/introduction/)
 - [React Router v7 Docs](https://reactrouter.com/)
 - [TanStack Query Docs](https://tanstack.com/query/latest)
