@@ -623,19 +623,11 @@ func (s *ReservationService) CancelReservation(ctx context.Context, studentID uu
 		return nil, err
 	}
 
-	// 9. Request refund synchronously
-	refundResp, err := s.paymentClient.RequestRefund(ctx, dto.RefundRequest{
-		ReferenceID: resID.String(),
-		Amount:      s.cfg.Reservation.MealPriceTRY,
-		Currency:    "TRY",
-		Reason:      "Student cancelled reservation",
-	})
-	if err != nil {
-		s.logger.Error("refund failed", zap.Error(err), zap.String("reservation_id", reservationID))
-		return nil, err
-	}
-
-	// 9. Cancel reservation and create outbox event
+	// 9. Cancel reservation first (with outbox event), then refund. The
+	// old order refunded before cancelling: a failed cancel left the
+	// reservation usable AND the money returned. With cancel-first, a
+	// failed refund leaves the outbox event as the reconciliation record
+	// and the response reports the refund as pending.
 	eventPayload := map[string]any{
 		"reservation_id": reservation.ID.String(),
 		"student_id":     student.ID.String(),
@@ -652,16 +644,31 @@ func (s *ReservationService) CancelReservation(ctx context.Context, studentID uu
 		return nil, err
 	}
 
+	refundStatus := "pending"
+	refundResp, err := s.paymentClient.RequestRefund(ctx, dto.RefundRequest{
+		ReferenceID: resID.String(),
+		Amount:      s.cfg.Reservation.MealPriceTRY,
+		Currency:    "TRY",
+		Reason:      "Student cancelled reservation",
+	})
+	if err != nil {
+		s.logger.Error("refund failed after cancel, needs reconciliation",
+			zap.Error(err), zap.String("reservation_id", reservationID))
+	} else {
+		refundStatus = refundResp.Status
+	}
+
 	s.logger.Info("reservation cancelled",
 		zap.String("reservation_id", reservationID),
 		zap.String("student_id", studentID.String()),
+		zap.String("refund_status", refundStatus),
 	)
 
 	return &dto.CancelReservationResponse{
 		ReservationID: reservationID,
 		RefundAmount:  s.cfg.Reservation.MealPriceTRY,
 		Currency:      "TRY",
-		RefundStatus:  refundResp.Status,
+		RefundStatus:  refundStatus,
 	}, nil
 }
 
@@ -791,7 +798,22 @@ func (s *ReservationService) GenerateQR(ctx context.Context, cafeteriaID string,
 // HELPER METHODS
 // ============================================================================
 
+// maxReservationAdvanceDays bounds how far ahead a meal can be booked.
+// Menus are published monthly, so anything beyond ~a month is a typo.
+const maxReservationAdvanceDays = 30
+
 func (s *ReservationService) validateReservationDate(ctx context.Context, date time.Time) error {
+	// Compare calendar days in the cafeteria's timezone (UTC+3) — a
+	// same-day reservation is valid, yesterday is not.
+	loc := time.FixedZone("UTC+3", 3*3600)
+	now := clock.Now().In(loc)
+	today := time.Date(now.Year(), now.Month(), now.Day(), 0, 0, 0, 0, time.UTC)
+	target := time.Date(date.Year(), date.Month(), date.Day(), 0, 0, 0, 0, time.UTC)
+
+	if target.Before(today) || target.After(today.AddDate(0, 0, maxReservationAdvanceDays)) {
+		return serviceErrors.ErrInvalidDateRange
+	}
+
 	isClosed, err := s.closedDaysRepo.IsDateClosed(ctx, pgtype.Date{Time: date, Valid: true})
 	if err != nil {
 		s.logger.Error("failed to check closed day", zap.Error(err), zap.Time("date", date))
