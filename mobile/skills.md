@@ -75,13 +75,19 @@ onayli program varsa gorunur.
 1. Type tanimi:    types/{feature}.types.ts
 2. Service:        services/{feature}Service.ts (Bolum 6 sablonu)
 3. Hook:           hooks/use{Feature}.ts (Bolum 9 sablonu)
-4. Ekran:          app/{group}/{feature}.tsx (Bolum 7 sablonu)
-5. Layout (varsa): app/{group}/_layout.tsx (Stack/Tabs ekle)
+4. Ekran:          app/{feature}.tsx (Bolum 7 sablonu)
+5. Route baglama:  tab ekrani -> app/(tabs)/_layout.tsx; detay ekrani -> root
+                   app/_layout.tsx Stack'ine <Stack.Screen name="{feature}" /> ekle
 6. Tip kontrol:    npx tsc --noEmit
-7. Test:           npm test
+7. Test:           npm test (service + hook)
 8. Cihazda dene:   npm start -> a (Android) / i (iOS)
 9. Commit:         feat(mobile): add {feature} screen
 ```
+
+**Detay (stack) ekrani deseni:** `(tabs)` disindaki ekranlar (ornek `grades`,
+`cafeteria`, `schedule`) root Stack'te `headerShown:false` ile mount edilir ve
+kendi ust cubuklarini `components/ScreenHeader` (geri butonu + baslik) ile cizer
+— Stack header'i kullanma, tema tutarliligi ScreenHeader'da.
 
 ---
 
@@ -92,15 +98,16 @@ import { useRouter, useLocalSearchParams, Link, Stack, Tabs } from 'expo-router'
 
 // Programmatic
 const router = useRouter();
-router.push('/screens/detail/123');
-router.replace('/(tabs)/home');                  // history replace
+router.push('/grades');                           // root stack ekrani
+router.push('/(tabs)/scan');                       // tab ekrani
+router.replace('/(tabs)');                         // history replace
 router.back();
-router.dismiss();                                 // modal kapat
+router.dismiss();                                  // modal kapat
 
 // Link
-<Link href="/screens/detail/123">Detay</Link>    // ✅ href (to DEGIL)
+<Link href="/grades">Notlarim</Link>              // ✅ href (to DEGIL)
 
-// URL parametre — dosya: app/screens/detail/[id].tsx
+// URL parametre — dinamik route dosyasi: app/course/[id].tsx
 const { id } = useLocalSearchParams<{ id: string }>();
 
 // Query — /list?page=2
@@ -464,9 +471,11 @@ if (Platform.OS === 'android') { /* ... */ }
 if (Platform.OS === 'web') { /* ... */ }
 ```
 
-**Dosya suffix'leri:**
-- `useColorScheme.web.ts` → sadece web build'de
-- `useColorScheme.ts` → ios/android default
+**Dosya suffix'leri** (platforma ozel implementasyon icin):
+- `Foo.web.tsx` → sadece web build'de
+- `Foo.tsx` → ios/android default
+(Not: tema icin `ThemeContext` + NativeWind `colorScheme` kullaniliyor; ayri
+`useColorScheme` dosyasi yok.)
 
 API base URL ornek (`services/api.ts`):
 ```ts
