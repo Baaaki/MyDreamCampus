@@ -74,17 +74,17 @@ RETURNING id, session_id, student_id, course_id, semester, week_number, session_
 `
 
 type CreateAttendanceRecordManualParams struct {
-	SessionID        pgtype.UUID               `json:"session_id"`
-	StudentID        pgtype.UUID               `json:"student_id"`
-	CourseID         pgtype.UUID               `json:"course_id"`
-	Semester         string                    `json:"semester"`
-	WeekNumber       int16                     `json:"week_number"`
-	ManuallyMarkedBy pgtype.UUID               `json:"manually_marked_by"`
-	ManualNote       pgtype.Text               `json:"manual_note"`
-	SessionType      AttendanceSessionTypeEnum `json:"session_type"`
+	SessionID        pgtype.UUID     `json:"session_id"`
+	StudentID        pgtype.UUID     `json:"student_id"`
+	CourseID         pgtype.UUID     `json:"course_id"`
+	Semester         string          `json:"semester"`
+	WeekNumber       int16           `json:"week_number"`
+	ManuallyMarkedBy pgtype.UUID     `json:"manually_marked_by"`
+	ManualNote       pgtype.Text     `json:"manual_note"`
+	SessionType      SessionTypeEnum `json:"session_type"`
 }
 
-func (q *Queries) CreateAttendanceRecordManual(ctx context.Context, arg CreateAttendanceRecordManualParams) (AttendanceAttendanceRecord, error) {
+func (q *Queries) CreateAttendanceRecordManual(ctx context.Context, arg CreateAttendanceRecordManualParams) (AttendanceRecord, error) {
 	row := q.db.QueryRow(ctx, createAttendanceRecordManual,
 		arg.SessionID,
 		arg.StudentID,
@@ -95,7 +95,7 @@ func (q *Queries) CreateAttendanceRecordManual(ctx context.Context, arg CreateAt
 		arg.ManualNote,
 		arg.SessionType,
 	)
-	var i AttendanceAttendanceRecord
+	var i AttendanceRecord
 	err := row.Scan(
 		&i.ID,
 		&i.SessionID,
@@ -125,14 +125,14 @@ INSERT INTO attendance.attendance_records (
 `
 
 type CreateAttendanceRecordQRParams struct {
-	SessionID   pgtype.UUID               `json:"session_id"`
-	StudentID   pgtype.UUID               `json:"student_id"`
-	CourseID    pgtype.UUID               `json:"course_id"`
-	Semester    string                    `json:"semester"`
-	WeekNumber  int16                     `json:"week_number"`
-	ScannedAt   pgtype.Timestamp          `json:"scanned_at"`
-	QrTimestamp pgtype.Int8               `json:"qr_timestamp"`
-	SessionType AttendanceSessionTypeEnum `json:"session_type"`
+	SessionID   pgtype.UUID      `json:"session_id"`
+	StudentID   pgtype.UUID      `json:"student_id"`
+	CourseID    pgtype.UUID      `json:"course_id"`
+	Semester    string           `json:"semester"`
+	WeekNumber  int16            `json:"week_number"`
+	ScannedAt   pgtype.Timestamp `json:"scanned_at"`
+	QrTimestamp pgtype.Int8      `json:"qr_timestamp"`
+	SessionType SessionTypeEnum  `json:"session_type"`
 }
 
 func (q *Queries) CreateAttendanceRecordQR(ctx context.Context, arg CreateAttendanceRecordQRParams) error {
@@ -171,20 +171,20 @@ ORDER BY ar.created_at DESC
 `
 
 type GetAttendanceRecordsBySessionRow struct {
-	ID               pgtype.UUID               `json:"id"`
-	SessionID        pgtype.UUID               `json:"session_id"`
-	StudentID        pgtype.UUID               `json:"student_id"`
-	CourseID         pgtype.UUID               `json:"course_id"`
-	Semester         string                    `json:"semester"`
-	WeekNumber       int16                     `json:"week_number"`
-	MarkedVia        string                    `json:"marked_via"`
-	ScannedAt        pgtype.Timestamp          `json:"scanned_at"`
-	QrTimestamp      pgtype.Int8               `json:"qr_timestamp"`
-	ManuallyMarkedBy pgtype.UUID               `json:"manually_marked_by"`
-	MarkedAt         pgtype.Timestamp          `json:"marked_at"`
-	ManualNote       pgtype.Text               `json:"manual_note"`
-	CreatedAt        pgtype.Timestamp          `json:"created_at"`
-	SessionType      AttendanceSessionTypeEnum `json:"session_type"`
+	ID               pgtype.UUID      `json:"id"`
+	SessionID        pgtype.UUID      `json:"session_id"`
+	StudentID        pgtype.UUID      `json:"student_id"`
+	CourseID         pgtype.UUID      `json:"course_id"`
+	Semester         string           `json:"semester"`
+	WeekNumber       int16            `json:"week_number"`
+	MarkedVia        string           `json:"marked_via"`
+	ScannedAt        pgtype.Timestamp `json:"scanned_at"`
+	QrTimestamp      pgtype.Int8      `json:"qr_timestamp"`
+	ManuallyMarkedBy pgtype.UUID      `json:"manually_marked_by"`
+	MarkedAt         pgtype.Timestamp `json:"marked_at"`
+	ManualNote       pgtype.Text      `json:"manual_note"`
+	CreatedAt        pgtype.Timestamp `json:"created_at"`
+	SessionType      SessionTypeEnum  `json:"session_type"`
 }
 
 func (q *Queries) GetAttendanceRecordsBySession(ctx context.Context, sessionID pgtype.UUID) ([]GetAttendanceRecordsBySessionRow, error) {
@@ -292,9 +292,9 @@ ORDER BY s.student_number
 `
 
 type GetCourseAttendanceStatsByTypeParams struct {
-	CourseID    pgtype.UUID               `json:"course_id"`
-	Semester    string                    `json:"semester"`
-	SessionType AttendanceSessionTypeEnum `json:"session_type"`
+	CourseID    pgtype.UUID     `json:"course_id"`
+	Semester    string          `json:"semester"`
+	SessionType SessionTypeEnum `json:"session_type"`
 }
 
 type GetCourseAttendanceStatsByTypeRow struct {
@@ -416,11 +416,11 @@ HAVING COUNT(ar.id) < $5::bigint
 `
 
 type GetFailingStudentsByCourseByTypeParams struct {
-	CourseID              pgtype.UUID               `json:"course_id"`
-	Semester              string                    `json:"semester"`
-	SessionType           AttendanceSessionTypeEnum `json:"session_type"`
-	TotalSessions         int64                     `json:"total_sessions"`
-	MinRequiredAttendance int64                     `json:"min_required_attendance"`
+	CourseID              pgtype.UUID     `json:"course_id"`
+	Semester              string          `json:"semester"`
+	SessionType           SessionTypeEnum `json:"session_type"`
+	TotalSessions         int64           `json:"total_sessions"`
+	MinRequiredAttendance int64           `json:"min_required_attendance"`
 }
 
 type GetFailingStudentsByCourseByTypeRow struct {
@@ -528,13 +528,13 @@ type GetStudentAttendanceByCourseParams struct {
 }
 
 type GetStudentAttendanceByCourseRow struct {
-	WeekNumber       int16                     `json:"week_number"`
-	SessionDate      pgtype.Date               `json:"session_date"`
-	MarkedVia        string                    `json:"marked_via"`
-	ManualNote       pgtype.Text               `json:"manual_note"`
-	ScannedAt        pgtype.Timestamp          `json:"scanned_at"`
-	ManuallyMarkedAt pgtype.Timestamp          `json:"manually_marked_at"`
-	SessionType      AttendanceSessionTypeEnum `json:"session_type"`
+	WeekNumber       int16            `json:"week_number"`
+	SessionDate      pgtype.Date      `json:"session_date"`
+	MarkedVia        string           `json:"marked_via"`
+	ManualNote       pgtype.Text      `json:"manual_note"`
+	ScannedAt        pgtype.Timestamp `json:"scanned_at"`
+	ManuallyMarkedAt pgtype.Timestamp `json:"manually_marked_at"`
+	SessionType      SessionTypeEnum  `json:"session_type"`
 }
 
 func (q *Queries) GetStudentAttendanceByCourse(ctx context.Context, arg GetStudentAttendanceByCourseParams) ([]GetStudentAttendanceByCourseRow, error) {
@@ -572,10 +572,10 @@ WHERE student_id = $1 AND course_id = $2 AND semester = $3 AND session_type = $4
 `
 
 type GetStudentPresentCountByTypeParams struct {
-	StudentID   pgtype.UUID               `json:"student_id"`
-	CourseID    pgtype.UUID               `json:"course_id"`
-	Semester    string                    `json:"semester"`
-	SessionType AttendanceSessionTypeEnum `json:"session_type"`
+	StudentID   pgtype.UUID     `json:"student_id"`
+	CourseID    pgtype.UUID     `json:"course_id"`
+	Semester    string          `json:"semester"`
+	SessionType SessionTypeEnum `json:"session_type"`
 }
 
 func (q *Queries) GetStudentPresentCountByType(ctx context.Context, arg GetStudentPresentCountByTypeParams) (int64, error) {
@@ -615,9 +615,9 @@ WHERE course_id = $1 AND semester = $2 AND session_type = $3
 `
 
 type GetTotalSessionsByCourseAndTypeParams struct {
-	CourseID    pgtype.UUID               `json:"course_id"`
-	Semester    string                    `json:"semester"`
-	SessionType AttendanceSessionTypeEnum `json:"session_type"`
+	CourseID    pgtype.UUID     `json:"course_id"`
+	Semester    string          `json:"semester"`
+	SessionType SessionTypeEnum `json:"session_type"`
 }
 
 func (q *Queries) GetTotalSessionsByCourseAndType(ctx context.Context, arg GetTotalSessionsByCourseAndTypeParams) (int64, error) {

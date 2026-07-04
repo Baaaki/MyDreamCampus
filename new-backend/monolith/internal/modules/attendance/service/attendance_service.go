@@ -96,7 +96,7 @@ func (s *AttendanceService) CreateSession(ctx context.Context, instructorID uuid
 	}
 
 	// 3. Check session doesn't already exist for this week + session_type
-	sessionType := db.AttendanceSessionTypeEnum(req.SessionType)
+	sessionType := db.SessionTypeEnum(req.SessionType)
 	exists, err := s.sessionRepo.CheckSessionExists(ctx, req.CourseID, req.WeekNumber, sessionType)
 	if err != nil {
 		return dto.CreateSessionResponse{}, err
@@ -720,10 +720,10 @@ func (s *AttendanceService) GetCourseSessions(ctx context.Context, courseID, ins
 
 // Helper functions
 
-func (s *AttendanceService) getSessionWithFallback(ctx context.Context, sessionID string) (db.AttendanceAttendanceSession, error) {
+func (s *AttendanceService) getSessionWithFallback(ctx context.Context, sessionID string) (db.AttendanceSession, error) {
 	sessionUUID, err := uuid.Parse(sessionID)
 	if err != nil {
-		return db.AttendanceAttendanceSession{}, fmt.Errorf("invalid session ID: %w", err)
+		return db.AttendanceSession{}, fmt.Errorf("invalid session ID: %w", err)
 	}
 	// DB is source of truth; session cache is cleared on close and not rehydrated here.
 	return s.sessionRepo.GetActiveSessionByID(ctx, sessionUUID)

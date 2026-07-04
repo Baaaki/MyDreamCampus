@@ -29,9 +29,9 @@ WHERE id = $1
 LIMIT 1
 `
 
-func (q *Queries) GetStudentCacheByID(ctx context.Context, id pgtype.UUID) (AttendanceStudentsView, error) {
+func (q *Queries) GetStudentCacheByID(ctx context.Context, id pgtype.UUID) (StudentView, error) {
 	row := q.db.QueryRow(ctx, getStudentCacheByID, id)
-	var i AttendanceStudentsView
+	var i StudentView
 	err := row.Scan(
 		&i.ID,
 		&i.StudentNumber,

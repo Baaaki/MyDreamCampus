@@ -60,7 +60,7 @@ func (r *AttendanceRepository) BatchCreateAttendanceRecordsQR(ctx context.Contex
 	return r.queries.BatchCreateAttendanceRecordsQR(ctx, params)
 }
 
-func (r *AttendanceRepository) CreateAttendanceRecordManual(ctx context.Context, params db.CreateAttendanceRecordManualParams) (db.AttendanceAttendanceRecord, error) {
+func (r *AttendanceRepository) CreateAttendanceRecordManual(ctx context.Context, params db.CreateAttendanceRecordManualParams) (db.AttendanceRecord, error) {
 	return r.queries.CreateAttendanceRecordManual(ctx, params)
 }
 
@@ -116,7 +116,7 @@ func (r *AttendanceRepository) GetTotalSessionsByCourse(ctx context.Context, cou
 	})
 }
 
-func (r *AttendanceRepository) GetTotalSessionsByCourseAndType(ctx context.Context, courseID uuid.UUID, semester string, sessionType db.AttendanceSessionTypeEnum) (int64, error) {
+func (r *AttendanceRepository) GetTotalSessionsByCourseAndType(ctx context.Context, courseID uuid.UUID, semester string, sessionType db.SessionTypeEnum) (int64, error) {
 	return r.queries.GetTotalSessionsByCourseAndType(ctx, db.GetTotalSessionsByCourseAndTypeParams{
 		CourseID:    utils.UUIDToPgUUID(courseID),
 		Semester:    semester,
@@ -124,7 +124,7 @@ func (r *AttendanceRepository) GetTotalSessionsByCourseAndType(ctx context.Conte
 	})
 }
 
-func (r *AttendanceRepository) GetFailingStudentsByCourseByType(ctx context.Context, courseID uuid.UUID, semester string, sessionType db.AttendanceSessionTypeEnum, totalSessions int64, minRequired int64) ([]db.GetFailingStudentsByCourseByTypeRow, error) {
+func (r *AttendanceRepository) GetFailingStudentsByCourseByType(ctx context.Context, courseID uuid.UUID, semester string, sessionType db.SessionTypeEnum, totalSessions int64, minRequired int64) ([]db.GetFailingStudentsByCourseByTypeRow, error) {
 	return r.queries.GetFailingStudentsByCourseByType(ctx, db.GetFailingStudentsByCourseByTypeParams{
 		CourseID:              utils.UUIDToPgUUID(courseID),
 		Semester:              semester,
@@ -134,7 +134,7 @@ func (r *AttendanceRepository) GetFailingStudentsByCourseByType(ctx context.Cont
 	})
 }
 
-func (r *AttendanceRepository) GetStudentPresentCountByType(ctx context.Context, studentID, courseID uuid.UUID, semester string, sessionType db.AttendanceSessionTypeEnum) (int64, error) {
+func (r *AttendanceRepository) GetStudentPresentCountByType(ctx context.Context, studentID, courseID uuid.UUID, semester string, sessionType db.SessionTypeEnum) (int64, error) {
 	return r.queries.GetStudentPresentCountByType(ctx, db.GetStudentPresentCountByTypeParams{
 		StudentID:   utils.UUIDToPgUUID(studentID),
 		CourseID:    utils.UUIDToPgUUID(courseID),

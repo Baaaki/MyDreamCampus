@@ -21,19 +21,19 @@ func NewSessionRepository(pool *pgxpool.Pool) *SessionRepository {
 	}
 }
 
-func (r *SessionRepository) CreateAttendanceSession(ctx context.Context, params db.CreateAttendanceSessionParams) (db.AttendanceAttendanceSession, error) {
+func (r *SessionRepository) CreateAttendanceSession(ctx context.Context, params db.CreateAttendanceSessionParams) (db.AttendanceSession, error) {
 	return r.queries.CreateAttendanceSession(ctx, params)
 }
 
-func (r *SessionRepository) GetSessionByID(ctx context.Context, sessionID uuid.UUID) (db.AttendanceAttendanceSession, error) {
+func (r *SessionRepository) GetSessionByID(ctx context.Context, sessionID uuid.UUID) (db.AttendanceSession, error) {
 	return r.queries.GetSessionByID(ctx, utils.UUIDToPgUUID(sessionID))
 }
 
-func (r *SessionRepository) GetActiveSessionByID(ctx context.Context, sessionID uuid.UUID) (db.AttendanceAttendanceSession, error) {
+func (r *SessionRepository) GetActiveSessionByID(ctx context.Context, sessionID uuid.UUID) (db.AttendanceSession, error) {
 	return r.queries.GetActiveSessionByID(ctx, utils.UUIDToPgUUID(sessionID))
 }
 
-func (r *SessionRepository) CheckSessionExists(ctx context.Context, courseID uuid.UUID, weekNumber int16, sessionType db.AttendanceSessionTypeEnum) (bool, error) {
+func (r *SessionRepository) CheckSessionExists(ctx context.Context, courseID uuid.UUID, weekNumber int16, sessionType db.SessionTypeEnum) (bool, error) {
 	count, err := r.queries.CheckSessionExists(ctx, db.CheckSessionExistsParams{
 		CourseID:    utils.UUIDToPgUUID(courseID),
 		WeekNumber:  weekNumber,
@@ -56,7 +56,7 @@ func (r *SessionRepository) DeactivateSession(ctx context.Context, sessionID uui
 	return r.queries.DeactivateSession(ctx, utils.UUIDToPgUUID(sessionID))
 }
 
-func (r *SessionRepository) GetExpiredSessions(ctx context.Context) ([]db.AttendanceAttendanceSession, error) {
+func (r *SessionRepository) GetExpiredSessions(ctx context.Context) ([]db.AttendanceSession, error) {
 	return r.queries.GetExpiredSessions(ctx)
 }
 

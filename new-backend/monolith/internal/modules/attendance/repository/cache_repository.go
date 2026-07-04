@@ -26,7 +26,7 @@ func (r *CacheRepository) UpsertStudentCache(ctx context.Context, student db.Ups
 	return r.queries.UpsertStudentCache(ctx, student)
 }
 
-func (r *CacheRepository) GetStudentCacheByID(ctx context.Context, studentID uuid.UUID) (db.AttendanceStudentsView, error) {
+func (r *CacheRepository) GetStudentCacheByID(ctx context.Context, studentID uuid.UUID) (db.StudentView, error) {
 	return r.queries.GetStudentCacheByID(ctx, utils.UUIDToPgUUID(studentID))
 }
 
@@ -39,7 +39,7 @@ func (r *CacheRepository) UpsertCourseCache(ctx context.Context, course db.Upser
 	return r.queries.UpsertCourseCache(ctx, course)
 }
 
-func (r *CacheRepository) GetCourseCacheByID(ctx context.Context, courseID uuid.UUID) (db.AttendanceCoursesView, error) {
+func (r *CacheRepository) GetCourseCacheByID(ctx context.Context, courseID uuid.UUID) (db.CourseView, error) {
 	return r.queries.GetCourseCacheByID(ctx, utils.UUIDToPgUUID(courseID))
 }
 

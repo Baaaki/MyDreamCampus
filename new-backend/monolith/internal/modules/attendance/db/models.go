@@ -11,92 +11,92 @@ import (
 	"github.com/jackc/pgx/v5/pgtype"
 )
 
-type AttendanceOutboxStatusEnum string
+type OutboxStatusEnum string
 
 const (
-	AttendanceOutboxStatusEnumPending   AttendanceOutboxStatusEnum = "pending"
-	AttendanceOutboxStatusEnumProcessed AttendanceOutboxStatusEnum = "processed"
-	AttendanceOutboxStatusEnumFailed    AttendanceOutboxStatusEnum = "failed"
+	AttendanceOutboxStatusEnumPending   OutboxStatusEnum = "pending"
+	AttendanceOutboxStatusEnumProcessed OutboxStatusEnum = "processed"
+	AttendanceOutboxStatusEnumFailed    OutboxStatusEnum = "failed"
 )
 
-func (e *AttendanceOutboxStatusEnum) Scan(src interface{}) error {
+func (e *OutboxStatusEnum) Scan(src interface{}) error {
 	switch s := src.(type) {
 	case []byte:
-		*e = AttendanceOutboxStatusEnum(s)
+		*e = OutboxStatusEnum(s)
 	case string:
-		*e = AttendanceOutboxStatusEnum(s)
+		*e = OutboxStatusEnum(s)
 	default:
-		return fmt.Errorf("unsupported scan type for AttendanceOutboxStatusEnum: %T", src)
+		return fmt.Errorf("unsupported scan type for OutboxStatusEnum: %T", src)
 	}
 	return nil
 }
 
-type NullAttendanceOutboxStatusEnum struct {
-	AttendanceOutboxStatusEnum AttendanceOutboxStatusEnum `json:"attendance_outbox_status_enum"`
-	Valid                      bool                       `json:"valid"` // Valid is true if AttendanceOutboxStatusEnum is not NULL
+type NullOutboxStatusEnum struct {
+	OutboxStatusEnum OutboxStatusEnum `json:"attendance_outbox_status_enum"`
+	Valid            bool             `json:"valid"` // Valid is true if OutboxStatusEnum is not NULL
 }
 
 // Scan implements the Scanner interface.
-func (ns *NullAttendanceOutboxStatusEnum) Scan(value interface{}) error {
+func (ns *NullOutboxStatusEnum) Scan(value interface{}) error {
 	if value == nil {
-		ns.AttendanceOutboxStatusEnum, ns.Valid = "", false
+		ns.OutboxStatusEnum, ns.Valid = "", false
 		return nil
 	}
 	ns.Valid = true
-	return ns.AttendanceOutboxStatusEnum.Scan(value)
+	return ns.OutboxStatusEnum.Scan(value)
 }
 
 // Value implements the driver Valuer interface.
-func (ns NullAttendanceOutboxStatusEnum) Value() (driver.Value, error) {
+func (ns NullOutboxStatusEnum) Value() (driver.Value, error) {
 	if !ns.Valid {
 		return nil, nil
 	}
-	return string(ns.AttendanceOutboxStatusEnum), nil
+	return string(ns.OutboxStatusEnum), nil
 }
 
-type AttendanceSessionTypeEnum string
+type SessionTypeEnum string
 
 const (
-	AttendanceSessionTypeEnumTheory AttendanceSessionTypeEnum = "theory"
-	AttendanceSessionTypeEnumLab    AttendanceSessionTypeEnum = "lab"
+	AttendanceSessionTypeEnumTheory SessionTypeEnum = "theory"
+	AttendanceSessionTypeEnumLab    SessionTypeEnum = "lab"
 )
 
-func (e *AttendanceSessionTypeEnum) Scan(src interface{}) error {
+func (e *SessionTypeEnum) Scan(src interface{}) error {
 	switch s := src.(type) {
 	case []byte:
-		*e = AttendanceSessionTypeEnum(s)
+		*e = SessionTypeEnum(s)
 	case string:
-		*e = AttendanceSessionTypeEnum(s)
+		*e = SessionTypeEnum(s)
 	default:
-		return fmt.Errorf("unsupported scan type for AttendanceSessionTypeEnum: %T", src)
+		return fmt.Errorf("unsupported scan type for SessionTypeEnum: %T", src)
 	}
 	return nil
 }
 
-type NullAttendanceSessionTypeEnum struct {
-	AttendanceSessionTypeEnum AttendanceSessionTypeEnum `json:"attendance_session_type_enum"`
-	Valid                     bool                      `json:"valid"` // Valid is true if AttendanceSessionTypeEnum is not NULL
+type NullSessionTypeEnum struct {
+	SessionTypeEnum SessionTypeEnum `json:"attendance_session_type_enum"`
+	Valid           bool            `json:"valid"` // Valid is true if SessionTypeEnum is not NULL
 }
 
 // Scan implements the Scanner interface.
-func (ns *NullAttendanceSessionTypeEnum) Scan(value interface{}) error {
+func (ns *NullSessionTypeEnum) Scan(value interface{}) error {
 	if value == nil {
-		ns.AttendanceSessionTypeEnum, ns.Valid = "", false
+		ns.SessionTypeEnum, ns.Valid = "", false
 		return nil
 	}
 	ns.Valid = true
-	return ns.AttendanceSessionTypeEnum.Scan(value)
+	return ns.SessionTypeEnum.Scan(value)
 }
 
 // Value implements the driver Valuer interface.
-func (ns NullAttendanceSessionTypeEnum) Value() (driver.Value, error) {
+func (ns NullSessionTypeEnum) Value() (driver.Value, error) {
 	if !ns.Valid {
 		return nil, nil
 	}
-	return string(ns.AttendanceSessionTypeEnum), nil
+	return string(ns.SessionTypeEnum), nil
 }
 
-type AttendanceAcademicPeriod struct {
+type AcademicPeriod struct {
 	ID          pgtype.UUID        `json:"id"`
 	Semester    string             `json:"semester"`
 	PeriodStart pgtype.Timestamptz `json:"period_start"`
@@ -106,40 +106,40 @@ type AttendanceAcademicPeriod struct {
 	UpdatedAt   pgtype.Timestamptz `json:"updated_at"`
 }
 
-type AttendanceAttendanceRecord struct {
-	ID               pgtype.UUID               `json:"id"`
-	SessionID        pgtype.UUID               `json:"session_id"`
-	StudentID        pgtype.UUID               `json:"student_id"`
-	CourseID         pgtype.UUID               `json:"course_id"`
-	Semester         string                    `json:"semester"`
-	WeekNumber       int16                     `json:"week_number"`
-	SessionType      AttendanceSessionTypeEnum `json:"session_type"`
-	MarkedVia        string                    `json:"marked_via"`
-	ScannedAt        pgtype.Timestamp          `json:"scanned_at"`
-	QrTimestamp      pgtype.Int8               `json:"qr_timestamp"`
-	ManuallyMarkedBy pgtype.UUID               `json:"manually_marked_by"`
-	ManuallyMarkedAt pgtype.Timestamp          `json:"manually_marked_at"`
-	ManualNote       pgtype.Text               `json:"manual_note"`
-	CreatedAt        pgtype.Timestamp          `json:"created_at"`
+type AttendanceRecord struct {
+	ID               pgtype.UUID      `json:"id"`
+	SessionID        pgtype.UUID      `json:"session_id"`
+	StudentID        pgtype.UUID      `json:"student_id"`
+	CourseID         pgtype.UUID      `json:"course_id"`
+	Semester         string           `json:"semester"`
+	WeekNumber       int16            `json:"week_number"`
+	SessionType      SessionTypeEnum  `json:"session_type"`
+	MarkedVia        string           `json:"marked_via"`
+	ScannedAt        pgtype.Timestamp `json:"scanned_at"`
+	QrTimestamp      pgtype.Int8      `json:"qr_timestamp"`
+	ManuallyMarkedBy pgtype.UUID      `json:"manually_marked_by"`
+	ManuallyMarkedAt pgtype.Timestamp `json:"manually_marked_at"`
+	ManualNote       pgtype.Text      `json:"manual_note"`
+	CreatedAt        pgtype.Timestamp `json:"created_at"`
 }
 
-type AttendanceAttendanceSession struct {
-	ID                 pgtype.UUID               `json:"id"`
-	CourseID           pgtype.UUID               `json:"course_id"`
-	InstructorID       pgtype.UUID               `json:"instructor_id"`
-	Semester           string                    `json:"semester"`
-	WeekNumber         int16                     `json:"week_number"`
-	SessionDate        pgtype.Date               `json:"session_date"`
-	SessionType        AttendanceSessionTypeEnum `json:"session_type"`
-	QrSecret           string                    `json:"qr_secret"`
-	QrRotationInterval pgtype.Int2               `json:"qr_rotation_interval"`
-	StartedAt          pgtype.Timestamp          `json:"started_at"`
-	ExpiresAt          pgtype.Timestamp          `json:"expires_at"`
-	IsActive           pgtype.Bool               `json:"is_active"`
-	CreatedAt          pgtype.Timestamp          `json:"created_at"`
+type AttendanceSession struct {
+	ID                 pgtype.UUID      `json:"id"`
+	CourseID           pgtype.UUID      `json:"course_id"`
+	InstructorID       pgtype.UUID      `json:"instructor_id"`
+	Semester           string           `json:"semester"`
+	WeekNumber         int16            `json:"week_number"`
+	SessionDate        pgtype.Date      `json:"session_date"`
+	SessionType        SessionTypeEnum  `json:"session_type"`
+	QrSecret           string           `json:"qr_secret"`
+	QrRotationInterval pgtype.Int2      `json:"qr_rotation_interval"`
+	StartedAt          pgtype.Timestamp `json:"started_at"`
+	ExpiresAt          pgtype.Timestamp `json:"expires_at"`
+	IsActive           pgtype.Bool      `json:"is_active"`
+	CreatedAt          pgtype.Timestamp `json:"created_at"`
 }
 
-type AttendanceCoursesView struct {
+type CourseView struct {
 	ID                 pgtype.UUID      `json:"id"`
 	CourseCode         string           `json:"course_code"`
 	CourseName         string           `json:"course_name"`
@@ -153,7 +153,7 @@ type AttendanceCoursesView struct {
 	SyncedAt           pgtype.Timestamp `json:"synced_at"`
 }
 
-type AttendanceEnrollmentsView struct {
+type EnrollmentView struct {
 	ID        pgtype.UUID      `json:"id"`
 	StudentID pgtype.UUID      `json:"student_id"`
 	CourseID  pgtype.UUID      `json:"course_id"`
@@ -161,26 +161,26 @@ type AttendanceEnrollmentsView struct {
 	SyncedAt  pgtype.Timestamp `json:"synced_at"`
 }
 
-type AttendanceOutboxEvent struct {
-	ID           pgtype.UUID                    `json:"id"`
-	EventType    string                         `json:"event_type"`
-	RoutingKey   string                         `json:"routing_key"`
-	Payload      []byte                         `json:"payload"`
-	Status       NullAttendanceOutboxStatusEnum `json:"status"`
-	RetryCount   pgtype.Int2                    `json:"retry_count"`
-	MaxRetries   pgtype.Int2                    `json:"max_retries"`
-	CreatedAt    pgtype.Timestamp               `json:"created_at"`
-	ProcessedAt  pgtype.Timestamp               `json:"processed_at"`
-	ErrorMessage pgtype.Text                    `json:"error_message"`
+type OutboxEvent struct {
+	ID           pgtype.UUID          `json:"id"`
+	EventType    string               `json:"event_type"`
+	RoutingKey   string               `json:"routing_key"`
+	Payload      []byte               `json:"payload"`
+	Status       NullOutboxStatusEnum `json:"status"`
+	RetryCount   pgtype.Int2          `json:"retry_count"`
+	MaxRetries   pgtype.Int2          `json:"max_retries"`
+	CreatedAt    pgtype.Timestamp     `json:"created_at"`
+	ProcessedAt  pgtype.Timestamp     `json:"processed_at"`
+	ErrorMessage pgtype.Text          `json:"error_message"`
 }
 
-type AttendanceProcessedEvent struct {
+type ProcessedEvent struct {
 	EventID     pgtype.UUID      `json:"event_id"`
 	EventType   string           `json:"event_type"`
 	ProcessedAt pgtype.Timestamp `json:"processed_at"`
 }
 
-type AttendanceStudentsView struct {
+type StudentView struct {
 	ID            pgtype.UUID      `json:"id"`
 	StudentNumber string           `json:"student_number"`
 	FirstName     pgtype.Text      `json:"first_name"`

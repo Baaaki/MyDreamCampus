@@ -18,9 +18,9 @@ WHERE course_id = $1 AND week_number = $2 AND session_type = $3
 `
 
 type CheckSessionExistsParams struct {
-	CourseID    pgtype.UUID               `json:"course_id"`
-	WeekNumber  int16                     `json:"week_number"`
-	SessionType AttendanceSessionTypeEnum `json:"session_type"`
+	CourseID    pgtype.UUID     `json:"course_id"`
+	WeekNumber  int16           `json:"week_number"`
+	SessionType SessionTypeEnum `json:"session_type"`
 }
 
 func (q *Queries) CheckSessionExists(ctx context.Context, arg CheckSessionExistsParams) (int64, error) {
@@ -40,19 +40,19 @@ INSERT INTO attendance.attendance_sessions (
 `
 
 type CreateAttendanceSessionParams struct {
-	CourseID           pgtype.UUID               `json:"course_id"`
-	InstructorID       pgtype.UUID               `json:"instructor_id"`
-	Semester           string                    `json:"semester"`
-	WeekNumber         int16                     `json:"week_number"`
-	SessionDate        pgtype.Date               `json:"session_date"`
-	QrSecret           string                    `json:"qr_secret"`
-	QrRotationInterval pgtype.Int2               `json:"qr_rotation_interval"`
-	StartedAt          pgtype.Timestamp          `json:"started_at"`
-	ExpiresAt          pgtype.Timestamp          `json:"expires_at"`
-	SessionType        AttendanceSessionTypeEnum `json:"session_type"`
+	CourseID           pgtype.UUID      `json:"course_id"`
+	InstructorID       pgtype.UUID      `json:"instructor_id"`
+	Semester           string           `json:"semester"`
+	WeekNumber         int16            `json:"week_number"`
+	SessionDate        pgtype.Date      `json:"session_date"`
+	QrSecret           string           `json:"qr_secret"`
+	QrRotationInterval pgtype.Int2      `json:"qr_rotation_interval"`
+	StartedAt          pgtype.Timestamp `json:"started_at"`
+	ExpiresAt          pgtype.Timestamp `json:"expires_at"`
+	SessionType        SessionTypeEnum  `json:"session_type"`
 }
 
-func (q *Queries) CreateAttendanceSession(ctx context.Context, arg CreateAttendanceSessionParams) (AttendanceAttendanceSession, error) {
+func (q *Queries) CreateAttendanceSession(ctx context.Context, arg CreateAttendanceSessionParams) (AttendanceSession, error) {
 	row := q.db.QueryRow(ctx, createAttendanceSession,
 		arg.CourseID,
 		arg.InstructorID,
@@ -65,7 +65,7 @@ func (q *Queries) CreateAttendanceSession(ctx context.Context, arg CreateAttenda
 		arg.ExpiresAt,
 		arg.SessionType,
 	)
-	var i AttendanceAttendanceSession
+	var i AttendanceSession
 	err := row.Scan(
 		&i.ID,
 		&i.CourseID,
@@ -101,9 +101,9 @@ WHERE id = $1 AND is_active = TRUE AND expires_at > NOW()
 LIMIT 1
 `
 
-func (q *Queries) GetActiveSessionByID(ctx context.Context, id pgtype.UUID) (AttendanceAttendanceSession, error) {
+func (q *Queries) GetActiveSessionByID(ctx context.Context, id pgtype.UUID) (AttendanceSession, error) {
 	row := q.db.QueryRow(ctx, getActiveSessionByID, id)
-	var i AttendanceAttendanceSession
+	var i AttendanceSession
 	err := row.Scan(
 		&i.ID,
 		&i.CourseID,
@@ -127,15 +127,15 @@ SELECT id, course_id, instructor_id, semester, week_number, session_date, sessio
 WHERE is_active = TRUE AND expires_at < NOW()
 `
 
-func (q *Queries) GetExpiredSessions(ctx context.Context) ([]AttendanceAttendanceSession, error) {
+func (q *Queries) GetExpiredSessions(ctx context.Context) ([]AttendanceSession, error) {
 	rows, err := q.db.Query(ctx, getExpiredSessions)
 	if err != nil {
 		return nil, err
 	}
 	defer rows.Close()
-	items := []AttendanceAttendanceSession{}
+	items := []AttendanceSession{}
 	for rows.Next() {
-		var i AttendanceAttendanceSession
+		var i AttendanceSession
 		if err := rows.Scan(
 			&i.ID,
 			&i.CourseID,
@@ -167,9 +167,9 @@ WHERE id = $1
 LIMIT 1
 `
 
-func (q *Queries) GetSessionByID(ctx context.Context, id pgtype.UUID) (AttendanceAttendanceSession, error) {
+func (q *Queries) GetSessionByID(ctx context.Context, id pgtype.UUID) (AttendanceSession, error) {
 	row := q.db.QueryRow(ctx, getSessionByID, id)
-	var i AttendanceAttendanceSession
+	var i AttendanceSession
 	err := row.Scan(
 		&i.ID,
 		&i.CourseID,
@@ -208,13 +208,13 @@ type GetSessionsByCourseParams struct {
 }
 
 type GetSessionsByCourseRow struct {
-	ID          pgtype.UUID               `json:"id"`
-	WeekNumber  int16                     `json:"week_number"`
-	SessionDate pgtype.Date               `json:"session_date"`
-	IsActive    pgtype.Bool               `json:"is_active"`
-	StartedAt   pgtype.Timestamp          `json:"started_at"`
-	ExpiresAt   pgtype.Timestamp          `json:"expires_at"`
-	SessionType AttendanceSessionTypeEnum `json:"session_type"`
+	ID          pgtype.UUID      `json:"id"`
+	WeekNumber  int16            `json:"week_number"`
+	SessionDate pgtype.Date      `json:"session_date"`
+	IsActive    pgtype.Bool      `json:"is_active"`
+	StartedAt   pgtype.Timestamp `json:"started_at"`
+	ExpiresAt   pgtype.Timestamp `json:"expires_at"`
+	SessionType SessionTypeEnum  `json:"session_type"`
 }
 
 func (q *Queries) GetSessionsByCourse(ctx context.Context, arg GetSessionsByCourseParams) ([]GetSessionsByCourseRow, error) {
@@ -273,20 +273,20 @@ type GetSessionsByDateRangeParams struct {
 }
 
 type GetSessionsByDateRangeRow struct {
-	ID            pgtype.UUID               `json:"id"`
-	CourseID      pgtype.UUID               `json:"course_id"`
-	InstructorID  pgtype.UUID               `json:"instructor_id"`
-	Semester      string                    `json:"semester"`
-	WeekNumber    int16                     `json:"week_number"`
-	SessionDate   pgtype.Date               `json:"session_date"`
-	SessionType   AttendanceSessionTypeEnum `json:"session_type"`
-	IsActive      pgtype.Bool               `json:"is_active"`
-	StartedAt     pgtype.Timestamp          `json:"started_at"`
-	ExpiresAt     pgtype.Timestamp          `json:"expires_at"`
-	CourseCode    string                    `json:"course_code"`
-	CourseName    string                    `json:"course_name"`
-	PresentCount  int64                     `json:"present_count"`
-	EnrolledCount int64                     `json:"enrolled_count"`
+	ID            pgtype.UUID      `json:"id"`
+	CourseID      pgtype.UUID      `json:"course_id"`
+	InstructorID  pgtype.UUID      `json:"instructor_id"`
+	Semester      string           `json:"semester"`
+	WeekNumber    int16            `json:"week_number"`
+	SessionDate   pgtype.Date      `json:"session_date"`
+	SessionType   SessionTypeEnum  `json:"session_type"`
+	IsActive      pgtype.Bool      `json:"is_active"`
+	StartedAt     pgtype.Timestamp `json:"started_at"`
+	ExpiresAt     pgtype.Timestamp `json:"expires_at"`
+	CourseCode    string           `json:"course_code"`
+	CourseName    string           `json:"course_name"`
+	PresentCount  int64            `json:"present_count"`
+	EnrolledCount int64            `json:"enrolled_count"`
 }
 
 func (q *Queries) GetSessionsByDateRange(ctx context.Context, arg GetSessionsByDateRangeParams) ([]GetSessionsByDateRangeRow, error) {
