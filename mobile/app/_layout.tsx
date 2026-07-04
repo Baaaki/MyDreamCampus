@@ -92,6 +92,9 @@ function RootLayoutNav() {
             <Stack screenOptions={{ headerShown: false }}>
               <Stack.Screen name="(auth)" />
               <Stack.Screen name="(tabs)" />
+              <Stack.Screen name="grades" />
+              <Stack.Screen name="cafeteria" />
+              <Stack.Screen name="schedule" />
               <Stack.Screen
                 name="change-password"
                 options={{ presentation: 'modal', gestureEnabled: false }}

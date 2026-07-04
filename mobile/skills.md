@@ -16,7 +16,7 @@ React Native 0.81 + Expo 54 + Expo Router v6 + TanStack Query + axios. `mobile/a
 - **Env var**: `EXPO_PUBLIC_*` prefix — `process.env.EXPO_PUBLIC_X`.
 - **Web/native ayrimi**: `localStorage`, `document`, `window` ortak kodda YAPMA — web target'a ozel davranis gerekirse `Platform.OS === 'web'` guard ile koru veya `.web.ts` suffix dosya olarak ayir. Native build'de bu API'lar yok, runtime crash olur.
 - **Style**: **NativeWind v4** (`className="..."`) + `components/ui/` primitifleri (react-native-reusables pattern: cva + cn). Tema renkleri `global.css` CSS degiskenlerinden gelir (`bg-primary`, `text-foreground` vs.) — hardcoded hex YAPMA. `className` ile ifade edilemeyen degerler (animasyon transform'lari, shadow renkleri, yuzde genislik) icin `style={{...}}` serbest; JS tarafinda renk gerekirse `lib/theme.ts` `COLORS`. `react-native-paper` KALDIRILDI — geri ekleme.
-- **Tema (dark mode)**: `contexts/ThemeContext` (`useTheme()` -> `isDark`, `toggleTheme`) NativeWind `colorScheme` uzerine sarilidir. Renk degistirmek icin `global.css` (`:root` / `.dark:root`) + `lib/theme.ts` ikisini birden guncelle.
+- **Tema (dark mode)**: `contexts/ThemeContext` (`useTheme()` -> `isDark`, `toggleTheme`) NativeWind `colorScheme` uzerine sarilidir. Palet **mavi/beyaz** (`--primary` = mavi). Renk degistirmek icin `global.css` (`:root` / `.dark:root`) + `lib/theme.ts` `COLORS` ikisini birden guncelle (senkron tutulmali).
 
 ---
 
@@ -29,24 +29,40 @@ mobile/
 ├── app/                       # Expo Router file-based routing
 │   ├── _layout.tsx            # Root layout (provider'lar + AuthGuard + Stack)
 │   ├── (auth)/                # login
-│   ├── (tabs)/                # index (ana sayfa), scan (QR yoklama), profile
+│   ├── (tabs)/                # index (launcher ana sayfa), scan (QR yoklama), profile
+│   ├── grades.tsx             # notlarim (stack ekran)
+│   ├── cafeteria.tsx          # yemekhane menu + randevu (stack ekran)
+│   ├── schedule.tsx           # ders programi + kayitli dersler (stack ekran)
 │   ├── change-password.tsx    # zorunlu sifre degisimi (modal)
 │   ├── +not-found.tsx         # 404
 │   └── +html.tsx              # web HTML wrapper (RN web)
-├── components/ui/             # tasarim sistemi primitifleri (text, button, card, input, badge)
+├── components/
+│   ├── ui/                    # tasarim sistemi primitifleri (text, button, card, input, badge)
+│   ├── ScreenHeader.tsx       # stack detay ekranlari icin geri+baslik cubugu
+│   └── QuoteRotator.tsx       # ana sayfa: 2dk'da bir donen ilham sozu
 ├── contexts/                  # AuthContext, ThemeContext
-├── hooks/                     # useAuth, useAttendance, useEnrollment, useCatalog, useHaptic
+├── hooks/                     # useAuth, useAttendance, useEnrollment, useGrades, useMeals, useHaptic
 ├── services/                  # API service'leri
 │   ├── api.ts                 # axios instance + 401 refresh interceptor
 │   ├── authService.ts         # login, logout, refresh
-│   └── {feature}Service.ts
+│   └── {feature}Service.ts    # meal endpoint'leri {success,data} zarfli — serviste ac
 ├── lib/                       # utils (cn), theme (COLORS/NAV_THEME), qr-payload, password-policy
-├── constants/                 # schedule.ts (TIME_SLOTS, DAYS_OF_WEEK)
+├── constants/                 # schedule, datetime, quotes, grades yardimcilari
 ├── types/                     # TypeScript tipleri
 ├── global.css                 # tema CSS degiskenleri (:root / .dark:root)
 ├── tailwind.config.js         # NativeWind preset + token eslemeleri
 └── assets/                    # gorseller, fontlar (SpaceMono = data/eyebrow fontu)
 ```
+
+**Ogrenci islevleri:** QR yoklama (ana odak), notlarim, yemekhane randevu, ders
+programi/kayitli dersler, profil. Ana sayfa Getir-tarzi launcher grid — kartlar
+stack ekranlarina veya scan sekmesine yonlendirir. Ders Programi karti yalnizca
+onayli program varsa gorunur.
+
+> **Backend yol tuzaklari** (dogrulanmis): notlar `/grades/my/grades` (NOT
+> `/grades/student/my`); yemekhane slug'i `meals` (`/meals/*`) ve yanitlar
+> `{success, data}` zarfli; aktif donem endpoint'i (`/catalog/...`) admin-only,
+> ogrenci uygulamasi donemi `my-enrollments` yanitindan okur.
 
 **Route grup parantezleri** (Expo Router):
 - `(auth)`, `(tabs)` → URL'de **gorunmez**, sadece organize amacli

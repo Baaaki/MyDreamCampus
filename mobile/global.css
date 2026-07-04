@@ -2,54 +2,54 @@
 @tailwind components;
 @tailwind utilities;
 
-/* MyDreamCampus tasarim dili: sicak kagit zemin + gun batimi mercani.
+/* MyDreamCampus tasarim dili: dengeli mavi + temiz beyaz.
    Degerler HSL bileseni olarak tutulur (tailwind.config.js hsl(var(--x)) sarar). */
 @layer base {
   :root {
-    --background: 30 40% 97%;
-    --foreground: 24 22% 11%;
+    --background: 210 40% 98%;
+    --foreground: 222 47% 11%;
     --card: 0 0% 100%;
-    --card-foreground: 24 22% 11%;
-    --primary: 16 88% 54%;
-    --primary-foreground: 20 100% 98%;
-    --secondary: 28 42% 92%;
-    --secondary-foreground: 24 24% 22%;
-    --muted: 28 30% 92%;
-    --muted-foreground: 25 10% 42%;
-    --accent: 174 62% 34%;
-    --accent-foreground: 170 60% 97%;
-    --destructive: 0 74% 48%;
+    --card-foreground: 222 47% 11%;
+    --primary: 221 83% 53%;
+    --primary-foreground: 210 40% 99%;
+    --secondary: 214 42% 93%;
+    --secondary-foreground: 222 40% 24%;
+    --muted: 214 38% 94%;
+    --muted-foreground: 215 16% 47%;
+    --accent: 199 89% 48%;
+    --accent-foreground: 200 90% 98%;
+    --destructive: 0 74% 51%;
     --destructive-foreground: 0 0% 100%;
-    --success: 158 74% 32%;
-    --success-foreground: 150 60% 97%;
-    --warning: 34 94% 42%;
-    --warning-foreground: 40 100% 97%;
-    --border: 28 22% 86%;
-    --input: 28 22% 86%;
-    --ring: 16 88% 54%;
+    --success: 158 70% 36%;
+    --success-foreground: 150 60% 98%;
+    --warning: 33 92% 48%;
+    --warning-foreground: 40 100% 98%;
+    --border: 214 32% 90%;
+    --input: 214 32% 90%;
+    --ring: 221 83% 53%;
   }
 
   .dark:root {
-    --background: 24 16% 8%;
-    --foreground: 30 28% 93%;
-    --card: 24 14% 12%;
-    --card-foreground: 30 28% 93%;
-    --primary: 16 95% 60%;
-    --primary-foreground: 20 60% 8%;
-    --secondary: 24 12% 16%;
-    --secondary-foreground: 30 20% 85%;
-    --muted: 24 12% 16%;
-    --muted-foreground: 28 12% 62%;
-    --accent: 174 55% 45%;
-    --accent-foreground: 170 60% 6%;
-    --destructive: 0 78% 58%;
+    --background: 222 47% 7%;
+    --foreground: 210 40% 96%;
+    --card: 222 40% 12%;
+    --card-foreground: 210 40% 96%;
+    --primary: 217 91% 60%;
+    --primary-foreground: 222 47% 8%;
+    --secondary: 222 30% 17%;
+    --secondary-foreground: 210 30% 86%;
+    --muted: 222 28% 17%;
+    --muted-foreground: 215 20% 65%;
+    --accent: 199 89% 55%;
+    --accent-foreground: 200 90% 8%;
+    --destructive: 0 74% 58%;
     --destructive-foreground: 0 0% 100%;
-    --success: 158 60% 44%;
-    --success-foreground: 150 70% 6%;
-    --warning: 38 92% 55%;
+    --success: 158 62% 46%;
+    --success-foreground: 150 70% 7%;
+    --warning: 33 92% 56%;
     --warning-foreground: 34 80% 8%;
-    --border: 25 10% 19%;
-    --input: 25 10% 19%;
-    --ring: 16 95% 60%;
+    --border: 222 25% 20%;
+    --input: 222 25% 20%;
+    --ring: 217 91% 60%;
   }
 }

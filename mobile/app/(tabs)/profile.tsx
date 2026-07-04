@@ -8,7 +8,6 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { Badge, Button, Card, Text } from '@/components/ui';
 import { useAuthContext } from '@/contexts/AuthContext';
 import { useTheme } from '@/contexts/ThemeContext';
-import { useActiveSemester } from '@/hooks/useCatalog';
 import { useMyEnrollments } from '@/hooks/useEnrollment';
 import { useHaptic } from '@/hooks/useHaptic';
 import { COLORS } from '@/lib/theme';
@@ -29,10 +28,9 @@ export default function ProfileScreen() {
   const { isDark, toggleTheme } = useTheme();
   const colors = COLORS[isDark ? 'dark' : 'light'];
 
-  const semesterQuery = useActiveSemester();
-  const semester = semesterQuery.data?.name ?? '';
-  const enrollmentsQuery = useMyEnrollments(semester || undefined, 'approved');
+  const enrollmentsQuery = useMyEnrollments(undefined, 'approved');
   const program = enrollmentsQuery.data?.programs?.[0];
+  const semester = program?.semester ?? '';
 
   const displayName = program?.student_name ?? user?.email?.split('@')[0] ?? 'Ogrenci';
 
