@@ -1,4 +1,4 @@
--- name: CreateAttendanceRecordQR :exec
+-- name: CreateAttendanceRecordQR :execrows
 INSERT INTO attendance.attendance_records (
     session_id, student_id, course_id, semester, week_number,
     marked_via, scanned_at, qr_timestamp, session_type

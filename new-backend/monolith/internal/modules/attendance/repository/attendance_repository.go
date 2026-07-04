@@ -22,8 +22,14 @@ func NewAttendanceRepository(pool *pgxpool.Pool) *AttendanceRepository {
 	}
 }
 
-func (r *AttendanceRepository) CreateAttendanceRecordQR(ctx context.Context, params db.CreateAttendanceRecordQRParams) error {
-	return r.queries.CreateAttendanceRecordQR(ctx, params)
+// CreateAttendanceRecordQR inserts a single QR record and reports whether a
+// row was actually written — false means ON CONFLICT swallowed a duplicate.
+func (r *AttendanceRepository) CreateAttendanceRecordQR(ctx context.Context, params db.CreateAttendanceRecordQRParams) (bool, error) {
+	rows, err := r.queries.CreateAttendanceRecordQR(ctx, params)
+	if err != nil {
+		return false, err
+	}
+	return rows > 0, nil
 }
 
 // BatchCreateAttendanceRecordsQR inserts many QR attendance records in a single query via UNNEST.

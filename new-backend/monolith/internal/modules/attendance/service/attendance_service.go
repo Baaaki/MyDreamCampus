@@ -228,10 +228,15 @@ func (s *AttendanceService) ScanQR(ctx context.Context, studentID uuid.UUID, req
 
 	added, err := s.redisService.AddToBuffer(ctx, sessionID, studentID.String(), string(bufferJSON), scannedTTL)
 	if err != nil {
-		// Redis down, write directly to DB. ON CONFLICT keeps this safe on duplicates.
+		// Redis down, write directly to DB. ON CONFLICT keeps this safe on
+		// duplicates; 0 rows means the scan was already recorded.
 		logger.Warn("Redis down, writing directly to DB", zap.Error(err))
-		if err := s.attendanceRepo.CreateAttendanceRecordQR(ctx, recordParams); err != nil {
-			return dto.ScanQRResponse{}, err
+		inserted, dbErr := s.attendanceRepo.CreateAttendanceRecordQR(ctx, recordParams)
+		if dbErr != nil {
+			return dto.ScanQRResponse{}, dbErr
+		}
+		if !inserted {
+			return dto.ScanQRResponse{}, errors.ErrAlreadyMarked
 		}
 	} else if !added {
 		return dto.ScanQRResponse{}, errors.ErrAlreadyMarked

@@ -119,7 +119,7 @@ func (q *Queries) CreateAttendanceRecordManual(ctx context.Context, arg CreateAt
 	return i, err
 }
 
-const createAttendanceRecordQR = `-- name: CreateAttendanceRecordQR :exec
+const createAttendanceRecordQR = `-- name: CreateAttendanceRecordQR :execrows
 INSERT INTO attendance.attendance_records (
     session_id, student_id, course_id, semester, week_number,
     marked_via, scanned_at, qr_timestamp, session_type
@@ -139,8 +139,8 @@ type CreateAttendanceRecordQRParams struct {
 	SessionType SessionTypeEnum  `json:"session_type"`
 }
 
-func (q *Queries) CreateAttendanceRecordQR(ctx context.Context, arg CreateAttendanceRecordQRParams) error {
-	_, err := q.db.Exec(ctx, createAttendanceRecordQR,
+func (q *Queries) CreateAttendanceRecordQR(ctx context.Context, arg CreateAttendanceRecordQRParams) (int64, error) {
+	result, err := q.db.Exec(ctx, createAttendanceRecordQR,
 		arg.SessionID,
 		arg.StudentID,
 		arg.CourseID,
@@ -150,7 +150,10 @@ func (q *Queries) CreateAttendanceRecordQR(ctx context.Context, arg CreateAttend
 		arg.QrTimestamp,
 		arg.SessionType,
 	)
-	return err
+	if err != nil {
+		return 0, err
+	}
+	return result.RowsAffected(), nil
 }
 
 const getAttendanceRecordsBySession = `-- name: GetAttendanceRecordsBySession :many
