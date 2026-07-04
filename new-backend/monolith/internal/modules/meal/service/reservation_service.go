@@ -846,28 +846,31 @@ func (s *ReservationService) validateMealTimeAndMenu(mealTime, menuType string, 
 	return nil
 }
 
-// validateCancelCutoff rejects cancellations submitted after the configured
-// cut-off window before the meal's scheduled start time (UTC+3).
+// validateCancelCutoff rejects cancellations once the whole reservation week
+// has locked. Meals are booked a week ahead; the kitchen finalises headcounts
+// over the weekend, so the lock falls at 23:59 UTC+3 on the Friday of the week
+// PRECEDING the reservation date. Until that Friday ends the student may still
+// cancel (individually or in bulk); after it, the week is fixed.
 func (s *ReservationService) validateCancelCutoff(reservationDate time.Time, mealTime db.MealTimeEnum) error {
-	loc := time.FixedZone("UTC+3", 3*3600)
-
-	var mealStartHour int
-	switch mealTime {
-	case db.MealMealTimeEnumLunch:
-		mealStartHour = s.cfg.MealTime.LunchStartHour
-	case db.MealMealTimeEnumDinner:
-		mealStartHour = s.cfg.MealTime.DinnerStartHour
-	default:
+	// An unknown meal time must surface a clear error rather than be silently
+	// allowed through the cutoff gate.
+	if mealTime != db.MealMealTimeEnumLunch && mealTime != db.MealMealTimeEnumDinner {
 		return serviceErrors.ErrInvalidMealTime
 	}
 
-	mealStart := time.Date(
-		reservationDate.Year(), reservationDate.Month(), reservationDate.Day(),
-		mealStartHour, 0, 0, 0, loc,
-	)
-	cutoff := mealStart.Add(-time.Duration(s.cfg.Reservation.CancelCutoffHours) * time.Hour)
+	loc := time.FixedZone("UTC+3", 3*3600)
 
-	if clock.Now().In(loc).After(cutoff) {
+	d := time.Date(reservationDate.Year(), reservationDate.Month(), reservationDate.Day(), 0, 0, 0, 0, loc)
+	// Go's Weekday has Sunday=0; shift so Monday=0 to find the week's Monday.
+	daysSinceMonday := (int(d.Weekday()) + 6) % 7
+	mondayOfWeek := d.AddDate(0, 0, -daysSinceMonday)
+	fridayBefore := mondayOfWeek.AddDate(0, 0, -3) // Friday of the previous week
+	deadline := time.Date(
+		fridayBefore.Year(), fridayBefore.Month(), fridayBefore.Day(),
+		23, 59, 59, 0, loc,
+	)
+
+	if clock.Now().In(loc).After(deadline) {
 		return serviceErrors.ErrCancelCutoffPassed
 	}
 	return nil

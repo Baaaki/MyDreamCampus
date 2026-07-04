@@ -266,36 +266,36 @@ func TestReservationService_ValidateMealTimeWindow(t *testing.T) {
 }
 
 func TestReservationService_ValidateCancelCutoff(t *testing.T) {
-	cfg := defaultCfg() // CancelCutoffHours=2, lunch=11, dinner=16
-	s := newTestService(cfg)
+	s := newTestService(defaultCfg())
+	// 2026-04-27 is a Monday, so the week locks at 23:59:59 on Friday
+	// 2026-04-24 (the Friday of the preceding week).
 	reservationDate := time.Date(2026, time.April, 27, 0, 0, 0, 0, utcPlus3)
 
-	t.Run("well before cutoff is allowed", func(t *testing.T) {
-		// lunch starts at 11 UTC+3, cutoff at 09 UTC+3, so 08:00 is fine.
-		freezeAt(t, 2026, time.April, 27, 8, 0)
+	t.Run("days before the Friday lock is allowed", func(t *testing.T) {
+		freezeAt(t, 2026, time.April, 22, 12, 0)
 		assert.NoError(t, s.validateCancelCutoff(reservationDate, db.MealMealTimeEnumLunch))
 	})
 
-	t.Run("exactly at cutoff is still allowed (After is strict)", func(t *testing.T) {
-		freezeAt(t, 2026, time.April, 27, 9, 0)
-		assert.NoError(t, s.validateCancelCutoff(reservationDate, db.MealMealTimeEnumLunch))
+	t.Run("just before the Friday lock is allowed", func(t *testing.T) {
+		freezeAt(t, 2026, time.April, 24, 23, 59)
+		assert.NoError(t, s.validateCancelCutoff(reservationDate, db.MealMealTimeEnumLunch),
+			"lock is 23:59:59; a cancel at 23:59:00 on that Friday still lands before it")
 	})
 
-	t.Run("one minute past cutoff is rejected", func(t *testing.T) {
-		freezeAt(t, 2026, time.April, 27, 9, 1)
+	t.Run("after the Friday lock is rejected", func(t *testing.T) {
+		freezeAt(t, 2026, time.April, 25, 0, 0)
 		err := s.validateCancelCutoff(reservationDate, db.MealMealTimeEnumLunch)
 		assert.ErrorIs(t, err, serviceErrors.ErrCancelCutoffPassed)
 	})
 
-	t.Run("dinner uses dinner start hour", func(t *testing.T) {
-		// dinner starts 16 UTC+3, cutoff 14 UTC+3.
-		freezeAt(t, 2026, time.April, 27, 14, 1)
+	t.Run("on the meal day itself is rejected", func(t *testing.T) {
+		freezeAt(t, 2026, time.April, 27, 8, 0)
 		err := s.validateCancelCutoff(reservationDate, db.MealMealTimeEnumDinner)
 		assert.ErrorIs(t, err, serviceErrors.ErrCancelCutoffPassed)
 	})
 
 	t.Run("invalid meal time returns ErrInvalidMealTime", func(t *testing.T) {
-		freezeAt(t, 2026, time.April, 27, 8, 0)
+		freezeAt(t, 2026, time.April, 22, 8, 0)
 		err := s.validateCancelCutoff(reservationDate, db.MealTimeEnum("brunch"))
 		assert.ErrorIs(t, err, serviceErrors.ErrInvalidMealTime)
 	})
