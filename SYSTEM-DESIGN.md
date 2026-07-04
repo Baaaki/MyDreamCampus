@@ -181,6 +181,38 @@ Event girisi: worker/event_consumer → processed_events idempotency → reposit
 - **Redis:** QR tarama buffer (`SADD` atomik dedup — cift okutma tek sayilir), session metadata + enrolled ogrenci seti cache
 - **Tasarim notlari:** yazma yolu yuksek hacimli (sinifin tamami ayni dakikada QR okutur) → once Redis, sonra toplu DB flush. Devamsizlik esigi acilan oturum sayisina oranlanir; QR payload HMAC-SHA256 imzali.
 
+**Yoklama akisi (uctan uca):**
+
+```
+        OGRETMEN (web)                       OGRENCI (mobil)
+  POST /sessions · GET /sessions/:id/qr   POST /scan {sid, sig}
+  (QR ekranda dondurulur)                 (QR'dan okunan payload)
+              │                                    │
+              ▼                                    ▼
+ ┌───────────────────────────────────────────────────────┐
+ │ attendance service                                    │
+ │  create: sahiplik + donem kurali + hafta/tip UNIQUE   │
+ │  scan:   aktif oturum + sure + donem → HMAC dogrulama │
+ │          → enrolled mi? (Redis seti, miss'te DB'ye)   │
+ └───────┬───────────────────────────┬───────────────────┘
+         │ INSERT                    │ SADD scanned:<sid>  → atomik dedup
+         ▼                           │ HSET buffer:<sid>   → insert paramlari
+ attendance_sessions                 ▼        (Redis erisilemezse: dogrudan
+ (qr_secret, expires_at)      ┌──────────────┐ DB insert, ON CONFLICT)
+                              │ Redis buffer │
+ QR payload:                  └──────┬───────┘
+ {sid, HMAC(qr_secret, sid)}         │ BufferFlusher (5 sn tick):
+ statik — oturum boyunca ayni        │ SCAN buffer:* → toplu INSERT
+                                     │ (ON CONFLICT DO NOTHING) → HDEL
+                                     ▼
+                             attendance_records
+                  (satir var = katildi, satir yok = katilmadi;
+                   "absent" satiri hicbir zaman yazilmaz)
+```
+
+- **Oturum yasam dongusu:** kapanis ya ogretmenin `POST /sessions/:id/close`'u ya da `SessionExpiry` worker'i (1 dk tick, `expires_at` gecmis aktif oturumlar) ile olur → `is_active=false` + Redis session/enrolled/scanned key'leri silinir. Buffer bilerek silinmez — flusher bosaltana kadar yasar (kapanis aninda henuz flush edilmemis taramalar kaybolmaz). Manuel yoklama yalniz aktif oturumda; ON CONFLICT ile ayni ogrencinin QR kaydinin ustune yazar.
+- **Finalize akisi:** ogretmen `POST /courses/:id/finalize?semester=` → esikler acilan oturum sayisina oranlanir (`theory ceil(N*10/14)`, `lab ceil(N*11/14)`) → tip bazinda kalanlar `enrollments_view LEFT JOIN attendance_records` ile bulunur (hic QR okutmamis ogrenci de yakalanir), theory+lab sonuclari merge edilir → kalan ogrenci basina outbox'a `attendance.semester.failed` yazilir → grades registration'i devamsizliktan-kaldi isaretler. Finalize state tutmaz — tekrar cagirmak event'leri yeni `event_id` ile yeniden yayinlar.
+
 #### grades
 - **Veri:** `grades.student_course_registrations`, `student_assessment_scores`, `student_completed_courses`, `students_view`, `courses_view`, `prerequisite_courses_view`, `outbox_events`
 - **Sync bagimlilik:** catalog (`PeriodRepo`, `SemesterService`, `DirectAuditLogger`)
