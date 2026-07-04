@@ -7,7 +7,23 @@
       "Bash(RTK_NO_FILTER=1 rtk proxy bash -c \"grep -E '^func \\\\\\(h \\\\*EnrollmentHandler\\\\\\)' /home/nautilus/Desktop/Playground/mydreamcampus/new-backend/monolith/internal/modules/enrollment/handler/enrollment_handler.go\")",
       "Bash(RTK_NO_FILTER=1 rtk proxy bash -c \"awk '/^func setupRouter/,/^}/' /home/nautilus/Desktop/Playground/mydreamcampus/backend/services/enrollment-service/cmd/main.go | head -60\")",
       "Bash(RTK_NO_FILTER=1 rtk proxy bash -c 'grep -E \"Queue|RoutingKey|events\\\\.Event\" /home/nautilus/Desktop/Playground/mydreamcampus/new-backend/monolith/internal/modules/enrollment/worker/event_consumer.go | head -20')",
-      "Bash(RTK_NO_FILTER=1 rtk proxy bash -c 'grep -B 1 -A 20 \"func .Start\" /home/nautilus/Desktop/Playground/mydreamcampus/new-backend/monolith/internal/modules/enrollment/worker/event_consumer.go | head -30')"
+      "Bash(RTK_NO_FILTER=1 rtk proxy bash -c 'grep -B 1 -A 20 \"func .Start\" /home/nautilus/Desktop/Playground/mydreamcampus/new-backend/monolith/internal/modules/enrollment/worker/event_consumer.go | head -30')",
+      "Bash(bunx tsc *)",
+      "Bash(bunx prettier *)",
+      "Bash(awk '/export interface Student /{p=1} p{print NR\": \"$0} p&&/^}/{exit}' src/lib/types.ts)",
+      "Bash(awk '/export interface TimeStatus/{p=1} p{print NR\": \"$0} p&&/^}/{exit}' src/lib/types.ts)",
+      "Bash(awk '/export interface ServiceTimeStatus/{p=1} p{print NR\": \"$0} p&&/^}/{exit}' src/lib/types.ts)",
+      "Bash(bunx eslint *)",
+      "Bash(awk 'NR>=120 && NR<=130 || NR>=1315 && NR<=1535' frontend/src/lib/api-types.ts)",
+      "Bash(~/go/bin/gosec -quiet -exclude-generated ./...)",
+      "Bash(~/go/bin/gosec -quiet -exclude-generated -fmt json ./...)",
+      "Bash(~/go/bin/govulncheck ./...)",
+      "Bash(env)",
+      "Bash(git config *)",
+      "Bash(gofmt -w score_repository.go)",
+      "Bash(gofmt -w grade_service.go)",
+      "Bash(gofmt -w event_service.go)",
+      "Bash(gofmt -w service/student_service.go)"
     ]
   }
 }
