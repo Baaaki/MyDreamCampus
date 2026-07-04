@@ -15,7 +15,8 @@ React Native 0.81 + Expo 54 + Expo Router v6 + TanStack Query + axios. `mobile/a
 - **Token storage**: `expo-secure-store` — `AsyncStorage`, `localStorage` YAPMA (token icin).
 - **Env var**: `EXPO_PUBLIC_*` prefix — `process.env.EXPO_PUBLIC_X`.
 - **Web/native ayrimi**: `localStorage`, `document`, `window` ortak kodda YAPMA — web target'a ozel davranis gerekirse `Platform.OS === 'web'` guard ile koru veya `.web.ts` suffix dosya olarak ayir. Native build'de bu API'lar yok, runtime crash olur.
-- **Style**: **NativeWind v4** (`className="..."`) + `components/ui/` primitifleri (react-native-reusables pattern: cva + cn). Tema renkleri `global.css` CSS degiskenlerinden gelir (`bg-primary`, `text-foreground` vs.) — hardcoded hex YAPMA. `className` ile ifade edilemeyen degerler (animasyon transform'lari, shadow renkleri, yuzde genislik) icin `style={{...}}` serbest; JS tarafinda renk gerekirse `lib/theme.ts` `COLORS`. `react-native-paper` KALDIRILDI — geri ekleme.
+- **Style**: **NativeWind v4** (`className="..."`) + `components/ui/` primitifleri (react-native-reusables pattern: cva + cn). **`StyleSheet.create` YAPMA** — bir daha stil yaratmadan once `components/ui`'ya bak; yoksa oradaki desenle (asagi) yeni primitive ekle. Tema renkleri `global.css` CSS degiskenlerinden gelir (`bg-primary`, `text-foreground` vs.) — hardcoded hex YAPMA. `className` ile ifade edilemeyen degerler (animasyon transform'lari, shadow renkleri, yuzde genislik) icin **sadece** `style={{...}}` serbest; JS tarafinda renk gerekirse `lib/theme.ts` `COLORS`. `react-native-paper` KALDIRILDI — geri ekleme.
+- **Tasarim sistemi primitifleri** (`components/ui/`, hepsi cva + `cn` + `TextClassContext` deseninde): `Text`, `Button` (variant: default/secondary/outline/ghost/destructive · size: default/lg/sm/icon), `Card` (+ `CardHeader/Title/Description/Content/Footer`), `Input`, `Badge` (variant: default/secondary/success/warning/destructive/outline). Bir bilesen eksikse **`button.tsx`/`badge.tsx` desenini kopyala** (cva variants + `TextClassContext.Provider` ile ic Text'e stil aktar), sifirdan RNR CLI ile ekleme.
 - **Tema (dark mode)**: `contexts/ThemeContext` (`useTheme()` -> `isDark`, `toggleTheme`) NativeWind `colorScheme` uzerine sarilidir. Palet **mavi/beyaz** (`--primary` = mavi). Renk degistirmek icin `global.css` (`:root` / `.dark:root`) + `lib/theme.ts` `COLORS` ikisini birden guncelle (senkron tutulmali).
 
 ---
@@ -281,9 +282,11 @@ export default function XxxScreen() {
 
 ## 8. Form Sablonu (react-hook-form + zod)
 
-> Not: Sablondaki `StyleSheet` stilleri tarihseldir — yeni formlarda input/buton icin
-> `components/ui` (`Input`, `Button`, `Text`) + `className` kullan; form **logic'i**
-> (Controller, zodResolver, mutation) aynen gecerli.
+> ⚠️ Bu sablonun `StyleSheet` + ciplak `TextInput/Pressable` kismi **ESKIDIR,
+> KOPYALAMA.** Guncel desen: input/buton/hata metni icin `components/ui`
+> (`Input`, `Button`, `Text`) + `className`; canli ornek `app/change-password.tsx`
+> ve `app/(auth)/login.tsx`. Sadece form **logic'i** (Controller, zodResolver,
+> useMutation, klavye/a11y prop'lari) bu sablondan aynen gecerli.
 
 ```tsx
 import {
@@ -563,7 +566,7 @@ npm run test:coverage # kapsam raporu
 ```
 Web modulleri:        next/*, react-router, ky
 Storage:              localStorage (token icin AsyncStorage bile YAPMA)
-Style:                styled-components, react-native-paper (kaldirildi), hardcoded hex renk (tema degiskeni varken)
+Style:                StyleSheet.create, styled-components, react-native-paper (kaldirildi), hardcoded hex (tema degiskeni varken) — NativeWind className + components/ui kullan
 Routing API:          useNavigate, useParams (react-router)
 HTTP:                 fetch direkt, axios.create yeni instance
 Token:                JWT'yi AsyncStorage'a koymak (SecureStore zorunlu)
