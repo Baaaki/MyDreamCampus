@@ -41,7 +41,7 @@ func (r *AttendanceRepository) BatchCreateAttendanceRecordsQR(ctx context.Contex
 		WeekNumbers:  make([]int16, len(records)),
 		ScannedAts:   make([]pgtype.Timestamp, len(records)),
 		QrTimestamps: make([]int64, len(records)),
-		SessionTypes: make([]interface{}, len(records)),
+		SessionTypes: make([]string, len(records)),
 	}
 
 	for i, rec := range records {
@@ -54,7 +54,7 @@ func (r *AttendanceRepository) BatchCreateAttendanceRecordsQR(ctx context.Contex
 		if rec.QrTimestamp.Valid {
 			params.QrTimestamps[i] = rec.QrTimestamp.Int64
 		}
-		params.SessionTypes[i] = rec.SessionType
+		params.SessionTypes[i] = string(rec.SessionType)
 	}
 
 	return r.queries.BatchCreateAttendanceRecordsQR(ctx, params)

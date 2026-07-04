@@ -22,8 +22,12 @@ FROM (
         unnest(@semesters::text[])              AS semester,
         unnest(@week_numbers::smallint[])       AS week_number,
         unnest(@scanned_ats::timestamp[])       AS scanned_at,
-        unnest(@qr_timestamps::bigint[])        AS qr_timestamp,
-        unnest(@session_types::session_type_enum[]) AS session_type
+        -- 0 is the wrapper's stand-in for NULL (bigint[] cannot carry nils)
+        NULLIF(unnest(@qr_timestamps::bigint[]), 0) AS qr_timestamp,
+        -- text[] param + per-row cast: pgx cannot encode Go slices into a
+        -- non-registered enum array OID ("cannot find encode plan"), and the
+        -- bare enum[] cast is also invisible to the default search_path.
+        unnest(@session_types::text[])::attendance.session_type_enum AS session_type
 ) AS input
 ON CONFLICT (session_id, student_id) DO NOTHING;
 

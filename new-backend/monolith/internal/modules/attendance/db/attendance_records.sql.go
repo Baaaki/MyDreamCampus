@@ -27,8 +27,12 @@ FROM (
         unnest($4::text[])              AS semester,
         unnest($5::smallint[])       AS week_number,
         unnest($6::timestamp[])       AS scanned_at,
-        unnest($7::bigint[])        AS qr_timestamp,
-        unnest($8::session_type_enum[]) AS session_type
+        -- 0 is the wrapper's stand-in for NULL (bigint[] cannot carry nils)
+        NULLIF(unnest($7::bigint[]), 0) AS qr_timestamp,
+        -- text[] param + per-row cast: pgx cannot encode Go slices into a
+        -- non-registered enum array OID ("cannot find encode plan"), and the
+        -- bare enum[] cast is also invisible to the default search_path.
+        unnest($8::text[])::attendance.session_type_enum AS session_type
 ) AS input
 ON CONFLICT (session_id, student_id) DO NOTHING
 `
@@ -41,7 +45,7 @@ type BatchCreateAttendanceRecordsQRParams struct {
 	WeekNumbers  []int16            `json:"week_numbers"`
 	ScannedAts   []pgtype.Timestamp `json:"scanned_ats"`
 	QrTimestamps []int64            `json:"qr_timestamps"`
-	SessionTypes []interface{}      `json:"session_types"`
+	SessionTypes []string           `json:"session_types"`
 }
 
 func (q *Queries) BatchCreateAttendanceRecordsQR(ctx context.Context, arg BatchCreateAttendanceRecordsQRParams) error {
