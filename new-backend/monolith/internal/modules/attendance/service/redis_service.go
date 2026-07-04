@@ -38,6 +38,11 @@ func (s *RedisService) GetSessionCache(ctx context.Context, sessionID string) (m
 
 // Enrolled students set
 func (s *RedisService) AddEnrolledStudents(ctx context.Context, sessionID string, studentIDs []uuid.UUID) error {
+	// SADD with zero members is a protocol error; a course with no
+	// enrollments simply gets no set and scans fall back to the DB check.
+	if len(studentIDs) == 0 {
+		return nil
+	}
 	key := fmt.Sprintf("attendance:session:%s:enrolled", sessionID)
 	members := make([]any, len(studentIDs))
 	for i, id := range studentIDs {
