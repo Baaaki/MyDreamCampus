@@ -1,49 +1,31 @@
 import Ionicons from '@expo/vector-icons/Ionicons';
 import React, { useMemo, useState } from 'react';
-import { ActivityIndicator, Modal, Pressable, RefreshControl, ScrollView, View } from 'react-native';
+import { ActivityIndicator, Alert, Modal, Pressable, RefreshControl, ScrollView, View } from 'react-native';
 import Animated, { FadeInDown } from 'react-native-reanimated';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { ScreenHeader } from '@/components/ScreenHeader';
 import { Badge, Button, Card, Text } from '@/components/ui';
-import { MONTHS_TR, WEEKDAYS_SHORT_TR, formatDateLongTR, nextDays, toISODate } from '@/constants/datetime';
+import { formatDateLongTR, isCancellable, nextWeekWeekdays, toISODate } from '@/constants/datetime';
+import { MEAL_LABEL, MENU_LABEL, MEAL_PRICE_TRY, STATUS_LABEL, formatTRY, statusVariant } from '@/constants/meal';
 import { useTheme } from '@/contexts/ThemeContext';
+import { useHaptic } from '@/hooks/useHaptic';
 import {
   useCafeterias,
   useCancelReservation,
-  useCreateReservation,
+  useCancelReservations,
+  useCreateBatchReservation,
   useMonthlyMenu,
   useMyReservations,
 } from '@/hooks/useMeals';
-import { useHaptic } from '@/hooks/useHaptic';
 import { COLORS } from '@/lib/theme';
-import type { Cafeteria, MealTime, MenuType, Reservation } from '@/types/meal.types';
+import type { Cafeteria, DailyMenu, MealTime, MenuType, Reservation } from '@/types/meal.types';
 
-const MEAL_LABEL: Record<MealTime, string> = { lunch: 'Öğle', dinner: 'Akşam' };
-const MENU_LABEL: Record<MenuType, string> = { normal: 'Normal', vegan: 'Vegan' };
-const STATUS_LABEL: Record<string, string> = {
-  confirmed: 'Onaylandı',
-  pending: 'Ödeme bekleniyor',
-  used: 'Kullanıldı',
-  cancelled: 'İptal edildi',
-};
+// ---------------------------------------------------------------------------
+// Yardimci parcalar
+// ---------------------------------------------------------------------------
 
-function statusVariant(status: string): 'success' | 'warning' | 'secondary' | 'destructive' {
-  if (status === 'confirmed') return 'success';
-  if (status === 'pending') return 'warning';
-  if (status === 'cancelled') return 'destructive';
-  return 'secondary';
-}
-
-function Chip({
-  label,
-  active,
-  onPress,
-}: {
-  label: string;
-  active: boolean;
-  onPress: () => void;
-}) {
+function Chip({ label, active, onPress }: { label: string; active: boolean; onPress: () => void }) {
   return (
     <Pressable
       onPress={onPress}
@@ -59,19 +41,60 @@ function Chip({
   );
 }
 
+function SectionLabel({ children }: { children: React.ReactNode }) {
+  return (
+    <Text className="mb-2 font-mono text-xs uppercase tracking-widest text-muted-foreground">
+      {children}
+    </Text>
+  );
+}
+
+// ---------------------------------------------------------------------------
+// Randevu karti (liste) — secim modu + tekil iptal
+// ---------------------------------------------------------------------------
+
 function ReservationCard({
   reservation,
+  selectMode,
+  selected,
+  onToggleSelect,
   onCancel,
   canceling,
 }: {
   reservation: Reservation;
+  selectMode: boolean;
+  selected: boolean;
+  onToggleSelect: () => void;
   onCancel: () => void;
   canceling: boolean;
 }) {
+  const { isDark } = useTheme();
+  const colors = COLORS[isDark ? 'dark' : 'light'];
   const active = reservation.status === 'confirmed' || reservation.status === 'pending';
+  const cancellable = active && !reservation.is_used && isCancellable(reservation.date);
+
   return (
-    <Card className="mb-3 p-4">
-      <View className="flex-row items-start justify-between">
+    <Pressable
+      onPress={selectMode && cancellable ? onToggleSelect : undefined}
+      accessibilityRole={selectMode && cancellable ? 'checkbox' : undefined}
+      className={`mb-3 rounded-3xl border ${
+        selected ? 'border-primary bg-primary/5' : 'border-border bg-card'
+      }`}
+    >
+      <View className="flex-row items-start justify-between p-4">
+        {selectMode && (
+          <View className="mr-3 mt-0.5">
+            {cancellable ? (
+              <Ionicons
+                name={selected ? 'checkbox' : 'square-outline'}
+                size={22}
+                color={selected ? colors.primary : colors.mutedForeground}
+              />
+            ) : (
+              <Ionicons name="lock-closed" size={20} color={colors.mutedForeground} />
+            )}
+          </View>
+        )}
         <View className="flex-1 pr-3">
           <Text className="text-base font-bold text-card-foreground">
             {formatDateLongTR(reservation.date)}
@@ -80,6 +103,11 @@ function ReservationCard({
             {MEAL_LABEL[reservation.meal_time]} · {MENU_LABEL[reservation.menu_type]}
             {reservation.cafeteria?.name ? ` · ${reservation.cafeteria.name}` : ''}
           </Text>
+          {active && !cancellable && !reservation.is_used && (
+            <Text className="mt-1 text-xs text-muted-foreground">
+              İptal süresi doldu (cuma kilidi)
+            </Text>
+          )}
         </View>
         <Badge variant={statusVariant(reservation.status)}>
           <Text className="text-xs font-semibold text-primary-foreground">
@@ -87,23 +115,56 @@ function ReservationCard({
           </Text>
         </Badge>
       </View>
-      {active && (
-        <Button
-          variant="outline"
-          size="sm"
-          className="mt-3 self-start"
-          onPress={onCancel}
-          loading={canceling}
-          accessibilityLabel="Randevuyu iptal et"
-        >
-          <Text className="text-sm font-semibold text-destructive">İptal Et</Text>
-        </Button>
+      {!selectMode && cancellable && (
+        <View className="px-4 pb-4">
+          <Button
+            variant="outline"
+            size="sm"
+            className="self-start"
+            onPress={onCancel}
+            loading={canceling}
+            accessibilityLabel="Randevuyu iptal et"
+          >
+            <Text className="text-sm font-semibold text-destructive">İptal Et</Text>
+          </Button>
+        </View>
       )}
-    </Card>
+    </Pressable>
   );
 }
 
-function NewReservationModal({
+// ---------------------------------------------------------------------------
+// Yeni randevu sihirbazi
+// ---------------------------------------------------------------------------
+
+const STEP_TITLES = ['Yemekhane', 'Öğün & Menü', 'Günler', 'Öde'];
+
+function StepDots({ step }: { step: number }) {
+  return (
+    <View className="flex-row items-center gap-1.5">
+      {STEP_TITLES.map((_, i) => (
+        <View
+          key={i}
+          className={`h-1.5 rounded-full ${i === step ? 'w-6 bg-primary' : 'w-1.5 bg-border'}`}
+        />
+      ))}
+    </View>
+  );
+}
+
+function DayMenuRow({ menu, mealTimes }: { menu?: DailyMenu; mealTimes: MealTime[] }) {
+  const dishes = mealTimes.flatMap((mt) => menu?.[mt] ?? []);
+  if (dishes.length === 0) {
+    return <Text className="text-xs text-muted-foreground">Bu gün için menü henüz girilmedi.</Text>;
+  }
+  return (
+    <Text className="text-xs leading-5 text-muted-foreground" numberOfLines={2}>
+      {dishes.join(' · ')}
+    </Text>
+  );
+}
+
+function ReservationWizard({
   visible,
   onClose,
   cafeterias,
@@ -115,59 +176,134 @@ function NewReservationModal({
   const haptic = useHaptic();
   const { isDark } = useTheme();
   const colors = COLORS[isDark ? 'dark' : 'light'];
-  const createMutation = useCreateReservation();
+  const batchMutation = useCreateBatchReservation();
 
-  const days = useMemo(() => nextDays(14), []);
+  const days = useMemo(() => nextWeekWeekdays(), []);
+
+  const [step, setStep] = useState(0);
   const [cafeteriaId, setCafeteriaId] = useState(cafeterias[0]?.id ?? '');
-  const [date, setDate] = useState(toISODate(days[0]));
-  const [mealTime, setMealTime] = useState<MealTime>('lunch');
+  const [mealTimes, setMealTimes] = useState<MealTime[]>(['lunch']);
   const [menuType, setMenuType] = useState<MenuType>('normal');
+  const [dates, setDates] = useState<string[]>([toISODate(days[0])]);
   const [error, setError] = useState<string | null>(null);
 
   const cafeteria = cafeterias.find((c) => c.id === cafeteriaId) ?? cafeterias[0];
-  const selected = new Date(date);
-  const menuQuery = useMonthlyMenu(selected.getFullYear(), selected.getMonth() + 1);
-  const dayMenu = menuQuery.data?.menu_data?.[date];
-  const dishes = mealTime === 'dinner' ? dayMenu?.dinner : dayMenu?.lunch;
-
   const canDinner = cafeteria?.serves_dinner ?? false;
   const canVegan = cafeteria?.has_vegan_menu ?? false;
 
+  // Gelecek hafta iki aya yayilabilir (ay sonu); iki ay menusunu birlestir.
+  const menuA = useMonthlyMenu(days[0].getFullYear(), days[0].getMonth() + 1);
+  const menuB = useMonthlyMenu(days[4].getFullYear(), days[4].getMonth() + 1);
+  const menuByDate: Record<string, DailyMenu> = {
+    ...(menuA.data?.menu_data ?? {}),
+    ...(menuB.data?.menu_data ?? {}),
+  };
+  const menuLoading = menuA.isLoading || menuB.isLoading;
+
+  const effectiveMenuType: MenuType = canVegan ? menuType : 'normal';
+  const effectiveMeals = mealTimes.filter((mt) => mt === 'lunch' || canDinner);
+
+  // Kombinasyon: secili gunler x secili ogunler.
+  const items = dates.flatMap((date) =>
+    effectiveMeals.map((mt) => ({
+      cafeteria_id: cafeteriaId,
+      date,
+      meal_time: mt,
+      menu_type: effectiveMenuType,
+    }))
+  );
+  const total = items.length * MEAL_PRICE_TRY;
+
+  const reset = () => {
+    setStep(0);
+    setMealTimes(['lunch']);
+    setMenuType('normal');
+    setDates([toISODate(days[0])]);
+    setError(null);
+  };
+
+  const close = () => {
+    reset();
+    onClose();
+  };
+
+  const toggleMeal = (mt: MealTime) => {
+    haptic.selection();
+    setMealTimes((prev) =>
+      prev.includes(mt) ? prev.filter((x) => x !== mt) : [...prev, mt]
+    );
+  };
+
+  const toggleDate = (iso: string) => {
+    haptic.selection();
+    setDates((prev) => (prev.includes(iso) ? prev.filter((x) => x !== iso) : [...prev, iso]));
+  };
+
+  const next = () => {
+    setError(null);
+    if (step === 0 && !cafeteriaId) {
+      setError('Lütfen bir yemekhane seç.');
+      return;
+    }
+    if (step === 1 && effectiveMeals.length === 0) {
+      setError('En az bir öğün seç.');
+      return;
+    }
+    if (step === 2 && dates.length === 0) {
+      setError('En az bir gün seç.');
+      return;
+    }
+    haptic.light();
+    setStep((s) => Math.min(s + 1, 3));
+  };
+
+  const back = () => {
+    haptic.light();
+    setError(null);
+    setStep((s) => Math.max(s - 1, 0));
+  };
+
   const submit = () => {
-    if (!cafeteriaId) {
-      setError('Lütfen bir yemekhane seç');
+    if (items.length === 0) {
+      setError('Randevu için gün ve öğün seç.');
       return;
     }
     setError(null);
-    haptic.light();
-    createMutation.mutate(
-      {
-        cafeteria_id: cafeteriaId,
-        date,
-        meal_time: canDinner ? mealTime : 'lunch',
-        menu_type: canVegan ? menuType : 'normal',
-      },
+    haptic.medium();
+    batchMutation.mutate(
+      { reservations: items },
       {
         onSuccess: () => {
           haptic.success();
-          onClose();
+          close();
         },
         onError: (err: any) => {
           haptic.error();
-          setError(err.response?.data?.message ?? 'Randevu alınamadı. Tekrar dene.');
+          const code = err?.response?.data?.error?.code;
+          if (code === 'RESERVATION_CONFLICTS') {
+            setError('Seçtiğin bazı gün/öğünler için zaten randevun var. Onları çıkar ve tekrar dene.');
+          } else {
+            setError(err?.response?.data?.error?.message ?? 'Randevu alınamadı. Tekrar dene.');
+          }
         },
       }
     );
   };
 
   return (
-    <Modal visible={visible} animationType="slide" transparent onRequestClose={onClose}>
+    <Modal visible={visible} animationType="slide" transparent onRequestClose={close}>
       <View className="flex-1 justify-end bg-black/50">
-        <View className="max-h-[88%] rounded-t-4xl bg-background">
+        <View className="max-h-[90%] rounded-t-4xl bg-background">
+          {/* Baslik */}
           <View className="flex-row items-center justify-between px-5 pb-2 pt-4">
-            <Text className="text-xl font-extrabold text-foreground">Yeni Randevu</Text>
+            <View>
+              <Text className="text-xl font-extrabold text-foreground">Yeni Randevu</Text>
+              <Text className="text-xs text-muted-foreground">
+                Gelecek hafta · {STEP_TITLES[step]}
+              </Text>
+            </View>
             <Pressable
-              onPress={onClose}
+              onPress={close}
               accessibilityRole="button"
               accessibilityLabel="Kapat"
               className="h-9 w-9 items-center justify-center rounded-full bg-secondary active:opacity-70"
@@ -175,167 +311,280 @@ function NewReservationModal({
               <Ionicons name="close" size={20} color={colors.foreground} />
             </Pressable>
           </View>
+          <View className="px-5 pb-2">
+            <StepDots step={step} />
+          </View>
 
-          <ScrollView contentContainerClassName="px-5 pb-8 pt-2" keyboardShouldPersistTaps="handled">
-            {/* Yemekhane */}
-            <Text className="mb-2 font-mono text-xs uppercase tracking-widest text-muted-foreground">
-              Yemekhane
-            </Text>
-            <View className="mb-5 gap-2">
-              {cafeterias.map((c) => (
-                <Pressable
-                  key={c.id}
-                  onPress={() => {
-                    haptic.selection();
-                    setCafeteriaId(c.id);
-                  }}
-                  accessibilityRole="button"
-                  className={`flex-row items-center justify-between rounded-2xl border p-4 active:opacity-70 ${
-                    c.id === cafeteriaId ? 'border-primary bg-primary/5' : 'border-border bg-card'
-                  }`}
-                >
-                  <View className="flex-1 pr-3">
-                    <Text className="font-semibold text-foreground">{c.name}</Text>
-                    <Text className="text-xs text-muted-foreground">{c.location}</Text>
-                  </View>
-                  {c.id === cafeteriaId && (
-                    <Ionicons name="checkmark-circle" size={22} color={colors.primary} />
-                  )}
-                </Pressable>
-              ))}
-            </View>
-
-            {/* Tarih */}
-            <Text className="mb-2 font-mono text-xs uppercase tracking-widest text-muted-foreground">
-              Tarih
-            </Text>
-            <ScrollView
-              horizontal
-              showsHorizontalScrollIndicator={false}
-              contentContainerClassName="gap-2 pb-1"
-              className="mb-5"
-            >
-              {days.map((d) => {
-                const iso = toISODate(d);
-                const isActive = iso === date;
-                return (
-                  <Pressable
-                    key={iso}
-                    onPress={() => {
-                      haptic.selection();
-                      setDate(iso);
-                    }}
-                    accessibilityRole="button"
-                    className={`w-16 items-center rounded-2xl border py-3 active:opacity-70 ${
-                      isActive ? 'border-primary bg-primary' : 'border-border bg-card'
-                    }`}
-                  >
-                    <Text
-                      className={`text-xs ${isActive ? 'text-primary-foreground/80' : 'text-muted-foreground'}`}
+          <ScrollView contentContainerClassName="px-5 pb-4 pt-2" keyboardShouldPersistTaps="handled">
+            {/* Adim 1: Yemekhane */}
+            {step === 0 && (
+              <Animated.View entering={FadeInDown.duration(250)}>
+                <SectionLabel>Yemekhane seç</SectionLabel>
+                <View className="gap-2">
+                  {cafeterias.map((c) => (
+                    <Pressable
+                      key={c.id}
+                      onPress={() => {
+                        haptic.selection();
+                        setCafeteriaId(c.id);
+                      }}
+                      accessibilityRole="button"
+                      className={`flex-row items-center justify-between rounded-2xl border p-4 active:opacity-70 ${
+                        c.id === cafeteriaId ? 'border-primary bg-primary/5' : 'border-border bg-card'
+                      }`}
                     >
-                      {WEEKDAYS_SHORT_TR[d.getDay()]}
-                    </Text>
-                    <Text
-                      className={`text-lg font-extrabold ${isActive ? 'text-primary-foreground' : 'text-foreground'}`}
-                    >
-                      {d.getDate()}
-                    </Text>
-                    <Text
-                      className={`text-[10px] ${isActive ? 'text-primary-foreground/80' : 'text-muted-foreground'}`}
-                    >
-                      {MONTHS_TR[d.getMonth()].slice(0, 3)}
-                    </Text>
-                  </Pressable>
-                );
-              })}
-            </ScrollView>
-
-            {/* Ogun */}
-            <Text className="mb-2 font-mono text-xs uppercase tracking-widest text-muted-foreground">
-              Öğün
-            </Text>
-            <View className="mb-5 flex-row gap-2">
-              <Chip label="Öğle" active={mealTime === 'lunch'} onPress={() => setMealTime('lunch')} />
-              {canDinner && (
-                <Chip label="Akşam" active={mealTime === 'dinner'} onPress={() => setMealTime('dinner')} />
-              )}
-            </View>
-
-            {/* Menu tipi */}
-            {canVegan && (
-              <>
-                <Text className="mb-2 font-mono text-xs uppercase tracking-widest text-muted-foreground">
-                  Menü
-                </Text>
-                <View className="mb-5 flex-row gap-2">
-                  <Chip label="Normal" active={menuType === 'normal'} onPress={() => setMenuType('normal')} />
-                  <Chip label="Vegan" active={menuType === 'vegan'} onPress={() => setMenuType('vegan')} />
+                      <View className="flex-1 pr-3">
+                        <Text className="font-semibold text-foreground">{c.name}</Text>
+                        <Text className="text-xs text-muted-foreground">{c.location}</Text>
+                        <View className="mt-1 flex-row gap-1.5">
+                          {c.serves_dinner && (
+                            <Badge variant="secondary">
+                              <Text className="text-[10px] font-semibold text-secondary-foreground">Akşam var</Text>
+                            </Badge>
+                          )}
+                          {c.has_vegan_menu && (
+                            <Badge variant="secondary">
+                              <Text className="text-[10px] font-semibold text-secondary-foreground">Vegan var</Text>
+                            </Badge>
+                          )}
+                        </View>
+                      </View>
+                      {c.id === cafeteriaId && (
+                        <Ionicons name="checkmark-circle" size={22} color={colors.primary} />
+                      )}
+                    </Pressable>
+                  ))}
                 </View>
-              </>
+              </Animated.View>
             )}
 
-            {/* Menu onizleme */}
-            <Card className="mb-5 p-4">
-              <Text className="mb-2 font-mono text-xs uppercase tracking-widest text-muted-foreground">
-                {formatDateLongTR(date)} · {MEAL_LABEL[mealTime]}
-              </Text>
-              {menuQuery.isLoading ? (
-                <ActivityIndicator color={colors.primary} />
-              ) : dishes && dishes.length > 0 ? (
-                dishes.map((dish, i) => (
-                  <View key={i} className="flex-row items-center gap-2 py-0.5">
-                    <View className="h-1.5 w-1.5 rounded-full bg-primary" />
-                    <Text className="text-sm text-foreground">{dish}</Text>
+            {/* Adim 2: Ogun & Menu */}
+            {step === 1 && (
+              <Animated.View entering={FadeInDown.duration(250)}>
+                <SectionLabel>Öğün (birden fazla seçebilirsin)</SectionLabel>
+                <View className="mb-5 flex-row gap-2">
+                  <Chip label="Öğle" active={mealTimes.includes('lunch')} onPress={() => toggleMeal('lunch')} />
+                  {canDinner ? (
+                    <Chip label="Akşam" active={mealTimes.includes('dinner')} onPress={() => toggleMeal('dinner')} />
+                  ) : (
+                    <View className="rounded-full border border-dashed border-border px-4 py-2">
+                      <Text className="text-sm text-muted-foreground">Akşam yok</Text>
+                    </View>
+                  )}
+                </View>
+
+                <SectionLabel>Menü tipi</SectionLabel>
+                <View className="flex-row gap-2">
+                  <Chip label="Normal" active={effectiveMenuType === 'normal'} onPress={() => setMenuType('normal')} />
+                  {canVegan ? (
+                    <Chip label="Vegan" active={effectiveMenuType === 'vegan'} onPress={() => setMenuType('vegan')} />
+                  ) : (
+                    <View className="rounded-full border border-dashed border-border px-4 py-2">
+                      <Text className="text-sm text-muted-foreground">Vegan yok</Text>
+                    </View>
+                  )}
+                </View>
+              </Animated.View>
+            )}
+
+            {/* Adim 3: Gunler + menu onizleme */}
+            {step === 2 && (
+              <Animated.View entering={FadeInDown.duration(250)}>
+                <SectionLabel>Gelecek hafta — günleri seç</SectionLabel>
+                {menuLoading && (
+                  <View className="items-center py-3">
+                    <ActivityIndicator color={colors.primary} />
                   </View>
-                ))
-              ) : (
-                <Text className="text-sm text-muted-foreground">Bu gün için menü henüz girilmedi.</Text>
-              )}
-            </Card>
+                )}
+                <View className="gap-2">
+                  {days.map((d) => {
+                    const iso = toISODate(d);
+                    const isActive = dates.includes(iso);
+                    return (
+                      <Pressable
+                        key={iso}
+                        onPress={() => toggleDate(iso)}
+                        accessibilityRole="checkbox"
+                        className={`rounded-2xl border p-3 active:opacity-70 ${
+                          isActive ? 'border-primary bg-primary/5' : 'border-border bg-card'
+                        }`}
+                      >
+                        <View className="flex-row items-center gap-3">
+                          <Ionicons
+                            name={isActive ? 'checkbox' : 'square-outline'}
+                            size={22}
+                            color={isActive ? colors.primary : colors.mutedForeground}
+                          />
+                          <View className="flex-1">
+                            <Text className="font-semibold text-foreground">
+                              {formatDateLongTR(iso)}
+                            </Text>
+                            <View className="mt-1">
+                              <DayMenuRow menu={menuByDate[iso]} mealTimes={effectiveMeals} />
+                            </View>
+                          </View>
+                        </View>
+                      </Pressable>
+                    );
+                  })}
+                </View>
+              </Animated.View>
+            )}
+
+            {/* Adim 4: Ozet + fiyat */}
+            {step === 3 && (
+              <Animated.View entering={FadeInDown.duration(250)}>
+                <SectionLabel>Özet</SectionLabel>
+                <Card className="mb-4 p-4">
+                  <View className="mb-2 flex-row items-center justify-between">
+                    <Text className="text-muted-foreground">Yemekhane</Text>
+                    <Text className="font-semibold text-card-foreground">{cafeteria?.name}</Text>
+                  </View>
+                  <View className="mb-2 flex-row items-center justify-between">
+                    <Text className="text-muted-foreground">Öğün</Text>
+                    <Text className="font-semibold text-card-foreground">
+                      {effectiveMeals.map((mt) => MEAL_LABEL[mt]).join(' + ')} · {MENU_LABEL[effectiveMenuType]}
+                    </Text>
+                  </View>
+                  <View className="flex-row items-center justify-between">
+                    <Text className="text-muted-foreground">Gün sayısı</Text>
+                    <Text className="font-semibold text-card-foreground">{dates.length} gün</Text>
+                  </View>
+                </Card>
+
+                <SectionLabel>Seçilen günler</SectionLabel>
+                <View className="mb-4 gap-1.5">
+                  {[...dates].sort().map((iso) => (
+                    <View key={iso} className="flex-row items-center gap-2">
+                      <View className="h-1.5 w-1.5 rounded-full bg-primary" />
+                      <Text className="text-sm text-foreground">{formatDateLongTR(iso)}</Text>
+                    </View>
+                  ))}
+                </View>
+
+                <View className="flex-row items-center justify-between rounded-2xl border border-border bg-card p-4">
+                  <View>
+                    <Text className="text-sm text-muted-foreground">
+                      {items.length} öğün × {formatTRY(MEAL_PRICE_TRY)}
+                    </Text>
+                    <Text className="text-xs text-muted-foreground">Toplam tutar</Text>
+                  </View>
+                  <Text className="text-2xl font-extrabold text-foreground">{formatTRY(total)}</Text>
+                </View>
+              </Animated.View>
+            )}
 
             {error && (
-              <View className="mb-4 flex-row items-center gap-2 rounded-2xl border border-destructive/30 bg-destructive/10 p-3">
+              <View className="mt-4 flex-row items-center gap-2 rounded-2xl border border-destructive/30 bg-destructive/10 p-3">
                 <Ionicons name="alert-circle" size={18} color={colors.destructive} />
                 <Text className="flex-1 text-sm font-medium text-destructive">{error}</Text>
               </View>
             )}
-
-            <Button
-              size="lg"
-              onPress={submit}
-              loading={createMutation.isPending}
-              accessibilityLabel="Randevuyu oluştur"
-            >
-              <Text>Randevu Al</Text>
-            </Button>
           </ScrollView>
+
+          {/* Alt navigasyon */}
+          <View className="flex-row gap-3 border-t border-border px-5 pb-8 pt-3">
+            {step > 0 && (
+              <Button variant="outline" className="flex-1" onPress={back} accessibilityLabel="Geri">
+                <Text>Geri</Text>
+              </Button>
+            )}
+            {step < 3 ? (
+              <Button className="flex-1" onPress={next} accessibilityLabel="Devam">
+                <Text>Devam</Text>
+              </Button>
+            ) : (
+              <Button
+                className="flex-1"
+                onPress={submit}
+                loading={batchMutation.isPending}
+                accessibilityLabel="Öde ve onayla"
+              >
+                <Text>{formatTRY(total)} Öde ve Onayla</Text>
+              </Button>
+            )}
+          </View>
         </View>
       </View>
     </Modal>
   );
 }
 
+// ---------------------------------------------------------------------------
+// Ekran
+// ---------------------------------------------------------------------------
+
 export default function CafeteriaScreen() {
   const haptic = useHaptic();
   const { isDark } = useTheme();
   const colors = COLORS[isDark ? 'dark' : 'light'];
-  const [modalVisible, setModalVisible] = useState(false);
+
+  const [wizardVisible, setWizardVisible] = useState(false);
+  const [selectMode, setSelectMode] = useState(false);
+  const [selectedIds, setSelectedIds] = useState<string[]>([]);
 
   const cafeteriasQuery = useCafeterias();
   const reservationsQuery = useMyReservations();
   const cancelMutation = useCancelReservation();
+  const bulkCancelMutation = useCancelReservations();
 
-  const reservations = reservationsQuery.data?.reservations ?? [];
   const cafeterias = cafeteriasQuery.data?.cafeterias ?? [];
+  const reservations = useMemo(
+    () => [...(reservationsQuery.data?.reservations ?? [])].sort((a, b) => a.date.localeCompare(b.date)),
+    [reservationsQuery.data]
+  );
 
-  const handleCancel = (id: string) => {
+  const cancellableIds = reservations
+    .filter((r) => (r.status === 'confirmed' || r.status === 'pending') && !r.is_used && isCancellable(r.date))
+    .map((r) => r.id);
+
+  const toggleSelect = (id: string) =>
+    setSelectedIds((prev) => (prev.includes(id) ? prev.filter((x) => x !== id) : [...prev, id]));
+
+  const exitSelectMode = () => {
+    setSelectMode(false);
+    setSelectedIds([]);
+  };
+
+  const handleSingleCancel = (id: string) => {
     haptic.medium();
     cancelMutation.mutate(id);
   };
 
+  const handleBulkCancel = () => {
+    if (selectedIds.length === 0) return;
+    Alert.alert(
+      'Randevuları iptal et',
+      `${selectedIds.length} randevu iptal edilecek. Emin misin?`,
+      [
+        { text: 'Vazgeç', style: 'cancel' },
+        {
+          text: 'İptal Et',
+          style: 'destructive',
+          onPress: () => {
+            haptic.medium();
+            bulkCancelMutation.mutate(selectedIds, {
+              onSuccess: (res) => {
+                exitSelectMode();
+                if (res.failed > 0) {
+                  Alert.alert(
+                    'Kısmi iptal',
+                    `${res.total - res.failed} randevu iptal edildi, ${res.failed} tanesi iptal edilemedi (kilit süresi geçmiş olabilir).`
+                  );
+                }
+              },
+            });
+          },
+        },
+      ]
+    );
+  };
+
+  const hasCancellable = cancellableIds.length > 0;
+
   return (
     <SafeAreaView className="flex-1 bg-background" edges={['top']}>
-      <ScreenHeader title="Yemekhane" subtitle="Randevularını yönet" />
+      <ScreenHeader title="Yemekhane" subtitle="Gelecek hafta randevuların" />
 
       <ScrollView
         contentContainerClassName="px-5 pb-28 pt-1"
@@ -353,14 +602,37 @@ export default function CafeteriaScreen() {
           </View>
         ) : reservations.length > 0 ? (
           <Animated.View entering={FadeInDown.duration(400)}>
-            <Text className="mb-3 font-mono text-xs uppercase tracking-widest text-muted-foreground">
-              Randevularım
-            </Text>
+            <View className="mb-3 flex-row items-center justify-between">
+              <Text className="font-mono text-xs uppercase tracking-widest text-muted-foreground">
+                Randevularım
+              </Text>
+              {hasCancellable &&
+                (selectMode ? (
+                  <Pressable onPress={exitSelectMode} accessibilityRole="button" className="active:opacity-70">
+                    <Text className="text-sm font-semibold text-primary">Bitti</Text>
+                  </Pressable>
+                ) : (
+                  <Pressable
+                    onPress={() => {
+                      haptic.light();
+                      setSelectMode(true);
+                    }}
+                    accessibilityRole="button"
+                    className="active:opacity-70"
+                  >
+                    <Text className="text-sm font-semibold text-primary">Toplu Seç</Text>
+                  </Pressable>
+                ))}
+            </View>
+
             {reservations.map((r) => (
               <ReservationCard
                 key={r.id}
                 reservation={r}
-                onCancel={() => handleCancel(r.id)}
+                selectMode={selectMode}
+                selected={selectedIds.includes(r.id)}
+                onToggleSelect={() => toggleSelect(r.id)}
+                onCancel={() => handleSingleCancel(r.id)}
                 canceling={cancelMutation.isPending && cancelMutation.variables === r.id}
               />
             ))}
@@ -369,32 +641,46 @@ export default function CafeteriaScreen() {
           <View className="items-center py-16">
             <Ionicons name="fast-food-outline" size={44} color={colors.mutedForeground} />
             <Text className="mt-3 text-center text-muted-foreground">
-              Henüz randevun yok. Aşağıdan yeni randevu al.
+              Gelecek hafta için randevun yok. Aşağıdan yeni randevu al.
             </Text>
           </View>
         )}
       </ScrollView>
 
-      {/* Sabit alt aksiyon butonu */}
+      {/* Sabit alt aksiyon */}
       <View className="absolute inset-x-0 bottom-0 border-t border-border bg-background px-5 pb-8 pt-3">
-        <Button
-          size="lg"
-          onPress={() => {
-            haptic.light();
-            setModalVisible(true);
-          }}
-          disabled={cafeterias.length === 0}
-          accessibilityLabel="Yeni randevu al"
-        >
-          <Ionicons name="add" size={20} color={colors.primaryForeground} />
-          <Text>Yeni Randevu Al</Text>
-        </Button>
+        {selectMode ? (
+          <Button
+            size="lg"
+            variant="destructive"
+            onPress={handleBulkCancel}
+            loading={bulkCancelMutation.isPending}
+            disabled={selectedIds.length === 0}
+            accessibilityLabel="Seçili randevuları iptal et"
+          >
+            <Ionicons name="trash-outline" size={20} color={colors.primaryForeground} />
+            <Text>Seçili İptal Et ({selectedIds.length})</Text>
+          </Button>
+        ) : (
+          <Button
+            size="lg"
+            onPress={() => {
+              haptic.light();
+              setWizardVisible(true);
+            }}
+            disabled={cafeterias.length === 0}
+            accessibilityLabel="Yeni randevu al"
+          >
+            <Ionicons name="add" size={20} color={colors.primaryForeground} />
+            <Text>Yeni Randevu Al</Text>
+          </Button>
+        )}
       </View>
 
       {cafeterias.length > 0 && (
-        <NewReservationModal
-          visible={modalVisible}
-          onClose={() => setModalVisible(false)}
+        <ReservationWizard
+          visible={wizardVisible}
+          onClose={() => setWizardVisible(false)}
           cafeterias={cafeterias}
         />
       )}

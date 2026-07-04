@@ -1,6 +1,8 @@
 import api from './api';
 import type {
+  BatchReservationRequest,
   CafeteriaListData,
+  CreateBatchReservationData,
   CreateReservationData,
   CreateReservationRequest,
   MonthlyMenuData,
@@ -31,6 +33,16 @@ export const mealService = {
 
   async createReservation(data: CreateReservationRequest): Promise<CreateReservationData> {
     const response = await api.post<Envelope<CreateReservationData>>('/meals/reservations', data);
+    return response.data.data;
+  },
+
+  async createBatchReservation(
+    data: BatchReservationRequest
+  ): Promise<CreateBatchReservationData> {
+    const response = await api.post<Envelope<CreateBatchReservationData>>(
+      '/meals/reservations/batch',
+      data
+    );
     return response.data.data;
   },
 

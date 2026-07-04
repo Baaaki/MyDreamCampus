@@ -71,3 +71,23 @@ export interface CreateReservationData {
   currency: string;
   reservation: Reservation;
 }
+
+// Batch: bir kombinasyon (secili gunler x secili ogunler) tek istekte alinir.
+export interface BatchReservationItem {
+  cafeteria_id: string;
+  date: string; // YYYY-MM-DD
+  meal_time: MealTime;
+  menu_type: MenuType;
+}
+
+export interface BatchReservationRequest {
+  reservations: BatchReservationItem[];
+}
+
+export interface CreateBatchReservationData {
+  batch_id: string;
+  payment_url: string;
+  total_amount: number;
+  currency: string;
+  reservations: Reservation[];
+}
