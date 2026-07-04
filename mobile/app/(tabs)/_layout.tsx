@@ -1,73 +1,86 @@
-import React from 'react';
-import { View } from 'react-native';
-import FontAwesome from '@expo/vector-icons/FontAwesome';
+import Ionicons from '@expo/vector-icons/Ionicons';
 import { Tabs } from 'expo-router';
-import { IconButton, useTheme } from 'react-native-paper';
+import React from 'react';
+import { Pressable, View, type PressableProps } from 'react-native';
 
-import { useColorScheme } from '@/components/useColorScheme';
-import { useClientOnlyValue } from '@/components/useClientOnlyValue';
-import { useTheme as useAppTheme } from '@/contexts/ThemeContext';
-import { useAuthContext } from '@/contexts/AuthContext';
+import { useTheme } from '@/contexts/ThemeContext';
+import { useHaptic } from '@/hooks/useHaptic';
+import { COLORS } from '@/lib/theme';
 
-function TabBarIcon(props: {
-  name: React.ComponentProps<typeof FontAwesome>['name'];
-  color: string;
-}) {
-  return <FontAwesome size={24} style={{ marginBottom: -3 }} {...props} />;
+// Tab bar'in imza ogesi: ortada yukseltilmis, mercan renkli dairesel
+// yoklama butonu. Standart tab butonunun yerine gecer.
+function ScanTabButton({ onPress }: { onPress?: PressableProps['onPress'] }) {
+  const haptic = useHaptic();
+  const { isDark } = useTheme();
+  const colors = COLORS[isDark ? 'dark' : 'light'];
+
+  return (
+    <View className="flex-1 items-center">
+      <Pressable
+        onPress={(e) => {
+          haptic.medium();
+          onPress?.(e);
+        }}
+        accessibilityRole="button"
+        accessibilityLabel="Yoklama al"
+        className="-mt-6 h-16 w-16 items-center justify-center rounded-full bg-primary active:opacity-90"
+        style={{
+          shadowColor: colors.primary,
+          shadowOpacity: 0.45,
+          shadowRadius: 12,
+          shadowOffset: { width: 0, height: 6 },
+          elevation: 10,
+        }}
+      >
+        <Ionicons name="qr-code" size={26} color={colors.primaryForeground} />
+      </Pressable>
+    </View>
+  );
 }
 
 export default function TabLayout() {
-  const colorScheme = useColorScheme();
-  const { toggleTheme, isDark } = useAppTheme();
-  const { logout } = useAuthContext();
-  const theme = useTheme();
-  const { colors } = theme;
+  const { isDark } = useTheme();
+  const colors = COLORS[isDark ? 'dark' : 'light'];
 
   return (
     <Tabs
       screenOptions={{
+        headerShown: false,
         tabBarActiveTintColor: colors.primary,
-        tabBarInactiveTintColor: colors.onSurfaceVariant,
+        tabBarInactiveTintColor: colors.mutedForeground,
         tabBarStyle: {
-          backgroundColor: colors.surface,
-          borderTopColor: colors.outlineVariant,
-          elevation: 4,
+          backgroundColor: colors.card,
+          borderTopColor: colors.border,
         },
-        headerStyle: {
-          backgroundColor: colors.surface,
-          elevation: 2,
+        tabBarLabelStyle: {
+          fontSize: 11,
+          fontWeight: '600',
         },
-        headerTintColor: colors.onSurface,
-        headerShown: useClientOnlyValue(false, true),
-        headerRight: () => (
-          <View style={{ flexDirection: 'row' }}>
-            <IconButton
-              icon={isDark ? 'white-balance-sunny' : 'moon-waning-crescent'}
-              size={22}
-              onPress={toggleTheme}
-              iconColor={colors.onSurface}
-            />
-            <IconButton
-              icon="logout"
-              size={22}
-              onPress={logout}
-              iconColor={colors.onSurface}
-            />
-          </View>
-        ),
-      }}>
+      }}
+    >
       <Tabs.Screen
         name="index"
         options={{
           title: 'Ana Sayfa',
-          tabBarIcon: ({ color }) => <TabBarIcon name="home" color={color} />,
+          tabBarIcon: ({ color, focused }) => (
+            <Ionicons name={focused ? 'home' : 'home-outline'} size={24} color={color} />
+          ),
         }}
       />
       <Tabs.Screen
-        name="two"
+        name="scan"
         options={{
-          title: 'Derslerim',
-          tabBarIcon: ({ color }) => <TabBarIcon name="book" color={color} />,
+          title: 'Yoklama',
+          tabBarButton: (props) => <ScanTabButton onPress={props.onPress} />,
+        }}
+      />
+      <Tabs.Screen
+        name="profile"
+        options={{
+          title: 'Profil',
+          tabBarIcon: ({ color, focused }) => (
+            <Ionicons name={focused ? 'person' : 'person-outline'} size={24} color={color} />
+          ),
         }}
       />
     </Tabs>

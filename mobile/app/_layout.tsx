@@ -1,19 +1,18 @@
+import '../global.css';
+
 import FontAwesome from '@expo/vector-icons/FontAwesome';
-import { DarkTheme, DefaultTheme, ThemeProvider as NavThemeProvider } from '@react-navigation/native';
+import { ThemeProvider as NavThemeProvider } from '@react-navigation/native';
+import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { useFonts } from 'expo-font';
 import { Stack, useRouter, useSegments } from 'expo-router';
 import * as SplashScreen from 'expo-splash-screen';
+import { StatusBar } from 'expo-status-bar';
 import { useEffect } from 'react';
 import 'react-native-reanimated';
-import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
-import { PaperProvider } from 'react-native-paper';
 
-import { useColorScheme } from '@/components/useColorScheme';
-import { ThemeProvider } from '@/contexts/ThemeContext';
 import { AuthProvider, useAuthContext } from '@/contexts/AuthContext';
-import { ToastProvider } from '@/contexts/ToastContext';
-import { LightTheme, DarkTheme as PaperDarkTheme } from '@/constants/theme';
-import { ErrorBoundary as AppErrorBoundary } from '@/components/ui';
+import { ThemeProvider, useTheme } from '@/contexts/ThemeContext';
+import { NAV_THEME } from '@/lib/theme';
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -82,32 +81,24 @@ function AuthGuard({ children }: { children: React.ReactNode }) {
 }
 
 function RootLayoutNav() {
-  const colorScheme = useColorScheme();
-  const paperTheme = colorScheme === 'dark' ? PaperDarkTheme : LightTheme;
+  const { isDark } = useTheme();
 
   return (
     <QueryClientProvider client={queryClient}>
       <AuthProvider>
-        <PaperProvider theme={paperTheme}>
-          <NavThemeProvider value={colorScheme === 'dark' ? DarkTheme : DefaultTheme}>
-            <ToastProvider>
-              <AppErrorBoundary>
-                <AuthGuard>
-                  <Stack>
-                    <Stack.Screen name="(auth)" options={{ headerShown: false }} />
-                    <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
-                    <Stack.Screen name="modal" options={{ presentation: 'modal' }} />
-                    <Stack.Screen name="screens/qr-attendance" options={{ title: 'QR Yoklama' }} />
-                    <Stack.Screen name="screens/my-grades" options={{ title: 'Notlarim' }} />
-                    <Stack.Screen name="screens/cafeteria" options={{ title: 'Yemekhane' }} />
-                    <Stack.Screen name="screens/change-password" options={{ title: 'Sifre Degistir' }} />
-                    <Stack.Screen name="screens/enrollment" options={{ title: 'Ders Kaydi' }} />
-                  </Stack>
-                </AuthGuard>
-              </AppErrorBoundary>
-            </ToastProvider>
-          </NavThemeProvider>
-        </PaperProvider>
+        <NavThemeProvider value={isDark ? NAV_THEME.dark : NAV_THEME.light}>
+          <StatusBar style={isDark ? 'light' : 'dark'} />
+          <AuthGuard>
+            <Stack screenOptions={{ headerShown: false }}>
+              <Stack.Screen name="(auth)" />
+              <Stack.Screen name="(tabs)" />
+              <Stack.Screen
+                name="change-password"
+                options={{ presentation: 'modal', gestureEnabled: false }}
+              />
+            </Stack>
+          </AuthGuard>
+        </NavThemeProvider>
       </AuthProvider>
     </QueryClientProvider>
   );

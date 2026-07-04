@@ -1,0 +1,55 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/* MyDreamCampus tasarim dili: sicak kagit zemin + gun batimi mercani.
+   Degerler HSL bileseni olarak tutulur (tailwind.config.js hsl(var(--x)) sarar). */
+@layer base {
+  :root {
+    --background: 30 40% 97%;
+    --foreground: 24 22% 11%;
+    --card: 0 0% 100%;
+    --card-foreground: 24 22% 11%;
+    --primary: 16 88% 54%;
+    --primary-foreground: 20 100% 98%;
+    --secondary: 28 42% 92%;
+    --secondary-foreground: 24 24% 22%;
+    --muted: 28 30% 92%;
+    --muted-foreground: 25 10% 42%;
+    --accent: 174 62% 34%;
+    --accent-foreground: 170 60% 97%;
+    --destructive: 0 74% 48%;
+    --destructive-foreground: 0 0% 100%;
+    --success: 158 74% 32%;
+    --success-foreground: 150 60% 97%;
+    --warning: 34 94% 42%;
+    --warning-foreground: 40 100% 97%;
+    --border: 28 22% 86%;
+    --input: 28 22% 86%;
+    --ring: 16 88% 54%;
+  }
+
+  .dark:root {
+    --background: 24 16% 8%;
+    --foreground: 30 28% 93%;
+    --card: 24 14% 12%;
+    --card-foreground: 30 28% 93%;
+    --primary: 16 95% 60%;
+    --primary-foreground: 20 60% 8%;
+    --secondary: 24 12% 16%;
+    --secondary-foreground: 30 20% 85%;
+    --muted: 24 12% 16%;
+    --muted-foreground: 28 12% 62%;
+    --accent: 174 55% 45%;
+    --accent-foreground: 170 60% 6%;
+    --destructive: 0 78% 58%;
+    --destructive-foreground: 0 0% 100%;
+    --success: 158 60% 44%;
+    --success-foreground: 150 70% 6%;
+    --warning: 38 92% 55%;
+    --warning-foreground: 34 80% 8%;
+    --border: 25 10% 19%;
+    --input: 25 10% 19%;
+    --ring: 16 95% 60%;
+  }
+}

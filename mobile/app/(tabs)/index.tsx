@@ -1,204 +1,322 @@
-import { StyleSheet, ScrollView, View, RefreshControl } from 'react-native';
-import { Text, Surface, TouchableRipple, useTheme, ActivityIndicator } from 'react-native-paper';
-import FontAwesome from '@expo/vector-icons/FontAwesome';
+import Ionicons from '@expo/vector-icons/Ionicons';
 import { useRouter } from 'expo-router';
+import React, { useMemo } from 'react';
+import { ActivityIndicator, RefreshControl, ScrollView, View } from 'react-native';
+import Animated, { FadeInDown } from 'react-native-reanimated';
+import { SafeAreaView } from 'react-native-safe-area-context';
 
+import { Badge, Button, Card, Text } from '@/components/ui';
+import {
+  DAYS_OF_WEEK,
+  SESSION_TYPE_LABEL,
+  jsDayToBackendDay,
+  slotRange,
+  timeToMinutes,
+} from '@/constants/schedule';
 import { useAuthContext } from '@/contexts/AuthContext';
-import { useMyGrades } from '@/hooks/useGrades';
+import { useTheme } from '@/contexts/ThemeContext';
 import { useMyAttendance } from '@/hooks/useAttendance';
+import { useActiveSemester } from '@/hooks/useCatalog';
 import { useMyEnrollments } from '@/hooks/useEnrollment';
-import { SectionHeader, StatCard, SessionTypeChip } from '@/components/ui';
-import { spacing, radius, layout, accentColors, withOpacity } from '@/constants/tokens';
+import { COLORS } from '@/lib/theme';
+import type { EnrollmentCourse, ScheduleSession } from '@/types/enrollment.types';
 
-const quickActions = [
-  { icon: 'qrcode' as const, label: 'QR Yoklama', color: accentColors.indigo, route: '/screens/qr-attendance' as const },
-  { icon: 'calendar' as const, label: 'Ders Kaydi', color: accentColors.violet, route: '/screens/enrollment' as const },
-  { icon: 'bar-chart' as const, label: 'Notlarim', color: accentColors.pink, route: '/screens/my-grades' as const },
-  { icon: 'cutlery' as const, label: 'Yemekhane', color: accentColors.amber, route: '/screens/cafeteria' as const },
+const MONTHS_TR = [
+  'Ocak', 'Subat', 'Mart', 'Nisan', 'Mayis', 'Haziran',
+  'Temmuz', 'Agustos', 'Eylul', 'Ekim', 'Kasim', 'Aralik',
 ];
 
-export default function HomeScreen() {
-  const { colors } = useTheme();
-  const router = useRouter();
-  const { user } = useAuthContext();
+type TodaySession = {
+  course: EnrollmentCourse;
+  session: ScheduleSession;
+  start: string;
+  end: string;
+  startMin: number;
+  endMin: number;
+};
 
-  const gradesQuery = useMyGrades();
-  const attendanceQuery = useMyAttendance();
-  const enrollmentsQuery = useMyEnrollments();
-
-  const isRefreshing = gradesQuery.isRefetching || attendanceQuery.isRefetching;
-
-  const handleRefresh = () => {
-    gradesQuery.refetch();
-    attendanceQuery.refetch();
-    enrollmentsQuery.refetch();
-  };
-
-  // Derive stats from real data
-  const gpa = gradesQuery.data?.cumulative_gpa?.toFixed(2) ?? '-';
-  const courseCount = (() => {
-    const approved = enrollmentsQuery.data?.programs?.find(p => p.status === 'approved');
-    return approved?.courses?.length ?? gradesQuery.data?.active_courses?.length ?? '-';
-  })();
-
-  const attendancePercent = (() => {
-    const courses = attendanceQuery.data?.courses;
-    if (!courses?.length) return '-';
-    const totalPresent = courses.reduce((sum, c) => sum + c.theory.present_count + c.lab.present_count, 0);
-    const totalSessions = courses.reduce((sum, c) => sum + c.theory.total_sessions + c.lab.total_sessions, 0);
-    if (totalSessions === 0) return '-';
-    return `%${Math.round((totalPresent / totalSessions) * 100)}`;
-  })();
-
-  const displayName = user?.email?.split('@')[0] ?? 'Ogrenci';
-  const department = user?.department ?? '';
-
-  return (
-    <ScrollView
-      style={[styles.scrollView, { backgroundColor: colors.background }]}
-      refreshControl={
-        <RefreshControl refreshing={isRefreshing} onRefresh={handleRefresh} />
-      }
-    >
-      <View style={styles.container}>
-        {/* Header */}
-        <View style={styles.header}>
-          <Text variant="bodyLarge" style={{ color: colors.onSurfaceVariant }}>Merhaba,</Text>
-          <Text variant="headlineMedium" style={[styles.name, { color: colors.onBackground }]}>
-            {displayName}
-          </Text>
-          {department ? (
-            <Text variant="bodyMedium" style={{ color: colors.onSurfaceVariant }}>
-              {department}
-            </Text>
-          ) : null}
-        </View>
-
-        {/* Quick Actions */}
-        <View style={styles.section}>
-          <SectionHeader title="Hizli Erisim" />
-          <View style={styles.actionsGrid}>
-            {quickActions.map((action) => (
-              <Surface
-                key={action.label}
-                style={[styles.actionCard, { backgroundColor: colors.surface }]}
-                elevation={1}
-              >
-                <TouchableRipple
-                  onPress={() => router.push(action.route)}
-                  borderless
-                  style={styles.actionCardInner}
-                  rippleColor={withOpacity(action.color, 0.19)}
-                >
-                  <View style={styles.actionCardContent}>
-                    <View style={[styles.actionIcon, { backgroundColor: withOpacity(action.color, 0.08) }]}>
-                      <FontAwesome name={action.icon} size={24} color={action.color} />
-                    </View>
-                    <Text variant="labelMedium" style={{ color: colors.onSurface }}>
-                      {action.label}
-                    </Text>
-                  </View>
-                </TouchableRipple>
-              </Surface>
-            ))}
-          </View>
-        </View>
-
-        {/* Enrolled Courses */}
-        <View style={styles.section}>
-          <SectionHeader title="Kayitli Derslerim" />
-          {enrollmentsQuery.isLoading ? (
-            <ActivityIndicator style={{ marginVertical: spacing.lg }} />
-          ) : (() => {
-            const approved = enrollmentsQuery.data?.programs?.find(p => p.status === 'approved');
-            if (!approved?.courses?.length) {
-              return (
-                <Surface style={[styles.scheduleCard, { backgroundColor: colors.surface }]} elevation={1}>
-                  <View style={styles.scheduleContent}>
-                    <Text variant="bodyMedium" style={{ color: colors.onSurfaceVariant }}>
-                      Henuz onaylanmis ders kaydiniz bulunmuyor
-                    </Text>
-                  </View>
-                </Surface>
-              );
-            }
-            return approved.courses.slice(0, 4).map((course) => (
-              <Surface
-                key={course.id}
-                style={[styles.scheduleCard, { backgroundColor: colors.surface }]}
-                elevation={1}
-              >
-                <View style={styles.scheduleContent}>
-                  <View style={styles.scheduleTime}>
-                    <Text variant="labelSmall" style={{ color: colors.primary }}>{course.course_code}</Text>
-                  </View>
-                  <View style={styles.scheduleInfo}>
-                    <Text variant="bodyLarge" style={[styles.courseName, { color: colors.onSurface }]}>
-                      {course.course_name}
-                    </Text>
-                    <Text variant="bodySmall" style={{ color: colors.onSurfaceVariant }}>
-                      {course.instructor} · {course.credits} KR
-                    </Text>
-                  </View>
-                  <FontAwesome name="chevron-right" size={14} color={colors.onSurfaceVariant} />
-                </View>
-              </Surface>
-            ));
-          })()}
-        </View>
-
-        {/* Stats */}
-        <View style={styles.section}>
-          <SectionHeader title="Donem Ozeti" />
-          <View style={styles.statsRow}>
-            <StatCard icon="line-chart" value={gpa} label="GPA" />
-            <StatCard icon="book" value={String(courseCount)} label="Ders" />
-            <StatCard icon="check-circle" value={attendancePercent} label="Devam" />
-          </View>
-        </View>
-      </View>
-    </ScrollView>
-  );
+function greetingByHour(hour: number): string {
+  if (hour < 12) return 'Gunaydin';
+  if (hour < 18) return 'Iyi gunler';
+  return 'Iyi aksamlar';
 }
 
-const styles = StyleSheet.create({
-  scrollView: { flex: 1 },
-  container: { flex: 1, padding: layout.screenPadding },
-  header: { marginBottom: spacing.lg },
-  name: { fontWeight: 'bold', marginTop: 2 },
-  section: { marginBottom: spacing.lg },
-  actionsGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: spacing.md },
-  actionCard: {
-    width: '47%',
-    borderRadius: radius.lg,
-    overflow: 'hidden',
-  },
-  actionCardInner: {
-    padding: spacing.md,
-  },
-  actionCardContent: {
-    alignItems: 'center',
-  },
-  actionIcon: {
-    width: 52,
-    height: 52,
-    borderRadius: radius.md,
-    alignItems: 'center',
-    justifyContent: 'center',
-    marginBottom: spacing.sm,
-  },
-  scheduleCard: {
-    borderRadius: radius.md,
-    marginBottom: spacing.sm,
-    overflow: 'hidden',
-  },
-  scheduleContent: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    padding: 14,
-  },
-  scheduleTime: { alignItems: 'center', marginRight: 14, minWidth: 50 },
-  scheduleInfo: { flex: 1 },
-  courseName: { fontWeight: '500' },
-  statsRow: { flexDirection: 'row', gap: spacing.md },
-});
+function initialsOf(name: string): string {
+  return name
+    .split(/\s+/)
+    .filter(Boolean)
+    .slice(0, 2)
+    .map((part) => part[0]?.toUpperCase())
+    .join('');
+}
+
+export default function HomeScreen() {
+  const router = useRouter();
+  const { user } = useAuthContext();
+  const { isDark } = useTheme();
+  const colors = COLORS[isDark ? 'dark' : 'light'];
+
+  const semesterQuery = useActiveSemester();
+  const semester = semesterQuery.data?.name ?? '';
+  const enrollmentsQuery = useMyEnrollments(semester || undefined, 'approved');
+  const attendanceQuery = useMyAttendance(semester || undefined);
+
+  const program = enrollmentsQuery.data?.programs?.[0];
+  const courses = useMemo(() => program?.courses ?? [], [program]);
+
+  const now = new Date();
+  const backendDay = jsDayToBackendDay(now.getDay());
+  const nowMin = now.getHours() * 60 + now.getMinutes();
+
+  const todaySessions = useMemo<TodaySession[]>(() => {
+    return courses
+      .flatMap((course) =>
+        course.schedule_sessions
+          .filter((session) => session.day_of_week === backendDay)
+          .map((session) => {
+            const range = slotRange(session.slot_numbers);
+            if (!range) return null;
+            return {
+              course,
+              session,
+              start: range.start,
+              end: range.end,
+              startMin: timeToMinutes(range.start),
+              endMin: timeToMinutes(range.end),
+            };
+          })
+          .filter((s): s is TodaySession => s !== null)
+      )
+      .sort((a, b) => a.startMin - b.startMin);
+  }, [courses, backendDay]);
+
+  const nextSession = todaySessions.find((s) => s.endMin > nowMin);
+  const nextIsLive = !!nextSession && nextSession.startMin <= nowMin;
+
+  const firstName =
+    program?.student_name?.split(/\s+/)[0] ?? user?.email?.split('@')[0] ?? 'Ogrenci';
+  const displayName = program?.student_name ?? user?.email ?? '';
+
+  const isLoading = semesterQuery.isLoading || enrollmentsQuery.isLoading;
+  const isError = semesterQuery.isError || enrollmentsQuery.isError;
+
+  const refetchAll = () => {
+    semesterQuery.refetch();
+    enrollmentsQuery.refetch();
+    attendanceQuery.refetch();
+  };
+
+  if (isLoading) {
+    return (
+      <SafeAreaView className="flex-1 items-center justify-center bg-background" edges={['top']}>
+        <ActivityIndicator size="large" color={colors.primary} />
+      </SafeAreaView>
+    );
+  }
+
+  if (isError) {
+    return (
+      <SafeAreaView
+        className="flex-1 items-center justify-center gap-4 bg-background px-8"
+        edges={['top']}
+      >
+        <Ionicons name="cloud-offline-outline" size={44} color={colors.mutedForeground} />
+        <Text className="text-center text-base text-muted-foreground">
+          Program bilgisi yuklenemedi. Baglantini kontrol edip tekrar dene.
+        </Text>
+        <Button variant="outline" onPress={refetchAll} accessibilityLabel="Tekrar dene">
+          <Text>Tekrar Dene</Text>
+        </Button>
+      </SafeAreaView>
+    );
+  }
+
+  return (
+    <SafeAreaView className="flex-1 bg-background" edges={['top']}>
+      <ScrollView
+        contentContainerClassName="px-5 pb-10 pt-4"
+        refreshControl={
+          <RefreshControl
+            refreshing={enrollmentsQuery.isRefetching}
+            onRefresh={refetchAll}
+            tintColor={colors.primary}
+          />
+        }
+      >
+        {/* Baslik: tarih (mono, makine sesi) + selamlama + avatar */}
+        <Animated.View
+          entering={FadeInDown.duration(400)}
+          className="mb-6 flex-row items-center justify-between"
+        >
+          <View className="flex-1">
+            <Text className="mb-1 font-mono text-xs uppercase tracking-widest text-primary">
+              {DAYS_OF_WEEK[backendDay]} · {now.getDate()} {MONTHS_TR[now.getMonth()]}
+            </Text>
+            <Text className="text-3xl font-extrabold text-foreground">
+              {greetingByHour(now.getHours())}, {firstName}
+            </Text>
+          </View>
+          <View className="h-12 w-12 items-center justify-center rounded-full bg-secondary">
+            <Text className="text-base font-bold text-secondary-foreground">
+              {initialsOf(displayName) || '?'}
+            </Text>
+          </View>
+        </Animated.View>
+
+        {/* Siradaki ders — gunun kahramani */}
+        <Animated.View entering={FadeInDown.delay(80).duration(400)} className="mb-8">
+          {nextSession ? (
+            <View className="rounded-4xl bg-primary p-6">
+              <View className="mb-4 flex-row items-center justify-between">
+                <Text className="font-mono text-xs uppercase tracking-widest text-primary-foreground/80">
+                  {nextIsLive ? '● Su an derste' : 'Siradaki ders'}
+                </Text>
+                <Badge variant="secondary" className="bg-primary-foreground/20">
+                  <Text className="text-xs font-semibold text-primary-foreground">
+                    {SESSION_TYPE_LABEL[nextSession.session.session_type]}
+                  </Text>
+                </Badge>
+              </View>
+              <Text className="mb-1 text-2xl font-extrabold text-primary-foreground">
+                {nextSession.course.course_name}
+              </Text>
+              <Text className="mb-5 font-mono text-sm text-primary-foreground/80">
+                {nextSession.course.course_code} · {nextSession.course.instructor}
+              </Text>
+              <View className="flex-row items-end justify-between">
+                <Text className="font-mono text-3xl font-bold text-primary-foreground">
+                  {nextSession.start}
+                  <Text className="font-mono text-base text-primary-foreground/70">
+                    {' '}– {nextSession.end}
+                  </Text>
+                </Text>
+                <Button
+                  size="sm"
+                  className="bg-primary-foreground"
+                  onPress={() => router.push('/(tabs)/scan')}
+                  accessibilityLabel="QR yoklama okut"
+                >
+                  <Ionicons name="qr-code" size={14} color={colors.primary} />
+                  <Text className="text-sm font-bold text-primary">QR Okut</Text>
+                </Button>
+              </View>
+            </View>
+          ) : (
+            <Card className="items-center p-8">
+              <Ionicons name="cafe-outline" size={36} color={colors.mutedForeground} />
+              <Text className="mt-3 text-lg font-bold text-foreground">
+                Bugun icin ders kalmadi
+              </Text>
+              <Text className="mt-1 text-center text-sm text-muted-foreground">
+                {todaySessions.length > 0
+                  ? 'Gunun tum dersleri tamamlandi. Iyi dinlenmeler!'
+                  : 'Bugun programinda ders yok.'}
+              </Text>
+            </Card>
+          )}
+        </Animated.View>
+
+        {/* Bugunun programi */}
+        {todaySessions.length > 0 && (
+          <Animated.View entering={FadeInDown.delay(160).duration(400)} className="mb-8">
+            <Text className="mb-3 font-mono text-xs uppercase tracking-widest text-muted-foreground">
+              Bugunun programi
+            </Text>
+            <View className="gap-3">
+              {todaySessions.map((item) => {
+                const isPast = item.endMin <= nowMin;
+                const isLive = item.startMin <= nowMin && item.endMin > nowMin;
+                return (
+                  <Card
+                    key={`${item.course.id}-${item.session.session_type}-${item.start}`}
+                    className={`flex-row items-center gap-4 p-4 ${
+                      isLive ? 'border-primary' : ''
+                    } ${isPast ? 'opacity-50' : ''}`}
+                  >
+                    <View className="items-center">
+                      <Text className="font-mono text-sm font-bold text-foreground">
+                        {item.start}
+                      </Text>
+                      <Text className="font-mono text-xs text-muted-foreground">{item.end}</Text>
+                    </View>
+                    <View
+                      className={`h-10 w-0.5 rounded-full ${isLive ? 'bg-primary' : 'bg-border'}`}
+                    />
+                    <View className="flex-1">
+                      <Text className="font-semibold text-foreground" numberOfLines={1}>
+                        {item.course.course_name}
+                      </Text>
+                      <Text className="font-mono text-xs text-muted-foreground">
+                        {item.course.course_code} · {SESSION_TYPE_LABEL[item.session.session_type]}
+                      </Text>
+                    </View>
+                    {isLive && (
+                      <Badge>
+                        <Text className="text-xs font-bold text-primary-foreground">Canli</Text>
+                      </Badge>
+                    )}
+                  </Card>
+                );
+              })}
+            </View>
+          </Animated.View>
+        )}
+
+        {/* Devam durumu */}
+        <Animated.View entering={FadeInDown.delay(240).duration(400)}>
+          <Text className="mb-3 font-mono text-xs uppercase tracking-widest text-muted-foreground">
+            Devam durumu
+          </Text>
+          {attendanceQuery.isLoading ? (
+            <Card className="items-center p-6">
+              <ActivityIndicator color={colors.primary} />
+            </Card>
+          ) : (attendanceQuery.data?.courses?.length ?? 0) > 0 ? (
+            <Card className="gap-4 p-5">
+              {attendanceQuery.data!.courses.map((course) => {
+                const present = course.theory.present_count + course.lab.present_count;
+                const total = course.theory.total_sessions + course.lab.total_sessions;
+                const pct = total > 0 ? Math.round((present / total) * 100) : null;
+                const barClass =
+                  pct === null
+                    ? 'bg-muted'
+                    : pct >= 80
+                      ? 'bg-success'
+                      : pct >= 60
+                        ? 'bg-warning'
+                        : 'bg-destructive';
+                return (
+                  <View key={course.course_id}>
+                    <View className="mb-1.5 flex-row items-center justify-between">
+                      <Text
+                        className="flex-1 text-sm font-semibold text-foreground"
+                        numberOfLines={1}
+                      >
+                        {course.course_name}
+                      </Text>
+                      <Text className="ml-3 font-mono text-sm font-bold text-foreground">
+                        {pct === null ? '—' : `%${pct}`}
+                      </Text>
+                    </View>
+                    <View className="h-2 overflow-hidden rounded-full bg-muted">
+                      <View
+                        className={`h-2 rounded-full ${barClass}`}
+                        style={{ width: `${pct ?? 0}%` }}
+                      />
+                    </View>
+                  </View>
+                );
+              })}
+            </Card>
+          ) : (
+            <Card className="items-center p-6">
+              <Text className="text-sm text-muted-foreground">
+                Bu donem icin henuz yoklama kaydi yok.
+              </Text>
+            </Card>
+          )}
+        </Animated.View>
+      </ScrollView>
+    </SafeAreaView>
+  );
+}
