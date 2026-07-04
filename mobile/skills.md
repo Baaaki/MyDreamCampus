@@ -15,37 +15,41 @@ React Native 0.81 + Expo 54 + Expo Router v6 + TanStack Query + axios. `mobile/a
 - **Token storage**: `expo-secure-store` — `AsyncStorage`, `localStorage` YAPMA (token icin).
 - **Env var**: `EXPO_PUBLIC_*` prefix — `process.env.EXPO_PUBLIC_X`.
 - **Web/native ayrimi**: `localStorage`, `document`, `window` ortak kodda YAPMA — web target'a ozel davranis gerekirse `Platform.OS === 'web'` guard ile koru veya `.web.ts` suffix dosya olarak ayir. Native build'de bu API'lar yok, runtime crash olur.
-- **Style**: React Native `StyleSheet.create` veya `style={{...}}` — CSS class **YOK**, Tailwind **YOK**.
+- **Style**: **NativeWind v4** (`className="..."`) + `components/ui/` primitifleri (react-native-reusables pattern: cva + cn). Tema renkleri `global.css` CSS degiskenlerinden gelir (`bg-primary`, `text-foreground` vs.) — hardcoded hex YAPMA. `className` ile ifade edilemeyen degerler (animasyon transform'lari, shadow renkleri, yuzde genislik) icin `style={{...}}` serbest; JS tarafinda renk gerekirse `lib/theme.ts` `COLORS`. `react-native-paper` KALDIRILDI — geri ekleme.
+- **Tema (dark mode)**: `contexts/ThemeContext` (`useTheme()` -> `isDark`, `toggleTheme`) NativeWind `colorScheme` uzerine sarilidir. Renk degistirmek icin `global.css` (`:root` / `.dark:root`) + `lib/theme.ts` ikisini birden guncelle.
 
 ---
 
 ## 2. Dosya Yapisi (sabit)
 
+Uygulama **sadece ogrenci** icindir — personel/ogretmen/admin akisi YOK (web frontend'de var).
+
 ```
 mobile/
 ├── app/                       # Expo Router file-based routing
-│   ├── _layout.tsx            # Root layout (Stack/Tabs)
-│   ├── (auth)/                # login, register
-│   ├── (tabs)/                # tab navigator (ogrenci ana navigasyon)
-│   ├── (staff)/               # personel akisi
-│   ├── screens/               # ortak ekranlar
-│   ├── modal.tsx              # modal route
+│   ├── _layout.tsx            # Root layout (provider'lar + AuthGuard + Stack)
+│   ├── (auth)/                # login
+│   ├── (tabs)/                # index (ana sayfa), scan (QR yoklama), profile
+│   ├── change-password.tsx    # zorunlu sifre degisimi (modal)
 │   ├── +not-found.tsx         # 404
 │   └── +html.tsx              # web HTML wrapper (RN web)
-├── components/                # paylasilan componentler
+├── components/ui/             # tasarim sistemi primitifleri (text, button, card, input, badge)
 ├── contexts/                  # AuthContext, ThemeContext
-├── hooks/                     # useAuth, useGrades, useMeals (TanStack Query wrapper'lar)
+├── hooks/                     # useAuth, useAttendance, useEnrollment, useCatalog, useHaptic
 ├── services/                  # API service'leri
 │   ├── api.ts                 # axios instance + 401 refresh interceptor
 │   ├── authService.ts         # login, logout, refresh
 │   └── {feature}Service.ts
-├── constants/                 # sabit degerler
+├── lib/                       # utils (cn), theme (COLORS/NAV_THEME), qr-payload, password-policy
+├── constants/                 # schedule.ts (TIME_SLOTS, DAYS_OF_WEEK)
 ├── types/                     # TypeScript tipleri
-└── assets/                    # gorseller, fontlar
+├── global.css                 # tema CSS degiskenleri (:root / .dark:root)
+├── tailwind.config.js         # NativeWind preset + token eslemeleri
+└── assets/                    # gorseller, fontlar (SpaceMono = data/eyebrow fontu)
 ```
 
 **Route grup parantezleri** (Expo Router):
-- `(auth)`, `(tabs)`, `(staff)` → URL'de **gorunmez**, sadece organize amacli
+- `(auth)`, `(tabs)` → URL'de **gorunmez**, sadece organize amacli
 
 ---
 
@@ -173,9 +177,12 @@ export default xxxService;
 
 ```tsx
 // app/(tabs)/xxx.tsx
-import { Text, FlatList, Pressable, ActivityIndicator, StyleSheet, View } from 'react-native';
+import { ActivityIndicator, FlatList, Pressable, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
+import Animated, { FadeInDown } from 'react-native-reanimated';
+
+import { Button, Card, Text } from '@/components/ui';
 import { useMyXxx } from '@/hooks/useXxx';
 
 export default function XxxScreen() {
@@ -184,7 +191,7 @@ export default function XxxScreen() {
 
   if (isLoading) {
     return (
-      <SafeAreaView style={styles.center} edges={['top']}>
+      <SafeAreaView className="flex-1 items-center justify-center bg-background" edges={['top']}>
         <ActivityIndicator size="large" />
       </SafeAreaView>
     );
@@ -192,38 +199,41 @@ export default function XxxScreen() {
 
   if (isError) {
     return (
-      <SafeAreaView style={styles.center} edges={['top']}>
-        <Text style={styles.error}>
+      <SafeAreaView
+        className="flex-1 items-center justify-center gap-4 bg-background px-8"
+        edges={['top']}
+      >
+        <Text className="text-center text-muted-foreground">
           {error instanceof Error ? error.message : 'Bir hata olustu'}
         </Text>
-        <Pressable
-          onPress={() => refetch()}
-          style={({ pressed }) => [styles.button, pressed && styles.pressed]}
-          accessibilityRole="button"
-          accessibilityLabel="Tekrar dene"
-        >
-          <Text style={styles.buttonText}>Tekrar Dene</Text>
-        </Pressable>
+        <Button variant="outline" onPress={() => refetch()} accessibilityLabel="Tekrar dene">
+          <Text>Tekrar Dene</Text>
+        </Button>
       </SafeAreaView>
     );
   }
 
   return (
-    <SafeAreaView style={styles.container} edges={['top']}>
+    <SafeAreaView className="flex-1 bg-background" edges={['top']}>
       <FlatList
         data={data?.items ?? []}
         keyExtractor={(item) => item.id}
-        renderItem={({ item }) => (
-          <Pressable
-            style={({ pressed }) => [styles.item, pressed && styles.pressed]}
-            onPress={() => router.push(`/screens/xxx/${item.id}`)}
-            accessibilityRole="button"
-          >
-            <Text style={styles.itemTitle}>{item.name}</Text>
-          </Pressable>
+        contentContainerClassName="gap-3 p-5"
+        renderItem={({ item, index }) => (
+          <Animated.View entering={FadeInDown.delay(index * 60)}>
+            <Pressable
+              onPress={() => router.push(`/xxx/${item.id}`)}
+              accessibilityRole="button"
+              className="active:opacity-70"
+            >
+              <Card className="p-4">
+                <Text className="font-semibold">{item.name}</Text>
+              </Card>
+            </Pressable>
+          </Animated.View>
         )}
         ListEmptyComponent={
-          <Text style={styles.empty}>Henuz kayit yok</Text>
+          <Text className="p-8 text-center text-muted-foreground">Henuz kayit yok</Text>
         }
         onRefresh={refetch}
         refreshing={isLoading}
@@ -231,34 +241,26 @@ export default function XxxScreen() {
     </SafeAreaView>
   );
 }
-
-const styles = StyleSheet.create({
-  container: { flex: 1, padding: 16 },
-  center: { flex: 1, alignItems: 'center', justifyContent: 'center', padding: 16 },
-  item: { padding: 16, borderRadius: 8, backgroundColor: '#f5f5f5', marginBottom: 8 },
-  itemTitle: { fontSize: 16, fontWeight: '600' },
-  empty: { textAlign: 'center', padding: 32, color: '#999' },
-  error: { color: 'red', marginBottom: 12 },
-  button: { padding: 12, backgroundColor: '#007aff', borderRadius: 8 },
-  buttonText: { color: '#fff', fontWeight: '600' },
-  pressed: { opacity: 0.7 },
-});
 ```
 
 **Ekran kurallari:**
 - Default export — Expo Router otomatik route bulur
-- **`SafeAreaView` (`react-native-safe-area-context`)** — root container. `edges={['top']}` (alt tab bar zaten safe). Bu paket kurulu, **pure `react-native`'in `SafeAreaView`'unu kullanma** (Android'de calismiyor).
+- **`SafeAreaView` (`react-native-safe-area-context`)** — root container, `className="flex-1 bg-background"` + `edges={['top']}` (alt tab bar zaten safe). **Pure `react-native`'in `SafeAreaView`'unu kullanma** (Android'de calismiyor).
 - `FlatList` (uzun liste) > `ScrollView` + `.map()`
 - `keyExtractor` zorunlu (`(item) => item.id`)
-- Loading: `ActivityIndicator`
-- Empty state: `ListEmptyComponent` veya manuel kontrol
-- `Pressable` + `({ pressed }) => [base, pressed && styles.pressed]` — TouchableOpacity'nin opacity feedback'i Pressable'da default yok, manuel ekle
-- Stil: `StyleSheet.create` (tip guvenligi + perf)
+- Loading: `ActivityIndicator`; empty state: `ListEmptyComponent` veya manuel kontrol
+- Buton/kart/input/badge icin once `components/ui/` primitiflerine bak, yoksa ekle — ekranda tek seferlik stil uydurma
+- Pressable feedback: `className="active:opacity-70"` (NativeWind active: state)
+- Mikro-animasyon: `react-native-reanimated` `entering={FadeInDown...}` — abartma, liste/section girisleri yeterli
 - A11y minimum: `accessibilityRole="button"`, ikon-only butonlarda `accessibilityLabel`
 
 ---
 
 ## 8. Form Sablonu (react-hook-form + zod)
+
+> Not: Sablondaki `StyleSheet` stilleri tarihseldir — yeni formlarda input/buton icin
+> `components/ui` (`Input`, `Button`, `Text`) + `className` kullan; form **logic'i**
+> (Controller, zodResolver, mutation) aynen gecerli.
 
 ```tsx
 import {
@@ -536,7 +538,7 @@ npm run test:coverage # kapsam raporu
 ```
 Web modulleri:        next/*, react-router, ky
 Storage:              localStorage (token icin AsyncStorage bile YAPMA)
-Style:                CSS class, Tailwind, styled-components, inline string style
+Style:                styled-components, react-native-paper (kaldirildi), hardcoded hex renk (tema degiskeni varken)
 Routing API:          useNavigate, useParams (react-router)
 HTTP:                 fetch direkt, axios.create yeni instance
 Token:                JWT'yi AsyncStorage'a koymak (SecureStore zorunlu)
