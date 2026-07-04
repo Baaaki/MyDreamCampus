@@ -13,7 +13,7 @@ export const QUOTES: Quote[] = [
     text: 'Kandırmaman gereken ilk kişi kendinsin; kandırması en kolay kişi de sensin.',
     author: 'Richard Feynman',
   },
-  { text: 'Yaratamadığım şeyi gerçekten anlamış sayılmam.', author: 'Richard Feynman' },
+  { text: 'Kendi elimle uygulamadığım şeyi gerçekten anlamış sayılmam.', author: 'Richard Feynman' },
   { text: 'Bir şeyin adını bilmek, onu bilmek değildir.', author: 'Richard Feynman' },
   { text: 'Geleceği tahmin etmenin en iyi yolu onu icat etmektir.', author: 'Alan Kay' },
   { text: "En tehlikeli cümle şudur: 'Bu hep böyle yapıldı.'", author: 'Grace Hopper' },
@@ -43,8 +43,8 @@ export const QUOTES: Quote[] = [
   },
   { text: 'Yalnız kalmayı öğren; icadın sırrı budur.', author: 'Nikola Tesla' },
   {
-    text: 'Gemi yaptırmak istiyorsan, önce insanlara denizin özlemini aşıla.',
-    author: 'Antoine de Saint-Exupéry',
+    text: 'Bir hata yapıp onu düzeltmemek; işte asıl hata budur.',
+    author: 'Konfüçyüs',
   },
   { text: 'Önemli olan ne kadar yavaş gittiğin değil, durmadığındır.', author: 'Konfüçyüs' },
   {
