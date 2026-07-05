@@ -971,8 +971,18 @@ func (s *GradeService) ProcessAppeal(ctx context.Context, req dto.AppealScoreReq
 	}
 	gradingConfigJSON, _ := json.Marshal(gradingConfig)
 
-	// 11. Update the completed course record
-	err = s.completedRepo.UpdateCompletedCourseAfterAppeal(ctx, db.UpdateCompletedCourseAfterAppealParams{
+	// 11. Update the completed course record. Same tx as the prerequisite
+	// outbox write below — an appeal can flip a failing grade to passing,
+	// and enrollment learns about that only through the event; committing
+	// one without the other would strand the student's prerequisite state.
+	tx, err := s.pool.Begin(ctx)
+	if err != nil {
+		logger.Error("failed to begin appeal transaction", zap.Error(err))
+		return nil, err
+	}
+	defer tx.Rollback(ctx)
+
+	err = s.completedRepo.WithTx(tx).UpdateCompletedCourseAfterAppeal(ctx, db.UpdateCompletedCourseAfterAppealParams{
 		StudentID:        req.StudentID,
 		CourseID:         req.CourseID,
 		AssessmentScores: updatedScoresJSON,
@@ -982,6 +992,42 @@ func (s *GradeService) ProcessAppeal(ctx context.Context, req dto.AppealScoreReq
 	})
 	if err != nil {
 		logger.Error("failed to update completed course after appeal", zap.Error(err))
+		return nil, err
+	}
+
+	// 12. Fail -> pass flip on a prerequisite course: publish the same event
+	// the finalize path publishes, so enrollment's projection catches up.
+	if !isPassing(completedCourse.GradePoint) && isPassing(newGradePoint) {
+		isPrereq, err := s.cacheRepo.IsPrerequisiteCourse(ctx, completedCourse.CourseCode)
+		if err != nil {
+			logger.Error("failed to check prerequisite after appeal", zap.Error(err))
+			return nil, err
+		}
+		if isPrereq {
+			prereqEvent := dto.GradeStudentPrerequisitePassedEvent{
+				EventType: "grade.student.prerequisite.passed",
+				Timestamp: clock.Now(),
+			}
+			prereqEvent.Data.StudentID = req.StudentID
+			prereqEvent.Data.CourseID = req.CourseID
+			prereqEvent.Data.CourseCode = completedCourse.CourseCode
+			prereqEvent.Data.Semester = completedCourse.Semester
+			prereqEvent.Data.GradePoint = string(newGradePoint)
+
+			prereqPayload, _ := json.Marshal(prereqEvent)
+			if _, err := s.outboxRepo.WithTx(tx).CreateOutboxEvent(ctx, db.CreateOutboxEventParams{
+				EventType:  "grade.student.prerequisite.passed",
+				RoutingKey: "grade.student.prerequisite.passed",
+				Payload:    prereqPayload,
+			}); err != nil {
+				logger.Error("failed to create prerequisite passed outbox event after appeal", zap.Error(err))
+				return nil, err
+			}
+		}
+	}
+
+	if err := tx.Commit(ctx); err != nil {
+		logger.Error("failed to commit appeal transaction", zap.Error(err))
 		return nil, err
 	}
 
