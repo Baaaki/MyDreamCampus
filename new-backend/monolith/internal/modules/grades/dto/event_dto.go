@@ -64,12 +64,22 @@ type CourseSemesterCreatedEvent struct {
 	InstructorID       uuid.UUID              `json:"instructor_id"`
 	InstructorFullname string                 `json:"instructor_fullname"`
 	AssessmentSchema   []AssessmentSchemaItem `json:"assessment_schema"`
+	Prerequisites      []PrerequisiteItem     `json:"prerequisites"`
 }
 
 type AssessmentSchemaItem struct {
 	Slug   string `json:"slug"`
 	Name   string `json:"name"`
 	Weight int    `json:"weight"`
+}
+
+// PrerequisiteItem mirrors the catalog's prerequisite snapshot inside the
+// course.semester.created payload. ID is the catalog course id of the
+// prerequisite course itself, not the semester course id.
+type PrerequisiteItem struct {
+	ID         uuid.UUID `json:"id"`
+	CourseCode string    `json:"course_code"`
+	CourseName string    `json:"course_name"`
 }
 
 // Enrollment Events

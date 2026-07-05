@@ -45,3 +45,7 @@ func (r *CacheRepository) GetCourseCacheByID(ctx context.Context, id uuid.UUID) 
 func (r *CacheRepository) IsPrerequisiteCourse(ctx context.Context, courseCode string) (bool, error) {
 	return r.queries.IsPrerequisiteCourse(ctx, courseCode)
 }
+
+func (r *CacheRepository) UpsertPrerequisiteCourse(ctx context.Context, arg db.UpsertPrerequisiteCourseParams) error {
+	return r.queries.UpsertPrerequisiteCourse(ctx, arg)
+}

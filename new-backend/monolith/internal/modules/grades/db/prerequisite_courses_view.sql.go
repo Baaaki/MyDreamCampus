@@ -7,6 +7,8 @@ package db
 
 import (
 	"context"
+
+	"github.com/google/uuid"
 )
 
 const isPrerequisiteCourse = `-- name: IsPrerequisiteCourse :one
@@ -21,4 +23,20 @@ func (q *Queries) IsPrerequisiteCourse(ctx context.Context, courseCode string) (
 	var is_prerequisite bool
 	err := row.Scan(&is_prerequisite)
 	return is_prerequisite, err
+}
+
+const upsertPrerequisiteCourse = `-- name: UpsertPrerequisiteCourse :exec
+INSERT INTO grades.prerequisite_courses_view (course_code, course_id, synced_at)
+VALUES ($1, $2, NOW())
+ON CONFLICT (course_code, course_id) DO UPDATE SET synced_at = NOW()
+`
+
+type UpsertPrerequisiteCourseParams struct {
+	CourseCode string    `json:"course_code"`
+	CourseID   uuid.UUID `json:"course_id"`
+}
+
+func (q *Queries) UpsertPrerequisiteCourse(ctx context.Context, arg UpsertPrerequisiteCourseParams) error {
+	_, err := q.db.Exec(ctx, upsertPrerequisiteCourse, arg.CourseCode, arg.CourseID)
+	return err
 }

@@ -188,9 +188,24 @@ func (w *EventConsumer) handleCourseSemesterCreated(ctx context.Context, env out
 		return err
 	}
 
+	// Every prerequisite of this course is itself "a course that is a
+	// prerequisite of something" — that is what prerequisite_courses_view
+	// tracks, and what gates the prerequisite.passed publish at finalize.
+	for _, prereq := range event.Prerequisites {
+		if err := w.cacheRepo.UpsertPrerequisiteCourse(ctx, db.UpsertPrerequisiteCourseParams{
+			CourseCode: prereq.CourseCode,
+			CourseID:   prereq.ID,
+		}); err != nil {
+			log.Error("failed to upsert prerequisite course", zap.Error(err),
+				zap.String("prerequisite_code", prereq.CourseCode))
+			return err
+		}
+	}
+
 	log.Info("course cache synced",
 		zap.String("course_id", event.SemesterCourseID.String()),
 		zap.String("course_code", event.CourseCode),
+		zap.Int("prerequisite_count", len(event.Prerequisites)),
 	)
 	return nil
 }

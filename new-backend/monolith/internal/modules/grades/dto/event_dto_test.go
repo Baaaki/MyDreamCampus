@@ -111,16 +111,11 @@ func TestGradeFinalizedEvent_PublishedShape(t *testing.T) {
 }
 
 func TestGradeStudentPrerequisitePassedEvent_PublishedShape(t *testing.T) {
-	// ⚠ Production note: enrollment-service's consumer DTO for this event
-	// (enrollment-service/internal/dto/event_dto.go:GradeStudentPrerequisitePassedEvent)
-	// declares the fields at TOP LEVEL via embedded BaseEvent — i.e. expects a
-	// FLAT shape. But grades-service publishes them WRAPPED under "data".
-	// In practice the worker layer in enrollment-service does manual
-	// unmarshalling that bridges the gap (it doesn't json.Unmarshal directly
-	// into the DTO struct), so production works. This test pins the producer
-	// side of the contract; if the worker is ever simplified to a direct
-	// json.Unmarshal(body, &GradeStudentPrerequisitePassedEvent), it will
-	// silently zero every field. Documenting the trap here.
+	// This event is published WRAPPED under "data". The consumer-side mirror
+	// (enrollment/dto.GradeStudentPrerequisitePassedEvent) declares the same
+	// nesting — its contract test is
+	// enrollment/dto/event_contract_test.go:TestGradeStudentPrerequisitePassedEvent_ConsumedWrappedShape.
+	// Flattening either side silently zeroes the other's read.
 	studentID := uuid.MustParse("55555555-5555-5555-5555-555555555555")
 	courseID := uuid.MustParse("66666666-6666-6666-6666-666666666666")
 
@@ -217,7 +212,10 @@ func TestCourseSemesterCreatedEvent_ConsumedFlatShape(t *testing.T) {
       "department": "CS",
       "instructor_id": "22222222-2222-2222-2222-222222222222",
       "instructor_fullname": "Jane Doe",
-      "assessment_schema": [{"slug":"midterm","name":"Midterm","weight":40}]
+      "assessment_schema": [{"slug":"midterm","name":"Midterm","weight":40}],
+      "prerequisites": [
+        {"id":"33333333-3333-3333-3333-333333333333","course_code":"CS100","course_name":"Pre"}
+      ]
     }`)
 
 	var ev CourseSemesterCreatedEvent
@@ -231,6 +229,15 @@ func TestCourseSemesterCreatedEvent_ConsumedFlatShape(t *testing.T) {
 	require.Len(t, ev.AssessmentSchema, 1)
 	assert.Equal(t, "midterm", ev.AssessmentSchema[0].Slug)
 	assert.Equal(t, 40, ev.AssessmentSchema[0].Weight)
+
+	// prerequisites feed prerequisite_courses_view, which gates the
+	// prerequisite.passed publish at finalize — zeroing here silently
+	// disables the whole prerequisite chain.
+	require.Len(t, ev.Prerequisites, 1)
+	assert.Equal(t, "CS100", ev.Prerequisites[0].CourseCode)
+	assert.Equal(t,
+		uuid.MustParse("33333333-3333-3333-3333-333333333333"),
+		ev.Prerequisites[0].ID)
 }
 
 func TestEnrollmentProgramApprovedEvent_ConsumedShape(t *testing.T) {
