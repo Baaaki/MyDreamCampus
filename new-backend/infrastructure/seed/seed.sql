@@ -226,3 +226,68 @@ SELECT sv.id,
 FROM meal.students_view sv
 CROSS JOIN (VALUES (0), (1), (2)) AS d(n)
 ON CONFLICT (student_id, reservation_date, meal_time) WHERE status IN ('pending', 'confirmed') DO NOTHING;
+
+-- ============================================================
+-- 9. Prerequisite demo — CENG201 (Bahar) requires CENG102
+-- ============================================================
+-- A standalone enrollment window in a SEPARATE semester ('2025-2026 Bahar')
+-- so nobody has an existing approved program blocking a fresh submission (the
+-- '2025-2026 Güz' programs above are approved and per-semester exclusive). The
+-- enrollment period check reads course_catalog.academic_periods only — no
+-- 'semesters' row is needed, so the single-active-semester constraint is
+-- untouched.
+--
+-- Expected behaviour when a student POSTs a program for '2025-2026 Bahar'
+-- containing the Bahar CENG201 offering:
+--   accept  → Zeynep, Emir, Elif, Baran (passed CENG102, class_level ≥ 2)
+--   reject  → Deniz, Selin  (class_level 2, but never passed CENG102 →
+--             ErrPrerequisitesNotMet — the exact path this feature adds)
+--   reject  → Kerem, Naz    (class_level 1 < 2 → ErrInvalidClassLevel, a
+--             different, earlier guard — not the prerequisite check)
+
+-- 9a. Open enrollment window for the demo semester.
+INSERT INTO course_catalog.academic_periods (semester, period_start, period_end, is_active)
+VALUES ('2025-2026 Bahar', NOW() - INTERVAL '1 day', NOW() + INTERVAL '30 days', true)
+ON CONFLICT (semester) DO NOTHING;
+
+-- 9b. Bahar CENG201 offering, carrying the prerequisite snapshot the enrollment
+-- check walks (semester_courses.prerequisites, keyed by course_code). The id in
+-- the snapshot is CENG102's catalog id; the check matches on course_code only.
+INSERT INTO course_catalog.semester_courses
+  (semester, course_code, department, credits, class_level, instructor_id, instructor_fullname,
+   classroom_location, max_capacity, prerequisites, assessment_schema)
+SELECT '2025-2026 Bahar', c.course_code, c.department, c.credits, c.class_level, s.id,
+       s.first_name || ' ' || s.last_name, 'A Blok 401', 40,
+       jsonb_build_array(jsonb_build_object(
+         'id', (SELECT id FROM course_catalog.course_catalog WHERE course_code = 'CENG102'),
+         'course_code', 'CENG102',
+         'course_name', 'Veri Yapıları')),
+       '[{"slug":"midterm","name":"Vize","weight":40},{"slug":"final","name":"Final","weight":60}]'::jsonb
+FROM course_catalog.course_catalog c
+JOIN staff.staff s ON s.email = 'ayse.demir@uni.edu.tr'
+WHERE c.course_code = 'CENG201'
+ON CONFLICT (semester, course_code, department) DO NOTHING;
+
+-- 9c. grades' hidden prerequisite index ("gizli tablo"): CENG102 is now a
+-- prerequisite of something. Normally filled by course.semester.created events;
+-- filled directly here, same as the other read-model views above.
+INSERT INTO grades.prerequisite_courses_view (course_code, course_id)
+SELECT 'CENG102', id FROM course_catalog.course_catalog WHERE course_code = 'CENG102'
+ON CONFLICT (course_code, course_id) DO NOTHING;
+
+-- 9d. Enrollment's passed-prerequisite projection. In production these rows
+-- arrive via grades' grade.student.prerequisite.passed event on finalize; the
+-- seed fills the projection directly (same philosophy as every view above).
+-- Only the four upper-class students who "passed CENG102" get a row.
+INSERT INTO enrollment.student_passed_prerequisites (student_id, course_id, course_code, semester, grade_point)
+SELECT st.id,
+       (SELECT id FROM course_catalog.course_catalog WHERE course_code = 'CENG102'),
+       'CENG102', '2024-2025 Bahar', v.grade_point
+FROM student.students st
+JOIN (VALUES
+   ('2021510001', '3.50'),  -- Zeynep
+   ('2021510002', '3.00'),  -- Emir
+   ('2022510010', '2.50'),  -- Elif
+   ('2022510011', '2.00')   -- Baran
+ ) AS v(student_number, grade_point) ON v.student_number = st.student_number
+ON CONFLICT (student_id, course_code) DO NOTHING;
