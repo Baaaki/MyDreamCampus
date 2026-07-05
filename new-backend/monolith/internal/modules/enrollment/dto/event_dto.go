@@ -83,13 +83,18 @@ type CourseSemesterCreatedEvent struct {
 	ScheduleSessions  []CourseSession      `json:"schedule_sessions"`
 }
 
-// GradeStudentPrerequisitePassedEvent represents grade.student.prerequisite.passed event
+// GradeStudentPrerequisitePassedEvent represents grade.student.prerequisite.passed event.
+// grades' outbox payload is BaseEvent-shaped: the envelope's data key holds
+// {event_type, timestamp, data: {student_id, ...}} — mirror that nesting here.
 type GradeStudentPrerequisitePassedEvent struct {
 	BaseEvent
-	StudentID  uuid.UUID `json:"student_id"`
-	CourseCode string    `json:"course_code"`
-	Semester   string    `json:"semester"`
-	GradePoint string    `json:"grade_point"`
+	Data struct {
+		StudentID  uuid.UUID `json:"student_id"`
+		CourseID   uuid.UUID `json:"course_id"`
+		CourseCode string    `json:"course_code"`
+		Semester   string    `json:"semester"`
+		GradePoint string    `json:"grade_point"`
+	} `json:"data"`
 }
 
 // ========== Outbound Events (Published to RabbitMQ via Outbox) ==========

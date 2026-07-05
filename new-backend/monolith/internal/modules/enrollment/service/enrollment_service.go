@@ -22,6 +22,7 @@ import (
 
 type EnrollmentService struct {
 	enrollmentRepo      *repository.EnrollmentRepository
+	passedPrereqRepo    *repository.PassedPrerequisitesRepository
 	studentClient       StudentClient
 	courseCatalogClient CourseCatalogClient
 	periodRepo          *sharedRepo.SimplePeriodRepository
@@ -29,12 +30,14 @@ type EnrollmentService struct {
 
 func NewEnrollmentService(
 	enrollmentRepo *repository.EnrollmentRepository,
+	passedPrereqRepo *repository.PassedPrerequisitesRepository,
 	studentClient StudentClient,
 	courseCatalogClient CourseCatalogClient,
 	periodRepo *sharedRepo.SimplePeriodRepository,
 ) *EnrollmentService {
 	return &EnrollmentService{
 		enrollmentRepo:      enrollmentRepo,
+		passedPrereqRepo:    passedPrereqRepo,
 		studentClient:       studentClient,
 		courseCatalogClient: courseCatalogClient,
 		periodRepo:          periodRepo,
@@ -317,24 +320,16 @@ func (s *EnrollmentService) CreateEnrollmentProgram(ctx context.Context, req dto
 	return s.buildProgramResponse(ctx, program, courses), nil
 }
 
-// Helper: Check prerequisites for a course
+// Helper: Check prerequisites for a course against the local projection
+// (student_passed_prerequisites, fed by grades' prerequisite.passed events).
+// Matching is by course_code: semester course ids are regenerated every term,
+// the code is the stable identity of a course.
 func (s *EnrollmentService) checkPrerequisites(ctx context.Context, studentID uuid.UUID, course catalogDTO.SemesterCourseResponse) error {
-	// Map prerequisites
-	var prerequisites []dto.PrerequisiteCourse
 	for _, p := range course.Prerequisites {
-		prerequisites = append(prerequisites, dto.PrerequisiteCourse{
-			ID:         p.ID,
-			CourseCode: p.CourseCode,
-			CourseName: p.CourseName,
-		})
-	}
-
-	// Check each prerequisite
-	// TODO: Phase 2.x - Integrate with Grades module to check passed courses
-	// For now, we bypass since student_passed_prerequisites cache was removed
-	// and Grades dependency is not yet injected in Faz 2.4.
-	for range prerequisites {
-		passed := true // s.gradesClient.CheckPrerequisitePassed(...)
+		passed, err := s.passedPrereqRepo.HasPassedPrerequisite(ctx, studentID, p.CourseCode)
+		if err != nil {
+			return sharedErrors.Wrap(sharedErrors.ErrInternal, err)
+		}
 		if !passed {
 			return serviceErrors.ErrPrerequisitesNotMet
 		}

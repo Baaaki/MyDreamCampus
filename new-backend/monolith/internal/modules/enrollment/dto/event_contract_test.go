@@ -211,6 +211,62 @@ func TestStudentUpdatedEvent_AdvisorIDIsNullable(t *testing.T) {
 	assert.Nil(t, got, "null advisor_id must decode to nil pointer, not empty string")
 }
 
+// grade.student.prerequisite.passed arrives DOUBLE-wrapped: the outbox worker's
+// envelope carries {event_id, ..., data: <grades' own BaseEvent-shaped payload>},
+// and that payload nests the fields under its own "data" key again. The
+// producer-side mirror is
+//   grades/dto/event_dto_test.go:TestGradeStudentPrerequisitePassedEvent_PublishedShape.
+// The consumer (worker/event_consumer.go) unmarshals the envelope's data into
+// this DTO directly — flattening either side silently zeroes every field.
+
+func TestGradeStudentPrerequisitePassedEvent_ConsumedWrappedShape(t *testing.T) {
+	// This literal is what grades' outbox row looks like on the wire, i.e.
+	// what the enrollment consumer receives as the envelope's "data" value.
+	body := `{
+      "event_type": "grade.student.prerequisite.passed",
+      "timestamp": "2026-04-27T09:00:00Z",
+      "data": {
+        "student_id": "55555555-5555-5555-5555-555555555555",
+        "course_id": "66666666-6666-6666-6666-666666666666",
+        "course_code": "CS101",
+        "semester": "2025-2026-Fall",
+        "grade_point": "4.00"
+      }
+    }`
+
+	var got GradeStudentPrerequisitePassedEvent
+	require.NoError(t, json.Unmarshal([]byte(body), &got))
+
+	assert.Equal(t, "grade.student.prerequisite.passed", got.EventType)
+	assert.Equal(t,
+		uuid.MustParse("55555555-5555-5555-5555-555555555555"),
+		got.Data.StudentID)
+	assert.Equal(t,
+		uuid.MustParse("66666666-6666-6666-6666-666666666666"),
+		got.Data.CourseID)
+	assert.Equal(t, "CS101", got.Data.CourseCode,
+		"course_code is the projection key — semester course ids rotate every term")
+	assert.Equal(t, "2025-2026-Fall", got.Data.Semester)
+	assert.Equal(t, "4.00", got.Data.GradePoint)
+}
+
+func TestGradeStudentPrerequisitePassedEvent_FlatPayloadDecodesToZero(t *testing.T) {
+	// Regression guard: the pre-monolith DTO declared these fields FLAT and
+	// silently zeroed against the wrapped producer shape. Pin the failure mode
+	// so a "simplification" back to flat is caught.
+	flat := `{
+      "event_type": "grade.student.prerequisite.passed",
+      "student_id": "55555555-5555-5555-5555-555555555555",
+      "course_code": "CS101"
+    }`
+
+	var got GradeStudentPrerequisitePassedEvent
+	require.NoError(t, json.Unmarshal([]byte(flat), &got))
+
+	assert.Equal(t, uuid.Nil, got.Data.StudentID)
+	assert.Empty(t, got.Data.CourseCode)
+}
+
 // =============================================================================
 // OUTBOUND — published by enrollment-service via outbox
 // =============================================================================

@@ -137,6 +137,8 @@ func main() {
 		{Queue: "grades.sync_events", Exchange: "attendance.events", RoutingKey: "attendance.semester.failed"},
 		// grades — self-loop so AutoFinalize runs off the request path.
 		{Queue: "grades.finalize_requested", Exchange: "grades.events", RoutingKey: "grade.finalize.requested"},
+		// enrollment — passed-prerequisite projection for enrollment validation.
+		{Queue: "enrollment.sync_events", Exchange: "grades.events", RoutingKey: "grade.student.prerequisite.passed"},
 	}
 	if err := eventbus.DeclareDownstreamBindings(publisher, downstreamBindings); err != nil {
 		logger.Fatal("failed to declare downstream bindings", zap.Error(err))
@@ -169,7 +171,7 @@ func main() {
 	enrollmentStudentClient := enrollmentService.NewInProcessStudentClient(studentModule.StudentService())
 	enrollmentCourseClient := enrollmentService.NewInProcessCourseCatalogClient(catalogModule.SemesterService())
 
-	enrollmentModule := enrollment.New(pool, enrollmentStudentClient, enrollmentCourseClient, catalogModule.PeriodRepo())
+	enrollmentModule := enrollment.New(pool, rabbitConn, enrollmentStudentClient, enrollmentCourseClient, catalogModule.PeriodRepo())
 	if err := enrollmentModule.Bootstrap(ctx); err != nil {
 		logger.Fatal("failed to bootstrap enrollment module", zap.Error(err))
 	}

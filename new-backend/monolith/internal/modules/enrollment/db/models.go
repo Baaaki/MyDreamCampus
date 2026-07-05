@@ -144,3 +144,12 @@ type ProcessedEvent struct {
 	EventType   string           `json:"event_type"`
 	ProcessedAt pgtype.Timestamp `json:"processed_at"`
 }
+
+type StudentPassedPrerequisite struct {
+	StudentID  pgtype.UUID      `json:"student_id"`
+	CourseID   pgtype.UUID      `json:"course_id"`
+	CourseCode string           `json:"course_code"`
+	Semester   string           `json:"semester"`
+	GradePoint string           `json:"grade_point"`
+	SyncedAt   pgtype.Timestamp `json:"synced_at"`
+}

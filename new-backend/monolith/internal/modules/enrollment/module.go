@@ -15,7 +15,9 @@ import (
 	"github.com/baaaki/mydreamcampus/monolith/internal/modules/enrollment/handler"
 	"github.com/baaaki/mydreamcampus/monolith/internal/modules/enrollment/repository"
 	"github.com/baaaki/mydreamcampus/monolith/internal/modules/enrollment/service"
+	"github.com/baaaki/mydreamcampus/monolith/internal/modules/enrollment/worker"
 	platformMiddleware "github.com/baaaki/mydreamcampus/monolith/internal/platform/middleware"
+	"github.com/baaaki/mydreamcampus/monolith/internal/platform/rabbitmq"
 	platformRepo "github.com/baaaki/mydreamcampus/monolith/internal/platform/repository"
 	"github.com/gin-gonic/gin"
 	"github.com/jackc/pgx/v5/pgxpool"
@@ -27,16 +29,20 @@ type Module struct {
 	enrollmentRepo      *repository.EnrollmentRepository
 	outboxRepo          *repository.OutboxRepository
 	processedEventsRepo *repository.ProcessedEventsRepository
+	passedPrereqRepo    *repository.PassedPrerequisitesRepository
 	periodRepo          *platformRepo.SimplePeriodRepository
 	outboxStore         *repository.OutboxStore
 
 	enrollmentService *service.EnrollmentService
 
 	enrollmentHandler *handler.EnrollmentHandler
+
+	eventConsumer *worker.EventConsumer
 }
 
 func New(
 	pool *pgxpool.Pool,
+	rabbitConn *rabbitmq.Connection,
 	studentClient service.StudentClient,
 	courseCatalogClient service.CourseCatalogClient,
 	periodRepo *platformRepo.SimplePeriodRepository,
@@ -44,18 +50,21 @@ func New(
 	enrollmentRepo := repository.NewEnrollmentRepository(pool)
 	outboxRepo := repository.NewOutboxRepository(pool)
 	processedEventsRepo := repository.NewProcessedEventsRepository(pool)
+	passedPrereqRepo := repository.NewPassedPrerequisitesRepository(pool)
 
-	enrollmentSvc := service.NewEnrollmentService(enrollmentRepo, studentClient, courseCatalogClient, periodRepo)
+	enrollmentSvc := service.NewEnrollmentService(enrollmentRepo, passedPrereqRepo, studentClient, courseCatalogClient, periodRepo)
 
 	return &Module{
 		pool:                pool,
 		enrollmentRepo:      enrollmentRepo,
 		outboxRepo:          outboxRepo,
 		processedEventsRepo: processedEventsRepo,
+		passedPrereqRepo:    passedPrereqRepo,
 		periodRepo:          periodRepo,
 		outboxStore:         repository.NewOutboxStore(outboxRepo),
 		enrollmentService:   enrollmentSvc,
 		enrollmentHandler:   handler.NewEnrollmentHandler(enrollmentSvc),
+		eventConsumer:       worker.NewEventConsumer(rabbitmq.NewConsumer(rabbitConn), passedPrereqRepo),
 	}
 }
 
@@ -65,9 +74,11 @@ func (m *Module) Name() string { return "enrollment" }
 // OutboxStore for the per-module outbox worker.
 func (m *Module) OutboxStore() eventbus.OutboxStore { return m.outboxStore }
 
-// Bootstrap starts the staff/student/course event consumers
+// Bootstrap starts the RabbitMQ consumer feeding the passed-prerequisite
+// projection. Queue bindings are pre-declared in main.go so events published
+// before this point are not lost.
 func (m *Module) Bootstrap(ctx context.Context) error {
-	return nil
+	return m.eventConsumer.Start(ctx)
 }
 
 // RegisterRoutes mounts /api/enrollment/*. All routes JWT-authed.

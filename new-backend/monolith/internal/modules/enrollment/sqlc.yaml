@@ -2,7 +2,11 @@ version: "2"
 sql:
   - engine: "postgresql"
     queries: "./sql/queries"
-    schema: "./sql/migrations"
+    # bootstrap first: migrations assume the schema already exists
+    # (init-dbs.sql creates it), but sqlc's catalog starts empty.
+    schema:
+      - "./sql/sqlc/bootstrap.sql"
+      - "./sql/migrations"
     gen:
       go:
         package: "db"
@@ -22,4 +26,5 @@ sql:
           enrollment_outbox_event: "OutboxEvent"
           enrollment_outbox_status_enum: "OutboxStatusEnum"
           enrollment_processed_event: "ProcessedEvent"
+          enrollment_student_passed_prerequisite: "StudentPassedPrerequisite"
           enrollment_enrollment_status_enum: "EnrollmentStatusEnum"
