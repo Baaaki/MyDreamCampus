@@ -6,6 +6,7 @@ import (
 	"time"
 
 	"github.com/baaaki/mydreamcampus/monolith/internal/modules/enrollment/dto"
+	serviceErrors "github.com/baaaki/mydreamcampus/monolith/internal/modules/enrollment/errors"
 	"github.com/baaaki/mydreamcampus/monolith/internal/modules/enrollment/service"
 	sharedErrors "github.com/baaaki/mydreamcampus/monolith/internal/platform/errors"
 	"github.com/baaaki/mydreamcampus/monolith/internal/platform/logger"
@@ -614,6 +615,21 @@ func (h *EnrollmentHandler) handleError(c *gin.Context, err error) {
 	// Try to extract AppError
 	if appErr, ok := sharedErrors.As(err); ok {
 		reqLogger.Warn("application error",
+			zap.Error(err),
+			zap.String("error_code", appErr.Code),
+		)
+		c.JSON(appErr.HTTPStatus, dto.ErrorResponse{
+			Error: appErr.Message,
+			Code:  appErr.Code,
+		})
+		return
+	}
+
+	// Known plain sentinel (prerequisite, capacity, schedule, validation, ...)
+	// — the service returns these bare, so map them to a proper 4xx here rather
+	// than leaking a generic 500.
+	if appErr, ok := serviceErrors.MapSentinel(err); ok {
+		reqLogger.Warn("mapped sentinel error",
 			zap.Error(err),
 			zap.String("error_code", appErr.Code),
 		)
