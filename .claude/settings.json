@@ -23,7 +23,25 @@
       "Bash(gofmt -w score_repository.go)",
       "Bash(gofmt -w grade_service.go)",
       "Bash(gofmt -w event_service.go)",
-      "Bash(gofmt -w service/student_service.go)"
+      "Bash(gofmt -w service/student_service.go)",
+      "Bash(rtk proxy go test -run TestLive -v ./internal/modules/attendance/repository/)",
+      "Bash(npm ping *)",
+      "Bash(bash -c 'npx --yes @react-native-reusables/cli@latest add --help')",
+      "Bash(bash -c 'npx --yes @react-native-reusables/cli@latest init --help')",
+      "Bash(bash -c 'npx --yes @react-native-reusables/cli@latest add -y text button card badge skeleton alert')",
+      "Bash(npm uninstall *)",
+      "Bash(node -e \"const p=require\\('./package.json'\\); console.log\\('paper:', p.dependencies['react-native-paper']\\); console.log\\('nativewind:', p.dependencies['nativewind']\\); console.log\\('cva:', p.dependencies['class-variance-authority']\\); console.log\\('slot:', p.dependencies['@rn-primitives/slot']\\); console.log\\('tailwind:', p.devDependencies['tailwindcss']\\)\")",
+      "Bash(git rm *)",
+      "Bash(npm ls *)",
+      "Bash(npm test *)",
+      "Bash(node -e \"console.log\\('env-node:', require\\('./node_modules/jest-environment-node/package.json'\\).version\\)\")",
+      "Bash(./node_modules/.bin/expo export *)",
+      "Bash(ip -4 addr show)",
+      "Bash(awk '/monolith:/,/^  [a-z]/' new-backend/infrastructure/docker-compose.yml)",
+      "Bash(sudo -n docker ps --format '{{.Names}}: {{.Ports}}')",
+      "Bash(awk 'NR>=110 && NR<=145' new-backend/infrastructure/docker-compose.yml)",
+      "Bash(node -e \"const q=require\\('./constants/quotes.ts'\\); \")",
+      "Bash(node -e \"process.stdout.write\\(''\\)\")"
     ]
   }
 }
