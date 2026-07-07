@@ -2,7 +2,7 @@
 
 Tek binary monolith (`new-backend/monolith`) + ayri notification servisi. 9 modul: auth, staff, student, course_catalog, enrollment, attendance, grades, meal, payment. `new-backend/**` icinde calisirken bu dosya zorunlu okumadir.
 
-> **Onemli:** Bu artik mikroservis DEGIL. `legacy-codebase/` eski mikroservis kodudur — salt-okunur referans, oradan kod duzeltme.
+> **Onemli:** Bu artik mikroservis DEGIL. Eski mikroservis kodu `v0-microservices` git tag'inde arsivli — main'de legacy kod yok.
 
 ---
 
@@ -33,7 +33,7 @@ new-backend/
                              #   db/ (generated)  sql/{migrations,queries}/  sqlc.yaml
   services/notification/     # AYRI binary — RabbitMQ consumer (consumer/delivery/templates), kendi sqlc+goose
   shared/events/             # event envelope tipleri
-  infrastructure/            # docker-compose.yml, seed, grafana/loki/promtail
+  infrastructure/            # docker-compose.yml, seed, Caddy
 ```
 
 Kanonik ornekler: **auth** (tam katman seti + consumer), **staff** (outbox dahil en sade modul).
@@ -116,4 +116,4 @@ make migrate-create-<module> name=create_x_table
 | sqlc generate hata | Query SQL'i duzelt, tekrar `make sqlc-<m>` | `db/` dosyalarini elle duzenleme |
 | Migration hata | Kullaniciya goster, `migrate-down-<m>` oner | Tablo `DROP`, goose tablosu `DELETE` |
 | RabbitMQ/Redis baglantisi yok (dev) | Kullaniciya compose komutunu goster (sudo gerekir) | Publish/blacklist adimini bypass etme |
-| Legacy kodda bug fark ettin | Not et, `new-backend`'e dokunan kismi bildir | `legacy-codebase/` icinde fix |
+| Legacy kodda (v0-microservices tag) bug fark ettin | Not et, `new-backend`'e dokunan kismi bildir | Tag icindeki kodu duzeltmeye calisma |

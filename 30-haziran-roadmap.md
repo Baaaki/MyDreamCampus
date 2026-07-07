@@ -29,8 +29,9 @@ Roadmap yazıldığından bu yana kayda değer ilerleme — özellikle Faz 1'in 
 
 **Açık kalan eşik işleri:**
 - **Canlı deploy YOK** — DEPLOY.md var ama gerçek URL + demo video + demo hesaplarıyla erişilebilir ortam yok. Eşiği geçiren adım (Faz 2) hâlâ bekliyor.
-- **Lint/security bulguları** (52 lint + 40 gosec, 04.07 sayımı) — commit öncesi `make build && make test` + golangci çalıştır.
 - **Mobile e2e doğrulama (NOT — sonraki oturumda denenecek):** QR scan → attendance kaydı akışının gerçek backend'e karşı uçtan uca çalıştığını doğrula. Bilerek ertelendi; deploy sonrası birlikte test edilecek.
+
+**07.07 kapanışları:** lint 0 bulgu (54 idi), gosec 0 bulgu (CI'daki `-exclude=G104,G109,G115,G118` kaldırıldı, sadece `-exclude-generated` kaldı), ölü mikroservis kodu silindi (ExtractUserFromHeaders/StripInternalHeaders, PaymentConfig.GRPCAddress, meal gRPC proto), AI/plan izi yorumlar temizlendi, legacy-codebase `v0-microservices` tag'ine alınıp main'den çıkarıldı.
 
 ---
 
@@ -44,14 +45,13 @@ Eklediğin **her** teknoloji için "neden bunu kullandın?" sorusuna **1 cümlel
 
 Hızlı kazanımlar. Open-source'a açmadan önce.
 
-- [ ] **Eski backend kararı.** Repo'da iki canlı backend var (`legacy-codebase/backend` + `new-backend`). Karar ver:
-  - Önerilen: `legacy-codebase`'i ayrı bir git tag/branch'e al (`v0-microservices`), ana koldan çıkar. Migration anlatına referans olarak kalsın ama "iki canlı backend" kafa karışıklığını bitir.
-- [ ] **AI izlerini temizle.** Kodda `// plan section 5.5.2`, `// Faz 3` gibi iç referansları sil ([new-backend/monolith/cmd/main.go](new-backend/monolith/cmd/main.go#L133) ve eventbus dosyaları). "AI'a yazdırdım" sinyali veriyor. [utils/jwt.go](new-backend/monolith/internal/platform/utils/jwt.go)'daki mikroservis dönemi yorumları da ("Other services should validate...", "Should ONLY be called by Auth Service") monolitte anlamsız — sil ya da güncelle.
-- [ ] **Ölü kod/config temizliği.** Mikroservis kalıntıları: `ExtractUserFromHeaders` / `StripInternalHeaders` middleware'leri (Traefik forward-auth içindi, monolitte hiçbir route kullanmıyor; grades handler'daki bayat yorumlar da bunlara referans veriyor), `PaymentConfig.GRPCAddress` (monolitte gRPC yok). Kullanılmayan kod "taşınmış proje" izlenimi veriyor.
-- [ ] **Kök `infrastructure/` kararı.** Artık boş dizin değil — gerçek `loki/loki-config.yml` ve `promtail/promtail-config.yml` var. Ama compose'ta loki/promtail/grafana servisi yoksa bu config'ler ölü. Ya observability'yi gerçekten compose'a bağla ya da klasörü ve README'deki bahsini kaldır.
+- [x] **Eski backend kararı (07.07).** `legacy-codebase` HEAD'i `v0-microservices` annotated tag'ine alındı ve main'den `git rm` ile çıkarıldı. Untracked artıklar (node_modules, .next — 1.9GB) diskten silindi. Tag'i push etmeyi unutma: `git push origin v0-microservices`.
+- [x] **AI izlerini temizle (07.07).** Tüm `plan section X`, `Faz N`, `Strateji 1`, `docs/semester-wizard-plan.md` referansları koddan silindi; jwt.go mikroservis dönemi yorumları monolith diline çevrildi.
+- [x] **Ölü kod/config temizliği (07.07).** `ExtractUserFromHeaders`/`StripInternalHeaders` + testleri, `PaymentConfig.GRPCAddress`, meal `proto/` (gRPC kalıntısı) silindi; grades handler'daki bayat yorumlar güncellendi; go.mod'dan grpc bağımlılığı düştü.
+- [x] **Kök `infrastructure/` kararı (07.07): observability KALDIRILDI.** `new-backend/infrastructure/{grafana,loki,promtail}` untracked artıkları silindi. Kök `infrastructure/` root-owned (eski docker volume) — elle sil: `sudo rm -rf infrastructure/`.
 - [x] **Kopya kağıtları kararı (07.07): repo'da KALACAK.** `CLAUDE.md` ve `*/skills.md` bilinçli olarak public — "AI'ı disiplinli kullanıyorum" sinyali olarak konumlandırılacak. gitignore'a alınmayacak.
-- [ ] **Binary/artifact temizliği.** `bin/`, `tmp/` klasörleri git'te olmasın; `.gitignore` kontrol et. Gerekirse geçmişten temizle. Lokal derleme artıkları `new-backend/monolith/main` (45 MB) ve `cmd/monolith_bin` untracked ama `.gitignore`'a ekle ki yanlışlıkla commit'lenmesin.
-- [x] ~~Kök klasördeki `fix_*.py` scriptleri~~ — silindi. **Ama `legacy-codebase/*.py` (8 script: `fix_enums.py`, `fix_events.py`, `fix_go.py`, `rename_*.py` …) hâlâ duruyor.** legacy-codebase'i `v0-microservices` tag'ine alıp ana koldan çıkarınca birlikte gider; almazsan bu scriptleri de sil.
+- [x] **Binary/artifact temizliği (07.07).** `.gitignore` zaten `bin/`, `tmp/`, `new-backend/monolith/main`, `cmd/monolith_bin` içeriyordu; git'te takip edilen artık yok. Lokal derleme artıkları diskten silindi.
+- [x] ~~Kök klasördeki `fix_*.py` scriptleri~~ — silindi; `legacy-codebase/*.py` scriptleri de v0-microservices tag'iyle birlikte main'den çıktı.
 
 **Done:** Repo açılınca tek net backend, AI iç notu yok, kopya kağıdı yok.
 
@@ -65,8 +65,8 @@ Demo'da gösterilecek altın yolu kurşungeçirmez yap. Ürün hedefi: **yemekha
 - [ ] **Build + CI yeşil.** Main'deki CI kırmızıyken hiçbir Faz 1 işine başlama. Durum (04.07.2026):
   - [x] `backend-build` + `backend-test`: `go build ./...` + `go vet ./...` lokalde temiz, testler yeşil
   - [x] notification: lint (12) + gosec (1) + go.mod tidy düzeltildi
-  - [ ] `backend-lint`: monolith'te **52 bulgu** (43 errcheck — unchecked `Close`/`Rollback`/`Ack`/`auditLogger.Log`; 8 staticcheck — SA1029 context key, ST1005, QF10xx; 1 unused func)
-  - [ ] `backend-security`: monolith'te **40 gosec bulgusu** (34 G115 int→int32/16 dönüşümü, 3 G109, 2 G118 goroutine context). Ya bounds-check'li güvenli dönüşümlerle düzelt ya da gerekçeli gosec konfigürasyonu yaz — sessizce `#nosec` serpiştirme.
+  - [x] `backend-lint`: **0 bulgu** (07.07). errcheck'ler kaynağında düzeltildi (log-on-error veya gerekçeli `_ =`), staticcheck SA1029 typed context key ile, ST1005 lowercase ile kapandı, unused func silindi.
+  - [x] `backend-security`: **0 bulgu** (07.07). G115/G109 `utils.ClampTo*` saturating cast helper'larıyla, G118 `context.WithoutCancel` ile düzeltildi. CI'daki `-exclude=G104,G109,G115,G118` kaldırıldı; sadece `-exclude-generated` kaldı (sqlc üretimi dosyalar).
   - Bundan sonra her commit öncesi `make build && make test` zorunlu.
 - [x] **Prerequisite bypass'ını kapat.** ~~`passed := true` stub'ı~~ — kapandı (07.07). Enrollment, grades'in `prerequisite.passed` event'leriyle beslenen `student_passed_prerequisites` projection'ından kontrol ediyor; modüller-arası seam örneği olarak mülakatta gösterilebilir.
 - [ ] **Demo-kritik modülleri uçtan uca test et (manuel):**

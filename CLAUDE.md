@@ -1,6 +1,6 @@
 # MyDreamCampus — AI Asistanı Talimatları
 
-Universite yonetim sistemi. Full-stack monorepo: Go moduler monolith (`new-backend/`) + React+Vite web + React Native (Expo) mobil. `legacy-codebase/` eski mikroservis kodu — salt-okunur referans.
+Universite yonetim sistemi. Full-stack monorepo: Go moduler monolith (`new-backend/`) + React+Vite web + React Native (Expo) mobil. Eski mikroservis kodu main'den cikarildi — `v0-microservices` git tag'inde arsivli.
 
 > Bu dosya **AI'a** talimattir. Kullanici dokumanlari icin bkz. `README.md`.
 
@@ -273,7 +273,7 @@ Bu yollardaki dosyalari **manuel duzenleme**. Kaynak dosyayi guncelle ve generat
 - Backend: [`new-backend/skills.md`](new-backend/skills.md)
 - Frontend: [`frontend/skills.md`](frontend/skills.md)
 - Mobile: [`mobile/skills.md`](mobile/skills.md)
-- Moduler monolith migration plani (tarihsel referans, migration tamamlandi): [`legacy-codebase/architecture/`](legacy-codebase/architecture/)
+- Moduler monolith migration plani (tarihsel referans, migration tamamlandi): `v0-microservices` tag'i altinda `legacy-codebase/architecture/`
 
 ## 16. Dis Referanslar
 
