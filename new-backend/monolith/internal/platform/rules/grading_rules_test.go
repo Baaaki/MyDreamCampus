@@ -68,7 +68,7 @@ func TestCanEditGrade_OverrideExtendsDeadline(t *testing.T) {
 	override := time.Date(2026, 7, 1, 0, 0, 0, 0, time.UTC)
 	res := CanEditGrade(GradeEditParams{
 		GlobalDeadline:   time.Date(2026, 5, 1, 0, 0, 0, 0, time.UTC), // ended
-		OverrideDeadline: &override,                                    // extends
+		OverrideDeadline: &override,                                   // extends
 	})
 	assert.True(t, res.Allowed, "override should extend deadline beyond global")
 	assert.Equal(t, override, res.EffectiveDeadline)

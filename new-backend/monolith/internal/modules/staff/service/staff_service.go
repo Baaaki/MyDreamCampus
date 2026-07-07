@@ -3,13 +3,13 @@ package service
 import (
 	"context"
 
-	sharedErrors "github.com/baaaki/mydreamcampus/monolith/internal/platform/errors"
-	"github.com/baaaki/mydreamcampus/monolith/internal/platform/logger"
-	"github.com/baaaki/mydreamcampus/monolith/internal/platform/utils"
 	"github.com/baaaki/mydreamcampus/monolith/internal/modules/staff/db"
 	"github.com/baaaki/mydreamcampus/monolith/internal/modules/staff/dto"
 	serviceErrors "github.com/baaaki/mydreamcampus/monolith/internal/modules/staff/errors"
 	"github.com/baaaki/mydreamcampus/monolith/internal/modules/staff/repository"
+	sharedErrors "github.com/baaaki/mydreamcampus/monolith/internal/platform/errors"
+	"github.com/baaaki/mydreamcampus/monolith/internal/platform/logger"
+	"github.com/baaaki/mydreamcampus/monolith/internal/platform/utils"
 	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5/pgtype"
 	"go.uber.org/zap"
@@ -295,8 +295,8 @@ func (s *StaffService) ListStaff(ctx context.Context, query dto.PaginationQuery)
 		zap.Int("limit", query.Limit),
 	)
 
-	limit := int32(query.Limit)
-	offset := int32((query.Page - 1) * query.Limit)
+	limit := utils.ClampToInt32(query.Limit)
+	offset := utils.ClampToInt32((query.Page - 1) * query.Limit)
 
 	staffList, total, err := s.staffRepo.ListStaff(ctx, limit, offset)
 	if err != nil {

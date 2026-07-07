@@ -186,8 +186,8 @@ func (s *CatalogService) ListCourses(ctx context.Context, req dto.ListCoursesReq
 		zap.Int("limit", req.Limit),
 	)
 
-	limit := int32(req.Limit)
-	offset := int32((req.Page - 1) * req.Limit)
+	limit := utils.ClampToInt32(req.Limit)
+	offset := utils.ClampToInt32((req.Page - 1) * req.Limit)
 
 	// Build query params
 	params := db.ListCoursesParams{

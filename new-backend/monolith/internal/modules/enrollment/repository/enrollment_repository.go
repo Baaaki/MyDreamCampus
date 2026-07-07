@@ -32,10 +32,10 @@ func NewEnrollmentRepository(pool *pgxpool.Pool) *EnrollmentRepository {
 }
 
 type ProgramCourseSnapshot struct {
-	CourseID   uuid.UUID
-	CourseCode string
-	CourseName string
-	Credits    int16
+	CourseID    uuid.UUID
+	CourseCode  string
+	CourseName  string
+	Credits     int16
 	MaxCapacity int16
 }
 
@@ -50,7 +50,8 @@ func (r *EnrollmentRepository) CreateProgramWithCoursesAndEvent(
 	if err != nil {
 		return db.EnrollmentProgram{}, fmt.Errorf("%w: failed to begin transaction: %v", sharedErrors.ErrTransactionFailed, err)
 	}
-	defer tx.Rollback(ctx)
+	// Rollback after successful commit is a no-op returning ErrTxClosed — safe to discard.
+	defer func() { _ = tx.Rollback(ctx) }()
 
 	qtx := r.queries.WithTx(tx)
 
@@ -59,8 +60,10 @@ func (r *EnrollmentRepository) CreateProgramWithCoursesAndEvent(
 
 	// Check capacity for each course using advisory locks
 	for _, course := range courses {
-		// Acquire an exclusive transaction-level advisory lock for the course
-		lockID := int64(crc64.Checksum(course.CourseID[:], crcTable))
+		// Acquire an exclusive transaction-level advisory lock for the course.
+		// The uint64→int64 wraparound is fine: the checksum is only a
+		// deterministic lock key, never interpreted as a quantity.
+		lockID := int64(crc64.Checksum(course.CourseID[:], crcTable)) // #nosec G115
 		_, err := tx.Exec(ctx, "SELECT pg_advisory_xact_lock($1)", lockID)
 		if err != nil {
 			return db.EnrollmentProgram{}, fmt.Errorf("%w: failed to acquire advisory lock: %v", sharedErrors.ErrQueryFailed, err)
@@ -78,7 +81,7 @@ func (r *EnrollmentRepository) CreateProgramWithCoursesAndEvent(
 			return db.EnrollmentProgram{}, fmt.Errorf("%w: failed to count course enrollments: %v", sharedErrors.ErrQueryFailed, err)
 		}
 
-		if int16(count) >= course.MaxCapacity {
+		if count >= int64(course.MaxCapacity) {
 			return db.EnrollmentProgram{}, fmt.Errorf("%w: course capacity is full", sharedErrors.ErrConflict)
 		}
 	}
@@ -201,7 +204,8 @@ func (r *EnrollmentRepository) ApproveProgramWithEvent(
 	if err != nil {
 		return db.EnrollmentProgram{}, fmt.Errorf("%w: failed to begin transaction: %v", sharedErrors.ErrTransactionFailed, err)
 	}
-	defer tx.Rollback(ctx)
+	// Rollback after successful commit is a no-op returning ErrTxClosed — safe to discard.
+	defer func() { _ = tx.Rollback(ctx) }()
 
 	qtx := r.queries.WithTx(tx)
 
@@ -246,7 +250,8 @@ func (r *EnrollmentRepository) RejectProgramWithEventAndLog(
 	if err != nil {
 		return fmt.Errorf("%w: failed to begin transaction: %v", sharedErrors.ErrTransactionFailed, err)
 	}
-	defer tx.Rollback(ctx)
+	// Rollback after successful commit is a no-op returning ErrTxClosed — safe to discard.
+	defer func() { _ = tx.Rollback(ctx) }()
 
 	qtx := r.queries.WithTx(tx)
 
@@ -340,7 +345,8 @@ func (r *EnrollmentRepository) CancelProgramWithEvent(
 	if err != nil {
 		return fmt.Errorf("%w: failed to begin transaction: %v", sharedErrors.ErrTransactionFailed, err)
 	}
-	defer tx.Rollback(ctx)
+	// Rollback after successful commit is a no-op returning ErrTxClosed — safe to discard.
+	defer func() { _ = tx.Rollback(ctx) }()
 
 	qtx := r.queries.WithTx(tx)
 

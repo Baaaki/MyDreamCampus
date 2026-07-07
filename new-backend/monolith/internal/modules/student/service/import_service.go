@@ -9,12 +9,12 @@ import (
 	"strings"
 	"time"
 
-	"github.com/baaaki/mydreamcampus/monolith/internal/platform/errors"
-	"github.com/baaaki/mydreamcampus/monolith/internal/platform/logger"
-	"github.com/baaaki/mydreamcampus/monolith/internal/platform/utils"
 	"github.com/baaaki/mydreamcampus/monolith/internal/modules/student/db"
 	"github.com/baaaki/mydreamcampus/monolith/internal/modules/student/dto"
 	"github.com/baaaki/mydreamcampus/monolith/internal/modules/student/repository"
+	"github.com/baaaki/mydreamcampus/monolith/internal/platform/errors"
+	"github.com/baaaki/mydreamcampus/monolith/internal/platform/logger"
+	"github.com/baaaki/mydreamcampus/monolith/internal/platform/utils"
 	"github.com/google/uuid"
 	"go.uber.org/zap"
 )
@@ -104,7 +104,7 @@ func (s *ImportService) BulkImportStudents(ctx context.Context, fileName string,
 	// Create import job
 	job, err := s.importRepo.CreateImportJob(ctx, db.CreateImportJobParams{
 		FileName:     fileName,
-		TotalRecords: int32(totalRecords),
+		TotalRecords: utils.ClampToInt32(totalRecords),
 		CreatedBy:    utils.UUIDToPgtype(createdBy),
 	})
 	if err != nil {
@@ -117,7 +117,7 @@ func (s *ImportService) BulkImportStudents(ctx context.Context, fileName string,
 	jobID := utils.PgtypeToUUIDString(job.ID)
 
 	// Start background processing
-	go s.processImport(context.Background(), utils.PgtypeToUUID(job.ID), students, importErrors)
+	go s.processImport(context.WithoutCancel(ctx), utils.PgtypeToUUID(job.ID), students, importErrors)
 
 	log.Info("bulk import job created",
 		zap.String("job_id", jobID),
@@ -187,9 +187,9 @@ func (s *ImportService) processImport(ctx context.Context, jobID uuid.UUID, stud
 
 	if err := s.importRepo.UpdateImportJobProgress(ctx, db.UpdateImportJobProgressParams{
 		ID:                utils.UUIDToPgtype(jobID),
-		ProcessedRecords:  int32(successCount + failCount),
-		SuccessfulRecords: int32(successCount),
-		FailedRecords:     int32(failCount),
+		ProcessedRecords:  utils.ClampToInt32(successCount + failCount),
+		SuccessfulRecords: utils.ClampToInt32(successCount),
+		FailedRecords:     utils.ClampToInt32(failCount),
 		Errors:            errorsJSON,
 	}); err != nil {
 		log.Error("failed to update job progress",
@@ -199,9 +199,13 @@ func (s *ImportService) processImport(ctx context.Context, jobID uuid.UUID, stud
 
 	// Mark job as completed
 	if failCount > 0 && successCount == 0 {
-		s.importRepo.FailImportJob(ctx, jobID)
+		if err := s.importRepo.FailImportJob(ctx, jobID); err != nil {
+			log.Error("failed to mark import job as failed", zap.Error(err))
+		}
 	} else {
-		s.importRepo.CompleteImportJob(ctx, jobID)
+		if err := s.importRepo.CompleteImportJob(ctx, jobID); err != nil {
+			log.Error("failed to mark import job as completed", zap.Error(err))
+		}
 	}
 
 	log.Info("import processing completed",
@@ -294,10 +298,10 @@ func (s *ImportService) ListImportJobs(ctx context.Context, userID uuid.UUID, qu
 	offset := int32(0)
 
 	if query.Limit > 0 {
-		limit = int32(query.Limit)
+		limit = utils.ClampToInt32(query.Limit)
 	}
 	if query.Page > 0 {
-		offset = int32((query.Page - 1) * query.Limit)
+		offset = utils.ClampToInt32((query.Page - 1) * query.Limit)
 	}
 
 	jobs, total, err := s.importRepo.ListImportJobsByUser(ctx, userID, limit, offset)
@@ -353,7 +357,7 @@ func validateHeader(got, expected []string) bool {
 
 func parseStudentRecord(record []string, lineNumber int) (db.CreateStudentParams, error) {
 	if len(record) != 8 {
-		return db.CreateStudentParams{}, fmt.Errorf("Line %d: expected 8 columns, got %d", lineNumber, len(record))
+		return db.CreateStudentParams{}, fmt.Errorf("line %d: expected 8 columns, got %d", lineNumber, len(record))
 	}
 
 	// Sanitize all fields to prevent CSV formula injection
@@ -364,17 +368,17 @@ func parseStudentRecord(record []string, lineNumber int) (db.CreateStudentParams
 	// Parse enrollment year
 	enrollmentYear, err := strconv.Atoi(record[6])
 	if err != nil {
-		return db.CreateStudentParams{}, fmt.Errorf("Line %d: invalid enrollment_year: %v", lineNumber, err)
+		return db.CreateStudentParams{}, fmt.Errorf("line %d: invalid enrollment_year: %v", lineNumber, err)
 	}
 
 	// Parse class level
 	classLevel, err := strconv.ParseInt(record[7], 10, 16)
 	if err != nil {
-		return db.CreateStudentParams{}, fmt.Errorf("Line %d: invalid class_level: %v", lineNumber, err)
+		return db.CreateStudentParams{}, fmt.Errorf("line %d: invalid class_level: %v", lineNumber, err)
 	}
 
 	if classLevel < 1 || classLevel > 6 {
-		return db.CreateStudentParams{}, fmt.Errorf("Line %d: class_level must be between 1 and 6", lineNumber)
+		return db.CreateStudentParams{}, fmt.Errorf("line %d: class_level must be between 1 and 6", lineNumber)
 	}
 
 	return db.CreateStudentParams{
@@ -384,7 +388,7 @@ func parseStudentRecord(record []string, lineNumber int) (db.CreateStudentParams
 		Email:          record[3],
 		Faculty:        record[4],
 		Department:     record[5],
-		EnrollmentYear: int32(enrollmentYear),
+		EnrollmentYear: utils.ClampToInt32(enrollmentYear),
 		ClassLevel:     int16(classLevel),
 		AdvisorID:      utils.UUIDToPgtype(uuid.Nil), // Will be assigned later
 	}, nil

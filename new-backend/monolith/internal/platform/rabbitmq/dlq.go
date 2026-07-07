@@ -3,6 +3,7 @@ package rabbitmq
 import (
 	"fmt"
 
+	"github.com/baaaki/mydreamcampus/monolith/internal/platform/utils"
 	amqp "github.com/rabbitmq/amqp091-go"
 )
 
@@ -112,7 +113,7 @@ func SetupDLQWithTTL(channel *amqp.Channel, queueName string, ttlMs int) error {
 	// Declare main queue with DLQ and TTL
 	args := amqp.Table{
 		"x-dead-letter-exchange": dlqExchangeName,
-		"x-message-ttl":          int32(ttlMs), // Message TTL in milliseconds
+		"x-message-ttl":          utils.ClampToInt32(ttlMs), // Message TTL in milliseconds
 	}
 
 	if _, err := channel.QueueDeclare(

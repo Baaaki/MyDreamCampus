@@ -144,7 +144,8 @@ func calculateClassStatistics(averages []float64) ClassStatistics {
 	// Calculate standard deviation
 	variance := 0.0
 	for _, avg := range averages {
-		variance += math.Pow(avg-mean, 2)
+		d := avg - mean
+		variance += d * d
 	}
 	variance /= float64(len(averages))
 	stddev := math.Sqrt(variance)

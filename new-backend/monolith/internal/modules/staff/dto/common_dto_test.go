@@ -34,9 +34,9 @@ func TestPaginationQuery_Validation(t *testing.T) {
 		ok    bool
 	}{
 		{"?page=2&limit=50", true},
-		{"?page=0&limit=20", false},   // page must be >= 1
-		{"?page=1&limit=0", false},    // limit must be >= 1
-		{"?page=1&limit=101", false},  // limit max = 100
+		{"?page=0&limit=20", false},  // page must be >= 1
+		{"?page=1&limit=0", false},   // limit must be >= 1
+		{"?page=1&limit=101", false}, // limit max = 100
 		{"?page=-1&limit=20", false},
 	}
 	for _, tt := range tests {

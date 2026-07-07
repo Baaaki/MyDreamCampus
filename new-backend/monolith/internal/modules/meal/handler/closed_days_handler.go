@@ -92,8 +92,8 @@ func (h *ClosedDaysHandler) CreateClosedDay(c *gin.Context) {
 	}
 
 	closedDay, err := h.repo.CreateClosedDay(ctx, db.CreateClosedDayParams{
-		Date:   pgtype.Date{Time: date, Valid: true},
-		Reason: req.Reason,
+		Date:     pgtype.Date{Time: date, Valid: true},
+		Reason:   req.Reason,
 		Semester: pgtype.Text{},
 	})
 	if err != nil {
@@ -108,7 +108,7 @@ func (h *ClosedDaysHandler) CreateClosedDay(c *gin.Context) {
 	// Audit log
 	if h.auditLogger != nil {
 		actorID, _ := c.Get("user_id")
-		h.auditLogger.Log(ctx, audit.AuditEvent{
+		if err := h.auditLogger.Log(ctx, audit.AuditEvent{
 			ActorID:      actorID.(string),
 			ActorRole:    "admin",
 			Action:       "closed_day.created",
@@ -118,7 +118,9 @@ func (h *ClosedDaysHandler) CreateClosedDay(c *gin.Context) {
 				"date":   req.Date,
 				"reason": req.Reason,
 			},
-		})
+		}); err != nil {
+			h.logger.Warn("audit log write failed", zap.Error(err))
+		}
 	}
 
 	h.logger.Info("closed day created",
@@ -211,13 +213,15 @@ func (h *ClosedDaysHandler) DeleteClosedDay(c *gin.Context) {
 	// Audit log
 	if h.auditLogger != nil {
 		actorID, _ := c.Get("user_id")
-		h.auditLogger.Log(ctx, audit.AuditEvent{
+		if err := h.auditLogger.Log(ctx, audit.AuditEvent{
 			ActorID:      actorID.(string),
 			ActorRole:    "admin",
 			Action:       "closed_day.deleted",
 			ResourceType: "closed_day",
 			ResourceID:   idStr,
-		})
+		}); err != nil {
+			h.logger.Warn("audit log write failed", zap.Error(err))
+		}
 	}
 
 	h.logger.Info("closed day deleted", zap.String("id", idStr))

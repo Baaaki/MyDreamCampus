@@ -43,8 +43,8 @@ func TestCalculateAbsoluteGradePoint(t *testing.T) {
 		{67.5, db.GradesGradePointEnum175},
 		{65.0, db.GradesGradePointEnum150},
 		{62.5, db.GradesGradePointEnum125},
-		{60.0, db.GradesGradePointEnum100}, // DD (passing minimum)
-		{55.0, db.GradesGradePointEnum050}, // FD
+		{60.0, db.GradesGradePointEnum100},  // DD (passing minimum)
+		{55.0, db.GradesGradePointEnum050},  // FD
 		{49.99, db.GradesGradePointEnum000}, // FF
 		{0.0, db.GradesGradePointEnum000},
 	}
@@ -137,7 +137,7 @@ func TestCalculateClassStatistics(t *testing.T) {
 	})
 
 	t.Run("rounds to 2 decimal places", func(t *testing.T) {
-		s := calculateClassStatistics([]float64{1.0/3, 2.0/3, 1.0})
+		s := calculateClassStatistics([]float64{1.0 / 3, 2.0 / 3, 1.0})
 		// Just verify it's rounded — actual value matters less than precision
 		mean := s.Mean
 		assert.Equal(t, math.Round(mean*100)/100, mean,

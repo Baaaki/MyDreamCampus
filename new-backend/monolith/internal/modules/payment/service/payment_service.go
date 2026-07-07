@@ -68,10 +68,17 @@ type PaymentService struct {
 }
 
 func NewPaymentService(publisher *rabbitmq.Publisher, logger *zap.Logger) *PaymentService {
-	// Ensure the exchanges and queues are declared
-	publisher.DeclareExchange("payment.events")
-	publisher.DeclareAndBindQueue("meal.payment_completed_queue", "payment.events", "payment.completed")
-	publisher.DeclareAndBindQueue("meal.payment_failed_queue", "payment.events", "payment.failed")
+	// Ensure the exchanges and queues are declared. Failures are non-fatal:
+	// publish retries re-declare, and the mock payment flow must not block boot.
+	if err := publisher.DeclareExchange("payment.events"); err != nil {
+		logger.Warn("failed to declare payment exchange", zap.Error(err))
+	}
+	if err := publisher.DeclareAndBindQueue("meal.payment_completed_queue", "payment.events", "payment.completed"); err != nil {
+		logger.Warn("failed to declare payment_completed queue", zap.Error(err))
+	}
+	if err := publisher.DeclareAndBindQueue("meal.payment_failed_queue", "payment.events", "payment.failed"); err != nil {
+		logger.Warn("failed to declare payment_failed queue", zap.Error(err))
+	}
 
 	return &PaymentService{
 		publisher: publisher,
@@ -120,7 +127,7 @@ func (s *PaymentService) InitiatePayment(ctx context.Context, req InitiatePaymen
 			},
 		}
 
-		err := s.publisher.Publish(context.Background(), "payment.events", "payment.completed", event)
+		err := s.publisher.Publish(context.WithoutCancel(ctx), "payment.events", "payment.completed", event)
 		if err != nil {
 			s.logger.Error("failed to publish mock payment.completed event", zap.Error(err))
 		} else {

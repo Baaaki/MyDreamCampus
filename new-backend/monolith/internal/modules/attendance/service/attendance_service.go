@@ -12,11 +12,11 @@ import (
 	"github.com/baaaki/mydreamcampus/monolith/internal/modules/attendance/errors"
 	"github.com/baaaki/mydreamcampus/monolith/internal/modules/attendance/repository"
 	"github.com/baaaki/mydreamcampus/monolith/internal/platform/clock"
-	"github.com/baaaki/mydreamcampus/shared/events"
 	"github.com/baaaki/mydreamcampus/monolith/internal/platform/logger"
 	sharedRepo "github.com/baaaki/mydreamcampus/monolith/internal/platform/repository"
 	"github.com/baaaki/mydreamcampus/monolith/internal/platform/rules"
 	"github.com/baaaki/mydreamcampus/monolith/internal/platform/utils"
+	"github.com/baaaki/mydreamcampus/shared/events"
 	"github.com/google/uuid"
 	"go.uber.org/zap"
 )
@@ -116,15 +116,15 @@ func (s *AttendanceService) CreateSession(ctx context.Context, instructorID uuid
 	expiresAt := now.Add(time.Duration(req.DurationMinutes) * time.Minute)
 
 	session, err := s.sessionRepo.CreateAttendanceSession(ctx, db.CreateAttendanceSessionParams{
-		CourseID:           utils.UUIDToPgUUID(req.CourseID),
-		InstructorID:       utils.UUIDToPgUUID(instructorID),
-		Semester:           course.Semester,
-		WeekNumber:         req.WeekNumber,
-		SessionDate:        utils.TimeToPgDate(now),
-		QrSecret:  qrSecret,
-		StartedAt: utils.TimeToPgTimestamp(now),
-		ExpiresAt:          utils.TimeToPgTimestamp(expiresAt),
-		SessionType:        sessionType,
+		CourseID:     utils.UUIDToPgUUID(req.CourseID),
+		InstructorID: utils.UUIDToPgUUID(instructorID),
+		Semester:     course.Semester,
+		WeekNumber:   req.WeekNumber,
+		SessionDate:  utils.TimeToPgDate(now),
+		QrSecret:     qrSecret,
+		StartedAt:    utils.TimeToPgTimestamp(now),
+		ExpiresAt:    utils.TimeToPgTimestamp(expiresAt),
+		SessionType:  sessionType,
 	})
 	if err != nil {
 		return dto.CreateSessionResponse{}, err
@@ -142,30 +142,35 @@ func (s *AttendanceService) CreateSession(ctx context.Context, instructorID uuid
 		for i, student := range enrolledStudents {
 			studentIDs[i] = utils.PgUUIDToUUID(student.ID)
 		}
-		s.redisService.AddEnrolledStudents(ctx, sessionID, studentIDs)
+		if err := s.redisService.AddEnrolledStudents(ctx, sessionID, studentIDs); err != nil {
+			// Best-effort warm: scan path falls back to DB when the set is missing.
+			logger.Warn("failed to warm enrolled-student set", zap.Error(err))
+		}
 	}
 
 	// Session cache
-	s.redisService.SetSessionCache(ctx, sessionID, map[string]any{
-		"course_id":            req.CourseID.String(),
-		"instructor_id":        instructorID.String(),
-		"semester":             course.Semester,
-		"week_number":          fmt.Sprintf("%d", req.WeekNumber),
-		"session_type":         req.SessionType,
-		"qr_secret":  qrSecret,
-		"expires_at": fmt.Sprintf("%d", expiresAt.Unix()),
-		"enrolled_count":       fmt.Sprintf("%d", len(enrolledStudents)),
-	}, time.Until(expiresAt)+CacheTTLBuffer)
+	if err := s.redisService.SetSessionCache(ctx, sessionID, map[string]any{
+		"course_id":      req.CourseID.String(),
+		"instructor_id":  instructorID.String(),
+		"semester":       course.Semester,
+		"week_number":    fmt.Sprintf("%d", req.WeekNumber),
+		"session_type":   req.SessionType,
+		"qr_secret":      qrSecret,
+		"expires_at":     fmt.Sprintf("%d", expiresAt.Unix()),
+		"enrolled_count": fmt.Sprintf("%d", len(enrolledStudents)),
+	}, time.Until(expiresAt)+CacheTTLBuffer); err != nil {
+		logger.Warn("failed to warm session cache", zap.Error(err))
+	}
 
 	return dto.CreateSessionResponse{
 		SessionID:            utils.PgUUIDToUUID(session.ID),
 		CourseID:             req.CourseID,
 		CourseCode:           course.CourseCode,
 		CourseName:           course.CourseName,
-		WeekNumber:  req.WeekNumber,
-		SessionType: req.SessionType,
-		SessionDate: now.Format("2006-01-02"),
-		StartedAt:   now,
+		WeekNumber:           req.WeekNumber,
+		SessionType:          req.SessionType,
+		SessionDate:          now.Format("2006-01-02"),
+		StartedAt:            now,
 		ExpiresAt:            expiresAt,
 		EnrolledStudentCount: len(enrolledStudents),
 	}, nil
@@ -324,7 +329,9 @@ func (s *AttendanceService) CreateManualAttendance(ctx context.Context, sessionI
 	}
 
 	// Invalidate student summary cache
-	s.redisService.InvalidateStudentSummary(ctx, req.StudentID, session.Semester)
+	if err := s.redisService.InvalidateStudentSummary(ctx, req.StudentID, session.Semester); err != nil {
+		logger.Warn("failed to invalidate student summary cache", zap.Error(err))
+	}
 
 	// Get student info
 	student, err := s.cacheRepo.GetStudentCacheByID(ctx, req.StudentID)
@@ -375,7 +382,9 @@ func (s *AttendanceService) CloseSession(ctx context.Context, sessionID, instruc
 	}
 
 	// Clear Redis keys
-	s.redisService.ClearSessionKeys(ctx, sessionID.String())
+	if err := s.redisService.ClearSessionKeys(ctx, sessionID.String()); err != nil {
+		logger.Warn("failed to clear session redis keys", zap.Error(err))
+	}
 
 	// Get counts
 	courseID := utils.PgUUIDToUUID(session.CourseID)
@@ -802,8 +811,8 @@ func (s *AttendanceService) GetSessionDetails(ctx context.Context, sessionID, in
 		SessionType:          string(session.SessionType),
 		SessionDate:          session.SessionDate.Time.Format("2006-01-02"),
 		Semester:             session.Semester,
-		IsActive:  utils.PgBoolToBool(session.IsActive),
-		StartedAt: utils.PgTimestampToTime(session.StartedAt),
+		IsActive:             utils.PgBoolToBool(session.IsActive),
+		StartedAt:            utils.PgTimestampToTime(session.StartedAt),
 		ExpiresAt:            utils.PgTimestampToTime(session.ExpiresAt),
 		EnrolledStudentCount: totalEnrolled,
 		PresentCount:         int(presentCount),
@@ -985,7 +994,6 @@ func (s *AttendanceService) GetSessionsByDateRange(ctx context.Context, startDat
 // checkSemesterEnforcement checks hard_deadline + admin bypass + period window.
 // Semester enforcement: Uses CanOperateInSemester() — the three-layer model.
 // Admin can override period but NOT hard_deadline.
-// See: docs/semester-wizard-plan.md
 func (s *AttendanceService) checkSemesterEnforcement(ctx context.Context, semester string, isAdmin bool) error {
 	// Fetch hard_deadline from catalog service
 	semesterInfo, err := s.semesterClient.GetSemesterInfo(ctx, semester)

@@ -12,11 +12,11 @@ import (
 	"time"
 
 	"github.com/baaaki/mydreamcampus/monolith/config"
-	"github.com/baaaki/mydreamcampus/monolith/internal/platform/clock"
 	"github.com/baaaki/mydreamcampus/monolith/internal/modules/meal/db"
 	"github.com/baaaki/mydreamcampus/monolith/internal/modules/meal/dto"
 	serviceErrors "github.com/baaaki/mydreamcampus/monolith/internal/modules/meal/errors"
 	"github.com/baaaki/mydreamcampus/monolith/internal/modules/meal/repository"
+	"github.com/baaaki/mydreamcampus/monolith/internal/platform/clock"
 	sharedErrors "github.com/baaaki/mydreamcampus/monolith/internal/platform/errors"
 	"github.com/baaaki/mydreamcampus/monolith/internal/platform/utils"
 	"github.com/google/uuid"
@@ -483,11 +483,11 @@ func (s *ReservationService) GetMyReservations(ctx context.Context, studentID uu
 
 	if query.Page > 0 {
 		if query.Limit > 0 {
-			limit = int32(query.Limit)
+			limit = utils.ClampToInt32(query.Limit)
 		} else {
 			limit = 10 // default limit
 		}
-		offset = int32((query.Page - 1)) * limit
+		offset = utils.ClampToInt32(query.Page-1) * limit
 
 		// Get total count for pagination
 		totalCount, err = s.reservationRepo.CountStudentReservationsFiltered(ctx, db.CountStudentReservationsFilteredParams{
@@ -880,11 +880,12 @@ func (s *ReservationService) validateMealTimeWindow(mealTime string) error {
 	now := clock.Now().In(time.FixedZone("UTC+3", 3*3600))
 	hour := now.Hour()
 
-	if mealTime == "lunch" {
+	switch mealTime {
+	case "lunch":
 		if hour < s.cfg.MealTime.LunchStartHour || hour >= s.cfg.MealTime.LunchEndHour {
 			return serviceErrors.ErrOutsideMealTimeWindow
 		}
-	} else if mealTime == "dinner" {
+	case "dinner":
 		if hour < s.cfg.MealTime.DinnerStartHour || hour >= s.cfg.MealTime.DinnerEndHour {
 			return serviceErrors.ErrOutsideMealTimeWindow
 		}

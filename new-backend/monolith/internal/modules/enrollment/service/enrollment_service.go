@@ -5,11 +5,11 @@ import (
 	"fmt"
 	"time"
 
+	catalogDTO "github.com/baaaki/mydreamcampus/monolith/internal/modules/course_catalog/dto"
 	"github.com/baaaki/mydreamcampus/monolith/internal/modules/enrollment/db"
 	"github.com/baaaki/mydreamcampus/monolith/internal/modules/enrollment/dto"
 	serviceErrors "github.com/baaaki/mydreamcampus/monolith/internal/modules/enrollment/errors"
 	"github.com/baaaki/mydreamcampus/monolith/internal/modules/enrollment/repository"
-	catalogDTO "github.com/baaaki/mydreamcampus/monolith/internal/modules/course_catalog/dto"
 	studentDTO "github.com/baaaki/mydreamcampus/monolith/internal/modules/student/dto"
 	sharedErrors "github.com/baaaki/mydreamcampus/monolith/internal/platform/errors"
 	"github.com/baaaki/mydreamcampus/monolith/internal/platform/logger"
@@ -108,8 +108,8 @@ func (s *EnrollmentService) GetAvailableCourses(ctx context.Context, studentID u
 			Credits:           course.Credits,
 			ScheduleSessions:  scheduleSessions,
 			MaxCapacity:       course.MaxCapacity,
-			CurrentEnrollment: int16(currentEnrollment),
-			AvailableSeats:    course.MaxCapacity - int16(currentEnrollment),
+			CurrentEnrollment: utils.ClampToInt16(int(currentEnrollment)),
+			AvailableSeats:    course.MaxCapacity - utils.ClampToInt16(int(currentEnrollment)),
 			Instructor:        course.InstructorFullname,
 		})
 	}
@@ -150,7 +150,6 @@ func (s *EnrollmentService) CreateEnrollmentProgram(ctx context.Context, req dto
 	// No hard_deadline check needed — period is the only lock.
 	// Why no admin override? Enrollment is the student's own responsibility.
 	// Admin should not add/remove courses on behalf of students.
-	// See: docs/semester-wizard-plan.md "Ders Kayit (Enrollment) Icin: Siki Period Kilidi"
 	var periodStart, periodEnd *time.Time
 	period, periodErr := s.periodRepo.GetActivePeriodBySemester(ctx, req.Semester)
 	if periodErr == nil {
@@ -342,8 +341,8 @@ func (s *EnrollmentService) checkPrerequisites(ctx context.Context, studentID uu
 func (s *EnrollmentService) createProgramWithCapacityCheck(ctx context.Context, req dto.CreateEnrollmentRequest, courses []catalogDTO.SemesterCourseResponse, student studentDTO.StudentResponse) (db.EnrollmentProgram, error) {
 	// Create program parameters
 	programParams := db.CreateEnrollmentProgramParams{
-		StudentID:     utils.UUIDToPgtype(req.StudentID),
-		Semester:      req.Semester,
+		StudentID: utils.UUIDToPgtype(req.StudentID),
+		Semester:  req.Semester,
 		Status: db.NullEnrollmentStatusEnum{
 			EnrollmentStatusEnum: db.EnrollmentEnrollmentStatusEnumPending,
 			Valid:                true,

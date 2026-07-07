@@ -43,7 +43,8 @@ func (r *ReservationRepository) CreateReservationWithEvent(ctx context.Context, 
 	if err != nil {
 		return db.Reservation{}, fmt.Errorf("%w: failed to begin transaction: %v", sharedErrors.ErrTransactionFailed, err)
 	}
-	defer tx.Rollback(ctx)
+	// Rollback after successful commit is a no-op returning ErrTxClosed — safe to discard.
+	defer func() { _ = tx.Rollback(ctx) }()
 
 	qtx := r.queries.WithTx(tx)
 
@@ -72,7 +73,8 @@ func (r *ReservationRepository) CreateBatchReservations(ctx context.Context, res
 	if err != nil {
 		return nil, fmt.Errorf("%w: failed to begin transaction: %v", sharedErrors.ErrTransactionFailed, err)
 	}
-	defer tx.Rollback(ctx)
+	// Rollback after successful commit is a no-op returning ErrTxClosed — safe to discard.
+	defer func() { _ = tx.Rollback(ctx) }()
 
 	qtx := r.queries.WithTx(tx)
 
@@ -203,7 +205,8 @@ func (r *ReservationRepository) CancelReservationWithRefund(ctx context.Context,
 	if err != nil {
 		return db.Reservation{}, fmt.Errorf("%w: failed to begin transaction: %v", sharedErrors.ErrTransactionFailed, err)
 	}
-	defer tx.Rollback(ctx)
+	// Rollback after successful commit is a no-op returning ErrTxClosed — safe to discard.
+	defer func() { _ = tx.Rollback(ctx) }()
 
 	qtx := r.queries.WithTx(tx)
 
@@ -264,7 +267,8 @@ func (r *ReservationRepository) ConfirmReservationsWithEvents(ctx context.Contex
 	if err != nil {
 		return fmt.Errorf("%w: failed to begin transaction: %v", sharedErrors.ErrTransactionFailed, err)
 	}
-	defer tx.Rollback(ctx)
+	// Rollback after successful commit is a no-op returning ErrTxClosed — safe to discard.
+	defer func() { _ = tx.Rollback(ctx) }()
 
 	qtx := r.queries.WithTx(tx)
 

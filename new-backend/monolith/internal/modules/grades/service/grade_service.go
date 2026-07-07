@@ -426,7 +426,8 @@ func (s *GradeService) AutoFinalize(ctx context.Context, courseID uuid.UUID, ins
 		logger.Error("failed to begin transaction", zap.Error(err))
 		return nil, err
 	}
-	defer tx.Rollback(ctx)
+	// Rollback after successful commit is a no-op returning ErrTxClosed — safe to discard.
+	defer func() { _ = tx.Rollback(ctx) }()
 
 	completedQtx := s.completedRepo.WithTx(tx)
 	outboxQtx := s.outboxRepo.WithTx(tx)
@@ -755,22 +756,11 @@ func (s *GradeService) GetCourseStudents(ctx context.Context, instructorID uuid.
 // Helper Functions
 // ============================================
 
-func (s *GradeService) checkAllFinalScoresComplete(ctx context.Context, courseID uuid.UUID) (bool, error) {
-	totalStudents, err := s.registrationRepo.CountRegistrationsByCourse(ctx, courseID)
-	if err != nil {
-		return false, err
-	}
+type auditCtxKey string
 
-	finalGradedCount, err := s.scoreRepo.CountScoresBySlugAndCourse(ctx, db.CountScoresBySlugAndCourseParams{
-		CourseID: courseID,
-		Slug:     "final",
-	})
-	if err != nil {
-		return false, err
-	}
-
-	return finalGradedCount >= totalStudents, nil
-}
+// CtxKeyUserID carries the acting admin's user ID from the HTTP handler down
+// to audit logging without threading an extra parameter through the service.
+const CtxKeyUserID auditCtxKey = "user_id"
 
 // checkAllScoresLocked reports whether every eligible student has a locked
 // score for every assessment in the course. Attendance-failed students are
@@ -980,7 +970,8 @@ func (s *GradeService) ProcessAppeal(ctx context.Context, req dto.AppealScoreReq
 		logger.Error("failed to begin appeal transaction", zap.Error(err))
 		return nil, err
 	}
-	defer tx.Rollback(ctx)
+	// Rollback after successful commit is a no-op returning ErrTxClosed — safe to discard.
+	defer func() { _ = tx.Rollback(ctx) }()
 
 	err = s.completedRepo.WithTx(tx).UpdateCompletedCourseAfterAppeal(ctx, db.UpdateCompletedCourseAfterAppealParams{
 		StudentID:        req.StudentID,
@@ -1035,10 +1026,10 @@ func (s *GradeService) ProcessAppeal(ctx context.Context, req dto.AppealScoreReq
 	if s.auditLogger != nil {
 		// Extract actor_id from context (set by handler)
 		actorID := ""
-		if v := ctx.Value("user_id"); v != nil {
+		if v := ctx.Value(CtxKeyUserID); v != nil {
 			actorID, _ = v.(string)
 		}
-		s.auditLogger.Log(ctx, audit.AuditEvent{
+		auditErr := s.auditLogger.Log(ctx, audit.AuditEvent{
 			ActorID:      actorID,
 			ActorRole:    "admin",
 			Action:       "grade.appeal_processed",
@@ -1055,6 +1046,9 @@ func (s *GradeService) ProcessAppeal(ctx context.Context, req dto.AppealScoreReq
 				"reason":          req.Reason,
 			},
 		})
+		if auditErr != nil {
+			logger.Warn("audit log write failed", zap.Error(auditErr))
+		}
 	}
 
 	logger.Info("appeal processed successfully",
@@ -1291,7 +1285,6 @@ func (s *GradeService) checkHardDeadlineByRegistration(ctx context.Context, regi
 // If no active period is defined, grading is allowed (no deadline enforced).
 // Semester enforcement: checks hard_deadline + admin bypass + period window.
 // Admin can override period but NOT hard_deadline.
-// See: docs/semester-wizard-plan.md
 func (s *GradeService) checkCanEditGrade(ctx context.Context, semester string, courseID *uuid.UUID, isLocked bool, isAdmin bool) rules.GradeEditResult {
 	// Fetch hard_deadline from catalog service
 	var hardDeadline *time.Time

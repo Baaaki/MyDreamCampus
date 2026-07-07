@@ -29,8 +29,8 @@ import (
 	platformMiddleware "github.com/baaaki/mydreamcampus/monolith/internal/platform/middleware"
 	"github.com/baaaki/mydreamcampus/monolith/internal/platform/rabbitmq"
 	platformRedis "github.com/baaaki/mydreamcampus/monolith/internal/platform/redis"
-	"go.uber.org/zap"
 	"github.com/baaaki/mydreamcampus/monolith/internal/platform/utils"
+	"go.uber.org/zap"
 )
 
 func main() {
@@ -38,7 +38,7 @@ func main() {
 	if err != nil {
 		panic(fmt.Sprintf("failed to load config: %v", err))
 	}
-	
+
 	// Initialize JWT secret globally to avoid os.Setenv anti-pattern
 	utils.InitJWTSecret(cfg.JWT.Secret)
 
@@ -68,7 +68,11 @@ func main() {
 		// on login/refresh/password. Treat unavailability as fatal.
 		logger.Fatal("failed to connect to Redis", zap.Error(err))
 	}
-	defer redisClient.Close()
+	defer func() {
+		if err := redisClient.Close(); err != nil {
+			logger.Warn("redis close failed", zap.Error(err))
+		}
+	}()
 	logger.Info("Redis connection established")
 
 	if cfg.RateLimit.Enabled {
@@ -99,7 +103,11 @@ func main() {
 	if err != nil {
 		logger.Fatal("failed to connect to RabbitMQ", zap.Error(err))
 	}
-	defer rabbitConn.Close()
+	defer func() {
+		if err := rabbitConn.Close(); err != nil {
+			logger.Warn("rabbitmq close failed", zap.Error(err))
+		}
+	}()
 	logger.Info("RabbitMQ connection established")
 
 	publisher := rabbitmq.NewPublisher(rabbitConn)
@@ -109,7 +117,7 @@ func main() {
 	logger.Info("module exchanges declared", zap.Int("count", len(eventbus.ModuleExchanges)))
 
 	// Downstream queue bindings — pre-declared so messages persist even
-	// when consumers are offline (plan section 5.6.3). Each module appends
+	// when consumers are offline. Each module appends
 	// its consumers as it migrates. Auth + student still consume staff
 	// events from RabbitMQ until those modules switch to in-process pubsub.
 	downstreamBindings := []eventbus.DownstreamBinding{
@@ -146,15 +154,6 @@ func main() {
 
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
-
-	// Per-module outbox workers (plan section 5.5.2 selection A) start here
-	// as each module migrates. Auth does not yet publish events to its
-	// outbox — that wiring lands with notification (Faz 3).
-	//
-	//   go eventbus.NewOutboxWorker(
-	//       "auth", "auth.events", authModule.OutboxStore(), publisher,
-	//       cfg.OutboxInterval(), int32(cfg.Outbox.BatchSize),
-	//   ).Start(ctx)
 
 	authModule := auth.New(cfg, pool, redisClient, rabbitConn)
 	if err := authModule.Bootstrap(ctx); err != nil {
@@ -199,10 +198,10 @@ func main() {
 		logger.Fatal("failed to bootstrap meal module", zap.Error(err))
 	}
 
-	// Per-module outbox workers. Auth does not yet publish events
-	// (notification arrives in Faz 3); wait, auth now publishes events!
+	// One outbox worker per publishing module — events are written to the
+	// module's outbox table inside the business transaction, then relayed here.
 	outboxInterval := time.Duration(cfg.Outbox.IntervalSeconds) * time.Second
-	batchSize := int32(cfg.Outbox.BatchSize)
+	batchSize := utils.ClampToInt32(cfg.Outbox.BatchSize)
 	go eventbus.NewOutboxWorker("auth", "auth.events", authModule.OutboxStore(),
 		publisher, outboxInterval, batchSize).Start(ctx)
 	go eventbus.NewOutboxWorker("staff", "staff.events", staffModule.OutboxStore(),

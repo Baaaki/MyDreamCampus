@@ -6,11 +6,11 @@ import (
 	"errors"
 	"fmt"
 
-	"github.com/baaaki/mydreamcampus/shared/events"
-	sharedErrors "github.com/baaaki/mydreamcampus/monolith/internal/platform/errors"
-	"github.com/baaaki/mydreamcampus/monolith/internal/platform/utils"
 	"github.com/baaaki/mydreamcampus/monolith/internal/modules/staff/db"
 	serviceErrors "github.com/baaaki/mydreamcampus/monolith/internal/modules/staff/errors"
+	sharedErrors "github.com/baaaki/mydreamcampus/monolith/internal/platform/errors"
+	"github.com/baaaki/mydreamcampus/monolith/internal/platform/utils"
+	"github.com/baaaki/mydreamcampus/shared/events"
 	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgconn"
@@ -36,7 +36,8 @@ func (r *StaffRepository) CreateStaffWithEvent(ctx context.Context, params db.Cr
 	if err != nil {
 		return db.Staff{}, fmt.Errorf("%w: failed to begin transaction: %v", sharedErrors.ErrTransactionFailed, err)
 	}
-	defer tx.Rollback(ctx)
+	// Rollback after successful commit is a no-op returning ErrTxClosed — safe to discard.
+	defer func() { _ = tx.Rollback(ctx) }()
 
 	qtx := r.queries.WithTx(tx)
 
@@ -120,7 +121,8 @@ func (r *StaffRepository) UpdateStaffWithEvent(ctx context.Context, id uuid.UUID
 	if err != nil {
 		return db.Staff{}, fmt.Errorf("%w: failed to begin transaction: %v", sharedErrors.ErrTransactionFailed, err)
 	}
-	defer tx.Rollback(ctx)
+	// Rollback after successful commit is a no-op returning ErrTxClosed — safe to discard.
+	defer func() { _ = tx.Rollback(ctx) }()
 
 	qtx := r.queries.WithTx(tx)
 
@@ -160,7 +162,8 @@ func (r *StaffRepository) SoftDeleteStaffWithEvent(ctx context.Context, id uuid.
 	if err != nil {
 		return fmt.Errorf("%w: failed to begin transaction: %v", sharedErrors.ErrTransactionFailed, err)
 	}
-	defer tx.Rollback(ctx)
+	// Rollback after successful commit is a no-op returning ErrTxClosed — safe to discard.
+	defer func() { _ = tx.Rollback(ctx) }()
 
 	qtx := r.queries.WithTx(tx)
 

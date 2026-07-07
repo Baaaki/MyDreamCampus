@@ -22,14 +22,14 @@ type AssessmentItem struct {
 
 // CreateSemesterCourseRequest represents the request to create a semester course
 type CreateSemesterCourseRequest struct {
-	CourseCode         string             `json:"course_code" binding:"required,min=2,max=50"`
-	ClassLevel         int16              `json:"class_level" binding:"required,min=1,max=6"`
-	InstructorID       uuid.UUID          `json:"instructor_id" binding:"required,uuid"`
-	InstructorFullname string             `json:"instructor_fullname" binding:"required,min=3,max=150"`
-	ClassroomLocation  string             `json:"classroom_location" binding:"required,min=3,max=100"`
-	MaxCapacity        int16              `json:"max_capacity" binding:"required,min=1,max=1000"`
-	AssessmentSchema   []AssessmentItem   `json:"assessment_schema" binding:"required,min=1,dive"`
-	ScheduleSessions   []ScheduleSession  `json:"schedule_sessions" binding:"required,min=1,dive"`
+	CourseCode         string            `json:"course_code" binding:"required,min=2,max=50"`
+	ClassLevel         int16             `json:"class_level" binding:"required,min=1,max=6"`
+	InstructorID       uuid.UUID         `json:"instructor_id" binding:"required,uuid"`
+	InstructorFullname string            `json:"instructor_fullname" binding:"required,min=3,max=150"`
+	ClassroomLocation  string            `json:"classroom_location" binding:"required,min=3,max=100"`
+	MaxCapacity        int16             `json:"max_capacity" binding:"required,min=1,max=1000"`
+	AssessmentSchema   []AssessmentItem  `json:"assessment_schema" binding:"required,min=1,dive"`
+	ScheduleSessions   []ScheduleSession `json:"schedule_sessions" binding:"required,min=1,dive"`
 }
 
 // SemesterCourseResponse represents a semester course in API responses

@@ -6,15 +6,15 @@ import (
 	"context"
 
 	"github.com/baaaki/mydreamcampus/monolith/internal/eventbus"
+	ccService "github.com/baaaki/mydreamcampus/monolith/internal/modules/course_catalog/service"
 	"github.com/baaaki/mydreamcampus/monolith/internal/modules/grades/handler"
 	"github.com/baaaki/mydreamcampus/monolith/internal/modules/grades/repository"
 	"github.com/baaaki/mydreamcampus/monolith/internal/modules/grades/service"
 	"github.com/baaaki/mydreamcampus/monolith/internal/modules/grades/worker"
+	"github.com/baaaki/mydreamcampus/monolith/internal/platform/audit"
 	platformMiddleware "github.com/baaaki/mydreamcampus/monolith/internal/platform/middleware"
 	"github.com/baaaki/mydreamcampus/monolith/internal/platform/rabbitmq"
 	platformRepo "github.com/baaaki/mydreamcampus/monolith/internal/platform/repository"
-	"github.com/baaaki/mydreamcampus/monolith/internal/platform/audit"
-	ccService "github.com/baaaki/mydreamcampus/monolith/internal/modules/course_catalog/service"
 	"github.com/gin-gonic/gin"
 	"github.com/jackc/pgx/v5/pgxpool"
 )

@@ -4,9 +4,9 @@ import (
 	"context"
 	"fmt"
 
+	"github.com/baaaki/mydreamcampus/monolith/internal/modules/meal/db"
 	sharedErrors "github.com/baaaki/mydreamcampus/monolith/internal/platform/errors"
 	"github.com/baaaki/mydreamcampus/monolith/internal/platform/utils"
-	"github.com/baaaki/mydreamcampus/monolith/internal/modules/meal/db"
 	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5/pgtype"
 	"github.com/jackc/pgx/v5/pgxpool"
@@ -54,7 +54,7 @@ func (r *OutboxRepository) MarkOutboxEventPublished(ctx context.Context, id uuid
 // MarkOutboxEventFailed marks an outbox event as failed
 func (r *OutboxRepository) MarkOutboxEventFailed(ctx context.Context, id uuid.UUID, errorMsg string) error {
 	err := r.queries.MarkOutboxEventFailed(ctx, db.MarkOutboxEventFailedParams{
-		ID: utils.UUIDToPgtype(id),
+		ID:        utils.UUIDToPgtype(id),
 		LastError: pgtype.Text{String: errorMsg, Valid: true},
 	})
 	if err != nil {
@@ -66,9 +66,9 @@ func (r *OutboxRepository) MarkOutboxEventFailed(ctx context.Context, id uuid.UU
 // UpdateOutboxEventRetry updates retry information for an outbox event
 func (r *OutboxRepository) UpdateOutboxEventRetry(ctx context.Context, id uuid.UUID, nextRetryAt pgtype.Timestamptz, errorMsg string) error {
 	err := r.queries.UpdateOutboxEventRetry(ctx, db.UpdateOutboxEventRetryParams{
-		ID:           utils.UUIDToPgtype(id),
-		NextRetryAt:  nextRetryAt,
-		LastError:    pgtype.Text{String: errorMsg, Valid: true},
+		ID:          utils.UUIDToPgtype(id),
+		NextRetryAt: nextRetryAt,
+		LastError:   pgtype.Text{String: errorMsg, Valid: true},
 	})
 	if err != nil {
 		return fmt.Errorf("%w: failed to update outbox event retry: %v", sharedErrors.ErrQueryFailed, err)

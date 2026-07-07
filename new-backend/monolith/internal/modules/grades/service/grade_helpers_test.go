@@ -322,7 +322,8 @@ func TestDecodeScoresJSON(t *testing.T) {
 		raw := []byte(`{"x":{"score":"50","is_absent":false,"is_locked":true}}`)
 		out, err := decodeScoresJSON(raw)
 		require.NoError(t, err)
-		var _ dto.ScoreDetail = out["x"]
+		// Compile-time type guard: fails to build if the map value type drifts.
+		assertScoreDetail := func(dto.ScoreDetail) {}
+		assertScoreDetail(out["x"])
 	})
 }
-

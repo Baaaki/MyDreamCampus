@@ -4,8 +4,8 @@ import (
 	"encoding/json"
 	"testing"
 
-	"github.com/baaaki/mydreamcampus/shared/events"
 	"github.com/baaaki/mydreamcampus/monolith/internal/modules/student/dto"
+	"github.com/baaaki/mydreamcampus/shared/events"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -62,9 +62,9 @@ func TestEvent_DataAsMapPreservesAllKeys(t *testing.T) {
 		"event_type": "staff.created",
 		"timestamp":  "2026-04-28T10:00:00Z",
 		"data": map[string]any{
-			"id":            "22222222-2222-2222-2222-222222222222",
-			"email":         "jane@univ.edu",
-			"future_field":  "added by a newer producer",
+			"id":           "22222222-2222-2222-2222-222222222222",
+			"email":        "jane@univ.edu",
+			"future_field": "added by a newer producer",
 		},
 	})
 

@@ -62,9 +62,10 @@ func New(code, message string, httpStatus int) *AppError {
 // This maintains the error context chain for debugging
 //
 // Example:
-//   if err := db.Query(); err != nil {
-//       return errors.Wrap(errors.ErrInternal, err)
-//   }
+//
+//	if err := db.Query(); err != nil {
+//	    return errors.Wrap(errors.ErrInternal, err)
+//	}
 func Wrap(appErr *AppError, cause error) *AppError {
 	if appErr == nil {
 		return nil
@@ -98,9 +99,10 @@ func WrapWithMessage(appErr *AppError, cause error, message string) *AppError {
 // Returns the AppError and true if the error chain contains an AppError
 //
 // Example:
-//   if appErr, ok := errors.As(err); ok {
-//       c.JSON(appErr.HTTPStatus, appErr)
-//   }
+//
+//	if appErr, ok := errors.As(err); ok {
+//	    c.JSON(appErr.HTTPStatus, appErr)
+//	}
 func As(err error) (*AppError, bool) {
 	var appErr *AppError
 	if errors.As(err, &appErr) {

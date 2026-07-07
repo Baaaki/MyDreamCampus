@@ -22,17 +22,17 @@ type InitiatePaymentResponse struct {
 
 // RefundRequest represents refund request to payment service
 type RefundRequest struct {
-	ReferenceID  string  `json:"reference_id"` // reservation ID
-	Amount       float64 `json:"amount"`
-	Currency     string  `json:"currency"`
-	Reason       string  `json:"reason"`
+	ReferenceID string  `json:"reference_id"` // reservation ID
+	Amount      float64 `json:"amount"`
+	Currency    string  `json:"currency"`
+	Reason      string  `json:"reason"`
 }
 
 // RefundResponse represents refund response from payment service
 type RefundResponse struct {
-	RefundID     string  `json:"refund_id"`
-	Amount       float64 `json:"amount"`
-	Currency     string  `json:"currency"`
-	Status       string  `json:"status"` // "completed", "failed", "pending"
-	Message      string  `json:"message,omitempty"`
+	RefundID string  `json:"refund_id"`
+	Amount   float64 `json:"amount"`
+	Currency string  `json:"currency"`
+	Status   string  `json:"status"` // "completed", "failed", "pending"
+	Message  string  `json:"message,omitempty"`
 }

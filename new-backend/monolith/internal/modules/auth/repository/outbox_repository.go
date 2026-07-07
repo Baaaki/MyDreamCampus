@@ -47,7 +47,7 @@ func (r *OutboxRepository) MarkEventFailed(ctx context.Context, id uuid.UUID, er
 	if errorMessage != "" {
 		errMsg = &errorMessage
 	}
-	
+
 	err := r.queries.MarkOutboxEventFailed(ctx, db.MarkOutboxEventFailedParams{
 		ID:           utils.UUIDToPgtype(id),
 		ErrorMessage: errMsg,

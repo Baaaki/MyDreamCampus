@@ -267,7 +267,8 @@ func (r *StudentRepository) CreateStudentWithEvent(ctx context.Context, params d
 	if err != nil {
 		return db.Student{}, fmt.Errorf("%w: failed to begin transaction: %v", sharedErrors.ErrTransactionFailed, err)
 	}
-	defer tx.Rollback(ctx)
+	// Rollback after successful commit is a no-op returning ErrTxClosed — safe to discard.
+	defer func() { _ = tx.Rollback(ctx) }()
 
 	qtx := r.queries.WithTx(tx)
 
@@ -357,7 +358,8 @@ func (r *StudentRepository) UpdateStudentWithEvent(ctx context.Context, id uuid.
 	if err != nil {
 		return db.Student{}, fmt.Errorf("%w: failed to begin transaction: %v", sharedErrors.ErrTransactionFailed, err)
 	}
-	defer tx.Rollback(ctx)
+	// Rollback after successful commit is a no-op returning ErrTxClosed — safe to discard.
+	defer func() { _ = tx.Rollback(ctx) }()
 
 	qtx := r.queries.WithTx(tx)
 
@@ -397,7 +399,8 @@ func (r *StudentRepository) SoftDeleteStudentWithEvent(ctx context.Context, id u
 	if err != nil {
 		return fmt.Errorf("%w: failed to begin transaction: %v", sharedErrors.ErrTransactionFailed, err)
 	}
-	defer tx.Rollback(ctx)
+	// Rollback after successful commit is a no-op returning ErrTxClosed — safe to discard.
+	defer func() { _ = tx.Rollback(ctx) }()
 
 	qtx := r.queries.WithTx(tx)
 
@@ -494,7 +497,8 @@ func (r *StudentRepository) BulkAssignAdvisor(ctx context.Context, studentIDs []
 	if err != nil {
 		return fmt.Errorf("%w: failed to begin transaction: %v", sharedErrors.ErrTransactionFailed, err)
 	}
-	defer tx.Rollback(ctx)
+	// Rollback after successful commit is a no-op returning ErrTxClosed — safe to discard.
+	defer func() { _ = tx.Rollback(ctx) }()
 
 	qtx := r.queries.WithTx(tx)
 
@@ -552,7 +556,8 @@ func (r *StudentRepository) UnassignAdvisorByStaffIDWithEventMarking(ctx context
 	if err != nil {
 		return fmt.Errorf("%w: failed to begin transaction: %v", sharedErrors.ErrTransactionFailed, err)
 	}
-	defer tx.Rollback(ctx)
+	// Rollback after successful commit is a no-op returning ErrTxClosed — safe to discard.
+	defer func() { _ = tx.Rollback(ctx) }()
 
 	qtx := r.queries.WithTx(tx)
 

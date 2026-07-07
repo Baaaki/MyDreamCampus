@@ -53,7 +53,7 @@ func (l *HTTPLogger) Log(ctx context.Context, event AuditEvent) error {
 		)
 		return nil
 	}
-	defer resp.Body.Close()
+	defer func() { _ = resp.Body.Close() }()
 
 	if resp.StatusCode != http.StatusCreated {
 		logger.Warn("audit log returned non-201 status",

@@ -76,12 +76,7 @@ func (r *ScheduleRepository) BulkCreateScheduleSessions(ctx context.Context, ses
 	// Convert CreateScheduleSessionParams to BatchCreateScheduleSessionsParams
 	batchParams := make([]db.BatchCreateScheduleSessionsParams, len(sessions))
 	for i, s := range sessions {
-		batchParams[i] = db.BatchCreateScheduleSessionsParams{
-			SemesterCourseID: s.SemesterCourseID,
-			DayOfWeek:        s.DayOfWeek,
-			SlotNumber:       s.SlotNumber,
-			SessionType:      s.SessionType,
-		}
+		batchParams[i] = db.BatchCreateScheduleSessionsParams(s)
 	}
 
 	// Use sqlc-generated batch method

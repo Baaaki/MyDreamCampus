@@ -181,14 +181,14 @@ func decodeHash(encodedHash string) (*Argon2Params, []byte, []byte, error) {
 	if err != nil {
 		return nil, nil, nil, fmt.Errorf("failed to decode salt: %w", err)
 	}
-	params.SaltLength = uint32(len(salt))
+	params.SaltLength = ClampToUint32(len(salt))
 
 	// Decode hash
 	hash, err := base64.RawStdEncoding.DecodeString(parts[5])
 	if err != nil {
 		return nil, nil, nil, fmt.Errorf("failed to decode hash: %w", err)
 	}
-	params.KeyLength = uint32(len(hash))
+	params.KeyLength = ClampToUint32(len(hash))
 
 	return params, salt, hash, nil
 }

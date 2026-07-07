@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"regexp"
+	"strconv"
 
 	"github.com/baaaki/mydreamcampus/monolith/internal/modules/course_catalog/db"
 	"github.com/baaaki/mydreamcampus/monolith/internal/modules/course_catalog/dto"
@@ -63,7 +64,7 @@ func validateScheduleSessionTypes(sessions []dto.ScheduleSession, theoreticalHou
 			return catalogErrors.ErrInvalidSessionType
 		}
 
-		slotCount := int16(len(session.SlotNumbers))
+		slotCount := utils.ClampToInt16(len(session.SlotNumbers))
 
 		if session.SessionType == "theory" {
 			if theoreticalHours == 0 {
@@ -110,7 +111,6 @@ func (s *SemesterService) CreateSemesterCourse(ctx context.Context, semester str
 
 	// Semester course offerings can only be added while semester is in 'planned' status.
 	// After activation, the course structure is FROZEN — no add/remove/modify.
-	// See: docs/semester-wizard-plan.md "Iki Katmanli Degismezlik Modeli"
 	if s.semesterStatusRepo != nil {
 		status, err := s.semesterStatusRepo.GetSemesterStatus(ctx, semester)
 		if err != nil {
@@ -256,7 +256,8 @@ func (s *SemesterService) CreateSemesterCourse(ctx context.Context, semester str
 		serviceLogger.Error("failed to begin transaction", zap.Error(err))
 		return dto.SemesterCourseResponse{}, catalogErrors.ErrTransactionFailed
 	}
-	defer tx.Rollback(ctx)
+	// Rollback after successful commit is a no-op returning ErrTxClosed — safe to discard.
+	defer func() { _ = tx.Rollback(ctx) }()
 
 	// Get transaction-aware repositories
 	semesterRepoTx := s.semesterRepo.WithTx(tx)
@@ -408,8 +409,8 @@ func (s *SemesterService) ListSemesterCourses(ctx context.Context, semester stri
 		zap.Int("limit", req.Limit),
 	)
 
-	limit := int32(req.Limit)
-	offset := int32((req.Page - 1) * req.Limit)
+	limit := utils.ClampToInt32(req.Limit)
+	offset := utils.ClampToInt32((req.Page - 1) * req.Limit)
 
 	// Build query params
 	params := db.ListSemesterCoursesParams{
@@ -829,10 +830,11 @@ func isValidSemesterFormat(semester string) bool {
 		return false
 	}
 
-	startYear := 0
-	endYear := 0
-	fmt.Sscanf(matches[1], "%d", &startYear)
-	fmt.Sscanf(matches[2], "%d", &endYear)
+	startYear, err1 := strconv.Atoi(matches[1])
+	endYear, err2 := strconv.Atoi(matches[2])
+	if err1 != nil || err2 != nil {
+		return false
+	}
 
 	if endYear != startYear+1 {
 		return false

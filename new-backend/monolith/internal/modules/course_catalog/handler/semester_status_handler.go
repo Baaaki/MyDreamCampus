@@ -9,15 +9,16 @@ import (
 	"io"
 	"net/http"
 	"regexp"
+	"strconv"
 	"time"
 
 	"github.com/baaaki/mydreamcampus/monolith/internal/modules/course_catalog/db"
 	"github.com/baaaki/mydreamcampus/monolith/internal/modules/course_catalog/repository"
 	"github.com/baaaki/mydreamcampus/monolith/internal/platform/audit"
-	"github.com/baaaki/mydreamcampus/shared/events"
 	"github.com/baaaki/mydreamcampus/monolith/internal/platform/logger"
 	sharedRepo "github.com/baaaki/mydreamcampus/monolith/internal/platform/repository"
 	"github.com/baaaki/mydreamcampus/monolith/internal/platform/utils"
+	"github.com/baaaki/mydreamcampus/shared/events"
 	"github.com/gin-gonic/gin"
 	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5/pgconn"
@@ -35,9 +36,11 @@ func isValidSemesterName(name string) bool {
 		return false
 	}
 
-	var startYear, endYear int
-	fmt.Sscanf(matches[1], "%d", &startYear)
-	fmt.Sscanf(matches[2], "%d", &endYear)
+	startYear, err1 := strconv.Atoi(matches[1])
+	endYear, err2 := strconv.Atoi(matches[2])
+	if err1 != nil || err2 != nil {
+		return false
+	}
 
 	if endYear != startYear+1 {
 		return false
@@ -173,7 +176,7 @@ func (h *SemesterStatusHandler) CreateSemester(c *gin.Context) {
 
 	// Audit log
 	if h.auditLogger != nil {
-		h.auditLogger.Log(ctx, audit.AuditEvent{
+		if err := h.auditLogger.Log(ctx, audit.AuditEvent{
 			ActorID:      getActorID(c),
 			ActorRole:    "admin",
 			Action:       "semester.created",
@@ -183,7 +186,9 @@ func (h *SemesterStatusHandler) CreateSemester(c *gin.Context) {
 				"semester_name": req.Name,
 				"hard_deadline": req.HardDeadline.Format(time.RFC3339),
 			},
-		})
+		}); err != nil {
+			handlerLogger.Warn("audit log write failed", zap.Error(err))
+		}
 	}
 
 	handlerLogger.Info("semester created", zap.String("name", req.Name))
@@ -192,7 +197,6 @@ func (h *SemesterStatusHandler) CreateSemester(c *gin.Context) {
 	// This is intentionally NOT a single atomic endpoint — the steps are separated so that
 	// in the future, a "department_head" role can handle course creation (step 2)
 	// while admin handles semester creation (step 1) and activation (step 3).
-	// See: docs/semester-wizard-plan.md "Gelecek Uyumluluk: Bolum Baskani Rolu"
 	var periodErrors []string
 
 	if req.Periods != nil {
@@ -304,7 +308,7 @@ func (h *SemesterStatusHandler) createRemotePeriod(ctx context.Context, baseURL,
 	if err != nil {
 		return fmt.Errorf("HTTP call failed: %w", err)
 	}
-	defer resp.Body.Close()
+	defer func() { _ = resp.Body.Close() }()
 
 	if resp.StatusCode != http.StatusCreated && resp.StatusCode != http.StatusOK {
 		respBody, _ := io.ReadAll(io.LimitReader(resp.Body, 1024))
@@ -344,7 +348,7 @@ func (h *SemesterStatusHandler) distributeClosedDays(ctx context.Context, closed
 	if err != nil {
 		return fmt.Errorf("HTTP call failed: %w", err)
 	}
-	defer resp.Body.Close()
+	defer func() { _ = resp.Body.Close() }()
 
 	if resp.StatusCode != http.StatusCreated && resp.StatusCode != http.StatusOK {
 		respBody, _ := io.ReadAll(io.LimitReader(resp.Body, 1024))
@@ -406,7 +410,6 @@ func (h *SemesterStatusHandler) GetActiveSemester(c *gin.Context) {
 // cause ambiguity in which semester students enroll in, teachers grade for, etc.
 // The database also enforces this via idx_semesters_single_active partial unique index
 // as a safety net against race conditions.
-// See: docs/semester-wizard-plan.md "Tek Aktif Dönem Kuralı"
 func (h *SemesterStatusHandler) ActivateSemester(c *gin.Context) {
 	ctx, cancel := context.WithTimeout(c.Request.Context(), requestTimeout)
 	defer cancel()
@@ -444,7 +447,8 @@ func (h *SemesterStatusHandler) ActivateSemester(c *gin.Context) {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "internal error", "code": "INTERNAL_ERROR"})
 		return
 	}
-	defer tx.Rollback(ctx)
+	// Rollback after successful commit is a no-op returning ErrTxClosed — safe to discard.
+	defer func() { _ = tx.Rollback(ctx) }()
 
 	qtx := db.New(tx)
 
@@ -500,7 +504,7 @@ func (h *SemesterStatusHandler) ActivateSemester(c *gin.Context) {
 	resp := toSemesterResponse(semester)
 
 	if h.auditLogger != nil {
-		h.auditLogger.Log(ctx, audit.AuditEvent{
+		if err := h.auditLogger.Log(ctx, audit.AuditEvent{
 			ActorID:      getActorID(c),
 			ActorRole:    "admin",
 			Action:       "semester.activated",
@@ -511,7 +515,9 @@ func (h *SemesterStatusHandler) ActivateSemester(c *gin.Context) {
 				"hard_deadline": semester.HardDeadline.Time.Format(time.RFC3339),
 				"courses_count": len(courses),
 			},
-		})
+		}); err != nil {
+			handlerLogger.Warn("audit log write failed", zap.Error(err))
+		}
 	}
 
 	handlerLogger.Info("semester activated",
@@ -587,7 +593,7 @@ func (h *SemesterStatusHandler) CompleteSemester(c *gin.Context) {
 	resp := toSemesterResponse(semester)
 
 	if h.auditLogger != nil {
-		h.auditLogger.Log(ctx, audit.AuditEvent{
+		if err := h.auditLogger.Log(ctx, audit.AuditEvent{
 			ActorID:      getActorID(c),
 			ActorRole:    "admin",
 			Action:       "semester.completed",
@@ -596,7 +602,9 @@ func (h *SemesterStatusHandler) CompleteSemester(c *gin.Context) {
 			Details: map[string]any{
 				"semester_name": semester.Name,
 			},
-		})
+		}); err != nil {
+			handlerLogger.Warn("audit log write failed", zap.Error(err))
+		}
 	}
 
 	handlerLogger.Info("semester completed", zap.String("name", semester.Name))
@@ -723,7 +731,8 @@ func (h *SemesterStatusHandler) DeletePlannedSemester(c *gin.Context) {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "internal error", "code": "INTERNAL_ERROR"})
 		return
 	}
-	defer tx.Rollback(ctx)
+	// Rollback after successful commit is a no-op returning ErrTxClosed — safe to discard.
+	defer func() { _ = tx.Rollback(ctx) }()
 
 	qtx := db.New(tx)
 
@@ -779,7 +788,7 @@ func (h *SemesterStatusHandler) DeletePlannedSemester(c *gin.Context) {
 
 	// Audit log
 	if h.auditLogger != nil {
-		h.auditLogger.Log(ctx, audit.AuditEvent{
+		if err := h.auditLogger.Log(ctx, audit.AuditEvent{
 			ActorID:      getActorID(c),
 			ActorRole:    "admin",
 			Action:       "semester.deleted",
@@ -788,7 +797,9 @@ func (h *SemesterStatusHandler) DeletePlannedSemester(c *gin.Context) {
 			Details: map[string]any{
 				"semester_name": semester.Name,
 			},
-		})
+		}); err != nil {
+			handlerLogger.Warn("audit log write failed", zap.Error(err))
+		}
 	}
 
 	handlerLogger.Info("planned semester deleted", zap.String("name", semester.Name))
@@ -905,7 +916,7 @@ func (h *SemesterStatusHandler) UpdatePlannedSemester(c *gin.Context) {
 
 	// Audit log
 	if h.auditLogger != nil {
-		h.auditLogger.Log(ctx, audit.AuditEvent{
+		if err := h.auditLogger.Log(ctx, audit.AuditEvent{
 			ActorID:      getActorID(c),
 			ActorRole:    "admin",
 			Action:       "semester.updated",
@@ -915,7 +926,9 @@ func (h *SemesterStatusHandler) UpdatePlannedSemester(c *gin.Context) {
 				"semester_name": updated.Name,
 				"hard_deadline": req.HardDeadline.Format(time.RFC3339),
 			},
-		})
+		}); err != nil {
+			handlerLogger.Warn("audit log write failed", zap.Error(err))
+		}
 	}
 
 	resp := toSemesterResponse(updated)
@@ -969,7 +982,7 @@ func (h *SemesterStatusHandler) updateRemotePeriod(ctx context.Context, baseURL,
 	if err != nil {
 		return fmt.Errorf("HTTP call failed: %w", err)
 	}
-	defer resp.Body.Close()
+	defer func() { _ = resp.Body.Close() }()
 
 	if resp.StatusCode >= 400 {
 		respBody, _ := io.ReadAll(io.LimitReader(resp.Body, 1024))
@@ -1008,7 +1021,7 @@ func (h *SemesterStatusHandler) updateRemoteClosedDays(ctx context.Context, seme
 	if err != nil {
 		return fmt.Errorf("HTTP call failed: %w", err)
 	}
-	defer resp.Body.Close()
+	defer func() { _ = resp.Body.Close() }()
 
 	if resp.StatusCode >= 400 {
 		respBody, _ := io.ReadAll(io.LimitReader(resp.Body, 1024))
@@ -1032,7 +1045,7 @@ func (h *SemesterStatusHandler) deleteRemoteResource(ctx context.Context, url st
 	if err != nil {
 		return fmt.Errorf("HTTP call failed: %w", err)
 	}
-	defer resp.Body.Close()
+	defer func() { _ = resp.Body.Close() }()
 
 	if resp.StatusCode >= 400 {
 		respBody, _ := io.ReadAll(io.LimitReader(resp.Body, 1024))

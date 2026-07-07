@@ -79,7 +79,8 @@ func (s *EventService) HandleStudentCreated(ctx context.Context, event dto.Stude
 	if err != nil {
 		return fmt.Errorf("%w: failed to begin transaction: %v", sharedErrors.ErrTransactionFailed, err)
 	}
-	defer tx.Rollback(ctx)
+	// Rollback after successful commit is a no-op returning ErrTxClosed — safe to discard.
+	defer func() { _ = tx.Rollback(ctx) }()
 
 	// Parse user ID
 	userID, err := uuid.Parse(event.Data.ID)
@@ -186,7 +187,8 @@ func (s *EventService) HandleStaffCreated(ctx context.Context, event dto.StaffCr
 	if err != nil {
 		return fmt.Errorf("%w: failed to begin transaction: %v", sharedErrors.ErrTransactionFailed, err)
 	}
-	defer tx.Rollback(ctx)
+	// Rollback after successful commit is a no-op returning ErrTxClosed — safe to discard.
+	defer func() { _ = tx.Rollback(ctx) }()
 
 	// Parse user ID
 	userID, err := uuid.Parse(event.Data.ID)
@@ -298,7 +300,8 @@ func (s *EventService) HandleUserUpdated(ctx context.Context, event dto.UserUpda
 	if err != nil {
 		return fmt.Errorf("%w: failed to begin transaction: %v", sharedErrors.ErrTransactionFailed, err)
 	}
-	defer tx.Rollback(ctx)
+	// Rollback after successful commit is a no-op returning ErrTxClosed — safe to discard.
+	defer func() { _ = tx.Rollback(ctx) }()
 
 	// Parse user ID
 	userID, err := uuid.Parse(event.Data.ID)
@@ -382,7 +385,8 @@ func (s *EventService) HandleUserDeactivated(ctx context.Context, event dto.User
 	if err != nil {
 		return fmt.Errorf("%w: failed to begin transaction: %v", sharedErrors.ErrTransactionFailed, err)
 	}
-	defer tx.Rollback(ctx)
+	// Rollback after successful commit is a no-op returning ErrTxClosed — safe to discard.
+	defer func() { _ = tx.Rollback(ctx) }()
 
 	// Parse user ID
 	userID, err := uuid.Parse(event.Data.ID)

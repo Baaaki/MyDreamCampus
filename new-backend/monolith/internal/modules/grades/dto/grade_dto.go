@@ -18,8 +18,8 @@ type SubmitScoreRequest struct {
 }
 
 type BulkSubmitScoresRequest struct {
-	Slug   string            `json:"slug" binding:"required"`
-	Scores []BulkScoreEntry  `json:"scores" binding:"required,dive"`
+	Slug   string           `json:"slug" binding:"required"`
+	Scores []BulkScoreEntry `json:"scores" binding:"required,dive"`
 }
 
 type BulkScoreEntry struct {
@@ -29,13 +29,13 @@ type BulkScoreEntry struct {
 }
 
 type SubmitScoreResponse struct {
-	ID            uuid.UUID        `json:"id"`
-	StudentNumber string           `json:"student_number"`
-	Slug          string           `json:"slug"`
-	Score         *float64         `json:"score"`
-	IsAbsent      bool             `json:"is_absent"`
-	GradedAt      time.Time        `json:"graded_at"`
-	AutoFinalized bool             `json:"auto_finalized,omitempty"`
+	ID             uuid.UUID       `json:"id"`
+	StudentNumber  string          `json:"student_number"`
+	Slug           string          `json:"slug"`
+	Score          *float64        `json:"score"`
+	IsAbsent       bool            `json:"is_absent"`
+	GradedAt       time.Time       `json:"graded_at"`
+	AutoFinalized  bool            `json:"auto_finalized,omitempty"`
 	FinalizeResult *FinalizeResult `json:"finalize_result,omitempty"`
 }
 
@@ -60,17 +60,17 @@ type FinalizeResult struct {
 // ============================================
 
 type CourseStatusResponse struct {
-	CourseID       uuid.UUID            `json:"course_id"`
-	CourseCode     string               `json:"course_code"`
-	CourseName     string               `json:"course_name"`
-	Semester       string               `json:"semester"`
-	TotalStudents  int                  `json:"total_students"`
-	Assessments    []AssessmentStatus   `json:"assessments"`
-	IsFinalized    bool                 `json:"is_finalized"`
-	PendingMessage string               `json:"pending_message,omitempty"`
-	FinalizedAt    *time.Time           `json:"finalized_at,omitempty"`
-	GradingType    string               `json:"grading_type,omitempty"`
-	ClassStats     *ClassStatistics     `json:"class_statistics,omitempty"`
+	CourseID       uuid.UUID          `json:"course_id"`
+	CourseCode     string             `json:"course_code"`
+	CourseName     string             `json:"course_name"`
+	Semester       string             `json:"semester"`
+	TotalStudents  int                `json:"total_students"`
+	Assessments    []AssessmentStatus `json:"assessments"`
+	IsFinalized    bool               `json:"is_finalized"`
+	PendingMessage string             `json:"pending_message,omitempty"`
+	FinalizedAt    *time.Time         `json:"finalized_at,omitempty"`
+	GradingType    string             `json:"grading_type,omitempty"`
+	ClassStats     *ClassStatistics   `json:"class_statistics,omitempty"`
 }
 
 type AssessmentStatus struct {
@@ -122,12 +122,12 @@ type ScoreDetail struct {
 // ============================================
 
 type MyGradesResponse struct {
-	StudentID        uuid.UUID           `json:"student_id"`
-	StudentNumber    string              `json:"student_number"`
-	ActiveCourses    []ActiveCourse      `json:"active_courses"`
-	CompletedCourses []CompletedCourse   `json:"completed_courses"`
-	CumulativeGPA    float64             `json:"cumulative_gpa"`
-	TotalCredits     int                 `json:"total_credits"`
+	StudentID        uuid.UUID         `json:"student_id"`
+	StudentNumber    string            `json:"student_number"`
+	ActiveCourses    []ActiveCourse    `json:"active_courses"`
+	CompletedCourses []CompletedCourse `json:"completed_courses"`
+	CumulativeGPA    float64           `json:"cumulative_gpa"`
+	TotalCredits     int               `json:"total_credits"`
 }
 
 type ActiveCourse struct {
@@ -153,10 +153,10 @@ type CompletedCourse struct {
 // ============================================
 
 type TranscriptResponse struct {
-	Student  StudentInfo       `json:"student"`
-	Semesters []SemesterGrades `json:"semesters"`
-	Summary  TranscriptSummary `json:"summary"`
-	GeneratedAt time.Time      `json:"generated_at"`
+	Student     StudentInfo       `json:"student"`
+	Semesters   []SemesterGrades  `json:"semesters"`
+	Summary     TranscriptSummary `json:"summary"`
+	GeneratedAt time.Time         `json:"generated_at"`
 }
 
 type StudentInfo struct {
@@ -168,11 +168,11 @@ type StudentInfo struct {
 }
 
 type SemesterGrades struct {
-	Semester        string          `json:"semester"`
-	SemesterDisplay string          `json:"semester_display"`
-	Courses         []CourseGrade   `json:"courses"`
-	SemesterCredits int             `json:"semester_credits"`
-	SemesterGPA     float64         `json:"semester_gpa"`
+	Semester        string        `json:"semester"`
+	SemesterDisplay string        `json:"semester_display"`
+	Courses         []CourseGrade `json:"courses"`
+	SemesterCredits int           `json:"semester_credits"`
+	SemesterGPA     float64       `json:"semester_gpa"`
 }
 
 type CourseGrade struct {

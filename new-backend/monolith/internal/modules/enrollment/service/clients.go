@@ -4,11 +4,11 @@ import (
 	"context"
 	"fmt"
 
-	"github.com/google/uuid"
-	catalogService "github.com/baaaki/mydreamcampus/monolith/internal/modules/course_catalog/service"
 	catalogDTO "github.com/baaaki/mydreamcampus/monolith/internal/modules/course_catalog/dto"
-	studentService "github.com/baaaki/mydreamcampus/monolith/internal/modules/student/service"
+	catalogService "github.com/baaaki/mydreamcampus/monolith/internal/modules/course_catalog/service"
 	studentDTO "github.com/baaaki/mydreamcampus/monolith/internal/modules/student/dto"
+	studentService "github.com/baaaki/mydreamcampus/monolith/internal/modules/student/service"
+	"github.com/google/uuid"
 )
 
 // StudentClient defines the interface for communicating with the Student module

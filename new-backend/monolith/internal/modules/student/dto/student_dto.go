@@ -8,14 +8,14 @@ import (
 
 // CreateStudentRequest represents the request body for creating a student
 type CreateStudentRequest struct {
-	StudentNumber  string    `json:"student_number" binding:"required"`
-	FirstName      string    `json:"first_name" binding:"required"`
-	LastName       string    `json:"last_name" binding:"required"`
-	Email          string    `json:"email" binding:"required,email"`
-	Faculty        string    `json:"faculty" binding:"required"`
-	Department     string    `json:"department" binding:"required"`
-	EnrollmentYear int       `json:"enrollment_year" binding:"required,min=1900,max=2100"`
-	ClassLevel     int16     `json:"class_level" binding:"required,min=1,max=6"`
+	StudentNumber  string     `json:"student_number" binding:"required"`
+	FirstName      string     `json:"first_name" binding:"required"`
+	LastName       string     `json:"last_name" binding:"required"`
+	Email          string     `json:"email" binding:"required,email"`
+	Faculty        string     `json:"faculty" binding:"required"`
+	Department     string     `json:"department" binding:"required"`
+	EnrollmentYear int        `json:"enrollment_year" binding:"required,min=1900,max=2100"`
+	ClassLevel     int16      `json:"class_level" binding:"required,min=1,max=6"`
 	AdvisorID      *uuid.UUID `json:"advisor_id"`
 }
 

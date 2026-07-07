@@ -128,7 +128,7 @@ func (m *Module) RegisterRoutes(rg *gin.RouterGroup) {
 		// Student routes
 		protected.POST("/scan", platformMiddleware.RequireRole("student"), m.attendanceHandler.ScanQR)
 		protected.GET("/my", platformMiddleware.RequireRole("student"), m.attendanceHandler.GetMyAttendance)
-		
+
 		// Admin
 		protected.GET("/admin/sessions", platformMiddleware.RequireAdmin(), m.attendanceHandler.AdminListSessions)
 	}

@@ -61,15 +61,15 @@ func (c *Connection) connect() error {
 
 	channel, err := conn.Channel()
 	if err != nil {
-		conn.Close()
+		_ = conn.Close()
 		return fmt.Errorf("failed to open channel: %w", err)
 	}
 
 	// Set QoS (Quality of Service)
 	// prefetchCount: number of unacknowledged messages before blocking
 	if err := channel.Qos(10, 0, false); err != nil {
-		channel.Close()
-		conn.Close()
+		_ = channel.Close()
+		_ = conn.Close()
 		return fmt.Errorf("failed to set QoS: %w", err)
 	}
 

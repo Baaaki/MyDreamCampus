@@ -25,8 +25,8 @@ var (
 	ErrTokenVersionMismatch = sharedErrors.New("TOKEN_VERSION_MISMATCH", "Token version mismatch, please login again", http.StatusUnauthorized)
 
 	// Account status errors
-	ErrAccountLocked      = sharedErrors.New("ACCOUNT_LOCKED", "Account is temporarily locked due to multiple failed login attempts", http.StatusTooManyRequests)
-	ErrAccountDeactivated = sharedErrors.New("ACCOUNT_DEACTIVATED", "Account has been deactivated", http.StatusUnauthorized)
+	ErrAccountLocked       = sharedErrors.New("ACCOUNT_LOCKED", "Account is temporarily locked due to multiple failed login attempts", http.StatusTooManyRequests)
+	ErrAccountDeactivated  = sharedErrors.New("ACCOUNT_DEACTIVATED", "Account has been deactivated", http.StatusUnauthorized)
 	ErrForcePasswordChange = sharedErrors.New("FORCE_PASSWORD_CHANGE", "Password change required", http.StatusForbidden)
 
 	// Session errors

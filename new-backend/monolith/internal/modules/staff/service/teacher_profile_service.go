@@ -4,13 +4,13 @@ import (
 	"context"
 	"encoding/json"
 
+	"github.com/baaaki/mydreamcampus/monolith/internal/modules/staff/db"
+	"github.com/baaaki/mydreamcampus/monolith/internal/modules/staff/dto"
+	serviceErrors "github.com/baaaki/mydreamcampus/monolith/internal/modules/staff/errors"
+	"github.com/baaaki/mydreamcampus/monolith/internal/modules/staff/repository"
 	sharedErrors "github.com/baaaki/mydreamcampus/monolith/internal/platform/errors"
 	"github.com/baaaki/mydreamcampus/monolith/internal/platform/logger"
 	"github.com/baaaki/mydreamcampus/monolith/internal/platform/utils"
-	serviceErrors "github.com/baaaki/mydreamcampus/monolith/internal/modules/staff/errors"
-	"github.com/baaaki/mydreamcampus/monolith/internal/modules/staff/db"
-	"github.com/baaaki/mydreamcampus/monolith/internal/modules/staff/dto"
-	"github.com/baaaki/mydreamcampus/monolith/internal/modules/staff/repository"
 	"github.com/google/uuid"
 	"go.uber.org/zap"
 )
@@ -22,6 +22,18 @@ type TeacherProfileService struct {
 func NewTeacherProfileService(profileRepo *repository.TeacherProfileRepository) *TeacherProfileService {
 	return &TeacherProfileService{
 		profileRepo: profileRepo,
+	}
+}
+
+// decodeJSONBField decodes a denormalized JSONB column. A corrupt value
+// degrades to the field's zero value instead of failing the whole read.
+func decodeJSONBField(raw []byte, dst any, field string) {
+	if len(raw) == 0 {
+		return
+	}
+	if err := json.Unmarshal(raw, dst); err != nil {
+		logger.Warn("failed to decode teacher profile JSONB field",
+			zap.String("field", field), zap.Error(err))
 	}
 }
 
@@ -143,8 +155,8 @@ func (s *TeacherProfileService) ListTeacherProfiles(ctx context.Context, query d
 		zap.Int("limit", query.Limit),
 	)
 
-	limit := int32(query.Limit)
-	offset := int32((query.Page - 1) * query.Limit)
+	limit := utils.ClampToInt32(query.Limit)
+	offset := utils.ClampToInt32((query.Page - 1) * query.Limit)
 
 	profiles, total, err := s.profileRepo.ListTeacherProfiles(ctx, limit, offset)
 	if err != nil {
@@ -180,50 +192,36 @@ func (s *TeacherProfileService) ListTeacherProfiles(ctx context.Context, query d
 // toTeacherProfileResponse converts db row to dto response
 func (s *TeacherProfileService) toTeacherProfileResponse(row db.GetTeacherProfileByStaffIDRow) dto.TeacherProfileResponse {
 	response := dto.TeacherProfileResponse{
-		ID:              utils.PgtypeToUUIDString(row.ID),
-		StaffID:         utils.PgtypeToUUIDString(row.StaffID),
-		AcademicTitle:   utils.PgTextToString(row.AcademicTitle),
-		FirstName:       row.FirstName,
-		LastName:        row.LastName,
-		Faculty:         utils.PgTextToString(row.Faculty),
-		Department:      utils.PgTextToString(row.Department),
-		Email:           row.Email,
-		Phone:           utils.PgTextToString(row.Phone),
-		OfficeLocation:  utils.PgTextToString(row.OfficeLocation),
-		ProfileImageURL: utils.PgTextToString(row.ProfileImageUrl),
-		Education:       []dto.Education{},
-		Articles:        []dto.Article{},
-		Bulletins:       []dto.Bulletin{},
-		Projects:        []dto.Project{},
-		Awards:          []dto.Award{},
-		Scholarships:    []dto.Scholarship{},
+		ID:               utils.PgtypeToUUIDString(row.ID),
+		StaffID:          utils.PgtypeToUUIDString(row.StaffID),
+		AcademicTitle:    utils.PgTextToString(row.AcademicTitle),
+		FirstName:        row.FirstName,
+		LastName:         row.LastName,
+		Faculty:          utils.PgTextToString(row.Faculty),
+		Department:       utils.PgTextToString(row.Department),
+		Email:            row.Email,
+		Phone:            utils.PgTextToString(row.Phone),
+		OfficeLocation:   utils.PgTextToString(row.OfficeLocation),
+		ProfileImageURL:  utils.PgTextToString(row.ProfileImageUrl),
+		Education:        []dto.Education{},
+		Articles:         []dto.Article{},
+		Bulletins:        []dto.Bulletin{},
+		Projects:         []dto.Project{},
+		Awards:           []dto.Award{},
+		Scholarships:     []dto.Scholarship{},
 		AdminAssignments: []dto.AdminAssignment{},
-		CreatedAt:       row.CreatedAt.Time,
-		UpdatedAt:       row.UpdatedAt.Time,
+		CreatedAt:        row.CreatedAt.Time,
+		UpdatedAt:        row.UpdatedAt.Time,
 	}
 
 	// Parse JSONB fields
-	if len(row.Education) > 0 {
-		json.Unmarshal(row.Education, &response.Education)
-	}
-	if len(row.Articles) > 0 {
-		json.Unmarshal(row.Articles, &response.Articles)
-	}
-	if len(row.Bulletins) > 0 {
-		json.Unmarshal(row.Bulletins, &response.Bulletins)
-	}
-	if len(row.Projects) > 0 {
-		json.Unmarshal(row.Projects, &response.Projects)
-	}
-	if len(row.Awards) > 0 {
-		json.Unmarshal(row.Awards, &response.Awards)
-	}
-	if len(row.Scholarships) > 0 {
-		json.Unmarshal(row.Scholarships, &response.Scholarships)
-	}
-	if len(row.AdminAssignments) > 0 {
-		json.Unmarshal(row.AdminAssignments, &response.AdminAssignments)
-	}
+	decodeJSONBField(row.Education, &response.Education, "education")
+	decodeJSONBField(row.Articles, &response.Articles, "articles")
+	decodeJSONBField(row.Bulletins, &response.Bulletins, "bulletins")
+	decodeJSONBField(row.Projects, &response.Projects, "projects")
+	decodeJSONBField(row.Awards, &response.Awards, "awards")
+	decodeJSONBField(row.Scholarships, &response.Scholarships, "scholarships")
+	decodeJSONBField(row.AdminAssignments, &response.AdminAssignments, "admin_assignments")
 
 	return response
 }
@@ -231,50 +229,36 @@ func (s *TeacherProfileService) toTeacherProfileResponse(row db.GetTeacherProfil
 // listRowToTeacherProfileResponse converts list row to dto response
 func (s *TeacherProfileService) listRowToTeacherProfileResponse(row db.ListTeacherProfilesRow) dto.TeacherProfileResponse {
 	response := dto.TeacherProfileResponse{
-		ID:              utils.PgtypeToUUIDString(row.ID),
-		StaffID:         utils.PgtypeToUUIDString(row.StaffID),
-		AcademicTitle:   utils.PgTextToString(row.AcademicTitle),
-		FirstName:       row.FirstName,
-		LastName:        row.LastName,
-		Faculty:         utils.PgTextToString(row.Faculty),
-		Department:      utils.PgTextToString(row.Department),
-		Email:           row.Email,
-		Phone:           utils.PgTextToString(row.Phone),
-		OfficeLocation:  utils.PgTextToString(row.OfficeLocation),
-		ProfileImageURL: utils.PgTextToString(row.ProfileImageUrl),
-		Education:       []dto.Education{},
-		Articles:        []dto.Article{},
-		Bulletins:       []dto.Bulletin{},
-		Projects:        []dto.Project{},
-		Awards:          []dto.Award{},
-		Scholarships:    []dto.Scholarship{},
+		ID:               utils.PgtypeToUUIDString(row.ID),
+		StaffID:          utils.PgtypeToUUIDString(row.StaffID),
+		AcademicTitle:    utils.PgTextToString(row.AcademicTitle),
+		FirstName:        row.FirstName,
+		LastName:         row.LastName,
+		Faculty:          utils.PgTextToString(row.Faculty),
+		Department:       utils.PgTextToString(row.Department),
+		Email:            row.Email,
+		Phone:            utils.PgTextToString(row.Phone),
+		OfficeLocation:   utils.PgTextToString(row.OfficeLocation),
+		ProfileImageURL:  utils.PgTextToString(row.ProfileImageUrl),
+		Education:        []dto.Education{},
+		Articles:         []dto.Article{},
+		Bulletins:        []dto.Bulletin{},
+		Projects:         []dto.Project{},
+		Awards:           []dto.Award{},
+		Scholarships:     []dto.Scholarship{},
 		AdminAssignments: []dto.AdminAssignment{},
-		CreatedAt:       row.CreatedAt.Time,
-		UpdatedAt:       row.UpdatedAt.Time,
+		CreatedAt:        row.CreatedAt.Time,
+		UpdatedAt:        row.UpdatedAt.Time,
 	}
 
 	// Parse JSONB fields
-	if len(row.Education) > 0 {
-		json.Unmarshal(row.Education, &response.Education)
-	}
-	if len(row.Articles) > 0 {
-		json.Unmarshal(row.Articles, &response.Articles)
-	}
-	if len(row.Bulletins) > 0 {
-		json.Unmarshal(row.Bulletins, &response.Bulletins)
-	}
-	if len(row.Projects) > 0 {
-		json.Unmarshal(row.Projects, &response.Projects)
-	}
-	if len(row.Awards) > 0 {
-		json.Unmarshal(row.Awards, &response.Awards)
-	}
-	if len(row.Scholarships) > 0 {
-		json.Unmarshal(row.Scholarships, &response.Scholarships)
-	}
-	if len(row.AdminAssignments) > 0 {
-		json.Unmarshal(row.AdminAssignments, &response.AdminAssignments)
-	}
+	decodeJSONBField(row.Education, &response.Education, "education")
+	decodeJSONBField(row.Articles, &response.Articles, "articles")
+	decodeJSONBField(row.Bulletins, &response.Bulletins, "bulletins")
+	decodeJSONBField(row.Projects, &response.Projects, "projects")
+	decodeJSONBField(row.Awards, &response.Awards, "awards")
+	decodeJSONBField(row.Scholarships, &response.Scholarships, "scholarships")
+	decodeJSONBField(row.AdminAssignments, &response.AdminAssignments, "admin_assignments")
 
 	return response
 }

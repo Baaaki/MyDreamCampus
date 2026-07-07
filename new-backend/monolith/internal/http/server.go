@@ -10,8 +10,8 @@ import (
 
 	"github.com/baaaki/mydreamcampus/monolith/config"
 	platformHandler "github.com/baaaki/mydreamcampus/monolith/internal/platform/handler"
-	platformMiddleware "github.com/baaaki/mydreamcampus/monolith/internal/platform/middleware"
 	"github.com/baaaki/mydreamcampus/monolith/internal/platform/logger"
+	platformMiddleware "github.com/baaaki/mydreamcampus/monolith/internal/platform/middleware"
 	"github.com/gin-gonic/gin"
 	"go.uber.org/zap"
 )

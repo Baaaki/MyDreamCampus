@@ -93,7 +93,7 @@ func (r *SemesterStatusRepository) IsSemesterActive(ctx context.Context, semeste
 		} else {
 			// Audit log: semester.auto_completed
 			if r.auditLogger != nil {
-				r.auditLogger.Log(ctx, audit.AuditEvent{
+				if err := r.auditLogger.Log(ctx, audit.AuditEvent{
 					ActorID:      "system",
 					ActorRole:    "system",
 					Action:       "semester.auto_completed",
@@ -104,7 +104,9 @@ func (r *SemesterStatusRepository) IsSemesterActive(ctx context.Context, semeste
 						"hard_deadline": semester.HardDeadline.Time.Format(time.RFC3339),
 						"reason":        "hard_deadline has passed",
 					},
-				})
+				}); err != nil {
+					log.Warn("audit log write failed", zap.Error(err))
+				}
 			}
 			log.Info("semester auto-completed due to hard deadline",
 				zap.String("semester", semesterName),

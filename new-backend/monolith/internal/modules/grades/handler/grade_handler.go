@@ -45,7 +45,7 @@ func (h *GradeHandler) GetCourseStatus(c *gin.Context) {
 		zap.String("method", "GetCourseStatus"),
 	)
 
-	// Get instructor ID from context (set by ExtractUserFromHeaders middleware as string)
+	// Get instructor ID from context (set by JWTAuth middleware as string)
 	instructorIDStr, exists := c.Get("user_id")
 	if !exists {
 		handlerLogger.Error("user_id not found in context")
@@ -109,7 +109,7 @@ func (h *GradeHandler) GetCourseStudents(c *gin.Context) {
 		zap.String("method", "GetCourseStudents"),
 	)
 
-	// Get instructor ID from context (set by ExtractUserFromHeaders middleware as string)
+	// Get instructor ID from context (set by JWTAuth middleware as string)
 	instructorIDStr, exists := c.Get("user_id")
 	if !exists {
 		handlerLogger.Error("user_id not found in context")
@@ -173,7 +173,7 @@ func (h *GradeHandler) SubmitScore(c *gin.Context) {
 		zap.String("method", "SubmitScore"),
 	)
 
-	// Get instructor ID from context (set by ExtractUserFromHeaders middleware as string)
+	// Get instructor ID from context (set by JWTAuth middleware as string)
 	instructorIDStr, exists := c.Get("user_id")
 	if !exists {
 		handlerLogger.Error("user_id not found in context")
@@ -246,7 +246,7 @@ func (h *GradeHandler) BulkSubmitScores(c *gin.Context) {
 		zap.String("method", "BulkSubmitScores"),
 	)
 
-	// Get instructor ID from context (set by ExtractUserFromHeaders middleware as string)
+	// Get instructor ID from context (set by JWTAuth middleware as string)
 	instructorIDStr, exists := c.Get("user_id")
 	if !exists {
 		handlerLogger.Error("user_id not found in context")
@@ -380,7 +380,7 @@ func (h *GradeHandler) GetMyGrades(c *gin.Context) {
 		zap.String("method", "GetMyGrades"),
 	)
 
-	// Get student ID from context (set by ExtractUserFromHeaders middleware as string)
+	// Get student ID from context (set by JWTAuth middleware as string)
 	studentIDStr, exists := c.Get("user_id")
 	if !exists {
 		handlerLogger.Error("user_id not found in context")
@@ -427,7 +427,7 @@ func (h *GradeHandler) GetTranscript(c *gin.Context) {
 		zap.String("method", "GetTranscript"),
 	)
 
-	// Get requester info from context (set by ExtractUserFromHeaders middleware as string)
+	// Get requester info from context (set by JWTAuth middleware as string)
 	requesterIDStr, exists := c.Get("user_id")
 	if !exists {
 		handlerLogger.Error("user_id not found in context")
@@ -539,7 +539,7 @@ func (h *GradeHandler) ProcessAppeal(c *gin.Context) {
 
 	// Add user_id to context for audit logging
 	userID, _ := c.Get("user_id")
-	ctx := context.WithValue(parentCtx, "user_id", userID)
+	ctx := context.WithValue(parentCtx, service.CtxKeyUserID, userID)
 
 	// Process appeal
 	result, err := h.gradeService.ProcessAppeal(ctx, req)

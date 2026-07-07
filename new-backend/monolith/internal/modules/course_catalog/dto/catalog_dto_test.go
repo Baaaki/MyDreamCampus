@@ -34,13 +34,13 @@ func validateBinding[T any](t *testing.T, body any) (int, string) {
 
 func TestCreateCourseRequest_Validation(t *testing.T) {
 	valid := map[string]any{
-		"course_code":      "CSE101",
-		"name":             "Intro to CS",
-		"faculty":          "Engineering",
-		"department":       "Computer Science",
-		"class_level":      1,
-		"credits":          3,
-		"course_type":      "mandatory",
+		"course_code": "CSE101",
+		"name":        "Intro to CS",
+		"faculty":     "Engineering",
+		"department":  "Computer Science",
+		"class_level": 1,
+		"credits":     3,
+		"course_type": "mandatory",
 	}
 
 	t.Run("valid request", func(t *testing.T) {

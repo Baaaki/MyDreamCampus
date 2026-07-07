@@ -84,10 +84,10 @@ func (s *EnrollmentService) ApproveEnrollmentProgram(ctx context.Context, progra
 	coursesDTO := make([]dto.CourseBasic, 0, len(coursesRows))
 	for _, row := range coursesRows {
 		coursesDTO = append(coursesDTO, dto.CourseBasic{
-			ID:             utils.PgtypeToUUID(row.CourseID).String(),
-			CourseCode:     row.CourseCode,
-			CourseName:     row.CourseName,
-			Credits:        row.Credits,
+			ID:         utils.PgtypeToUUID(row.CourseID).String(),
+			CourseCode: row.CourseCode,
+			CourseName: row.CourseName,
+			Credits:    row.Credits,
 		})
 	}
 
@@ -262,13 +262,13 @@ func (s *EnrollmentService) GetPendingProgramsByAdvisor(ctx context.Context, adv
 		}
 
 		programsDTO = append(programsDTO, dto.EnrollmentProgramResponse{
-			ID:            programID,
-			StudentID:     studentID,
-			StudentName:   studentMap[studentID],
-			Semester:      program.Semester,
-			Status:        string(program.Status.EnrollmentStatusEnum),
-			Courses:       coursesDTO,
-			CreatedAt:     program.CreatedAt.Time,
+			ID:          programID,
+			StudentID:   studentID,
+			StudentName: studentMap[studentID],
+			Semester:    program.Semester,
+			Status:      string(program.Status.EnrollmentStatusEnum),
+			Courses:     coursesDTO,
+			CreatedAt:   program.CreatedAt.Time,
 		})
 	}
 

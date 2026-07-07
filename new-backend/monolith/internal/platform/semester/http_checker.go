@@ -36,7 +36,7 @@ func (c *HTTPChecker) IsSemesterActive(ctx context.Context, semesterName string)
 	if err != nil {
 		return false, fmt.Errorf("failed to check semester status: %w", err)
 	}
-	defer resp.Body.Close()
+	defer func() { _ = resp.Body.Close() }()
 
 	if resp.StatusCode != http.StatusOK {
 		return false, nil

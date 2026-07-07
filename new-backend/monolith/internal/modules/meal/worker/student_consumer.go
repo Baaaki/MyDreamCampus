@@ -5,18 +5,18 @@ import (
 	"encoding/json"
 
 	"github.com/baaaki/mydreamcampus/monolith/internal/modules/meal/db"
-	"github.com/baaaki/mydreamcampus/monolith/internal/platform/utils"
 	"github.com/baaaki/mydreamcampus/monolith/internal/modules/meal/dto"
 	"github.com/baaaki/mydreamcampus/monolith/internal/modules/meal/repository"
+	"github.com/baaaki/mydreamcampus/monolith/internal/platform/utils"
 	"github.com/google/uuid"
 	"go.uber.org/zap"
 )
 
 // StudentEventConsumer handles student events from RabbitMQ
 type StudentEventConsumer struct {
-	studentCacheRepo     *repository.StudentCacheRepository
-	processedEventsRepo  *repository.ProcessedEventsRepository
-	logger               *zap.Logger
+	studentCacheRepo    *repository.StudentCacheRepository
+	processedEventsRepo *repository.ProcessedEventsRepository
+	logger              *zap.Logger
 }
 
 func NewStudentEventConsumer(

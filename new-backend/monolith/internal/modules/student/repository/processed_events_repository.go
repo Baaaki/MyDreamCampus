@@ -1,9 +1,9 @@
 package repository
 
 import (
-	sharedErrors "github.com/baaaki/mydreamcampus/monolith/internal/platform/errors"
 	"context"
 	"fmt"
+	sharedErrors "github.com/baaaki/mydreamcampus/monolith/internal/platform/errors"
 
 	"github.com/baaaki/mydreamcampus/monolith/internal/modules/student/db"
 	"github.com/jackc/pgx/v5/pgxpool"

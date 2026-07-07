@@ -66,21 +66,21 @@ type PrerequisiteCourse struct {
 // CourseSemesterCreatedEvent represents course.semester.created event
 type CourseSemesterCreatedEvent struct {
 	BaseEvent
-	SemesterCourseID  uuid.UUID            `json:"semester_course_id"`
-	CourseCode        string               `json:"course_code"`
-	CourseName        string               `json:"course_name"`
-	Faculty           string               `json:"faculty"`
-	Department        string               `json:"department"`
-	Credits           int16                `json:"credits"`
-	CourseType        string               `json:"course_type"`
-	ClassLevel        int16                `json:"class_level"`
-	Semester          string               `json:"semester"`
-	InstructorID      *uuid.UUID           `json:"instructor_id"`
-	InstructorFullname string              `json:"instructor_fullname"`
-	ClassroomLocation string               `json:"classroom_location"`
-	MaxCapacity       int16                `json:"max_capacity"`
-	Prerequisites     []PrerequisiteCourse `json:"prerequisites"`
-	ScheduleSessions  []CourseSession      `json:"schedule_sessions"`
+	SemesterCourseID   uuid.UUID            `json:"semester_course_id"`
+	CourseCode         string               `json:"course_code"`
+	CourseName         string               `json:"course_name"`
+	Faculty            string               `json:"faculty"`
+	Department         string               `json:"department"`
+	Credits            int16                `json:"credits"`
+	CourseType         string               `json:"course_type"`
+	ClassLevel         int16                `json:"class_level"`
+	Semester           string               `json:"semester"`
+	InstructorID       *uuid.UUID           `json:"instructor_id"`
+	InstructorFullname string               `json:"instructor_fullname"`
+	ClassroomLocation  string               `json:"classroom_location"`
+	MaxCapacity        int16                `json:"max_capacity"`
+	Prerequisites      []PrerequisiteCourse `json:"prerequisites"`
+	ScheduleSessions   []CourseSession      `json:"schedule_sessions"`
 }
 
 // GradeStudentPrerequisitePassedEvent represents grade.student.prerequisite.passed event.
@@ -102,22 +102,22 @@ type GradeStudentPrerequisitePassedEvent struct {
 // EnrollmentProgramSubmittedEvent represents enrollment.program_submitted event
 type EnrollmentProgramSubmittedEvent struct {
 	BaseEvent
-	ProgramID  uuid.UUID   `json:"program_id"`
-	StudentID  uuid.UUID   `json:"student_id"`
-	Semester   string      `json:"semester"`
-	CourseIDs  []uuid.UUID `json:"course_ids"`
-	TotalCourses int       `json:"total_courses"`
+	ProgramID    uuid.UUID   `json:"program_id"`
+	StudentID    uuid.UUID   `json:"student_id"`
+	Semester     string      `json:"semester"`
+	CourseIDs    []uuid.UUID `json:"course_ids"`
+	TotalCourses int         `json:"total_courses"`
 }
 
 // EnrollmentProgramApprovedEvent represents enrollment.program_approved event
 type EnrollmentProgramApprovedEvent struct {
 	BaseEvent
-	ProgramID   uuid.UUID   `json:"program_id"`
-	StudentID   uuid.UUID   `json:"student_id"`
-	Semester    string      `json:"semester"`
-	CourseIDs   []uuid.UUID `json:"course_ids"`
-	ApprovedBy  uuid.UUID   `json:"approved_by"`
-	ApprovedAt  time.Time   `json:"approved_at"`
+	ProgramID  uuid.UUID   `json:"program_id"`
+	StudentID  uuid.UUID   `json:"student_id"`
+	Semester   string      `json:"semester"`
+	CourseIDs  []uuid.UUID `json:"course_ids"`
+	ApprovedBy uuid.UUID   `json:"approved_by"`
+	ApprovedAt time.Time   `json:"approved_at"`
 }
 
 // EnrollmentProgramRejectedEvent represents enrollment.program_rejected event

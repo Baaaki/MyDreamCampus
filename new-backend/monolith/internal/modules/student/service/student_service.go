@@ -97,7 +97,7 @@ func (s *StudentService) CreateStudent(ctx context.Context, req dto.CreateStuden
 		Email:          req.Email,
 		Faculty:        req.Faculty,
 		Department:     req.Department,
-		EnrollmentYear: int32(req.EnrollmentYear),
+		EnrollmentYear: utils.ClampToInt32(req.EnrollmentYear),
 		ClassLevel:     req.ClassLevel,
 	}
 
@@ -405,8 +405,8 @@ func (s *StudentService) DeleteStudent(ctx context.Context, id string) error {
 
 // ListStudents lists students with pagination, filtering, and sorting
 func (s *StudentService) ListStudents(ctx context.Context, query dto.PaginationQuery) (dto.StudentListResponse, error) {
-	limit := int32(query.Limit)
-	offset := int32((query.Page - 1) * query.Limit)
+	limit := utils.ClampToInt32(query.Limit)
+	offset := utils.ClampToInt32((query.Page - 1) * query.Limit)
 
 	// Set default sort if not provided
 	sortBy := "created_at"
@@ -505,8 +505,8 @@ func (s *StudentService) ListStudentsByAdvisor(ctx context.Context, advisorID uu
 
 // ListOrphanedStudents lists students without advisor
 func (s *StudentService) ListOrphanedStudents(ctx context.Context, query dto.PaginationQuery) (dto.OrphanedStudentsResponse, error) {
-	limit := int32(query.Limit)
-	offset := int32((query.Page - 1) * query.Limit)
+	limit := utils.ClampToInt32(query.Limit)
+	offset := utils.ClampToInt32((query.Page - 1) * query.Limit)
 
 	students, total, err := s.studentRepo.ListOrphanedStudents(ctx, limit, offset)
 	if err != nil {
@@ -638,7 +638,7 @@ func (s *StudentService) SearchStudents(ctx context.Context, req dto.SearchStude
 		ClassLevel: utils.PointerInt16ToPgInt2(classLevel),
 		Status:     utils.PointerStringToPgText(status),
 		AdvisorID:  utils.PointerUUIDToPgtype(req.Filters.AdvisorID),
-		Limit:      int32(limit),
+		Limit:      utils.ClampToInt32(limit),
 		Offset:     0, // For cursor-based pagination, always start from 0
 	}
 

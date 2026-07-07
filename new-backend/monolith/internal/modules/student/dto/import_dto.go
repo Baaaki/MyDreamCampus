@@ -8,11 +8,11 @@ import (
 
 // BulkImportResponse represents the response for bulk import initiation
 type BulkImportResponse struct {
-	JobID                string    `json:"job_id"`
-	Status               string    `json:"status"`
-	Message              string    `json:"message"`
-	TotalRecords         int       `json:"total_records"`
-	EstimatedCompletion  time.Time `json:"estimated_completion"`
+	JobID               string    `json:"job_id"`
+	Status              string    `json:"status"`
+	Message             string    `json:"message"`
+	TotalRecords        int       `json:"total_records"`
+	EstimatedCompletion time.Time `json:"estimated_completion"`
 }
 
 // ImportJobResponse represents the import job details

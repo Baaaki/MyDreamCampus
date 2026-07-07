@@ -68,12 +68,12 @@ type InstructorChangedEvent struct {
 
 // InstructorChangedData represents instructor change event data
 type InstructorChangedData struct {
-	SemesterCourseID       uuid.UUID `json:"semester_course_id"`
-	Semester               string    `json:"semester"`
-	CourseCode             string    `json:"course_code"`
-	CourseName             string    `json:"course_name"`
-	OldInstructorID        uuid.UUID `json:"old_instructor_id"`
-	OldInstructorFullname  string    `json:"old_instructor_fullname"`
-	NewInstructorID        uuid.UUID `json:"new_instructor_id"`
-	NewInstructorFullname  string    `json:"new_instructor_fullname"`
+	SemesterCourseID      uuid.UUID `json:"semester_course_id"`
+	Semester              string    `json:"semester"`
+	CourseCode            string    `json:"course_code"`
+	CourseName            string    `json:"course_name"`
+	OldInstructorID       uuid.UUID `json:"old_instructor_id"`
+	OldInstructorFullname string    `json:"old_instructor_fullname"`
+	NewInstructorID       uuid.UUID `json:"new_instructor_id"`
+	NewInstructorFullname string    `json:"new_instructor_fullname"`
 }

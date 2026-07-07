@@ -143,14 +143,14 @@ type WeeklyAttendanceRecord struct {
 
 // CourseAttendanceDetail represents attendance detail for a course
 type CourseAttendanceDetail struct {
-	CourseID       uuid.UUID                `json:"course_id"`
-	CourseCode     string                   `json:"course_code"`
-	CourseName     string                   `json:"course_name"`
-	Instructor     string                   `json:"instructor"`
-	TotalWeeks     int16                    `json:"total_weeks"`
-	Theory         *SessionTypeAttendance   `json:"theory,omitempty"`
-	Lab            *SessionTypeAttendance   `json:"lab,omitempty"`
-	WeeklyRecords  []WeeklyAttendanceRecord `json:"weekly_records"`
+	CourseID      uuid.UUID                `json:"course_id"`
+	CourseCode    string                   `json:"course_code"`
+	CourseName    string                   `json:"course_name"`
+	Instructor    string                   `json:"instructor"`
+	TotalWeeks    int16                    `json:"total_weeks"`
+	Theory        *SessionTypeAttendance   `json:"theory,omitempty"`
+	Lab           *SessionTypeAttendance   `json:"lab,omitempty"`
+	WeeklyRecords []WeeklyAttendanceRecord `json:"weekly_records"`
 }
 
 // GetMyAttendanceResponse is the response for student's own attendance
@@ -163,11 +163,11 @@ type GetMyAttendanceResponse struct {
 
 // SessionTypeAttendance represents attendance stats for a specific session type
 type SessionTypeAttendance struct {
-	PresentCount         int `json:"present_count"`
-	AbsentCount          int `json:"absent_count"`
-	TotalSessions        int `json:"total_sessions"`
-	MinRequired          int `json:"min_required"`
-	Passed               bool `json:"passed"`
+	PresentCount  int  `json:"present_count"`
+	AbsentCount   int  `json:"absent_count"`
+	TotalSessions int  `json:"total_sessions"`
+	MinRequired   int  `json:"min_required"`
+	Passed        bool `json:"passed"`
 }
 
 // FailedStudent represents a student who failed due to attendance

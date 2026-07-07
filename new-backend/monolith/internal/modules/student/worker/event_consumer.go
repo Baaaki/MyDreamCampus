@@ -5,18 +5,18 @@ import (
 	"encoding/json"
 	"fmt"
 
-	"github.com/baaaki/mydreamcampus/shared/events"
-	"github.com/baaaki/mydreamcampus/monolith/internal/platform/logger"
-	"github.com/baaaki/mydreamcampus/monolith/internal/platform/rabbitmq"
 	"github.com/baaaki/mydreamcampus/monolith/internal/modules/student/dto"
 	"github.com/baaaki/mydreamcampus/monolith/internal/modules/student/repository"
+	"github.com/baaaki/mydreamcampus/monolith/internal/platform/logger"
+	"github.com/baaaki/mydreamcampus/monolith/internal/platform/rabbitmq"
+	"github.com/baaaki/mydreamcampus/shared/events"
 	"go.uber.org/zap"
 )
 
 type EventConsumer struct {
-	consumer              *rabbitmq.Consumer
-	studentRepo           *repository.StudentRepository
-	processedEventsRepo   *repository.ProcessedEventsRepository
+	consumer            *rabbitmq.Consumer
+	studentRepo         *repository.StudentRepository
+	processedEventsRepo *repository.ProcessedEventsRepository
 }
 
 func NewEventConsumer(
@@ -141,11 +141,11 @@ func SetupStaffEventsQueue(conn *rabbitmq.Connection) error {
 	// Declare queue using shared events constants
 	_, err := channel.QueueDeclare(
 		events.QueueStudentStaffEvents, // queue name
-		true,                            // durable
-		false,                           // delete when unused
-		false,                           // exclusive
-		false,                           // no-wait
-		nil,                             // arguments
+		true,                           // durable
+		false,                          // delete when unused
+		false,                          // exclusive
+		false,                          // no-wait
+		nil,                            // arguments
 	)
 	if err != nil {
 		return fmt.Errorf("failed to declare queue: %w", err)
@@ -153,9 +153,9 @@ func SetupStaffEventsQueue(conn *rabbitmq.Connection) error {
 
 	// Bind queue to staff.events exchange with staff.deleted routing key
 	err = channel.QueueBind(
-		events.QueueStudentStaffEvents, // queue name
+		events.QueueStudentStaffEvents,    // queue name
 		events.RoutingKeyStaffDeactivated, // routing key
-		"staff.events",                  // exchange
+		"staff.events",                    // exchange
 		false,
 		nil,
 	)

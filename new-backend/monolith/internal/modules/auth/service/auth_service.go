@@ -8,10 +8,10 @@ import (
 
 	"github.com/baaaki/mydreamcampus/monolith/config"
 	"github.com/baaaki/mydreamcampus/monolith/internal/modules/auth/db"
-	"github.com/baaaki/mydreamcampus/monolith/internal/platform/clock"
 	"github.com/baaaki/mydreamcampus/monolith/internal/modules/auth/dto"
 	serviceErrors "github.com/baaaki/mydreamcampus/monolith/internal/modules/auth/errors"
 	"github.com/baaaki/mydreamcampus/monolith/internal/modules/auth/repository"
+	"github.com/baaaki/mydreamcampus/monolith/internal/platform/clock"
 	sharedErrors "github.com/baaaki/mydreamcampus/monolith/internal/platform/errors"
 	"github.com/baaaki/mydreamcampus/monolith/internal/platform/logger"
 	"github.com/baaaki/mydreamcampus/monolith/internal/platform/redis"

@@ -90,7 +90,7 @@ func (h *SimplePeriodHandler) CreatePeriod(c *gin.Context) {
 	// Audit log
 	if h.auditLogger != nil {
 		actorID, _ := c.Get("user_id")
-		h.auditLogger.Log(c.Request.Context(), audit.AuditEvent{
+		if err := h.auditLogger.Log(c.Request.Context(), audit.AuditEvent{
 			ActorID:      actorID.(string),
 			ActorRole:    "admin",
 			Action:       "period.created",
@@ -101,7 +101,9 @@ func (h *SimplePeriodHandler) CreatePeriod(c *gin.Context) {
 				"period_start": req.PeriodStart.Format("2006-01-02T15:04:05Z07:00"),
 				"period_end":   req.PeriodEnd.Format("2006-01-02T15:04:05Z07:00"),
 			},
-		})
+		}); err != nil {
+			logger.Warn("audit log write failed", zap.Error(err))
+		}
 	}
 
 	logger.Info("academic period created",
@@ -211,7 +213,7 @@ func (h *SimplePeriodHandler) UpdatePeriod(c *gin.Context) {
 	// Audit log
 	if h.auditLogger != nil {
 		actorID, _ := c.Get("user_id")
-		h.auditLogger.Log(c.Request.Context(), audit.AuditEvent{
+		if err := h.auditLogger.Log(c.Request.Context(), audit.AuditEvent{
 			ActorID:      actorID.(string),
 			ActorRole:    "admin",
 			Action:       "period.updated",
@@ -220,7 +222,9 @@ func (h *SimplePeriodHandler) UpdatePeriod(c *gin.Context) {
 			Details: map[string]any{
 				"semester": existing.Semester,
 			},
-		})
+		}); err != nil {
+			logger.Warn("audit log write failed", zap.Error(err))
+		}
 	}
 
 	logger.Info("academic period updated",
@@ -288,7 +292,7 @@ func (h *SimplePeriodHandler) DeletePeriod(c *gin.Context) {
 	// Audit log
 	if h.auditLogger != nil {
 		actorID, _ := c.Get("user_id")
-		h.auditLogger.Log(c.Request.Context(), audit.AuditEvent{
+		if err := h.auditLogger.Log(c.Request.Context(), audit.AuditEvent{
 			ActorID:      actorID.(string),
 			ActorRole:    "admin",
 			Action:       "period.deleted",
@@ -297,7 +301,9 @@ func (h *SimplePeriodHandler) DeletePeriod(c *gin.Context) {
 			Details: map[string]any{
 				"semester": existing.Semester,
 			},
-		})
+		}); err != nil {
+			logger.Warn("audit log write failed", zap.Error(err))
+		}
 	}
 
 	logger.Info("academic period deleted",

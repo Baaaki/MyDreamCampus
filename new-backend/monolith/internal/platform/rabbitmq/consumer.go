@@ -5,6 +5,7 @@ import (
 	"fmt"
 
 	"github.com/baaaki/mydreamcampus/monolith/internal/platform/logger"
+	"github.com/baaaki/mydreamcampus/monolith/internal/platform/utils"
 	amqp "github.com/rabbitmq/amqp091-go"
 	"go.uber.org/zap"
 )
@@ -83,12 +84,16 @@ func (c *Consumer) Consume(queueName string, handler MessageHandler) error {
 				)
 
 				// Negative acknowledgment - requeue the message
-				msg.Nack(false, true)
+				if nackErr := msg.Nack(false, true); nackErr != nil {
+					logger.Warn("nack failed", zap.String("queue", queueName), zap.Error(nackErr))
+				}
 				continue
 			}
 
 			// Acknowledge successful processing
-			msg.Ack(false)
+			if ackErr := msg.Ack(false); ackErr != nil {
+				logger.Warn("ack failed", zap.String("queue", queueName), zap.Error(ackErr))
+			}
 		}
 	}()
 
@@ -136,20 +141,26 @@ func (c *Consumer) ConsumeWithDLQ(queueName string, handler MessageHandler, maxR
 				if retryCount < maxRetries {
 					// Republish with incremented retry count
 					c.republishWithRetry(msg, retryCount+1)
-					msg.Ack(false)
+					if ackErr := msg.Ack(false); ackErr != nil {
+						logger.Warn("ack failed after republish", zap.String("queue", queueName), zap.Error(ackErr))
+					}
 				} else {
 					// Max retries exceeded - send to DLQ
 					logger.Warn("max retries exceeded, sending to DLQ",
 						zap.String("queue", queueName),
 						zap.Int("retry_count", retryCount),
 					)
-					msg.Nack(false, false) // Don't requeue - goes to DLQ
+					if nackErr := msg.Nack(false, false); nackErr != nil { // Don't requeue - goes to DLQ
+						logger.Warn("nack to DLQ failed", zap.String("queue", queueName), zap.Error(nackErr))
+					}
 				}
 				continue
 			}
 
 			// Success
-			msg.Ack(false)
+			if ackErr := msg.Ack(false); ackErr != nil {
+				logger.Warn("ack failed", zap.String("queue", queueName), zap.Error(ackErr))
+			}
 		}
 	}()
 
@@ -175,7 +186,7 @@ func (c *Consumer) republishWithRetry(msg amqp.Delivery, retryCount int) {
 	if headers == nil {
 		headers = amqp.Table{}
 	}
-	headers["x-retry-count"] = int32(retryCount)
+	headers["x-retry-count"] = utils.ClampToInt32(retryCount)
 
 	err := c.conn.Channel().Publish(
 		msg.Exchange,   // exchange

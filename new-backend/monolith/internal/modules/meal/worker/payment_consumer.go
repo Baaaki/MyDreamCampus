@@ -5,9 +5,9 @@ import (
 	"encoding/json"
 
 	"github.com/baaaki/mydreamcampus/monolith/internal/modules/meal/db"
-	"github.com/baaaki/mydreamcampus/monolith/internal/platform/utils"
 	"github.com/baaaki/mydreamcampus/monolith/internal/modules/meal/dto"
 	"github.com/baaaki/mydreamcampus/monolith/internal/modules/meal/repository"
+	"github.com/baaaki/mydreamcampus/monolith/internal/platform/utils"
 	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5/pgtype"
 	"go.uber.org/zap"
@@ -89,7 +89,7 @@ func (c *PaymentEventConsumer) HandlePaymentCompleted(ctx context.Context, body 
 
 	// Mark event as processed
 	if err := c.processedEventsRepo.CreateProcessedEvent(ctx, db.CreateProcessedEventParams{
-		EventID: utils.UUIDToPgtype(eventID),
+		EventID:   utils.UUIDToPgtype(eventID),
 		EventType: event.EventType,
 	}); err != nil {
 		return err
@@ -155,7 +155,7 @@ func (c *PaymentEventConsumer) HandlePaymentFailed(ctx context.Context, body []b
 
 	// Mark event as processed
 	if err := c.processedEventsRepo.CreateProcessedEvent(ctx, db.CreateProcessedEventParams{
-		EventID: utils.UUIDToPgtype(eventID),
+		EventID:   utils.UUIDToPgtype(eventID),
 		EventType: event.EventType,
 	}); err != nil {
 		return err

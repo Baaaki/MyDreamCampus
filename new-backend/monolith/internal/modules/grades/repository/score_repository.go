@@ -40,7 +40,8 @@ func (r *ScoreRepository) UpsertAssessmentScoreWithEvent(
 	if err != nil {
 		return db.GradesStudentAssessmentScore{}, fmt.Errorf("%w: failed to begin tx: %v", sharedErrors.ErrTransactionFailed, err)
 	}
-	defer tx.Rollback(ctx)
+	// Rollback after successful commit is a no-op returning ErrTxClosed — safe to discard.
+	defer func() { _ = tx.Rollback(ctx) }()
 
 	qtx := r.queries.WithTx(tx)
 
@@ -93,7 +94,8 @@ func (r *ScoreRepository) BulkUpsertAssessmentScoresWithEvents(ctx context.Conte
 	if err != nil {
 		return 0, fmt.Errorf("%w: failed to begin tx: %v", sharedErrors.ErrTransactionFailed, err)
 	}
-	defer tx.Rollback(ctx)
+	// Rollback after successful commit is a no-op returning ErrTxClosed — safe to discard.
+	defer func() { _ = tx.Rollback(ctx) }()
 
 	qtx := r.queries.WithTx(tx)
 

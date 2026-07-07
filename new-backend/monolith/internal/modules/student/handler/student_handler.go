@@ -6,10 +6,10 @@ import (
 	"strings"
 	"time"
 
-	"github.com/baaaki/mydreamcampus/monolith/internal/platform/errors"
-	"github.com/baaaki/mydreamcampus/monolith/internal/platform/logger"
 	"github.com/baaaki/mydreamcampus/monolith/internal/modules/student/dto"
 	"github.com/baaaki/mydreamcampus/monolith/internal/modules/student/service"
+	"github.com/baaaki/mydreamcampus/monolith/internal/platform/errors"
+	"github.com/baaaki/mydreamcampus/monolith/internal/platform/logger"
 	"github.com/gin-gonic/gin"
 	"github.com/google/uuid"
 	"go.uber.org/zap"
@@ -526,7 +526,7 @@ func (h *StudentHandler) BulkImport(c *gin.Context) {
 		})
 		return
 	}
-	defer file.Close()
+	defer func() { _ = file.Close() }()
 
 	// Limit upload size to 10MB
 	c.Request.Body = http.MaxBytesReader(c.Writer, c.Request.Body, 10<<20)

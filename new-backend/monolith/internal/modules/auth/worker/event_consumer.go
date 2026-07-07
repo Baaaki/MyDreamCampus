@@ -7,9 +7,9 @@ import (
 
 	"github.com/baaaki/mydreamcampus/monolith/internal/modules/auth/dto"
 	"github.com/baaaki/mydreamcampus/monolith/internal/modules/auth/service"
-	"github.com/baaaki/mydreamcampus/shared/events"
 	"github.com/baaaki/mydreamcampus/monolith/internal/platform/logger"
 	"github.com/baaaki/mydreamcampus/monolith/internal/platform/rabbitmq"
+	"github.com/baaaki/mydreamcampus/shared/events"
 	"go.uber.org/zap"
 )
 
@@ -79,7 +79,6 @@ func (w *EventConsumer) Start(ctx context.Context) error {
 	log.Info("event consumer started successfully")
 	return nil
 }
-
 
 // handleStudentCreated processes student.created event
 func (w *EventConsumer) handleStudentCreated(ctx context.Context, body []byte) error {

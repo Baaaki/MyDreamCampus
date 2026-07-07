@@ -140,7 +140,7 @@ func TestParseStudentRecord(t *testing.T) {
 		short := validRecord()[:7]
 		_, err := parseStudentRecord(short, 5)
 		require.Error(t, err)
-		assert.Contains(t, err.Error(), "Line 5")
+		assert.Contains(t, err.Error(), "line 5")
 		assert.Contains(t, err.Error(), "expected 8 columns")
 	})
 
@@ -149,7 +149,7 @@ func TestParseStudentRecord(t *testing.T) {
 		row[6] = "twenty-one"
 		_, err := parseStudentRecord(row, 7)
 		require.Error(t, err)
-		assert.Contains(t, err.Error(), "Line 7")
+		assert.Contains(t, err.Error(), "line 7")
 		assert.Contains(t, err.Error(), "enrollment_year")
 	})
 
@@ -158,7 +158,7 @@ func TestParseStudentRecord(t *testing.T) {
 		row[7] = "freshman"
 		_, err := parseStudentRecord(row, 9)
 		require.Error(t, err)
-		assert.Contains(t, err.Error(), "Line 9")
+		assert.Contains(t, err.Error(), "line 9")
 		assert.Contains(t, err.Error(), "class_level")
 	})
 

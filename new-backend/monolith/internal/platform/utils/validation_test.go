@@ -19,8 +19,8 @@ func TestValidateEmail(t *testing.T) {
 		{"no-at-sign", false},
 		{"@no-local.com", false},
 		{"local@", false},
-		{"local@domain", false}, // missing TLD
-		{"a@b.c", false},        // tld too short
+		{"local@domain", false},                            // missing TLD
+		{"a@b.c", false},                                   // tld too short
 		{strings.Repeat("a", 250) + "@example.com", false}, // > 255
 	}
 	for _, tt := range tests {
@@ -55,7 +55,7 @@ func TestValidatePassword_StrictRule(t *testing.T) {
 func TestValidateStudentNumber(t *testing.T) {
 	assert.True(t, ValidateStudentNumber("2024001234"))
 	assert.True(t, ValidateStudentNumber("1234567"))
-	assert.False(t, ValidateStudentNumber("12345"))                       // too short
-	assert.False(t, ValidateStudentNumber(strings.Repeat("1", 60)))       // > 50
+	assert.False(t, ValidateStudentNumber("12345"))                 // too short
+	assert.False(t, ValidateStudentNumber(strings.Repeat("1", 60))) // > 50
 	assert.False(t, ValidateStudentNumber(""))
 }

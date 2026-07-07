@@ -47,12 +47,12 @@ func TestValidateAssessmentSchema(t *testing.T) {
 
 	t.Run("rejects invalid slug formats", func(t *testing.T) {
 		invalid := []string{
-			"Final",       // uppercase letter
-			"1exam",       // starts with digit
-			"_quiz",       // starts with underscore
-			"midterm-1",   // hyphen not allowed
-			"final exam",  // space not allowed
-			"",            // empty
+			"Final",      // uppercase letter
+			"1exam",      // starts with digit
+			"_quiz",      // starts with underscore
+			"midterm-1",  // hyphen not allowed
+			"final exam", // space not allowed
+			"",           // empty
 		}
 		for _, slug := range invalid {
 			err := ValidateAssessmentSchema([]dto.AssessmentItem{

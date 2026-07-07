@@ -100,7 +100,7 @@ func (m *Module) Bootstrap(ctx context.Context) error {
 	studentConsumer := worker.NewStudentEventConsumer(studentCacheRepo, processedEventsRepo, m.logger)
 	paymentConsumer := worker.NewPaymentEventConsumer(reservationRepo, processedEventsRepo, m.logger)
 	m.reservationWorker = worker.NewReservationWorker(reservationRepo, m.logger)
-	
+
 	consumer := rabbitmq.NewConsumer(m.rabbitConn)
 	m.eventConsumer = worker.NewEventConsumer(consumer, studentConsumer, paymentConsumer)
 

@@ -2,7 +2,6 @@ package middleware
 
 import (
 	"net/http/httptest"
-	"os"
 	"testing"
 
 	"github.com/gin-gonic/gin"
@@ -11,7 +10,8 @@ import (
 
 func TestSecurityHeaders_AlwaysSet(t *testing.T) {
 	gin.SetMode(gin.TestMode)
-	os.Unsetenv("ENVIRONMENT")
+	// Non-production behavior is the baseline; t.Setenv restores after the test.
+	t.Setenv("ENVIRONMENT", "")
 
 	r := gin.New()
 	r.Use(SecurityHeaders())

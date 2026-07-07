@@ -21,12 +21,12 @@ func TestBaseEvent_DispatchKeysMatchSharedEventsConstants(t *testing.T) {
 	// constants used by every router. If these names drift apart, the
 	// dispatch quietly fails on real production traffic.
 	cases := map[string]string{
-		"shared/events EventStudentCreated":      events.EventStudentCreated,
-		"shared/events EventStaffCreated":        events.EventStaffCreated,
-		"shared/events EventStudentUpdated":      events.EventStudentUpdated,
-		"shared/events EventStaffUpdated":        events.EventStaffUpdated,
-		"shared/events EventStudentDeactivated":  events.EventStudentDeactivated,
-		"shared/events EventStaffDeactivated":    events.EventStaffDeactivated,
+		"shared/events EventStudentCreated":     events.EventStudentCreated,
+		"shared/events EventStaffCreated":       events.EventStaffCreated,
+		"shared/events EventStudentUpdated":     events.EventStudentUpdated,
+		"shared/events EventStaffUpdated":       events.EventStaffUpdated,
+		"shared/events EventStudentDeactivated": events.EventStudentDeactivated,
+		"shared/events EventStaffDeactivated":   events.EventStaffDeactivated,
 	}
 
 	expected := map[string]string{

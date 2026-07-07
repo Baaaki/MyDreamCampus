@@ -20,7 +20,7 @@ type BufferFlusher struct {
 
 func NewBufferFlusher(
 	attendanceRepo *repository.AttendanceRepository,
-	redisService   *service.RedisService,
+	redisService *service.RedisService,
 ) *BufferFlusher {
 	return &BufferFlusher{
 		attendanceRepo: attendanceRepo,

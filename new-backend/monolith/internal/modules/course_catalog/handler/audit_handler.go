@@ -60,8 +60,8 @@ func (h *AuditHandler) ListAuditLog(c *gin.Context) {
 	actorIDStr := c.Query("actor_id")
 
 	params := db.ListAuditLogParams{
-		Limit:   int32(limit),
-		Offset:  int32(offset),
+		Limit:   utils.ClampToInt32(limit),
+		Offset:  utils.ClampToInt32(offset),
 		Service: utils.StringToPgText(service),
 		Action:  utils.StringToPgText(action),
 	}

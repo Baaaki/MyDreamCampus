@@ -34,12 +34,12 @@ func (c *InProcessSemesterClient) GetSemesterInfo(ctx context.Context, semester 
 	if err != nil {
 		return nil, err
 	}
-	
+
 	var hardDeadline time.Time
 	if s.HardDeadline.Valid {
 		hardDeadline = s.HardDeadline.Time
 	}
-	
+
 	isPast := time.Now().After(hardDeadline)
 
 	return &SemesterInfo{

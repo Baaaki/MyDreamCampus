@@ -13,11 +13,11 @@ import (
 
 func TestDeriveFailedType(t *testing.T) {
 	cases := []struct {
-		name           string
-		theoryFailed   bool
-		labFailed      bool
-		want           string
-		whyItMatters   string
+		name         string
+		theoryFailed bool
+		labFailed    bool
+		want         string
+		whyItMatters string
 	}{
 		{"only theory", true, false, "theory",
 			"if grades-service sees 'both' it will mark the lab as a fail too, awarding the student a course-level FF — wrong"},

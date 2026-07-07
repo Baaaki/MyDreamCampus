@@ -3,10 +3,10 @@ package service
 import (
 	"time"
 
-	"github.com/baaaki/mydreamcampus/monolith/internal/platform/clock"
-	"github.com/baaaki/mydreamcampus/monolith/internal/platform/utils"
 	"github.com/baaaki/mydreamcampus/monolith/internal/modules/student/db"
 	"github.com/baaaki/mydreamcampus/monolith/internal/modules/student/dto"
+	"github.com/baaaki/mydreamcampus/monolith/internal/platform/clock"
+	"github.com/baaaki/mydreamcampus/monolith/internal/platform/utils"
 	"github.com/google/uuid"
 )
 

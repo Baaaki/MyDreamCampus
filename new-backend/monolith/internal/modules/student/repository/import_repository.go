@@ -4,9 +4,9 @@ import (
 	"context"
 	"fmt"
 
+	"github.com/baaaki/mydreamcampus/monolith/internal/modules/student/db"
 	sharedErrors "github.com/baaaki/mydreamcampus/monolith/internal/platform/errors"
 	"github.com/baaaki/mydreamcampus/monolith/internal/platform/utils"
-	"github.com/baaaki/mydreamcampus/monolith/internal/modules/student/db"
 	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgxpool"
@@ -106,7 +106,8 @@ func (r *ImportRepository) BulkInsertStudents(ctx context.Context, students []db
 	if err != nil {
 		return fmt.Errorf("%w: failed to begin transaction: %v", sharedErrors.ErrTransactionFailed, err)
 	}
-	defer tx.Rollback(ctx)
+	// Rollback after successful commit is a no-op returning ErrTxClosed — safe to discard.
+	defer func() { _ = tx.Rollback(ctx) }()
 
 	// Prepare data for COPY
 	columns := []string{"student_number", "first_name", "last_name", "email", "faculty", "department", "enrollment_year", "class_level", "advisor_id"}

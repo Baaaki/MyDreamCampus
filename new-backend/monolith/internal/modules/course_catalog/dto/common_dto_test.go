@@ -46,12 +46,12 @@ func TestNewPaginationResponse(t *testing.T) {
 	tests := []struct {
 		page, limit, total, expectedPages int
 	}{
-		{1, 20, 0, 1},     // empty result still gets page 1
+		{1, 20, 0, 1}, // empty result still gets page 1
 		{1, 20, 19, 1},
 		{1, 20, 20, 1},
 		{1, 20, 21, 2},
 		{2, 50, 100, 2},
-		{1, 10, 95, 10},   // ceiling division
+		{1, 10, 95, 10}, // ceiling division
 	}
 	for _, tt := range tests {
 		r := NewPaginationResponse(tt.page, tt.limit, tt.total)

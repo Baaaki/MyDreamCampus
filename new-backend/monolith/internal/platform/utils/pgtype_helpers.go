@@ -114,7 +114,6 @@ func DerefInt32(i *int32, defaultValue int32) int32 {
 	return *i
 }
 
-
 // Int32Ptr converts int32 to *int32
 func Int32Ptr(i int32) *int32 {
 	return &i
@@ -202,8 +201,11 @@ func PgInt2ToInt16Ptr(i pgtype.Int2) *int16 {
 // Float64ToPgNumeric converts float64 to pgtype.Numeric
 func Float64ToPgNumeric(f float64) pgtype.Numeric {
 	var n pgtype.Numeric
-	// pgtype.Numeric.Scan accepts string format
-	n.Scan(fmt.Sprintf("%.2f", f))
+	// Scan of a fixed "%.2f" string only fails on NaN/Inf; return the
+	// invalid (NULL) Numeric in that case rather than a bogus value.
+	if err := n.Scan(fmt.Sprintf("%.2f", f)); err != nil {
+		return pgtype.Numeric{}
+	}
 	return n
 }
 

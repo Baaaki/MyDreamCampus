@@ -60,7 +60,7 @@ type UserDeactivatedEvent struct {
 
 // UserDeactivatedData represents the data payload for user deactivation
 type UserDeactivatedData struct {
-	ID         string    `json:"id"`
-	IsActive   bool      `json:"is_active"`
-	DeletedAt  time.Time `json:"deleted_at"`
+	ID        string    `json:"id"`
+	IsActive  bool      `json:"is_active"`
+	DeletedAt time.Time `json:"deleted_at"`
 }

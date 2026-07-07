@@ -6,10 +6,11 @@ import (
 	"errors"
 
 	"github.com/baaaki/mydreamcampus/monolith/internal/modules/meal/db"
-	"github.com/baaaki/mydreamcampus/monolith/internal/platform/clock"
 	"github.com/baaaki/mydreamcampus/monolith/internal/modules/meal/dto"
 	"github.com/baaaki/mydreamcampus/monolith/internal/modules/meal/repository"
+	"github.com/baaaki/mydreamcampus/monolith/internal/platform/clock"
 	sharedErrors "github.com/baaaki/mydreamcampus/monolith/internal/platform/errors"
+	"github.com/baaaki/mydreamcampus/monolith/internal/platform/utils"
 	"go.uber.org/zap"
 )
 
@@ -35,8 +36,8 @@ func (s *MenuService) CreateOrUpdateMonthlyMenu(ctx context.Context, req dto.Cre
 	}
 
 	menu, err := s.menuRepo.UpsertMonthlyMenu(ctx, db.UpsertMonthlyMenuParams{
-		Year:     int16(req.Year),
-		Month:    int16(req.Month),
+		Year:     utils.ClampToInt16(req.Year),
+		Month:    utils.ClampToInt16(req.Month),
 		MenuData: menuDataJSON,
 	})
 	if err != nil {
@@ -76,8 +77,8 @@ func (s *MenuService) GetMonthlyMenu(ctx context.Context, year, month int) (*dto
 	}
 
 	menu, err := s.menuRepo.GetMonthlyMenu(ctx, db.GetMonthlyMenuParams{
-		Year:  int16(year),
-		Month: int16(month),
+		Year:  utils.ClampToInt16(year),
+		Month: utils.ClampToInt16(month),
 	})
 	if err != nil {
 		if errors.Is(err, sharedErrors.ErrNotFoundRepo) {

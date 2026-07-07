@@ -308,7 +308,9 @@ func parseInterfaceToFloat64(v any) float64 {
 }
 
 // decodeScoresJSON parses a JSONB blob (scanned as []byte) of the shape
-//   { "midterm": { "score": 85, "is_absent": false, "is_locked": true }, ... }
+//
+//	{ "midterm": { "score": 85, "is_absent": false, "is_locked": true }, ... }
+//
 // into the DTO map. Empty/nil input returns an empty (non-nil) map.
 func decodeScoresJSON(raw any) (map[string]dto.ScoreDetail, error) {
 	out := map[string]dto.ScoreDetail{}

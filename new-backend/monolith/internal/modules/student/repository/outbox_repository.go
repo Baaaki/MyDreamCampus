@@ -4,11 +4,11 @@ import (
 	"context"
 	"fmt"
 
-	sharedErrors "github.com/baaaki/mydreamcampus/monolith/internal/platform/errors"
 	"github.com/baaaki/mydreamcampus/monolith/internal/modules/student/db"
+	sharedErrors "github.com/baaaki/mydreamcampus/monolith/internal/platform/errors"
+	"github.com/baaaki/mydreamcampus/monolith/internal/platform/utils"
 	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5/pgxpool"
-	"github.com/baaaki/mydreamcampus/monolith/internal/platform/utils"
 )
 
 type OutboxRepository struct {

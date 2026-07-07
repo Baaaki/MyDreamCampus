@@ -18,11 +18,11 @@ import (
 
 // fakeStore is an in-memory rate limit store with deterministic behavior.
 type fakeStore struct {
-	mu       sync.Mutex
-	counts   map[string]int
-	allow    bool
-	err      error
-	calls    int
+	mu     sync.Mutex
+	counts map[string]int
+	allow  bool
+	err    error
+	calls  int
 }
 
 func (f *fakeStore) CheckRateLimit(_ context.Context, key string, limit int, _ time.Duration) (bool, int, int, error) {
