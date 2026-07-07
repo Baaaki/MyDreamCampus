@@ -100,7 +100,7 @@ func IPRateLimit() gin.HandlerFunc {
 }
 
 // UserRateLimit applies rate limiting based on authenticated user ID.
-// Place after auth middleware (JWTAuth or ExtractUserFromHeaders).
+// Place after JWTAuth so the user ID is present in the gin context.
 // If no rate limiter is configured or user is not authenticated, requests pass through.
 func UserRateLimit() gin.HandlerFunc {
 	return func(c *gin.Context) {

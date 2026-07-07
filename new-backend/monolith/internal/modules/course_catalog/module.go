@@ -48,7 +48,7 @@ type Module struct {
 }
 
 // New constructs the course catalog module. Cross-module reads go through
-// the staff Service handle (in-process, plan section 8 strategy 1).
+// the staff Service handle (in-process).
 func New(
 	cfg *config.Config,
 	pool *pgxpool.Pool,
@@ -118,7 +118,7 @@ func (m *Module) Name() string { return "catalog" }
 func (m *Module) OutboxStore() eventbus.OutboxStore { return m.outboxStore }
 
 // SemesterService is the in-process handle the enrollment / grades /
-// attendance modules will use once they migrate (plan section 8).
+// attendance modules use.
 func (m *Module) SemesterService() *service.SemesterService { return m.semesterService }
 
 // CatalogService is the in-process handle other modules use for course

@@ -26,10 +26,10 @@ type SemesterOperationResult struct {
 // Layer 3: within service period -> ALLOW/REJECT for teacher/student
 //
 // Why this order matters:
-// - hard_deadline is the absolute lock. After it, even admin cannot modify data.
-//   This ensures completed semester data integrity for auditing/accreditation.
-// - Admin bypass before period check allows manual corrections (e.g. wrong grade,
-//   missed attendance) without waiting for a new period window.
+//   - hard_deadline is the absolute lock. After it, even admin cannot modify data.
+//     This ensures completed semester data integrity for auditing/accreditation.
+//   - Admin bypass before period check allows manual corrections (e.g. wrong grade,
+//     missed attendance) without waiting for a new period window.
 //
 // NOTE: Enrollment uses a DIFFERENT model -- strict period lock, no admin bypass.
 // See CanEnrollInSemester() for enrollment-specific rules.
@@ -92,7 +92,6 @@ type EnrollmentParams struct {
 // No hard_deadline check needed -- period is the only lock.
 // Why no admin override? Enrollment is the student's own responsibility.
 // Admin should not add/remove courses on behalf of students.
-// See: docs/semester-wizard-plan.md "Ders Kayit (Enrollment) Icin: Siki Period Kilidi"
 func CanEnrollInSemester(params EnrollmentParams) SemesterOperationResult {
 	now := clock.Now()
 

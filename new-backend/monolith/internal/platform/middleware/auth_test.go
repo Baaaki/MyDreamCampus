@@ -5,7 +5,6 @@ import (
 	"errors"
 	"net/http"
 	"net/http/httptest"
-	"os"
 	"testing"
 
 	"github.com/baaaki/mydreamcampus/monolith/internal/platform/logger"
@@ -19,10 +18,10 @@ const authTestSecret = "test-secret-key-minimum-32-characters-long-aaa"
 
 // fakeBlacklist is an in-memory implementation of TokenBlacklistChecker.
 type fakeBlacklist struct {
-	blacklisted   map[string]bool
-	minVersion    map[string]int
-	errOnCheck    bool
-	errOnVersion  bool
+	blacklisted  map[string]bool
+	minVersion   map[string]int
+	errOnCheck   bool
+	errOnVersion bool
 }
 
 func (f *fakeBlacklist) IsAccessTokenBlacklisted(_ context.Context, jti string) (bool, error) {
@@ -43,7 +42,7 @@ func setupAuthTest(t *testing.T, blacklist *fakeBlacklist, opts ...AuthOption) *
 	t.Helper()
 	require.NoError(t, logger.Init("test"))
 	gin.SetMode(gin.TestMode)
-	os.Setenv("JWT_SECRET", authTestSecret)
+	t.Setenv("JWT_SECRET", authTestSecret)
 	if blacklist == nil {
 		// untyped nil — middleware short-circuits the blacklist check
 		SetBlacklistChecker(nil)
@@ -152,9 +151,9 @@ func TestJWTAuth_RejectsTokenVersionTooOld(t *testing.T) {
 func TestJWTAuth_FailOpenOnRedisError(t *testing.T) {
 	tok := issueToken(t, "user-fo", "student", 1)
 	bl := &fakeBlacklist{
-		blacklisted: map[string]bool{},
-		minVersion:  map[string]int{},
-		errOnCheck:  true,
+		blacklisted:  map[string]bool{},
+		minVersion:   map[string]int{},
+		errOnCheck:   true,
 		errOnVersion: true,
 	}
 	r := setupAuthTest(t, bl)
@@ -188,7 +187,7 @@ func TestJWTAuth_FailClosedOnRedisError(t *testing.T) {
 func TestOptionalJWTAuth_PassesWithoutToken(t *testing.T) {
 	require.NoError(t, logger.Init("test"))
 	gin.SetMode(gin.TestMode)
-	os.Setenv("JWT_SECRET", authTestSecret)
+	t.Setenv("JWT_SECRET", authTestSecret)
 
 	r := gin.New()
 	r.GET("/", OptionalJWTAuth(), func(c *gin.Context) {
@@ -207,7 +206,7 @@ func TestOptionalJWTAuth_PassesWithoutToken(t *testing.T) {
 func TestOptionalJWTAuth_SetsClaimsWhenPresent(t *testing.T) {
 	require.NoError(t, logger.Init("test"))
 	gin.SetMode(gin.TestMode)
-	os.Setenv("JWT_SECRET", authTestSecret)
+	t.Setenv("JWT_SECRET", authTestSecret)
 
 	r := gin.New()
 	r.GET("/", OptionalJWTAuth(), func(c *gin.Context) {
@@ -222,89 +221,4 @@ func TestOptionalJWTAuth_SetsClaimsWhenPresent(t *testing.T) {
 	r.ServeHTTP(w, req)
 
 	assert.Contains(t, w.Body.String(), "opt-1")
-}
-
-func TestExtractUserFromHeaders(t *testing.T) {
-	require.NoError(t, logger.Init("test"))
-	gin.SetMode(gin.TestMode)
-
-	r := gin.New()
-	r.GET("/", ExtractUserFromHeaders(), func(c *gin.Context) {
-		uid, _ := c.Get("user_id")
-		role, _ := c.Get("role")
-		dept, _ := c.Get("department")
-		c.JSON(200, gin.H{"user": uid, "role": role, "dept": dept})
-	})
-
-	t.Run("rejects missing user header", func(t *testing.T) {
-		req := httptest.NewRequest("GET", "/", nil)
-		w := httptest.NewRecorder()
-		r.ServeHTTP(w, req)
-		assert.Equal(t, 401, w.Code)
-	})
-
-	t.Run("rejects missing role header", func(t *testing.T) {
-		req := httptest.NewRequest("GET", "/", nil)
-		req.Header.Set("X-User-ID", "u-1")
-		w := httptest.NewRecorder()
-		r.ServeHTTP(w, req)
-		assert.Equal(t, 401, w.Code)
-	})
-
-	t.Run("accepts when both present", func(t *testing.T) {
-		req := httptest.NewRequest("GET", "/", nil)
-		req.Header.Set("X-User-ID", "u-1")
-		req.Header.Set("X-User-Role", "admin")
-		req.Header.Set("X-User-Department", "CS")
-		w := httptest.NewRecorder()
-		r.ServeHTTP(w, req)
-		assert.Equal(t, 200, w.Code)
-		assert.Contains(t, w.Body.String(), "u-1")
-		assert.Contains(t, w.Body.String(), "admin")
-		assert.Contains(t, w.Body.String(), "CS")
-	})
-}
-
-func TestStripInternalHeaders_PanicsWithoutSecret(t *testing.T) {
-	os.Unsetenv("INTERNAL_SERVICE_SECRET")
-	assert.Panics(t, func() { _ = StripInternalHeaders() })
-}
-
-func TestStripInternalHeaders_StripsUntrustedHeaders(t *testing.T) {
-	require.NoError(t, logger.Init("test"))
-	gin.SetMode(gin.TestMode)
-	t.Setenv("INTERNAL_SERVICE_SECRET", "internal-shared-secret")
-
-	r := gin.New()
-	r.Use(StripInternalHeaders())
-	r.GET("/", func(c *gin.Context) {
-		c.JSON(200, gin.H{
-			"uid":  c.GetHeader("X-User-ID"),
-			"role": c.GetHeader("X-User-Role"),
-		})
-	})
-
-	t.Run("strips when no internal secret", func(t *testing.T) {
-		req := httptest.NewRequest("GET", "/", nil)
-		req.Header.Set("X-User-ID", "spoofed-1")
-		req.Header.Set("X-User-Role", "admin")
-		w := httptest.NewRecorder()
-		r.ServeHTTP(w, req)
-
-		assert.NotContains(t, w.Body.String(), "spoofed-1",
-			"X-User-ID without internal secret must be stripped")
-		assert.NotContains(t, w.Body.String(), "admin")
-	})
-
-	t.Run("preserves when internal secret matches", func(t *testing.T) {
-		req := httptest.NewRequest("GET", "/", nil)
-		req.Header.Set("X-Internal-Secret", "internal-shared-secret")
-		req.Header.Set("X-User-ID", "trusted-1")
-		req.Header.Set("X-User-Role", "admin")
-		w := httptest.NewRecorder()
-		r.ServeHTTP(w, req)
-
-		assert.Contains(t, w.Body.String(), "trusted-1")
-		assert.Contains(t, w.Body.String(), "admin")
-	})
 }

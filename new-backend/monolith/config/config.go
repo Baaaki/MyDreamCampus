@@ -17,7 +17,6 @@ type Config struct {
 	JWT         JWTConfig
 	Admin       AdminConfig
 	Outbox      OutboxConfig
-	Payment     PaymentConfig
 	QR          QRConfig
 	Reservation ReservationConfig
 	MealTime    MealTimeConfig
@@ -60,7 +59,7 @@ type AdminConfig struct {
 }
 
 // OutboxConfig governs the per-module outbox relay goroutines
-// (cf. plan section 5.5.2 — selection A, one worker per module).
+// (one worker per module).
 type OutboxConfig struct {
 	IntervalSeconds int `mapstructure:"OUTBOX_POLL_INTERVAL_SECONDS"`
 	BatchSize       int `mapstructure:"OUTBOX_BATCH_SIZE"`
@@ -94,10 +93,6 @@ type TimeoutConfig struct {
 type FrontendConfig struct {
 	StaticDir string `mapstructure:"FRONTEND_STATIC_DIR"`
 	Enabled   bool   `mapstructure:"FRONTEND_STATIC_ENABLED"`
-}
-
-type PaymentConfig struct {
-	GRPCAddress string `mapstructure:"PAYMENT_GRPC_ADDRESS"`
 }
 
 type QRConfig struct {
@@ -243,7 +238,6 @@ func setDefaults() {
 	viper.SetDefault("FRONTEND_STATIC_ENABLED", false)
 
 	// Meal service defaults
-	viper.SetDefault("PAYMENT_GRPC_ADDRESS", "localhost:50051")
 	viper.SetDefault("QR_SECRET", "change-this-qr-secret-in-production")
 	viper.SetDefault("RESERVATION_TIMEOUT_MINUTES", 15)
 	viper.SetDefault("MEAL_PRICE_TRY", 15.00)

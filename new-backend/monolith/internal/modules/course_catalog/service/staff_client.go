@@ -32,7 +32,7 @@ type InstructorInfo struct {
 
 // InProcessStaffClient adapts the staff module's StaffService to the
 // StaffClient interface. Replaces the HTTP-based HTTPStaffClient now
-// that staff lives in the same binary (plan section 8 strategy 1).
+// that staff lives in the same binary.
 type InProcessStaffClient struct {
 	staff *staffService.StaffService
 }

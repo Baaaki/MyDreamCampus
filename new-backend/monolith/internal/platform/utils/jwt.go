@@ -10,9 +10,8 @@ import (
 	"github.com/google/uuid"
 )
 
-// NOTE: JWT Generation should ONLY be used by Auth Service
-// Other services should validate tokens using middleware, not generate them
-// This is a utility function to avoid code duplication, not a design decision
+// NOTE: token generation belongs to the auth module; everything else
+// validates tokens via platform middleware and must not mint them.
 
 var (
 	ErrInvalidToken = errors.New("invalid token")
@@ -60,7 +59,7 @@ func GetJWTSecret() []byte {
 }
 
 // GenerateAccessToken creates a 15-minute access token
-// Should ONLY be called by Auth Service
+// Should ONLY be called by the auth module
 // Returns: (tokenString, jti, error)
 // DEPRECATED: Use GenerateAccessTokenWithSecret instead for better testability
 func GenerateAccessToken(userID, role, department string, tokenVersion int) (string, string, error) {
@@ -68,7 +67,7 @@ func GenerateAccessToken(userID, role, department string, tokenVersion int) (str
 }
 
 // GenerateAccessTokenWithSecret creates an access token with custom secret and expiry
-// Should ONLY be called by Auth Service
+// Should ONLY be called by the auth module
 // Returns: (tokenString, jti, error)
 // expiryMinutes: token expiry time in minutes
 func GenerateAccessTokenWithSecret(userID, role, department string, tokenVersion int, secret []byte, expiryMinutes int) (string, string, error) {
@@ -95,7 +94,7 @@ func GenerateAccessTokenWithSecret(userID, role, department string, tokenVersion
 }
 
 // GenerateRefreshToken creates a 24-hour refresh token with unique JTI
-// Should ONLY be called by Auth Service
+// Should ONLY be called by the auth module
 // Returns: (tokenString, jti, error)
 // DEPRECATED: Use GenerateRefreshTokenWithSecret instead for better testability
 func GenerateRefreshToken(userID string, tokenVersion int) (string, string, error) {
@@ -103,7 +102,7 @@ func GenerateRefreshToken(userID string, tokenVersion int) (string, string, erro
 }
 
 // GenerateRefreshTokenWithSecret creates a refresh token with custom secret and expiry
-// Should ONLY be called by Auth Service
+// Should ONLY be called by the auth module
 // Returns: (tokenString, jti, error)
 // expiryHours: token expiry time in hours
 func GenerateRefreshTokenWithSecret(userID string, tokenVersion int, secret []byte, expiryHours int) (string, string, error) {

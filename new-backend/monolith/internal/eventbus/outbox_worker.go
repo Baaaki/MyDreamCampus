@@ -11,7 +11,7 @@ import (
 )
 
 // OutboxWorker polls one module's outbox table and relays events to RabbitMQ.
-// Plan section 5.5.2 keeps the existing per-module shape — each module spins
+// Each module spins
 // up its own worker goroutine in main.go pointing at its own OutboxStore +
 // exchange. The worker code itself is shared.
 type OutboxWorker struct {
@@ -100,7 +100,8 @@ func (w *OutboxWorker) processEvents(ctx context.Context) {
 			continue
 		}
 
-		// Envelope shape required by consumers (see plan section 5.7).
+		// Envelope shape shared with all consumers (notification service +
+		// module workers) — changing a key here is a breaking contract change.
 		message := map[string]any{
 			"event_id":   ev.ID.String(),
 			"event_type": ev.EventType,

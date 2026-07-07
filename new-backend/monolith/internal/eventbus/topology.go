@@ -35,7 +35,7 @@ func DeclareModuleExchanges(publisher *rabbitmq.Publisher) error {
 
 // DownstreamBinding describes a (queue, exchange, routing_key) triple that
 // the monolith pre-declares so messages aren't lost while the consumer is
-// offline (plan section 5.6.3).
+// offline.
 type DownstreamBinding struct {
 	Queue      string
 	Exchange   string

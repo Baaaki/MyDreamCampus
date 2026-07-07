@@ -3,7 +3,6 @@ package middleware
 import (
 	"context"
 	"net/http"
-	"os"
 	"strings"
 
 	"github.com/baaaki/mydreamcampus/monolith/internal/platform/errors"
@@ -224,82 +223,6 @@ func OptionalJWTAuth() gin.HandlerFunc {
 		c.Set("role", claims.Role)
 		c.Set("department", claims.Department)
 		c.Set("token_version", claims.TokenVersion)
-
-		c.Next()
-	}
-}
-
-// StripInternalHeaders removes internal service headers from incoming requests
-// to prevent header spoofing. These headers should only be set by Traefik
-// after successful forward-auth verification.
-// This middleware should be placed BEFORE other auth middleware in the chain.
-// Internal services that communicate directly should include X-Internal-Secret.
-//
-// INTERNAL_SERVICE_SECRET environment variable must be set; the constructor
-// panics on init rather than per-request to fail fast at startup.
-func StripInternalHeaders() gin.HandlerFunc {
-	internalSecret := os.Getenv("INTERNAL_SERVICE_SECRET")
-	if internalSecret == "" {
-		panic("INTERNAL_SERVICE_SECRET environment variable is not set")
-	}
-
-	return func(c *gin.Context) {
-		receivedSecret := c.GetHeader("X-Internal-Secret")
-		if receivedSecret != internalSecret {
-			// Request is not from a trusted internal source - strip auth headers
-			c.Request.Header.Del("X-User-ID")
-			c.Request.Header.Del("X-User-Role")
-			c.Request.Header.Del("X-User-Email")
-			c.Request.Header.Del("X-Internal-Secret")
-		}
-
-		c.Next()
-	}
-}
-
-// ExtractUserFromHeaders extracts user information from X-User-* headers
-// These headers are set by Traefik after forward-auth to auth-service
-// Use this middleware for services that rely on Traefik for authentication
-func ExtractUserFromHeaders() gin.HandlerFunc {
-	return func(c *gin.Context) {
-		// Extract user ID from header (required)
-		userID := c.GetHeader("X-User-ID")
-		if userID == "" {
-			logger.Warn("X-User-ID header missing - request may not have passed through auth gateway")
-			c.AbortWithStatusJSON(http.StatusUnauthorized, gin.H{
-				"error":   errors.ErrUnauthorized.Code,
-				"message": "Authentication required",
-			})
-			return
-		}
-
-		// Extract role from header (required)
-		role := c.GetHeader("X-User-Role")
-		if role == "" {
-			logger.Warn("X-User-Role header missing - request may not have passed through auth gateway",
-				zap.String("user_id", userID),
-			)
-			c.AbortWithStatusJSON(http.StatusUnauthorized, gin.H{
-				"error":   errors.ErrUnauthorized.Code,
-				"message": "User role not found",
-			})
-			return
-		}
-
-		// Extract department from header (optional)
-		department := c.GetHeader("X-User-Department")
-
-		// Set user information in context for downstream handlers
-		c.Set("user_id", userID)
-		c.Set("role", role)
-		if department != "" {
-			c.Set("department", department)
-		}
-
-		logger.Debug("user extracted from headers",
-			zap.String("user_id", userID),
-			zap.String("role", role),
-		)
 
 		c.Next()
 	}

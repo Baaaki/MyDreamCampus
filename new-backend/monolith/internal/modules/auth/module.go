@@ -5,7 +5,7 @@
 // It implements monolithHTTP.Module so it can be registered onto the
 // shared Gin router under /api/auth, and exposes Bootstrap for the
 // startup-time work that has to run after dependency injection
-// (admin seed, cleanup scheduler, event consumer) — see plan section 3.
+// (admin seed, cleanup scheduler, event consumer).
 package auth
 
 import (
@@ -124,8 +124,8 @@ func (m *Module) RegisterRoutes(rg *gin.RouterGroup) {
 // scheduler, and begin consuming staff/student events from RabbitMQ.
 //
 // Cross-module event consumption stays on RabbitMQ for now; once staff
-// and student modules migrate (Faz 2) we can replace the RabbitMQ
-// hop with an in-process subscriber per plan section 8.
+// events settle fully in-process, the RabbitMQ hop can become an
+// in-process subscriber.
 func (m *Module) Bootstrap(ctx context.Context) error {
 	platformMiddleware.SetBlacklistChecker(m.redisClient)
 

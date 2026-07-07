@@ -3,16 +3,16 @@
 //
 // The module owns the staff schema (staff, outbox_events, teacher_profiles)
 // and publishes staff.created/updated/deactivated events through its own
-// outbox table — see plan section 5.9 for the event catalogue.
+// outbox table.
 package staff
 
 import (
 	"github.com/baaaki/mydreamcampus/monolith/internal/eventbus"
-	platformHandler "github.com/baaaki/mydreamcampus/monolith/internal/platform/handler"
-	platformMiddleware "github.com/baaaki/mydreamcampus/monolith/internal/platform/middleware"
 	"github.com/baaaki/mydreamcampus/monolith/internal/modules/staff/handler"
 	"github.com/baaaki/mydreamcampus/monolith/internal/modules/staff/repository"
 	"github.com/baaaki/mydreamcampus/monolith/internal/modules/staff/service"
+	platformHandler "github.com/baaaki/mydreamcampus/monolith/internal/platform/handler"
+	platformMiddleware "github.com/baaaki/mydreamcampus/monolith/internal/platform/middleware"
 	"github.com/gin-gonic/gin"
 	"github.com/jackc/pgx/v5/pgxpool"
 )
@@ -65,15 +65,15 @@ func (m *Module) Name() string { return "staff" }
 // worker started in main.go.
 func (m *Module) OutboxStore() eventbus.OutboxStore { return m.outboxStore }
 
-// StaffService is the in-process handle other modules use for staff lookups
-// (plan section 8 strategy 1). When staff splits out we'll switch the
+// StaffService is the in-process handle other modules use for staff lookups.
+// When staff splits out we'll switch the
 // return type to a small Service interface backed by an HTTP client.
 func (m *Module) StaffService() *service.StaffService { return m.staffService }
 
 // RegisterRoutes mounts /api/staff/*. Internal service-to-service routes
 // the original microservice exposed under /internal/staff/* are gone —
 // other modules now reach the staff service via the in-process Service
-// interface (plan section 8 strategy 1).
+// interface.
 func (m *Module) RegisterRoutes(rg *gin.RouterGroup) {
 	// Public profile lookup under the API prefix — no auth required so
 	// anonymous visitors can browse instructor pages. Mounted before the

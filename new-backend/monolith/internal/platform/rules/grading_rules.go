@@ -27,7 +27,6 @@ type GradeEditResult struct {
 // IMPORTANT: hard_deadline check MUST come before admin bypass.
 // Previous behavior allowed admin to bypass everything -- this was a security gap
 // where admin could modify grades even after semester completion.
-// See: docs/semester-wizard-plan.md "3 Katmanli Enforcement"
 //
 // Layer 0: Semester hard_deadline — absolute lock for everyone (including admin)
 // Layer 1: Score-level lock (is_locked) — only admin can bypass

@@ -11,13 +11,13 @@ import (
 	"context"
 
 	"github.com/baaaki/mydreamcampus/monolith/internal/eventbus"
+	staffService "github.com/baaaki/mydreamcampus/monolith/internal/modules/staff/service"
 	"github.com/baaaki/mydreamcampus/monolith/internal/modules/student/handler"
 	"github.com/baaaki/mydreamcampus/monolith/internal/modules/student/repository"
 	"github.com/baaaki/mydreamcampus/monolith/internal/modules/student/service"
 	"github.com/baaaki/mydreamcampus/monolith/internal/modules/student/worker"
 	platformMiddleware "github.com/baaaki/mydreamcampus/monolith/internal/platform/middleware"
 	"github.com/baaaki/mydreamcampus/monolith/internal/platform/rabbitmq"
-	staffService "github.com/baaaki/mydreamcampus/monolith/internal/modules/staff/service"
 	"github.com/gin-gonic/gin"
 	"github.com/jackc/pgx/v5/pgxpool"
 )
@@ -42,7 +42,7 @@ type Module struct {
 
 // New wires the module from shared infra. The staff service handle is
 // passed in so cross-module reads (advisor lookup) happen in-process
-// instead of via HTTP — see plan section 8 strategy 1.
+// instead of via HTTP.
 func New(
 	pool *pgxpool.Pool,
 	rabbitConn *rabbitmq.Connection,
@@ -79,17 +79,17 @@ func New(
 
 // Name is the URL slug under /api. Stays plural ("students") to match the
 // legacy microservice URL the frontend already calls — module identity
-// (schema, package) remains singular per plan section 0.2.
+// (schema, package) remains singular.
 func (m *Module) Name() string { return "students" }
 
-// StudentService exposes the internal service for cross-module calls (Strateji 1).
+// StudentService exposes the internal service for cross-module calls.
 func (m *Module) StudentService() *service.StudentService { return m.studentService }
 
 // OutboxStore for the per-module outbox worker.
 func (m *Module) OutboxStore() eventbus.OutboxStore { return m.outboxStore }
 
 // Bootstrap starts the staff-events consumer. Once staff is in the same
-// process this can move to in-process pubsub (plan section 8) — keeping
+// process this can move to in-process pubsub — keeping
 // RabbitMQ for now mirrors the legacy contract and lets us migrate
 // modules incrementally.
 func (m *Module) Bootstrap(ctx context.Context) error {
