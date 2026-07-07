@@ -15,6 +15,25 @@ Gerisi sinyal/bonus. Bu 3'ü olmadan keyword'ler havada kalır.
 
 ---
 
+## Durum Snapshot (07.07.2026)
+
+Roadmap yazıldığından bu yana kayda değer ilerleme — özellikle Faz 1'in en büyük ön şartı (containerization) kapandı:
+
+**Kapandı:**
+- **Dockerfile'lar yazıldı** (monolith, notification, migrate, seed) + compose'a `monolith`/`notification`/`caddy`/`migrate`/`seed` servisleri eklendi. Faz 1'in "repo'da hiç Dockerfile yok" bloğu geçersiz — tam stack artık tek compose'ta.
+- **Demo seed data** ilişkisel olarak hazır (profiller, ders açılışları, kayıtlar, notlar, yoklama oturumları, yemekhane menüsü). Faz 2'nin seed adımı büyük ölçüde bitti.
+- **DEPLOY.md yazıldı** (DigitalOcean droplet + compose + Caddy rehberi).
+- **Mobil yeniden konumlandı:** student-only QR yoklama uygulaması (login + tabs: index/scan/profile + grades/cafeteria/schedule). "Yarım ekranları gizle" kararı uygulandı — dağınık çok-rol yerine tek net akış.
+- **Prerequisite bypass kapandı:** `passed := true` stub'ı gitti; enrollment artık grades'in `prerequisite.passed` event'leriyle beslenen `student_passed_prerequisites` projection'ından kontrol ediyor. Appeal fail→pass akışı da event basıyor; CENG201→CENG102 demo seed'i mevcut.
+- `go build ./...` ve `go vet ./...` temiz. Kök `fix_*.py` scriptleri silindi.
+
+**Açık kalan eşik işleri:**
+- **Canlı deploy YOK** — DEPLOY.md var ama gerçek URL + demo video + demo hesaplarıyla erişilebilir ortam yok. Eşiği geçiren adım (Faz 2) hâlâ bekliyor.
+- **Lint/security bulguları** (52 lint + 40 gosec, 04.07 sayımı) — commit öncesi `make build && make test` + golangci çalıştır.
+- **Mobile e2e doğrulama (NOT — sonraki oturumda denenecek):** QR scan → attendance kaydı akışının gerçek backend'e karşı uçtan uca çalıştığını doğrula. Bilerek ertelendi; deploy sonrası birlikte test edilecek.
+
+---
+
 ## Altın Kural
 
 Eklediğin **her** teknoloji için "neden bunu kullandın?" sorusuna **1 cümlelik** cevabın olacak. Cevabın yoksa ekleme. Buzzword-as-decoration geri teper; savunulabilir genişlik istiyoruz, derinlik değil.
@@ -29,10 +48,10 @@ Hızlı kazanımlar. Open-source'a açmadan önce.
   - Önerilen: `legacy-codebase`'i ayrı bir git tag/branch'e al (`v0-microservices`), ana koldan çıkar. Migration anlatına referans olarak kalsın ama "iki canlı backend" kafa karışıklığını bitir.
 - [ ] **AI izlerini temizle.** Kodda `// plan section 5.5.2`, `// Faz 3` gibi iç referansları sil ([new-backend/monolith/cmd/main.go](new-backend/monolith/cmd/main.go#L133) ve eventbus dosyaları). "AI'a yazdırdım" sinyali veriyor. [utils/jwt.go](new-backend/monolith/internal/platform/utils/jwt.go)'daki mikroservis dönemi yorumları da ("Other services should validate...", "Should ONLY be called by Auth Service") monolitte anlamsız — sil ya da güncelle.
 - [ ] **Ölü kod/config temizliği.** Mikroservis kalıntıları: `ExtractUserFromHeaders` / `StripInternalHeaders` middleware'leri (Traefik forward-auth içindi, monolitte hiçbir route kullanmıyor; grades handler'daki bayat yorumlar da bunlara referans veriyor), `PaymentConfig.GRPCAddress` (monolitte gRPC yok). Kullanılmayan kod "taşınmış proje" izlenimi veriyor.
-- [ ] **Kök `infrastructure/` artıklarını sil.** İçinde sadece `loki-config.yml/` ve `promtail-config.yml/` adında *boş dizinler* var — eksik dosyayı volume-mount eden eski bir compose'un yarattığı çöp. Klasörü komple kaldır.
-- [ ] **Kopya kağıtlarını kaldır.** `CLAUDE.md` ve `*/skills.md` public repo'da kalmasın (ya `.gitignore` ya private). Bunlar senin AI talimatların; işverene gösterilecek şey değil.
+- [ ] **Kök `infrastructure/` kararı.** Artık boş dizin değil — gerçek `loki/loki-config.yml` ve `promtail/promtail-config.yml` var. Ama compose'ta loki/promtail/grafana servisi yoksa bu config'ler ölü. Ya observability'yi gerçekten compose'a bağla ya da klasörü ve README'deki bahsini kaldır.
+- [x] **Kopya kağıtları kararı (07.07): repo'da KALACAK.** `CLAUDE.md` ve `*/skills.md` bilinçli olarak public — "AI'ı disiplinli kullanıyorum" sinyali olarak konumlandırılacak. gitignore'a alınmayacak.
 - [ ] **Binary/artifact temizliği.** `bin/`, `tmp/` klasörleri git'te olmasın; `.gitignore` kontrol et. Gerekirse geçmişten temizle. Lokal derleme artıkları `new-backend/monolith/main` (45 MB) ve `cmd/monolith_bin` untracked ama `.gitignore`'a ekle ki yanlışlıkla commit'lenmesin.
-- [ ] **Kök klasördeki `fix_*.py` scriptleri** (`fix_claude.py`, `fix_issues.py`, `fix_meal.py`, `fix_skills.py`, `legacy-codebase/*.py`) — tek seferlik migration scriptleri, repo'dan çıkar.
+- [x] ~~Kök klasördeki `fix_*.py` scriptleri~~ — silindi. **Ama `legacy-codebase/*.py` (8 script: `fix_enums.py`, `fix_events.py`, `fix_go.py`, `rename_*.py` …) hâlâ duruyor.** legacy-codebase'i `v0-microservices` tag'ine alıp ana koldan çıkarınca birlikte gider; almazsan bu scriptleri de sil.
 
 **Done:** Repo açılınca tek net backend, AI iç notu yok, kopya kağıdı yok.
 
@@ -43,22 +62,22 @@ Hızlı kazanımlar. Open-source'a açmadan önce.
 Demo'da gösterilecek altın yolu kurşungeçirmez yap. Ürün hedefi: **yemekhane + ders kayıt**. Demo-kritik akış:
 `login → öğrenci ders kaydı → yemekhane kullanımı`. Bu akış patlamamalı.
 
-- [ ] **Build + CI yeşil.** Main'deki CI kırmızıyken hiçbir Faz 1 işine başlama. Durum (02.07.2026):
-  - [x] `backend-build` + `backend-test`: enrollment derleme hataları düzeltildi, 834 test yeşil
+- [ ] **Build + CI yeşil.** Main'deki CI kırmızıyken hiçbir Faz 1 işine başlama. Durum (04.07.2026):
+  - [x] `backend-build` + `backend-test`: `go build ./...` + `go vet ./...` lokalde temiz, testler yeşil
   - [x] notification: lint (12) + gosec (1) + go.mod tidy düzeltildi
   - [ ] `backend-lint`: monolith'te **52 bulgu** (43 errcheck — unchecked `Close`/`Rollback`/`Ack`/`auditLogger.Log`; 8 staticcheck — SA1029 context key, ST1005, QF10xx; 1 unused func)
   - [ ] `backend-security`: monolith'te **40 gosec bulgusu** (34 G115 int→int32/16 dönüşümü, 3 G109, 2 G118 goroutine context). Ya bounds-check'li güvenli dönüşümlerle düzelt ya da gerekçeli gosec konfigürasyonu yaz — sessizce `#nosec` serpiştirme.
   - Bundan sonra her commit öncesi `make build && make test` zorunlu.
-- [ ] **Prerequisite bypass'ını kapat.** [enrollment_service.go:335-338](new-backend/monolith/internal/modules/enrollment/service/enrollment_service.go#L335-L338) — `passed := true` stub'ı gerçek `gradesClient.CheckPrerequisitePassed(...)` çağrısıyla değiştir. Bu hem bayrak feature'ı tamamlar hem modüller-arası seam örneği olur (mülakatta gösterilecek şey).
+- [x] **Prerequisite bypass'ını kapat.** ~~`passed := true` stub'ı~~ — kapandı (07.07). Enrollment, grades'in `prerequisite.passed` event'leriyle beslenen `student_passed_prerequisites` projection'ından kontrol ediyor; modüller-arası seam örneği olarak mülakatta gösterilebilir.
 - [ ] **Demo-kritik modülleri uçtan uca test et (manuel):**
   - [ ] auth: login / logout / refresh çalışıyor
   - [ ] enrollment: öğrenci ders seçiyor, kapasite/çakışma/prerequisite kontrolleri devrede
   - [ ] meal (yemekhane): kredi/ödeme akışı uçtan uca (payment mock'la)
   - [ ] attendance: yoklama kaydı çalışıyor (Faz 3'te Kafka'ya taşınacak)
 - [ ] **Frontend golden path** (3 rol: admin/teacher/student): her rolün ana dashboard'u ve demo-kritik sayfaları açılıyor, 500/boş ekran yok.
-- [ ] **Mobile (Expo) minimum:** login + en az 1 anlamlı ekran (ör. ders programı veya yoklama) gerçek backend'e bağlı çalışıyor. Yarım ekranları "planned" olarak gizle, demo'da gösterme.
-- [ ] **Dockerfile yaz (ön şart — şu an repo'da hiç yok).** Monolith için multi-stage Dockerfile (+ notification için ikinci bir tane), compose'a `monolith` servisi olarak ekle. Ek A'daki Caddy adımı (`reverse_proxy monolith:8080`) ve Faz 3 K8s bu olmadan çalışmaz.
-- [ ] **Tam stack local'de tek komutla ayağa kalkıyor:** `docker compose up` → backend + frontend + Postgres + Redis + RabbitMQ. Sıfırdan kurulum README adımlarıyla doğrulanıyor. (Not: compose şu an yalnızca altyapı servislerini içeriyor; grafana/loki/promtail klasörleri boş — observability ya gerçekten ekle ya da bahsini kaldır.)
+- [~] **Mobile (Expo) minimum:** student-only QR yoklama olarak yeniden yazıldı — login + tabs (index/scan/profile) + grades/cafeteria/schedule ekranları mevcut. Kalan iş: bu ekranların **gerçek backend'e bağlı** ve demo'da patlamadan çalıştığını uçtan uca doğrula (özellikle QR scan → attendance kaydı).
+- [x] **Dockerfile'lar yazıldı.** Monolith + notification (+ migrate + seed) için Dockerfile'lar mevcut, compose'a servis olarak bağlandı. Ek A'daki Caddy adımı artık çözülebilir.
+- [~] **Tam stack local'de tek komutla:** compose artık `monolith`/`notification`/`caddy`/`migrate`/`seed` + altyapıyı içeriyor. Kalan iş: **temiz makinede sıfırdan `docker compose up` ile uçtan uca doğrulama** (README adımlarıyla). loki/promtail config'i var ama servisi compose'ta yok — observability'yi bağla ya da bahsini kaldır.
 - [ ] **Smoke test:** demo-kritik akış için 2-3 service-level happy-path testi (depth değil, "çalışıyor" kanıtı).
 
 **Done:** Temiz makinede `docker compose up` sonrası login→ders kayıt→yemekhane akışı baştan sona çalışıyor.
@@ -71,7 +90,7 @@ Bu olmadan proje "öğrenme projesi"; bununla "çalışan ürün".
 
 - [ ] **Bir yere deploy et.** Önerilen sıra: ucuz VPS (Hetzner/DO ~5$) > Fly.io > Railway. Monolith tek binary olduğu için tek VPS yeter.
 - [ ] **Canlı URL** — frontend + API erişilebilir, HTTPS (Caddy/Traefik ya da platform TLS).
-- [ ] **Seed data** — demo için hazır kullanıcılar (admin/teacher/student), örnek dersler, yemekhane menüsü. Hiring manager login olup gezebilmeli.
+- [x] **Seed data** — ilişkisel demo seed hazır (profiller, ders açılışları, kayıtlar, notlar, yoklama oturumları/kayıtları, yemekhane menüsü), compose'ta `seed` servisi olarak bağlı. Kalan: canlı ortamda çalıştığını ve demo hesaplarıyla login olunabildiğini doğrula.
 - [ ] **README'ye:** canlı link + demo login bilgileri + **2 dakikalık demo videosu** (Loom/YouTube unlisted).
 - [ ] **Gerçek ekran görüntüleri** (placeholder'ları değiştir).
 
