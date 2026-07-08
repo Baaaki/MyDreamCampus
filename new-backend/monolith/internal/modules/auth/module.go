@@ -115,7 +115,6 @@ func (m *Module) RegisterRoutes(rg *gin.RouterGroup) {
 		)
 		protected.GET("/sessions", m.handler.GetSessions)
 		protected.DELETE("/sessions/:id", m.handler.DeleteSession)
-		protected.GET("/verify", m.handler.Verify)
 	}
 }
 

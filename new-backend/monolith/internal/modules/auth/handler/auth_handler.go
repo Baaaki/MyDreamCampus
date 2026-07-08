@@ -481,40 +481,6 @@ func (h *AuthHandler) GetSessions(c *gin.Context) {
 	c.JSON(http.StatusOK, response)
 }
 
-// Verify validates the JWT token and returns user info for Traefik forward auth
-// This endpoint is called by Traefik before forwarding requests to protected services
-func (h *AuthHandler) Verify(c *gin.Context) {
-	// Get user claims from context (set by JWT middleware)
-	userID, exists := c.Get("user_id")
-	if !exists {
-		c.AbortWithStatus(http.StatusUnauthorized)
-		return
-	}
-
-	// Block downstream service access until password is changed
-	if fpc, ok := c.Get("force_password_change"); ok {
-		if mustChange, _ := fpc.(bool); mustChange {
-			c.JSON(http.StatusForbidden, dto.ErrorResponse{
-				Error:   "FORCE_PASSWORD_CHANGE",
-				Message: "Şifrenizi değiştirmeden diğer servislere erişemezsiniz",
-			})
-			return
-		}
-	}
-
-	role, _ := c.Get("role")
-	department, _ := c.Get("department")
-
-	// Set headers for downstream services (Traefik forwards these)
-	c.Header("X-User-ID", userID.(string))
-	c.Header("X-User-Role", role.(string))
-	if dept, ok := department.(string); ok && dept != "" {
-		c.Header("X-User-Department", dept)
-	}
-
-	c.Status(http.StatusOK)
-}
-
 // DeleteSession deletes a specific session
 func (h *AuthHandler) DeleteSession(c *gin.Context) {
 	ctx, cancel := context.WithTimeout(c.Request.Context(), requestTimeout)

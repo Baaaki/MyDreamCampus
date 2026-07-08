@@ -56,10 +56,6 @@ func (s *AuthService) Login(ctx context.Context, req dto.LoginRequest, deviceInf
 		zap.String("email", req.Email),
 	)
 
-	// Rate limit check (implement with Redis later)
-	// TODO: Email-based rate limiting
-	// TODO: IP-based rate limiting
-
 	// Get user by email
 	user, err := s.authRepo.GetUserByEmail(ctx, req.Email)
 	if err != nil {
