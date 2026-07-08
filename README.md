@@ -26,6 +26,13 @@ Proje, yönetimi ve dağıtımı zor olan parçalı mikroservis mimarisinden, da
 - **Veritabanı İzolasyonu:** Tek bir PostgreSQL veritabanı çalışsa da, her modülün kendi şeması (Schema) vardır. Modüller arası sıkı bağ (Foreign Key) kurulmamıştır.
 - **Mikroservise Geçiş (Future-Proof):** Eğer ileride sistem çok büyürse (örn: Ders Kayıt dönemi yoğunluğu), bu mimari sayesinde istenilen modül birkaç saat içinde koparılıp ayrı bir **Mikroservis** olarak dışarı çıkartılabilir. Modüller arası iletişim halihazırda asenkron olarak **RabbitMQ** (Event-Driven) ile sağlanmaktadır.
 
+> **Eski Mimari (Arşiv):** Bu projenin ilk sürümü 9 ayrı mikroservisten oluşuyordu. O mimarinin tüm kaynak kodu, geçiş öncesi son hâliyle `v0-microservices` git tag'i altında dondurulup arşivlendi; `main` dalını kirletmemesi için buradan çıkarıldı. İncelemek için:
+>
+> ```bash
+> git checkout v0-microservices   # eski mikroservis ağacını gez (salt-okunur)
+> git checkout main               # güncel modüler monolite geri dön
+> ```
+
 ## Kullanılan Modern Teknolojiler (Tech Stack)
 
 Sistem tamamen sektör standartlarında, güncel ve yüksek performanslı araçlarla inşa edilmiştir:
