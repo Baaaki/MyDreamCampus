@@ -9,8 +9,7 @@
     "web": "expo start --web",
     "test": "jest",
     "test:watch": "jest --watch",
-    "test:coverage": "jest --coverage",
-    "gen:api-types": "openapi-typescript ../backend/docs/openapi.yaml -o types/api-types.ts"
+    "test:coverage": "jest --coverage"
   },
   "jest": {
     "testEnvironment": "node",

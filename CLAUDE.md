@@ -114,7 +114,7 @@ sudo docker logs -f mydreamcampus-monolith
 ```
 feat(auth): add login and register endpoints
 fix(shared): resolve logger initialization bug
-chore(infra): update traefik configuration
+chore(infra): update caddy configuration
 feat(frontend): add student dashboard page
 feat(mobile): implement attendance screen
 ```
@@ -261,9 +261,7 @@ Bu yollardaki dosyalari **manuel duzenleme**. Kaynak dosyayi guncelle ve generat
 | `new-backend/monolith/internal/modules/*/db/*.go` | `internal/modules/*/sql/queries/*.sql` | `make sqlc-<module>` |
 | `new-backend/**/sql/migrations/*.sql` (uygulanmis) | — | Yeni migration ekle, eskisini degistirme |
 | `new-backend/services/notification/internal/db/*.go` | `sql/queries/*.sql` | servis dizininde `sqlc generate` |
-| `frontend/src/lib/api-types.ts` | Backend OpenAPI | `bun run gen:api-types` |
 | `frontend/src/components/ui/*` | shadcn CLI | `bunx --bun shadcn@latest add <c>` |
-| `mobile/types/api-types.ts` | Backend OpenAPI | `npm run gen:api-types` |
 | `*.lock`, `*.lockb`, `go.sum`, `bun.lock`, `package-lock.json` | Paket yoneticisi | Komutu calistir, manuel dokunma |
 
 ---

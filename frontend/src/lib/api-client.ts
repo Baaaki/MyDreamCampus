@@ -115,7 +115,7 @@ const apiClient = ky.create({
   },
 });
 
-// API clients - URLs must match Traefik routing in dynamic.yml
+// API clients — one per module; prefixes must match the monolith's route mounts.
 export const authApi = apiClient.extend({ prefixUrl: `${API_BASE_URL}/api/auth` });
 export const staffApi = apiClient.extend({ prefixUrl: `${API_BASE_URL}/api/staff` });
 export const adminStaffApi = apiClient.extend({ prefixUrl: `${API_BASE_URL}/api/admin-staff` });

@@ -15,8 +15,7 @@ export default defineConfig({
     port: 3000,
     proxy: {
       '/api': {
-        // target: 'http://localhost', // Eski Traefik bağlantısı
-        target: 'http://localhost:8080', // Yeni monolith bağlantısı
+        target: 'http://localhost:8080',
         changeOrigin: true,
       },
     },
