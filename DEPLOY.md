@@ -13,35 +13,76 @@ Caddy (SPA + `/api` proxy) → monolith → Postgres/Redis/RabbitMQ.
 | | **A. Ev sunucusu (LAN)** | **B. Public VPS** |
 |---|---|---|
 | Erişim | Ev ağındaki cihazlar | İnternetten herkes |
-| Adres | `http://192.168.1.50` | `https://203-0-113-5.sslip.io` |
+| Adres | `http://192.168.1.50:8080` | `https://203-0-113-5.sslip.io` |
 | HTTPS | Yok (özel IP'ye sertifika verilmez) | Let's Encrypt, otomatik |
+| Docker | Rootless — root yetkisi gerekmez | Root daemon (droplet'te zaten root'sun) |
 | Kurulum | Aşağıdaki **A** bölümü | **B** bölümü |
 
 ---
 
 ## A. Ev sunucusu — tek komut
 
-### A1. Sunucuda Docker — ve şifre sormasını kapat
+### A1. Sunucuda Docker — root yetkisi vermeden
+
+Makefile sudo'ya **sadece** docker soketine doğrudan erişemediğinde başvurur:
+
+```make
+SUDO := $(shell docker info >/dev/null 2>&1 || echo sudo)
+```
+
+Yani aşağıdaki kurulumdan sonra hiçbir `make` komutu şifre sormaz — `ssh sunucu
+'cd mydreamcampus && make deploy'` gibi tty'siz uzaktan komutlar da çalışır.
+
+**Rootless Docker (önerilen).** Daemon senin kullanıcın olarak çalışır;
+container'daki root, host'ta yetkisiz bir UID'ye map'lenir. Kalıcı root
+yetkisi **yok**:
+
+```bash
+sudo apt install -y uidmap dbus-user-session   # tek seferlik, paket kurulumu
+curl -fsSL https://get.docker.com/rootless | sh
+
+echo 'export PATH=$HOME/bin:$PATH' >> ~/.bashrc
+echo 'export DOCKER_HOST=unix:///run/user/'$(id -u)'/docker.sock' >> ~/.bashrc
+source ~/.bashrc
+
+systemctl --user enable --now docker
+sudo loginctl enable-linger $USER    # SSH oturumu kapanınca daemon ölmesin
+
+docker info >/dev/null && echo "rootless calisiyor, sudo gerekmiyor"
+```
+
+Rootless daemon 1024'ün altındaki portlara bağlanamaz, o yüzden `.env`'de
+yüksek port kullan (adım A3'te):
+
+```
+HTTP_PORT=8080
+HTTPS_PORT=8443
+PUBLIC_HOST=:80
+PUBLIC_ORIGIN=http://192.168.1.50:8080
+```
+
+Adres `http://192.168.1.50:8080` olur. Portsuz sade bir URL istersen tek
+seferlik şu capability yeter (kullanıcıya root vermez, sadece o binary'ye port
+bağlama izni tanır) — sonra `.env`'deki `HTTP_PORT` satırlarını sil:
+
+```bash
+sudo setcap cap_net_bind_service=ep $(which rootlesskit)
+systemctl --user restart docker
+```
+
+<details>
+<summary><b>Alternatif:</b> klasik (root) daemon + <code>docker</code> grubu — <b>önerilmez</b></summary>
 
 ```bash
 curl -fsSL https://get.docker.com | sh
-
-# Docker'i sudo'suz kullan: kendini docker grubuna ekle
-sudo usermod -aG docker $USER
-newgrp docker          # ya da: cikis yapip tekrar SSH ile baglan
-
-docker info >/dev/null && echo "sudo'suz calisiyor"
+sudo usermod -aG docker $USER && newgrp docker
 ```
 
-> Bu adım olmadan her `make deploy` sudo şifresi sorar — ve `ssh sunucu 'make
-> deploy'` gibi tek satırlık uzaktan komutlar tty olmadığı için tamamen
-> başarısız olur. Makefile sudo'ya **sadece** docker soketine doğrudan
-> erişemediğinde başvurur (`SUDO := $(shell docker info ... || echo sudo)`),
-> yani bu adımdan sonra hiçbir komut şifre istemez.
->
-> Güvenlik notu: `docker` grubu pratikte root yetkisine denktir (container
-> host'un diskini mount edebilir). Zaten sudo yetkin olan kendi ev sunucunda
-> bu kabul edilebilir; çok kullanıcılı bir makinede tercih etme.
+`docker` grubu pratikte root yetkisine denktir: gruba dahil olan herkes host
+diskini bir container'a mount edip root olabilir. Aynı sebeple `sudoers`'a
+NOPASSWD ile `docker` eklemek de güvenlik kazancı sağlamaz — riski sadece
+gizler. Rootless varken bunu tercih etme.
+</details>
 
 ### A2. Repoyu al ve LAN IP'sini öğren
 
@@ -62,13 +103,29 @@ nano new-backend/infrastructure/.env
 ```
 
 Her `CHANGE_ME` için ayrı ayrı `openssl rand -base64 48` çalıştırıp yapıştır.
-`PUBLIC_HOST` / `PUBLIC_ORIGIN` **kendi LAN IP'n** olacak, `http://` önekiyle:
+Adres satırları A1'de seçtiğin kuruluma göre — IP'yi kendi LAN IP'nle değiştir:
+
+**Rootless, yüksek port (varsayılan öneri):**
+
+```
+HTTP_PORT=8080
+HTTPS_PORT=8443
+PUBLIC_HOST=:80
+PUBLIC_ORIGIN=http://192.168.1.50:8080
+```
+
+**Port 80 kullanabiliyorsan (setcap yaptıysan ya da root daemon):**
 
 ```
 PUBLIC_HOST=http://192.168.1.50
 PUBLIC_ORIGIN=http://192.168.1.50
 ```
 
+> `PUBLIC_HOST` Caddy'nin **container içinde** dinlediği adres, `PUBLIC_ORIGIN`
+> ise **tarayıcının gördüğü** tam URL (CORS + e-posta linkleri buradan üretilir),
+> sonda `/` olmadan. Yüksek port kullanırken ikisi bilerek farklı: port
+> yönlendirmesini compose yapar, Caddy içeride hep 80'i dinler.
+>
 > `http://` öneki kritik: Caddy şemayı açıkça görünce otomatik HTTPS'i kapatır.
 > Öneksiz bırakırsan Let's Encrypt'ten özel IP için sertifika almaya çalışır ve
 > başarısız olur. `localhost` da yazma — o sadece sunucunun kendisi demek,
@@ -95,13 +152,17 @@ make deploy-down     # durdur (veri korunur)
 
 ### A5. Firewall (ufw kuruluysa)
 
+`.env`'deki `HTTP_PORT` neyse onu aç:
+
 ```bash
-sudo ufw allow 80/tcp
+sudo ufw allow 8080/tcp     # rootless varsayilani; port 80 kullaniyorsan: 80/tcp
 ```
 
 ### A6. Doğrula
 
-Ev ağındaki **herhangi bir cihazdan** tarayıcı: `http://192.168.1.50`
+Ev ağındaki **herhangi bir cihazdan** tarayıcı: `PUBLIC_ORIGIN`'e yazdığın adres
+— rootless kurulumda `http://192.168.1.50:8080`, port 80 kullanıyorsan
+`http://192.168.1.50`.
 
 Giriş bilgileri için aşağıdaki [demo hesaplar](#demo-giriş-bilgileri) tablosuna bak.
 
@@ -113,16 +174,21 @@ ilk kurulumda ve kod güncellemesinde gerekir.
 
 ### Mobil (Expo) uygulamayı bağlamak
 
-Telefon Caddy üzerinden değil, doğrudan `8080`'e gitmek isterse override
-dosyasıyla kaldır (base compose 8080'i dışarı açmaz):
+Telefon Caddy'yi es geçip doğrudan monolith'e gitmek isterse override dosyasıyla
+kaldır (base compose 8080'i dışarı açmaz):
 
 ```bash
-sudo docker compose \
+docker compose \
   -f new-backend/infrastructure/docker-compose.yml \
   -f new-backend/infrastructure/docker-compose.override.yml up -d
 ```
 
 Sonra `mobile/.env` içinde API adresini `http://192.168.1.50:8080` yap.
+
+> **Dikkat:** rootless kurulumda Caddy zaten `HTTP_PORT=8080`'de. Override da
+> monolith'i 8080'e bağlamaya çalışır ve compose `port is already allocated`
+> hatası verir. Birini değiştir — en kolayı `.env`'de `HTTP_PORT=8090` yapıp
+> `PUBLIC_ORIGIN`'i de `http://192.168.1.50:8090` olarak güncellemek.
 
 ### İnternete açmak istersen (opsiyonel)
 
@@ -315,9 +381,12 @@ docker compose -f new-backend/infrastructure/docker-compose.yml logs migrate
 
 | Belirti | Sebep / çözüm |
 |---|---|
-| Her komutta sudo şifresi soruyor | `sudo usermod -aG docker $USER` + yeniden giriş (adım A1). Makefile sonrasında sudo'yu tamamen atlar. |
-| `permission denied ... docker.sock` | Gruba eklendin ama oturum tazelenmedi: `newgrp docker` ya da çıkış/giriş. |
-| Ev ağındaki telefondan açılmıyor | `PUBLIC_HOST` `localhost` kalmış olabilir — LAN IP olmalı. Ayrıca `sudo ufw allow 80/tcp`. |
+| Her komutta sudo şifresi soruyor | Rootless daemon'a erişilemiyor. `echo $DOCKER_HOST` boşsa `source ~/.bashrc`; `systemctl --user status docker` çalışıyor mu? (adım A1) |
+| `permission denied ... docker.sock` | Klasik daemon'ın root soketine düşmüşsün. `DOCKER_HOST=unix:///run/user/$(id -u)/docker.sock` ayarlı mı? |
+| SSH kapanınca container'lar ölüyor | `sudo loginctl enable-linger $USER` yapılmamış (adım A1). |
+| `bind: permission denied` (port 80) | Rootless 1024 altına bağlanamaz: `.env`'de `HTTP_PORT=8080` kullan ya da `setcap` uygula (adım A1). |
+| `port is already allocated` | `HTTP_PORT` ile mobil override'ın 8080'i çakışıyor — birini değiştir. |
+| Ev ağındaki telefondan açılmıyor | `PUBLIC_ORIGIN` `localhost` kalmış olabilir — LAN IP + port olmalı. Ayrıca `sudo ufw allow <HTTP_PORT>/tcp`. |
 | `monolith` sürekli restart | `make deploy-logs` → genelde `.env`'de eksik/default secret. Düzelt, `make deploy`. |
 | Sertifika uyarısı | Caddy henüz cert almadı: `logs caddy`. 80/443 firewall'da açık mı? `PUBLIC_HOST` gerçekten IP'ye çözülüyor mu (`dig 203-0-113-5.sslip.io`)? |
 | `migrate` exit code ≠ 0 | `logs migrate`. DB henüz hazır değilse tekrar: `docker compose up -d migrate`. |
