@@ -193,34 +193,116 @@ Sonra `mobile/.env` içinde API adresini `http://192.168.1.50:8080` yap.
 ### A8. Cloudflare Tunnel ile internete açmak
 
 Ev bağlantılarında port yönlendirme çoğu zaman çalışmaz (ISP CGNAT arkasına
-alır, 80/443 kapalı olabilir). **Cloudflare Tunnel** giden bağlantı kurar: router'da
-port açmaz, gerçek HTTPS ve domain verir.
+alır, 80/443 kapalı olabilir). **Cloudflare Tunnel** giden bağlantı kurar:
+router'da port açmaz, gerçek HTTPS ve domain verir.
 
-Tunnel'ı Caddy'nin host portuna yönlendir (`.env`'deki `HTTP_PORT`):
+Ön koşul: Cloudflare'de yönetilen bir domain (nameserver'ları Cloudflare'e
+taşınmış olmalı — ücretsiz plan yeterli).
 
+#### 1. cloudflared kur ve giriş yap
+
+```bash
+curl -fsSL https://pkg.cloudflare.com/cloudflare-main.gpg \
+  | sudo tee /usr/share/keyrings/cloudflare-main.gpg >/dev/null
+echo "deb [signed-by=/usr/share/keyrings/cloudflare-main.gpg] https://pkg.cloudflare.com/cloudflared any main" \
+  | sudo tee /etc/apt/sources.list.d/cloudflared.list
+sudo apt update && sudo apt install -y cloudflared
+
+cloudflared tunnel login      # tarayicida domain'i sec
 ```
-localhost:8080  →  https://mydreamcampus.example.com
+
+#### 2. Tunnel oluştur
+
+```bash
+cloudflared tunnel create homelab
+cloudflared tunnel list        # ID'yi not al
 ```
 
-Sonra `.env`'i buna göre ayarla:
+#### 3. Ingress kurallarını yaz
+
+`~/.cloudflared/config.yml` — **routing burada yapılıyor**, her proje için bir
+hostname:
+
+```yaml
+tunnel: homelab
+credentials-file: /home/KULLANICI/.cloudflared/<TUNNEL_ID>.json
+
+ingress:
+  - hostname: campus.example.com
+    service: http://localhost:8080      # mydreamcampus (HTTP_PORT)
+  - hostname: proje2.example.com
+    service: http://localhost:8081
+  # Zorunlu: eslesmeyen her istek icin catch-all, en sonda olmali.
+  - service: http_status:404
+```
+
+#### 4. DNS kaydını aç ve servisi başlat
+
+```bash
+cloudflared tunnel route dns homelab campus.example.com
+
+sudo cloudflared service install     # boot'ta otomatik baslar
+sudo systemctl status cloudflared
+```
+
+#### 5. `.env`'i tunnel'a göre ayarla
 
 ```
 HTTP_PORT=8080
+HTTPS_PORT=8443
 PUBLIC_HOST=:80
-PUBLIC_ORIGIN=https://mydreamcampus.example.com
+PUBLIC_ORIGIN=https://campus.example.com
 ```
 
-`make deploy` ile uygula.
+`make deploy` ile uygula. Artık `https://campus.example.com` çalışıyor.
 
-> **`PUBLIC_HOST=:80` neden?** Tunnel isteği `Host: mydreamcampus.example.com`
-> ile iletir. Caddy'ye sabit bir hostname yazarsan eşleşmeyen her istek 404
-> döner; `:80` "hangi host olursa olsun 80'de cevap ver" demektir — host
-> doğrulamasını zaten Cloudflare yapıyor.
+> **`PUBLIC_HOST=:80` neden?** Tunnel isteği `Host: campus.example.com` ile
+> iletir. Caddy'ye sabit bir hostname yazarsan eşleşmeyen her istek 404 döner;
+> `:80` "hangi host olursa olsun 80'de cevap ver" demektir — host doğrulamasını
+> zaten Cloudflare yapıyor.
 >
 > **HTTPS'i Cloudflare sonlandırır**, Caddy'ye düz HTTP gelir. Bu yüzden Caddy
-> tarafında sertifika ayarı yapmana gerek yok. `PUBLIC_ORIGIN` yine de
-> `https://` olmalı — tarayıcının gördüğü şema o, CORS ve e-posta linkleri
-> oradan üretiliyor.
+> tarafında sertifika ayarı gerekmez. `PUBLIC_ORIGIN` yine de `https://` olmalı
+> — tarayıcının gördüğü şema o, CORS ve e-posta linkleri oradan üretiliyor.
+>
+> `HTTPS_PORT` bu senaryoda kullanılmıyor (TLS Cloudflare'de bitiyor), ama
+> compose onu publish ettiği için diğer projelerle çakışmayan bir değer ver.
+
+---
+
+## Aynı sunucuda birden fazla proje
+
+**Ayrı bir reverse proxy kurmana gerek yok.** Tunnel'ın `ingress` bloğu zaten
+hostname → port yönlendirmesi yapıyor. Her projeye farklı bir host portu ver,
+ingress'e bir satır ekle:
+
+```
+~/mydreamcampus/   HTTP_PORT=8080  →  campus.example.com
+~/proje2/          HTTP_PORT=8081  →  proje2.example.com
+~/proje3/          HTTP_PORT=8082  →  proje3.example.com
+```
+
+Projeler birbirini tanımaz; tek ortak nokta port numaralarının çakışmaması.
+
+### nginx'i ne zaman araya koymalı
+
+Tunnel ingress **şunları yapamaz**: aynı hostname altında path bazlı bölme
+(`/app1`, `/app2`), merkezi rate limit, tek yerde erişim logu, tunnel'dan
+bağımsız LAN erişimi. Bunlardan birine ihtiyacın olduğunda araya bir edge proxy
+koy:
+
+```
+Tunnel → nginx :80 → :8080 mydreamcampus
+                   → :8081 proje 2
+```
+
+O zaman ingress'te tek kural kalır (`service: http://localhost:80`) ve dağıtımı
+nginx yapar. Sonradan geçmek kolay, baştan kurmak gereksiz.
+
+**nginx bu repoda olmamalı** — ortak altyapı, ayrı bir dizin/repo'da dursun
+(`~/infra/`). Aksi halde MyDreamCampus'a her push, otomatik deploy sırasında
+tüm projelerin router'ını yeniden başlatır ve `make deploy-down` bütün siteleri
+kapatır.
 
 ---
 
