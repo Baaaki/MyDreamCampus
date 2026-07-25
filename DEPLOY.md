@@ -172,7 +172,7 @@ Bir şey yapman gerekmez — tüm servisler `restart: unless-stopped` ile
 tanımlı, Docker daemon boot'ta kalkınca stack de kalkar. `make deploy` yalnızca
 ilk kurulumda ve kod güncellemesinde gerekir.
 
-### Mobil (Expo) uygulamayı bağlamak
+### Ek: Mobil (Expo) uygulamayı bağlamak
 
 Telefon Caddy'yi es geçip doğrudan monolith'e gitmek isterse override dosyasıyla
 kaldır (base compose 8080'i dışarı açmaz):
@@ -190,13 +190,100 @@ Sonra `mobile/.env` içinde API adresini `http://192.168.1.50:8080` yap.
 > hatası verir. Birini değiştir — en kolayı `.env`'de `HTTP_PORT=8090` yapıp
 > `PUBLIC_ORIGIN`'i de `http://192.168.1.50:8090` olarak güncellemek.
 
-### İnternete açmak istersen (opsiyonel)
+### A8. Cloudflare Tunnel ile internete açmak
 
 Ev bağlantılarında port yönlendirme çoğu zaman çalışmaz (ISP CGNAT arkasına
-alır, 80/443 kapalı olabilir). Router'da port açmak yerine **Cloudflare Tunnel**
-kullan: giden bağlantı kurar, port yönlendirme gerektirmez, gerçek HTTPS ve
-domain verir. Tunnel'ı `localhost:80`'e (Caddy) yönlendir, sonra `.env`'de
-`PUBLIC_HOST` / `PUBLIC_ORIGIN`'i tunnel domain'ine çevirip `make deploy` çalıştır.
+alır, 80/443 kapalı olabilir). **Cloudflare Tunnel** giden bağlantı kurar: router'da
+port açmaz, gerçek HTTPS ve domain verir.
+
+Tunnel'ı Caddy'nin host portuna yönlendir (`.env`'deki `HTTP_PORT`):
+
+```
+localhost:8080  →  https://mydreamcampus.example.com
+```
+
+Sonra `.env`'i buna göre ayarla:
+
+```
+HTTP_PORT=8080
+PUBLIC_HOST=:80
+PUBLIC_ORIGIN=https://mydreamcampus.example.com
+```
+
+`make deploy` ile uygula.
+
+> **`PUBLIC_HOST=:80` neden?** Tunnel isteği `Host: mydreamcampus.example.com`
+> ile iletir. Caddy'ye sabit bir hostname yazarsan eşleşmeyen her istek 404
+> döner; `:80` "hangi host olursa olsun 80'de cevap ver" demektir — host
+> doğrulamasını zaten Cloudflare yapıyor.
+>
+> **HTTPS'i Cloudflare sonlandırır**, Caddy'ye düz HTTP gelir. Bu yüzden Caddy
+> tarafında sertifika ayarı yapmana gerek yok. `PUBLIC_ORIGIN` yine de
+> `https://` olmalı — tarayıcının gördüğü şema o, CORS ve e-posta linkleri
+> oradan üretiliyor.
+
+---
+
+## Otomatik deploy — push'ta sunucu kendini güncellesin
+
+`git pull` tek başına yetmez: Go kodu binary'ye, React kodu statik dosyalara
+**imajın içine** derleniyor. Kaynağı güncellemek çalışan container'ı değiştirmez;
+yeniden build + restart gerekir.
+
+Bunu otomatikleştirmek için sunucu `origin/main`'i yoklar ve hareket edince
+kendini günceller:
+
+```bash
+make autodeploy-install
+```
+
+Kurulan şey bir **systemd user timer**: 2 dakikada bir
+[scripts/auto-deploy.sh](scripts/auto-deploy.sh) çalışır, yeni commit yoksa
+hiçbir şey yapmadan çıkar, varsa `git pull --ff-only` + `make deploy` yapar.
+
+```bash
+make autodeploy-status   # sonraki kontrol ne zaman, son sonuç ne
+make autodeploy-logs     # deploy geçmişi (journalctl)
+make autodeploy-now      # timer'ı bekleme, hemen kontrol et
+make autodeploy-off      # kapat
+```
+
+Artık akış şu: kendi bilgisayarında `git push` → en geç 2 dakika içinde sunucu
+kendini günceller. Elle hiçbir komut yok.
+
+### Neden webhook değil de yoklama?
+
+Ev sunucusu NAT arkasında; GitHub Actions oraya SSH ile **bağlanamaz** —
+internette bir sunucu için standart olan "CI bitince sunucuya deploy komutu
+gönder" yaklaşımı burada çalışmaz. Yoklama ters yönde çalışır: sunucunun
+GitHub'a bağlanması her zaman mümkün.
+
+Cloudflare Tunnel kurulu olsa bile yoklama tercih edilir:
+
+| | Yoklama (kurulan bu) | Webhook (tunnel üzerinden) |
+|---|---|---|
+| Gecikme | ≤ 2 dakika | Anında |
+| Saldırı yüzeyi | Yok — dışarıdan tetiklenemez | İnternete açık bir deploy endpoint'i |
+| Gereken secret | Yok | HMAC imza doğrulaması şart |
+| Tunnel çökerse | Çalışmaya devam eder | Deploy durur |
+
+Portfolio/demo için 2 dakikalık gecikme sorun değil, o yüzden basit ve güvenli
+olan seçildi. Anlık deploy'a ihtiyaç olursa tunnel zaten kurulu — webhook
+listener'ı sonradan eklemek mümkün.
+
+### Notlar
+
+- **Linger şart.** `sudo loginctl enable-linger $USER` yapılmadıysa timer
+  yalnızca sen SSH ile bağlıyken çalışır (adım A1).
+- **Sunucuda elle commit atma.** Script `--ff-only` kullanır; sunucudaki local
+  değişiklik deploy'u sessizce bozmak yerine yüksek sesle patlatır.
+- **`.env` güvende.** `.gitignore`'da ve takipli değil — `git pull` sunucudaki
+  secret'larını ezmez.
+- **Başarısız build tekrar denenir.** Script en son *başarıyla* deploy edilen
+  SHA'yı `.git/last-deployed-sha` içinde tutar, `HEAD`'i değil. Build patlarsa
+  sonraki turda aynı commit tekrar denenir.
+- **Private repo ise** sunucuya read-only bir GitHub *deploy key* ekle
+  (`ssh-keygen -t ed25519` → public key'i repo → Settings → Deploy keys).
 
 ---
 

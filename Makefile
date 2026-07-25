@@ -1,6 +1,7 @@
 .PHONY: help dev up down stop infra infra-down backend notification frontend mobile clean \
 	test test-backend test-frontend test-mobile test-coverage \
-	deploy deploy-down deploy-logs deploy-ps deploy-update check-env
+	deploy deploy-down deploy-logs deploy-ps deploy-update check-env \
+	autodeploy-install autodeploy-status autodeploy-logs autodeploy-now autodeploy-off
 
 INFRA   := new-backend/infrastructure
 COMPOSE := $(INFRA)/docker-compose.yml
@@ -20,6 +21,13 @@ help:
 	@echo "  make deploy-logs   Follow monolith + caddy logs"
 	@echo "  make deploy-ps     Show container status"
 	@echo "  make deploy-down   Stop everything (volumes/data kept)"
+	@echo ""
+	@echo "OTOMATIK DEPLOY (sunucu origin/main'i yoklar, degisince kendini gunceller):"
+	@echo "  make autodeploy-install  Enable the systemd user timer (2 min poll)"
+	@echo "  make autodeploy-status   When the next poll runs / last result"
+	@echo "  make autodeploy-logs     Follow deploy history"
+	@echo "  make autodeploy-now      Poll immediately, don't wait for the timer"
+	@echo "  make autodeploy-off      Disable it"
 	@echo ""
 	@echo "LOCAL DEV (hot reload, ayri terminaller):"
 	@echo "  make up           Bring up infrastructure + monolith backend"
@@ -104,6 +112,45 @@ deploy-ps:
 
 deploy-down:
 	$(SUDO) docker compose -f $(COMPOSE) down
+
+# ─────────────────────────────────────────────
+# Auto-deploy — a systemd user timer polls origin and redeploys on new commits.
+# Pull-based because a home server behind NAT cannot receive a webhook.
+# ─────────────────────────────────────────────
+
+UNIT_DIR := $(HOME)/.config/systemd/user
+
+autodeploy-install:
+	@mkdir -p $(UNIT_DIR)
+	@sed -e 's|@REPO@|$(CURDIR)|g' -e 's|@UID@|$(shell id -u)|g' \
+		scripts/systemd/mydreamcampus-deploy.service > $(UNIT_DIR)/mydreamcampus-deploy.service
+	@cp scripts/systemd/mydreamcampus-deploy.timer $(UNIT_DIR)/mydreamcampus-deploy.timer
+	@chmod +x scripts/auto-deploy.sh
+	systemctl --user daemon-reload
+	systemctl --user enable --now mydreamcampus-deploy.timer
+	@echo ""
+	@echo "Otomatik deploy aktif — origin/main her 2 dakikada bir kontrol edilir."
+	@echo "  make autodeploy-status   sonraki kontrol ne zaman"
+	@echo "  make autodeploy-logs     deploy gecmisi"
+	@echo ""
+	@echo "NOT: 'sudo loginctl enable-linger $(shell id -un)' yapilmadiysa timer sadece"
+	@echo "     sen SSH ile bagliyken calisir."
+
+autodeploy-status:
+	@systemctl --user list-timers mydreamcampus-deploy.timer --all
+	@systemctl --user status mydreamcampus-deploy.service --no-pager || true
+
+autodeploy-logs:
+	journalctl --user -u mydreamcampus-deploy.service -f
+
+# Run one poll right now instead of waiting for the timer.
+autodeploy-now:
+	systemctl --user start mydreamcampus-deploy.service
+	@journalctl --user -u mydreamcampus-deploy.service -n 30 --no-pager
+
+autodeploy-off:
+	systemctl --user disable --now mydreamcampus-deploy.timer
+	@echo "Otomatik deploy kapatildi. Elle: make deploy-update"
 
 # ─────────────────────────────────────────────
 # Test targets

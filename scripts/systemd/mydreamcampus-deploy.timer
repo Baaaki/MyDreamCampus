@@ -1,0 +1,12 @@
+[Unit]
+Description=Poll GitHub for MyDreamCampus updates
+
+[Timer]
+# First check shortly after boot, then every 2 minutes. systemd will not start
+# a second run while one is still in progress, so a slow build cannot pile up.
+OnBootSec=2min
+OnUnitActiveSec=2min
+Unit=mydreamcampus-deploy.service
+
+[Install]
+WantedBy=timers.target
