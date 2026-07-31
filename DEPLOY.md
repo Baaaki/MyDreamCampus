@@ -288,14 +288,35 @@ PUBLIC_ORIGIN=https://campus.example.com
 
 ## C. Openship (self-hosted PaaS)
 
-[Openship](https://openship.io) repoyu kendisi klonlar, compose dosyasını okur,
-imajları build eder, container'ları ayağa kaldırır ve kendi **OpenResty edge**'i
-ile domain + Let's Encrypt sertifikasını yönetir. Bu senaryoda A/B'deki
+[Openship](https://openship.io) repoyu kendisi klonlar, compose servislerini
+build eder, container'ları ayağa kaldırır ve kendi **OpenResty edge**'i ile
+domain + Let's Encrypt sertifikasını yönetir. Bu senaryoda A/B'deki
 `make deploy` ve `.env` dosyası **kullanılmaz** — o işi Openship yapar.
+
+> **Bu bölüm dashboard'dan tamamlanamaz.** Openship'in compose pipeline'ı çalışır
+> durumda, ama `docker-compose` framework'ü dashboard'un seçicisinden kasıtlı
+> olarak çıkarılmış (`Frameworks.tsx` → `EXCLUDED_STACKS`). Projeyi UI'dan
+> açarsan stack tek bir Go/statik uygulama sanılır ve deploy static pipeline'ına
+> düşer. Doğru kapı `openship service sync`. Aşağıdaki adımlar Openship v0.4.5
+> kaynak kodu incelenerek çıkarıldı.
+
+### C0. Sunucuda bir kerelik izin düzeltmesi
+
+```bash
+sudo mkdir -p /opt/openship/static/{releases,.builds}
+sudo chown -R $USER:$USER /opt/openship
+```
+
+> Openship `/opt/openship/static`'i **uzak sunucuda oluşturmuyor** — repoda bu
+> dizini açan ya da sahipliğini veren kod yok, yalnızca docker volume mount'u
+> olarak tanımlı. Deploy'un son adımı (`promoteBuildArtifact` → `mkdir`) SSH
+> kullanıcısı olarak çalıştığı için stok `/opt` (root:root 0755) altında
+> `Permission denied` alır. Compose yoluna geçince bu kod yolu kullanılmaz ama
+> ilk denemede static'e düşersen duvara çarpmamak için önden aç.
 
 ### C1. Repodaki hazırlık — zaten yapıldı
 
-Kökteki [openship.json](openship.json) Openship'e üç şey söyler:
+Kökteki [openship.json](openship.json):
 
 ```json
 {
@@ -305,41 +326,91 @@ Kökteki [openship.json](openship.json) Openship'e üç şey söyler:
 }
 ```
 
-- **`framework`** — auto-detection'ı devre dışı bırakır. Bu satır olmasa Openship
-  kökteki `go.mod`/`package.json` izlerine bakıp stack'i tek bir Go (Gin)
-  uygulaması ya da statik site sanar, kendi jenerik Dockerfile'ını üretir ve
-  compose dosyasına hiç bakmaz.
 - **`rootDirectory`** — compose dosyası repo kökünde değil, Openship'in nereye
-  bakacağı buradan gelir. `build:` context'leri compose'un kendi kuralıyla,
-  **dosyanın bulunduğu dizine göre** çözülür; yani `context: ..` →
-  `new-backend/`, `../../frontend` → `frontend/` doğru çalışır.
+  bakacağı buradan gelir. Overlay bu alanı uyguluyor.
+- **`framework`** — **overlay bu alanı uygulamıyor** (`prepare.service.ts`
+  içindeki `applyOpenshipOverlay` listesinde yok). Yalnızca detection'ın seçtiği
+  dizinde bir `openship.json` varsa metadata fold'undan geçer; bizim compose
+  dosyamız kök dışında olduğu için geçmez. Dosyada yine de duruyor çünkü C2'de
+  aynı değeri API'ye vereceğiz.
+- **`env`** — sadece **yeni import**ta okunur; mevcut bir projeye sonradan
+  eklemek DB kaydını değiştirmez.
 
 > Şemanın kökünde `additionalProperties: false` var — tanımsız bir alan
 > (eskiden burada `composePath` yazıyordu) dosyanın tamamını geçersiz kılar ve
 > Openship sessizce auto-detection'a düşer. Alan adlarını
 > [openship.schema.json](https://openship.io/openship.schema.json) ile doğrula.
-- **`env`** — gizli olmayan değerler doğrudan yazılı, secret'lar boş satır
-  olarak açılır (C3'te dolduracaksın).
 
-### C2. Projeyi oluştur
+### C2. Projeyi `services` tipiyle oluştur
 
-Openship dashboard → **Library** → repoyu seç. Wizard `openship.json`'ı okuyup
-compose servislerini listeler. Kontrol et:
+```bash
+openship project create --name my-dream-campus \
+  --git-owner <owner> --git-repo <repo> --git-branch main --type services
+```
 
-| Servis | Ayar |
-|---|---|
-| `caddy` | **Publicly exposed**, container port **80** — domain buraya bağlanır |
-| diğer hepsi | **Internal only** |
+Proje zaten varsa tipini API'den çevir (CLI'de `update --framework` bayrağı yok):
+
+```bash
+curl -X PATCH https://<openship-host>/api/projects/<projectId> \
+  -H 'Authorization: Bearer <token>' -H 'Content-Type: application/json' \
+  -d '{"framework": "docker-compose"}'
+```
+
+### C3. Compose servislerini senkronla
+
+```bash
+openship service sync new-backend/infrastructure/docker-compose.yml \
+  --project <projectId>
+```
+
+Bu komut **yerelde** `docker compose config --format json` çalıştırıp sonucu
+gönderir; yani `${VAR}` interpolasyonunu Docker Compose çözer, Openship'e somut
+değerler gider. Oluşan `kind="compose"` satırları projeyi compose pipeline'ına
+sokar.
+
+**Sync sonrası build context'lerini düzelt — zorunlu.** `service sync` mutlak
+context'i repo köküne değil **compose dosyasının dizinine** göre relatifleştirir
+(`service.ts` → `relativizeContext`), build tarafı ise bu değeri doğrudan
+`rootDirectory` olarak kullanır ve `..` segmentlerini temizlemez. Compose dosyası
+repo kökünde olsaydı iki taban çakışacağı için görünmezdi; bizim iç içe
+yerleşimimizde her build context'i checkout dizininin dışını gösterir:
+
+| Servis | Sync'in ürettiği | Olması gereken |
+|---|---|---|
+| `monolith` | `..` | `new-backend` |
+| `notification` | `..` | `new-backend` |
+| `migrate` | `..` | `new-backend` |
+| `seed` | `seed` | `new-backend/infrastructure/seed` |
+| `caddy` | `../../frontend` | `frontend` |
+
+Her biri için:
+
+```bash
+curl -X PATCH https://<openship-host>/api/projects/<projectId>/services/<serviceId> \
+  -H 'Authorization: Bearer <token>' -H 'Content-Type: application/json' \
+  -d '{"build": "new-backend"}'
+```
+
+Kalan 4 servis (`postgres`, `notification-postgres`, `rabbitmq`, `redis`,
+`mailhog`) hazır imaj kullanıyor, `build` alanları yok — dokunma.
+
+### C4. Sadece `caddy`'yi dışa aç
+
+```bash
+openship service update caddy --expose --exposed-port 80 --domain <label>
+```
+
+`exposed` varsayılanı `false`, diğer servislere dokunmana gerek yok.
 
 > **`caddy`'yi public işaretlemek zorunlu.** Openship yalnızca route ettiği
 > servisin portunu `127.0.0.1:<pinned>:80` olarak yeniden bağlar; işaretlemezsen
 > compose'daki `80:80` olduğu gibi host'a publish edilir ve Openship'in kendi
 > edge'i (host network'te, `:80`/`:443`) ile çakışır.
 
-### C3. Environment variables
+### C5. Environment variables
 
-Dashboard → **Environment**. `openship.json` satırları açtı, secret'ları doldur —
-her biri için ayrı `openssl rand -base64 48`:
+Dashboard → **Environment**. Secret'ları doldur — her biri için ayrı
+`openssl rand -base64 48`:
 
 ```
 POSTGRES_PASSWORD  REDIS_PASSWORD  RABBITMQ_PASSWORD
@@ -360,7 +431,7 @@ PUBLIC_ORIGIN=https://campus.example.com     # sonda / YOK
 > Monolith `ENVIRONMENT=production` ile çalışır ve secret'lar boş/default kalırsa
 > **başlamayı reddeder** — bilinçli bir önlem, sessiz kırık deploy olmaz.
 
-### C4. Deploy
+### C6. Deploy
 
 Deploy'a bas. Sıra: imajlar build edilir → `migrate` şemayı kurar → `monolith` +
 `notification` başlar → `caddy` SPA'yı servis eder → edge domain'i bağlar.
@@ -369,7 +440,7 @@ Sonrası **push-to-deploy**: `main`'e her push Openship'in webhook'unu tetikler,
 sadece değişen servisler yeniden build edilir. A bölümündeki
 `make autodeploy-install` (systemd poll timer) burada **gereksiz** — kurma.
 
-### C5. Bilmen gereken iki davranış farkı
+### C7. Bilmen gereken iki davranış farkı
 
 **1. `depends_on` koşulları düşer.** Openship compose'un `depends_on`
 *bağlantısını* okur ama `condition: service_healthy` /
@@ -388,15 +459,17 @@ değiştirdiğinde repo dosyası ile ayrıştığını "drift" olarak işaretler
 seçim yapmaya çağırır. Kalıcı değişiklikler için compose dosyasını düzenleyip
 push et — tek doğruluk kaynağı repo kalsın.
 
-### C6. Sorun giderme
+### C8. Sorun giderme
 
 | Belirti | Sebep / çözüm |
 |---|---|
-| `port is already allocated` (80 veya 443) | `caddy` public işaretlenmemiş (C2), ya da yanlışlıkla `docker-compose.standalone.yml` de yüklenmiş — Openship sadece base dosyayı kullanmalı |
-| Wizard tek bir Go uygulaması gösteriyor | `composePath` okunmamış — wizard'daki **Compose file** alanına `new-backend/infrastructure/docker-compose.yml` yazıp **Scan** |
-| `monolith` sürekli restart | Loglara bak: genelde boş bırakılmış secret (C3) |
+| Log'da `runtime: static` ve jenerik 6 adımlık Dockerfile | Proje compose olarak tanınmamış — C2/C3 yapılmamış. Dashboard'dan düzeltilemez |
+| `Deploy failed: mkdir: Permission denied` | C0 atlanmış; `/opt/openship/static` sunucuda yok veya SSH kullanıcısının değil |
+| `COPY failed: ... package.json: file does not exist` | Build context yanlış — C3'teki tablo ile `build` alanlarını karşılaştır |
+| `port is already allocated` (80 veya 443) | `caddy` public işaretlenmemiş (C4), ya da yanlışlıkla `docker-compose.standalone.yml` de yüklenmiş — Openship sadece base dosyayı kullanmalı |
+| `monolith` sürekli restart | Loglara bak: genelde boş bırakılmış secret (C5) |
 | Login 500 / CORS hatası | `PUBLIC_ORIGIN` tam `https://<domain>` mi, sonda `/` var mı |
-| Sayfa açılıyor ama `/api` 404 | Domain `caddy`'ye değil başka bir servise bağlanmış (C2) |
+| Sayfa açılıyor ama `/api` 404 | Domain `caddy`'ye değil başka bir servise bağlanmış (C4) |
 
 ---
 
