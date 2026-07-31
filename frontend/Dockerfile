@@ -5,8 +5,8 @@
 
 FROM oven/bun:1 AS build
 WORKDIR /app
-COPY package.json bun.lock* bun.lockb* ./
-RUN bun install
+COPY package.json bun.lock ./
+RUN bun install --frozen-lockfile
 COPY . .
 # Same-origin: empty base URL -> the SPA calls relative /api/... which Caddy
 # routes to the monolith. Real API, not mock.
