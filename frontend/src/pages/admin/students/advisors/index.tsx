@@ -34,8 +34,6 @@ import { ArrowLeft, UserPlus, Users, ArrowUpDown, ArrowUp, ArrowDown, Loader2 } 
 import { Link } from 'react-router'
 import { mockFaculties } from '@/mock_data/catalog'
 
-const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost'
-
 type Student = {
   id: string
   student_number: string
@@ -376,18 +374,8 @@ export default function AdvisorManagementPage() {
   // Fetch instructors by department from API (with Turkish-English normalization on backend)
   const fetchInstructorsByDepartment = async (department: string): Promise<Staff[]> => {
     try {
-      const response = await fetch(
-        `${API_BASE_URL}:8002/internal/staff/instructors?department=${encodeURIComponent(department)}`
-      )
-
-      if (!response.ok) {
-        throw new Error(`HTTP error! status: ${response.status}`)
-      }
-
-      const data = await response.json()
-      const instructors = data.data || []
-      console.log(`[Advisors] Fetched ${instructors.length} instructors for department: ${department}`)
-      return instructors
+      const response = await staffApi.get('instructors', { searchParams: { department } }).json() as { data: Staff[] }
+      return response.data || []
     } catch (err) {
       console.error('Error fetching instructors by department:', err)
       // Fallback to client-side filtering
