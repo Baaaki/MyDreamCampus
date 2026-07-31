@@ -7,6 +7,9 @@ ENV CGO_ENABLED=0
 RUN go install github.com/pressly/goose/v3/cmd/goose@latest
 
 FROM alpine:3.20
+# pg_isready gates the migration run on the server actually accepting
+# connections — see entrypoint.sh for why compose's healthcheck isn't enough.
+RUN apk add --no-cache postgresql-client
 COPY --from=build /go/bin/goose /usr/local/bin/goose
 
 # Monolith modules (one migration dir + one version table each).

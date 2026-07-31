@@ -3,8 +3,14 @@
 	deploy deploy-down deploy-logs deploy-ps deploy-update check-env \
 	autodeploy-install autodeploy-status autodeploy-logs autodeploy-now autodeploy-off
 
-INFRA   := new-backend/infrastructure
-COMPOSE := $(INFRA)/docker-compose.yml
+INFRA        := new-backend/infrastructure
+COMPOSE_FILE := $(INFRA)/docker-compose.yml
+
+# The base file publishes only caddy's :80 so a PaaS (Openship) can front it
+# without fighting for :443; the standalone overlay adds the infra loopback
+# ports and caddy's :443 back. Every target here runs the stack WITHOUT such a
+# platform, so both files are always loaded.
+COMPOSE := -f $(COMPOSE_FILE) -f $(INFRA)/docker-compose.standalone.yml
 
 # Empty when the docker socket is already reachable (root, or user in the
 # `docker` group) so the server never prompts for a password; falls back to
@@ -57,10 +63,10 @@ down: infra-down
 dev: up
 
 infra:
-	$(SUDO) docker compose -f $(COMPOSE) up -d
+	$(SUDO) docker compose $(COMPOSE) up -d
 
 infra-down:
-	$(SUDO) docker compose -f $(COMPOSE) down
+	$(SUDO) docker compose $(COMPOSE) down
 
 backend:
 	cd new-backend/monolith && go run ./cmd
@@ -78,7 +84,7 @@ stop: down
 
 clean: infra-down
 	@echo "Pruning local volumes (docker)..."
-	$(SUDO) docker compose -f $(COMPOSE) down -v
+	$(SUDO) docker compose $(COMPOSE) down -v
 
 # ─────────────────────────────────────────────
 # Deploy targets — one command for the full stack.
@@ -98,20 +104,20 @@ check-env:
 		exit 1; } || true
 
 deploy: check-env
-	$(SUDO) docker compose -f $(COMPOSE) up -d --build
+	$(SUDO) docker compose $(COMPOSE) up -d --build
 
 deploy-update: check-env
 	git pull
-	$(SUDO) docker compose -f $(COMPOSE) up -d --build
+	$(SUDO) docker compose $(COMPOSE) up -d --build
 
 deploy-logs:
-	$(SUDO) docker compose -f $(COMPOSE) logs -f monolith caddy
+	$(SUDO) docker compose $(COMPOSE) logs -f monolith caddy
 
 deploy-ps:
-	$(SUDO) docker compose -f $(COMPOSE) ps
+	$(SUDO) docker compose $(COMPOSE) ps
 
 deploy-down:
-	$(SUDO) docker compose -f $(COMPOSE) down
+	$(SUDO) docker compose $(COMPOSE) down
 
 # ─────────────────────────────────────────────
 # Auto-deploy — a systemd user timer polls origin and redeploys on new commits.

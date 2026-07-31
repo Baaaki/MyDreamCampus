@@ -8,15 +8,29 @@ Caddy (SPA + `/api` proxy) → monolith → Postgres/Redis/RabbitMQ.
 > Caddy 80/443'ü dinler: `/api/*` → monolith:8080, geri kalan her şey SPA.
 > Tarayıcı tek origin görür — CORS yok, ayrı port yok.
 
-İki senaryo var:
+Üç senaryo var:
 
-| | **A. Ev sunucusu (LAN)** | **B. Public VPS** |
-|---|---|---|
-| Erişim | Ev ağındaki cihazlar | İnternetten herkes |
-| Adres | `http://192.168.1.50:8080` | `https://203-0-113-5.sslip.io` |
-| HTTPS | Yok (özel IP'ye sertifika verilmez) | Let's Encrypt, otomatik |
-| Docker | Rootless — root yetkisi gerekmez | Root daemon (droplet'te zaten root'sun) |
-| Kurulum | Aşağıdaki **A** bölümü | **B** bölümü |
+| | **A. Ev sunucusu (LAN)** | **B. Public VPS** | **C. Openship (PaaS)** |
+|---|---|---|---|
+| Erişim | Ev ağındaki cihazlar | İnternetten herkes | İnternetten herkes |
+| Adres | `http://192.168.1.50:8080` | `https://203-0-113-5.sslip.io` | Openship'in verdiği domain |
+| HTTPS | Yok (özel IP'ye sertifika verilmez) | Let's Encrypt, Caddy alır | Let's Encrypt, **Openship** alır |
+| Docker | Rootless — root yetkisi gerekmez | Root daemon (droplet'te zaten root'sun) | Openship yönetir |
+| Deploy | `make deploy` | `make deploy` | Push → Openship build eder |
+| Kurulum | Aşağıdaki **A** bölümü | **B** bölümü | **C** bölümü |
+
+### Compose dosyaları — hangisi ne zaman
+
+| Dosya | Ne yapar |
+|---|---|
+| `docker-compose.yml` | Temel stack. Host'ta **sadece** Caddy'nin `:80`'ini publish eder. |
+| `docker-compose.standalone.yml` | Caddy'nin `:443`'ünü + infra portlarını (`127.0.0.1:5432`, `6379`, `15672`, `8025`…) ekler. |
+| `docker-compose.override.yml` | Sadece mobil geliştirme: monolith `:8080`'i LAN'a açar. |
+
+**A ve B'de ikisi de gerekir** — `make deploy` temel + standalone'u birlikte yükler,
+elle bir şey yapman gerekmez. **C'de sadece temel dosya** kullanılır: Openship'in
+kendi edge proxy'si host'un `:80/:443`'ünü zaten tutuyor, Caddy de onu publish
+etmeye kalkarsa deploy port çakışmasından patlar.
 
 ---
 
@@ -175,11 +189,13 @@ ilk kurulumda ve kod güncellemesinde gerekir.
 ### Ek: Mobil (Expo) uygulamayı bağlamak
 
 Telefon Caddy'yi es geçip doğrudan monolith'e gitmek isterse override dosyasıyla
-kaldır (base compose 8080'i dışarı açmaz):
+kaldır (base compose 8080'i dışarı açmaz). Üç dosyanın da verilmesi gerekir —
+`-f` kullandığın anda compose `override.yml`'ı otomatik yüklemez:
 
 ```bash
 docker compose \
   -f new-backend/infrastructure/docker-compose.yml \
+  -f new-backend/infrastructure/docker-compose.standalone.yml \
   -f new-backend/infrastructure/docker-compose.override.yml up -d
 ```
 
@@ -270,7 +286,115 @@ PUBLIC_ORIGIN=https://campus.example.com
 
 ---
 
+## C. Openship (self-hosted PaaS)
+
+[Openship](https://openship.io) repoyu kendisi klonlar, compose dosyasını okur,
+imajları build eder, container'ları ayağa kaldırır ve kendi **OpenResty edge**'i
+ile domain + Let's Encrypt sertifikasını yönetir. Bu senaryoda A/B'deki
+`make deploy` ve `.env` dosyası **kullanılmaz** — o işi Openship yapar.
+
+### C1. Repodaki hazırlık — zaten yapıldı
+
+Kökteki [openship.json](openship.json) Openship'e iki şey söyler:
+
+```json
+{
+  "composePath": "new-backend/infrastructure/docker-compose.yml",
+  "env": { "PUBLIC_HOST": ":80", ... }
+}
+```
+
+- **`composePath`** — compose dosyası repo kökünde değil. Bu satır olmasa
+  Openship kökte arar, bulamaz ve stack'i tek bir Go uygulaması sanardı.
+  `build:` context'leri compose'un kendi kuralıyla, **dosyanın bulunduğu dizine
+  göre** çözülür; yani `context: ..` → `new-backend/`, `../../frontend` →
+  `frontend/` doğru çalışır.
+- **`env`** — gizli olmayan değerler doğrudan yazılı, secret'lar boş satır
+  olarak açılır (C3'te dolduracaksın).
+
+### C2. Projeyi oluştur
+
+Openship dashboard → **Library** → repoyu seç. Wizard `openship.json`'ı okuyup
+compose servislerini listeler. Kontrol et:
+
+| Servis | Ayar |
+|---|---|
+| `caddy` | **Publicly exposed**, container port **80** — domain buraya bağlanır |
+| diğer hepsi | **Internal only** |
+
+> **`caddy`'yi public işaretlemek zorunlu.** Openship yalnızca route ettiği
+> servisin portunu `127.0.0.1:<pinned>:80` olarak yeniden bağlar; işaretlemezsen
+> compose'daki `80:80` olduğu gibi host'a publish edilir ve Openship'in kendi
+> edge'i (host network'te, `:80`/`:443`) ile çakışır.
+
+### C3. Environment variables
+
+Dashboard → **Environment**. `openship.json` satırları açtı, secret'ları doldur —
+her biri için ayrı `openssl rand -base64 48`:
+
+```
+POSTGRES_PASSWORD  REDIS_PASSWORD  RABBITMQ_PASSWORD
+JWT_SECRET  INTERNAL_SERVICE_SECRET  QR_SECRET  ADMIN_INITIAL_PASSWORD
+```
+
+Bir de domain'e bağlı olan tek değişken:
+
+```
+PUBLIC_ORIGIN=https://campus.example.com     # sonda / YOK
+```
+
+> `PUBLIC_ORIGIN` tarayıcının gördüğü tam URL — CORS ve e-posta linkleri buradan
+> üretiliyor. `PUBLIC_HOST` ise `:80` olarak sabit: "hangi Host header gelirse
+> gelsin 80'de cevap ver". Host doğrulamasını ve TLS'i zaten Openship'in edge'i
+> yapıyor; Caddy'ye sabit hostname yazarsan eşleşmeyen istekler 404 döner.
+>
+> Monolith `ENVIRONMENT=production` ile çalışır ve secret'lar boş/default kalırsa
+> **başlamayı reddeder** — bilinçli bir önlem, sessiz kırık deploy olmaz.
+
+### C4. Deploy
+
+Deploy'a bas. Sıra: imajlar build edilir → `migrate` şemayı kurar → `monolith` +
+`notification` başlar → `caddy` SPA'yı servis eder → edge domain'i bağlar.
+
+Sonrası **push-to-deploy**: `main`'e her push Openship'in webhook'unu tetikler,
+sadece değişen servisler yeniden build edilir. A bölümündeki
+`make autodeploy-install` (systemd poll timer) burada **gereksiz** — kurma.
+
+### C5. Bilmen gereken iki davranış farkı
+
+**1. `depends_on` koşulları düşer.** Openship compose'un `depends_on`
+*bağlantısını* okur ama `condition: service_healthy` /
+`service_completed_successfully` kısmını okumaz. Pratikte:
+
+- `migrate` bu yüzden şemayı kurmadan önce DB'nin bağlantı kabul etmesini
+  [kendi içinde bekler](new-backend/infrastructure/migrate/entrypoint.sh)
+  (`pg_isready`, 120 sn). `restart: "no"` olduğu için orada patlamak kalıcı
+  olurdu.
+- `monolith` migration'lardan önce başlarsa DB'ye bağlanamayıp ölür ve
+  `restart: unless-stopped` ile geri gelir. İlk deploy'da loglarda birkaç
+  restart görmek **normal**; birkaç saniyede oturur.
+
+**2. Dashboard düzenlemesi repoyu ezmez.** Openship bir alanı dashboard'dan
+değiştirdiğinde repo dosyası ile ayrıştığını "drift" olarak işaretler ve seni
+seçim yapmaya çağırır. Kalıcı değişiklikler için compose dosyasını düzenleyip
+push et — tek doğruluk kaynağı repo kalsın.
+
+### C6. Sorun giderme
+
+| Belirti | Sebep / çözüm |
+|---|---|
+| `port is already allocated` (80 veya 443) | `caddy` public işaretlenmemiş (C2), ya da yanlışlıkla `docker-compose.standalone.yml` de yüklenmiş — Openship sadece base dosyayı kullanmalı |
+| Wizard tek bir Go uygulaması gösteriyor | `composePath` okunmamış — wizard'daki **Compose file** alanına `new-backend/infrastructure/docker-compose.yml` yazıp **Scan** |
+| `monolith` sürekli restart | Loglara bak: genelde boş bırakılmış secret (C3) |
+| Login 500 / CORS hatası | `PUBLIC_ORIGIN` tam `https://<domain>` mi, sonda `/` var mı |
+| Sayfa açılıyor ama `/api` 404 | Domain `caddy`'ye değil başka bir servise bağlanmış (C2) |
+
+---
+
 ## Aynı sunucuda birden fazla proje
+
+> Openship kullanıyorsan (C) bu bölümü atla — çoklu proje ve hostname
+> yönlendirmesi zaten onun işi.
 
 **Ayrı bir reverse proxy kurmana gerek yok.** Tunnel'ın `ingress` bloğu zaten
 hostname → port yönlendirmesi yapıyor. Her projeye farklı bir host portu ver,
@@ -461,10 +585,13 @@ echo '/swapfile none swap sw 0 0' >> /etc/fstab
 ## 5. Build + ayağa kaldır
 
 ```bash
-# hâlâ new-backend/infrastructure/ içindeyken
-docker compose build          # ilk sefer 3-6 dk (Go + frontend derlenir)
-docker compose up -d
+cd ~/mydreamcampus       # repo köküne dön
+make deploy              # ilk sefer 3-6 dk (Go + frontend derlenir)
 ```
+
+> Çıplak `docker compose up -d` **çalıştırma**: `-f` vermeden çağırdığında
+> standalone overlay'i yüklemez, Caddy `:443`'ü açmaz ve HTTPS gelmez.
+> `make deploy` doğru dosya setini kendisi veriyor.
 
 Sıra otomatik: infra sağlıklı olunca `migrate` çalışır → bitince `monolith` +
 `notification` başlar → `caddy` TLS sertifikasını çeker.
@@ -472,9 +599,8 @@ Sıra otomatik: infra sağlıklı olunca `migrate` çalışır → bitince `mono
 Migration loglarını gör:
 
 ```bash
-docker compose logs migrate           # ">> migrations complete" görmelisin
-docker compose logs -f monolith       # panik/hata var mı
-docker compose ps                     # hepsi "running", migrate "exited (0)"
+make deploy-ps                        # hepsi "running", migrate "exited (0)"
+make deploy-logs                      # monolith + caddy, canlı
 ```
 
 ---
@@ -537,12 +663,23 @@ make deploy-down     # durdur (veriyi korur — volume'lar kalır)
 make clean           # DİKKAT: veriyi de siler
 ```
 
-Tek bir servise müdahale gerekirse compose'a doğrudan da geçebilirsin:
+Tek bir servise müdahale gerekirse compose'a doğrudan da geçebilirsin. Stack iki
+dosyaya bölündüğü için ikisini de vermen gerekir; `COMPOSE_FILE` (compose'un
+kendi değişkeni, `:` ile ayrılır) bunu bir kez ayarlamanı sağlar:
 
 ```bash
-docker compose -f new-backend/infrastructure/docker-compose.yml restart monolith
-docker compose -f new-backend/infrastructure/docker-compose.yml logs migrate
+cd ~/mydreamcampus
+export COMPOSE_FILE=new-backend/infrastructure/docker-compose.yml:new-backend/infrastructure/docker-compose.standalone.yml
+
+docker compose restart monolith
+docker compose logs migrate
+docker compose logs seed
+docker compose up -d --build seed
+docker compose exec -T postgres psql -U postgres -d mydreamcampus \
+  < new-backend/monolith/seed_courses.sql
 ```
+
+Kalıcı olsun istersen `~/.bashrc`'ye ekle.
 
 ---
 

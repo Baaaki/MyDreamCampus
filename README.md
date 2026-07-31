@@ -75,11 +75,12 @@ Projeyi kendi bilgisayarınızda test etmek oldukça basittir.
 
 ```bash
 # 1. Altyapıyı ayağa kaldırın (Veritabanı, Redis, RabbitMQ vb.)
-cd new-backend/infrastructure
-docker compose up -d
+#    Repo kökünden çalıştırın: `make` doğru compose dosyalarını birlikte yükler
+#    ve infra portlarını 127.0.0.1'e açar (çıplak `docker compose up` açmaz).
+make infra
 
 # 2. Ana Uygulamayı (Backend) başlatın
-cd ../monolith
+cd new-backend/monolith
 make run
 
 # 3. Bildirim Servisini (E-posta ve Push) başlatın (Yeni bir terminalde)

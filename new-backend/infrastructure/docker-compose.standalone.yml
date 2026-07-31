@@ -1,0 +1,42 @@
+# Standalone overlay — for running the stack WITHOUT a PaaS in front of it.
+#
+# The base compose publishes only caddy's :80, because a managed platform
+# (Openship) owns the host's :80/:443 and pins its own loopback port for the
+# service it routes. Anything else published there would collide with it.
+#
+# Without such a platform, Caddy is itself the outermost edge and the infra
+# ports are a genuine convenience (psql, redis-cli, the RabbitMQ and MailHog
+# UIs), so this overlay adds them back. Every infra port binds to 127.0.0.1 —
+# only the host reaches them; Caddy stays the single externally reachable door.
+#
+# Loaded automatically by every `make` target. By hand:
+#   docker compose -f docker-compose.yml -f docker-compose.standalone.yml up -d
+services:
+  postgres:
+    ports:
+      - "127.0.0.1:5432:5432"
+
+  notification-postgres:
+    ports:
+      - "127.0.0.1:5433:5432"
+
+  rabbitmq:
+    ports:
+      - "127.0.0.1:5672:5672"
+      - "127.0.0.1:15672:15672"
+
+  redis:
+    ports:
+      - "127.0.0.1:6379:6379"
+
+  mailhog:
+    ports:
+      - "127.0.0.1:1025:1025"  # SMTP
+      - "127.0.0.1:8025:8025"  # Web UI
+
+  caddy:
+    # Caddy is the outermost edge here, so it terminates TLS itself: a real
+    # Let's Encrypt cert when PUBLIC_HOST is a public hostname, its internal CA
+    # otherwise. Rootless Docker cannot bind 443, hence the override.
+    ports:
+      - "${HTTPS_PORT:-443}:443"

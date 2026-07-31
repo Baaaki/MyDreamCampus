@@ -1,0 +1,19 @@
+{
+  "$schema": "https://openship.io/openship.schema.json",
+  "composePath": "new-backend/infrastructure/docker-compose.yml",
+  "env": {
+    "POSTGRES_USER": "postgres",
+    "RABBITMQ_USER": "rabbitmq",
+    "ADMIN_EMAIL": "admin@university.edu.tr",
+    "SEED_DEMO": "true",
+    "PUBLIC_HOST": ":80",
+    "PUBLIC_ORIGIN": "",
+    "POSTGRES_PASSWORD": { "value": "", "secret": true },
+    "REDIS_PASSWORD": { "value": "", "secret": true },
+    "RABBITMQ_PASSWORD": { "value": "", "secret": true },
+    "JWT_SECRET": { "value": "", "secret": true },
+    "INTERNAL_SERVICE_SECRET": { "value": "", "secret": true },
+    "QR_SECRET": { "value": "", "secret": true },
+    "ADMIN_INITIAL_PASSWORD": { "value": "", "secret": true }
+  }
+}

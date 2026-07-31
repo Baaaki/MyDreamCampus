@@ -250,6 +250,16 @@ Bu kararlar verilmis — yeniden sorma:
 
 Infra portlari `127.0.0.1`'e bind'li — disaridan sadece Caddy erisilir. Frontend dev: `3000` (Vite proxy `/api` -> 8080).
 
+**Compose dosyasi ikiye bolundu** — port publish etme yeri onemli:
+
+| Dosya | Publish ettigi host portlari |
+|---|---|
+| `docker-compose.yml` (base) | **Sadece** Caddy `:80`. PaaS (Openship) bunu okur; kendi edge'i `:80/:443`'u tuttugu icin baska port publish edilemez. |
+| `docker-compose.standalone.yml` | Caddy `:443` + yukaridaki tum infra portlari (`127.0.0.1`). PaaS'siz calisma (LAN / tunnel / VPS) icin. |
+
+`make` hedefleri **ikisini birlikte** yukler — yeni bir host portu eklerken
+standalone dosyasina ekle, base'e degil. Detay: [`DEPLOY.md`](DEPLOY.md).
+
 ---
 
 ## 14. Dokunma — Generated / Korunan Dosyalar
