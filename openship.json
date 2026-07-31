@@ -1,6 +1,7 @@
 {
   "$schema": "https://openship.io/openship.schema.json",
-  "composePath": "new-backend/infrastructure/docker-compose.yml",
+  "framework": "docker-compose",
+  "rootDirectory": "new-backend/infrastructure",
   "env": {
     "POSTGRES_USER": "postgres",
     "RABBITMQ_USER": "rabbitmq",

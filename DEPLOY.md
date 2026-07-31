@@ -295,20 +295,29 @@ ile domain + Let's Encrypt sertifikasını yönetir. Bu senaryoda A/B'deki
 
 ### C1. Repodaki hazırlık — zaten yapıldı
 
-Kökteki [openship.json](openship.json) Openship'e iki şey söyler:
+Kökteki [openship.json](openship.json) Openship'e üç şey söyler:
 
 ```json
 {
-  "composePath": "new-backend/infrastructure/docker-compose.yml",
+  "framework": "docker-compose",
+  "rootDirectory": "new-backend/infrastructure",
   "env": { "PUBLIC_HOST": ":80", ... }
 }
 ```
 
-- **`composePath`** — compose dosyası repo kökünde değil. Bu satır olmasa
-  Openship kökte arar, bulamaz ve stack'i tek bir Go uygulaması sanardı.
-  `build:` context'leri compose'un kendi kuralıyla, **dosyanın bulunduğu dizine
-  göre** çözülür; yani `context: ..` → `new-backend/`, `../../frontend` →
-  `frontend/` doğru çalışır.
+- **`framework`** — auto-detection'ı devre dışı bırakır. Bu satır olmasa Openship
+  kökteki `go.mod`/`package.json` izlerine bakıp stack'i tek bir Go (Gin)
+  uygulaması ya da statik site sanar, kendi jenerik Dockerfile'ını üretir ve
+  compose dosyasına hiç bakmaz.
+- **`rootDirectory`** — compose dosyası repo kökünde değil, Openship'in nereye
+  bakacağı buradan gelir. `build:` context'leri compose'un kendi kuralıyla,
+  **dosyanın bulunduğu dizine göre** çözülür; yani `context: ..` →
+  `new-backend/`, `../../frontend` → `frontend/` doğru çalışır.
+
+> Şemanın kökünde `additionalProperties: false` var — tanımsız bir alan
+> (eskiden burada `composePath` yazıyordu) dosyanın tamamını geçersiz kılar ve
+> Openship sessizce auto-detection'a düşer. Alan adlarını
+> [openship.schema.json](https://openship.io/openship.schema.json) ile doğrula.
 - **`env`** — gizli olmayan değerler doğrudan yazılı, secret'lar boş satır
   olarak açılır (C3'te dolduracaksın).
 
