@@ -1,0 +1,35 @@
+# Every service image builds from the repo root, so this is the only
+# .dockerignore Docker reads — the ones under frontend/ and new-backend/ apply
+# to their own context only and no image uses those contexts anymore.
+#
+# Why root context: Openship's compose builder prepares ONE shared context for
+# all services and always roots it at the checkout, using each service's
+# `build:` value solely to locate the Dockerfile. Repo-root-relative COPY paths
+# are the only layout that works there and under plain `docker compose` alike.
+#
+# Without the exclusions below a local `make deploy` would hand the daemon the
+# entire 1.2 GB worktree; a fresh clone is ~5 MB.
+
+.git/
+.github/
+.idea/
+.claude/
+
+# No image consumes these: mobile is Expo-only, scripts/ is host tooling.
+mobile/
+scripts/
+*.md
+
+# Dependency and build trees — restored inside the image, never copied in.
+**/node_modules/
+frontend/dist/
+**/bin/
+**/main
+**/*_bin
+
+# Secrets and local noise.
+**/.env
+**/.env.local
+**/*.log
+**/coverage.out
+**/coverage.html

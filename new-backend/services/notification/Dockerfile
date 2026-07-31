@@ -1,17 +1,19 @@
 # syntax=docker/dockerfile:1
-# Build context is new-backend/ so the notification module can reach
-# ../../shared (its go.mod replace target).
+# Build context is the REPO ROOT (Openship's compose builder roots its one
+# shared context at the checkout and ignores per-service contexts), so COPY
+# sources carry the new-backend/ prefix while destinations keep the old layout
+# — the module still reaches ../../shared, its go.mod replace target.
 
 FROM golang:1.26 AS build
 ENV GOWORK=off CGO_ENABLED=0
 WORKDIR /src
 
-COPY shared/ ./shared/
-COPY services/notification/go.mod services/notification/go.sum ./services/notification/
+COPY new-backend/shared/ ./shared/
+COPY new-backend/services/notification/go.mod new-backend/services/notification/go.sum ./services/notification/
 WORKDIR /src/services/notification
 RUN go mod download
 
-COPY services/notification/ ./
+COPY new-backend/services/notification/ ./
 RUN go build -trimpath -ldflags="-s -w" -o /out/notification ./cmd/main.go
 
 FROM gcr.io/distroless/static-debian12:nonroot

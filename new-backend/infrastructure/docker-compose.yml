@@ -93,8 +93,8 @@ services:
   # and notification wait for this to finish successfully before starting.
   migrate:
     build:
-      context: ..
-      dockerfile: infrastructure/migrate/Dockerfile
+      context: ../..
+      dockerfile: new-backend/infrastructure/migrate/Dockerfile
     image: mydreamcampus-migrate:latest
     container_name: mydreamcampus-migrate
     restart: "no"
@@ -109,8 +109,8 @@ services:
 
   monolith:
     build:
-      context: ..
-      dockerfile: monolith/Dockerfile
+      context: ../..
+      dockerfile: new-backend/monolith/Dockerfile
     image: mydreamcampus-monolith:latest
     container_name: mydreamcampus-monolith
     restart: unless-stopped
@@ -144,8 +144,8 @@ services:
 
   notification:
     build:
-      context: ..
-      dockerfile: services/notification/Dockerfile
+      context: ../..
+      dockerfile: new-backend/services/notification/Dockerfile
     image: mydreamcampus-notification:latest
     container_name: mydreamcampus-notification
     restart: unless-stopped
@@ -170,7 +170,8 @@ services:
   # .env disables it.
   seed:
     build:
-      context: ./seed
+      context: ../..
+      dockerfile: new-backend/infrastructure/seed/Dockerfile
     image: mydreamcampus-seed:latest
     container_name: mydreamcampus-seed
     restart: "no"
@@ -188,8 +189,8 @@ services:
   # Fetches a real Let's Encrypt cert for SITE_ADDRESS automatically.
   caddy:
     build:
-      context: ../../frontend
-      dockerfile: Dockerfile
+      context: ../..
+      dockerfile: frontend/Dockerfile
     image: mydreamcampus-caddy:latest
     container_name: mydreamcampus-caddy
     restart: unless-stopped
