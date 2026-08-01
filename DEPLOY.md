@@ -461,9 +461,37 @@ PUBLIC_ORIGIN=https://campus.example.com     # sonda / YOK
 Deploy'a bas. Sıra: imajlar build edilir → `migrate` şemayı kurar → `monolith` +
 `notification` başlar → `caddy` SPA'yı servis eder → edge domain'i bağlar.
 
-Sonrası **push-to-deploy**: `main`'e her push Openship'in webhook'unu tetikler,
-sadece değişen servisler yeniden build edilir. A bölümündeki
-`make autodeploy-install` (systemd poll timer) burada **gereksiz** — kurma.
+Sonrası **push-to-deploy** — ama Openship'in kendi auto-deploy'u üzerinden değil.
+A bölümündeki `make autodeploy-install` (systemd poll timer) yine de **gereksiz**.
+
+**Openship'in native auto-deploy'u bu kurulumda açılamıyor.** Toggle, repoda bir
+webhook oluşturmayı deniyor; Openship'in GitHub OAuth'u yalnızca
+`read:user` + `user:email` scope'larıyla bağlandığı için GitHub 403 döndürüyor ve
+webhook kurulamadan `autoDeploy` bayrağı da yazılmıyor. Açmak istersen repoya
+`admin:repo_hook` yetkili bir token bağlaman ya da GitHub App'i kurman gerekir —
+karşılığında akıllı servis routing'i ve commit-sha dedup'ı kazanırsın.
+
+Bunun yerine kurulu olan yol:
+
+1. Projede bir **incoming webhook** var (`actionType: deploy`, `authMode: token`).
+   Çağrıldığında deploy branch'inin (`main`) HEAD'ini deploy eder.
+2. [`.github/workflows/deploy.yml`](.github/workflows/deploy.yml) `main`'e push'ta
+   o URL'e `Authorization: Bearer <token>` ile POST atar.
+
+Branch filtresi **workflow'da** duruyor çünkü incoming webhook branch bilmez —
+çağrılan her istek production'ı yeniden build eder. GitHub'a doğrudan webhook
+eklersen (Actions yerine) her branch'e push production'ı build eder.
+
+Gereken iki repo secret'ı — Settings → Secrets and variables → Actions:
+
+| Secret | Değer |
+|---|---|
+| `OPENSHIP_DEPLOY_URL` | `https://<openship-host>/api/proxy/api/webhooks/incoming/<hookId>` |
+| `OPENSHIP_DEPLOY_TOKEN` | Hook oluşturulurken dönen `secret` |
+
+Secret'lar yoksa workflow deploy'u sessizce atlar (warning ile), kırmızıya
+düşmez. Her push tüm servisleri yeniden build eder (~80 sn) — akıllı routing
+yalnızca native auto-deploy'da devrede.
 
 ### C7. Bilmen gereken iki davranış farkı
 

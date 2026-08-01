@@ -1,0 +1,32 @@
+name: Deploy
+
+# Openship's incoming webhook is branch-blind: every call redeploys the
+# project's deploy branch (main). The branch filter therefore has to live
+# here — otherwise a push to any feature branch would rebuild production.
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+concurrency:
+  group: openship-deploy
+  cancel-in-progress: false
+
+jobs:
+  trigger:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Trigger Openship deploy
+        env:
+          HOOK_URL: ${{ secrets.OPENSHIP_DEPLOY_URL }}
+          HOOK_TOKEN: ${{ secrets.OPENSHIP_DEPLOY_TOKEN }}
+        run: |
+          if [ -z "$HOOK_URL" ] || [ -z "$HOOK_TOKEN" ]; then
+            echo "::warning::OPENSHIP_DEPLOY_URL / OPENSHIP_DEPLOY_TOKEN not set — skipping deploy."
+            exit 0
+          fi
+          curl -fsS -X POST "$HOOK_URL" \
+            -H "Authorization: Bearer $HOOK_TOKEN" \
+            -H "Content-Type: application/json" \
+            -d "{\"commit\":\"${GITHUB_SHA}\"}"
+          echo
