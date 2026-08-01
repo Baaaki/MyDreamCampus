@@ -1,15 +1,26 @@
 # Openship ile Deploy Denemesi — Bulunan Kusurlar ve Durum
 
-**Tarih:** 2026-07-31 · **Openship:** 0.4.8 (self-hosted, `deployMode: docker`, sunucu hedefi)
+**Tarih:** 2026-07-31 (ilk deneme) · 2026-08-01 (başarılı deploy)
+**Openship:** 0.4.8 (self-hosted, `deployMode: docker`, local hedef)
 **Proje:** MyDreamCampus — 10 servisli compose stack, compose dosyası repo kökünde değil
-(`new-backend/infrastructure/docker-compose.yml`), build context'leri compose dosyasına göreli.
+(`new-backend/infrastructure/docker-compose.yml`).
 
-Bu dosya bir günlük deneme sürecinin kaydı. Amaç ikili: (1) aynı duvara çarpan başkası
-zaman kaybetmesin, (2) Openship'e issue/PR açarken elde somut kanıt olsun.
+Bu dosya deneme sürecinin kaydı. Amaç ikili: (1) aynı duvara çarpan başkası zaman
+kaybetmesin, (2) Openship'e issue/PR açarken elde somut kanıt olsun.
 
-**Sonuç:** Stack 0.4.8 ile deploy **edilemedi**. Altı kusur aşıldı, yedincisi (build
-context) repo tarafında çözülemez — Openship'in kendi kodunda düzeltilmesi gerekiyor.
-Alternatif yol (`make deploy` + Cloudflare Tunnel) çalışıyor, bkz. [DEPLOY.md §A](DEPLOY.md).
+**Sonuç:** Stack 2026-08-01'de **deploy edildi** — 10/10 servis ayakta,
+<https://mydreamcampus.madebybaki.com> canlı. Kusur 7 (build context) Openship'te hâlâ
+duruyor; **repo tarafında dolanıldı** — tüm Dockerfile'lar repo kökü göreli COPY yollarına
+taşındı (commit `401397e`). Bu, Openship'in zaten yaptığı varsayımla hizalanmak demek;
+düz `docker compose` ile de aynı şekilde çalışıyor.
+
+Deploy'un gerçekten çalıştığının kanıtı:
+
+```
+GET  /health           -> 200 {"service":"monolith","status":"alive"}
+POST /api/auth/login   -> 401 {"error":"INVALID_CREDENTIALS", ...}   (yanlis parola ile)
+GET  /                 -> 200 SPA (gercek Vite build)
+```
 
 ---
 
@@ -29,7 +40,8 @@ repo/
 Tek servisli ya da "hepsi kökten build edilen" stack'lerde `context` ile checkout kökü
 zaten çakışır, dolayısıyla context'in yok sayılması **görünmez** kalır.
 
-Bizim yerleşimimizde çakışmıyor:
+Bizim yerleşimimizde çakışmıyordu (aşağıdaki değerler **düzeltme öncesi** hâl — bugün
+hepsi repo kökü, bkz. kusur 7):
 
 | Servis | compose'daki `context` | Gerçek context | Openship'in kullandığı |
 |---|---|---|---|
@@ -165,7 +177,7 @@ self-hosted kullanıcı için ikincisi yanlış yönlendirme.
 
 ---
 
-### 7. Compose build context'i tamamen yok sayılıyor — **AÇIK, tıkandığımız yer**
+### 7. Compose build context'i tamamen yok sayılıyor — Openship'te AÇIK, repoda dolanıldı
 
 **Belirti:** Beş servisin beşi de kendi Dockerfile'ının **ilk COPY**'sinde patlıyor:
 
@@ -181,10 +193,21 @@ Patlayan yolların hepsi repo kökünden bakınca yok, doğru context'ten bakın
 Dockerfile'lar **bulunuyor** — her biri `FROM`/`RUN` adımlarını çalıştırıyor, `migrate`
 `apk add postgresql-client`'ı bitiriyor, sonra ilk `COPY`'de düşüyor.
 
-**Kök neden (kanıta dayalı çıkarım):** `build` ve `dockerfile` alanları yalnızca
-Dockerfile'ın **yerini** belirlemek için birleştiriliyor; build **context**'i ise checkout
-kökü olarak sabit kalıyor. `context` compose semantiğinde tam olarak "COPY'lerin tabanı"
-demektir — bu davranış onu yok sayıyor.
+**Kök neden — artık çıkarım değil, log'da açıkça görünüyor.** Build fazı servis başına
+ayrı context hazırlamıyor; **tek bir ortak context** kuruyor ve beşine de onu veriyor:
+
+```
+Building compose service "caddy" from frontend using Dockerfile...
+Building compose service "monolith" from new-backend using monolith/Dockerfile...
+Preparing shared build context...          <-- TEK context, hepsi icin
+Cloning into '/tmp/openship-docker-context-tpe6R7'...
+Shared build context ready (4.7 MB)        <-- checkout kokunun tamami
+```
+
+Yani `build` ve `dockerfile` alanları yalnızca Dockerfile'ın **yerini** belirlemek için
+birleştiriliyor (`<build>/<dockerfile>`), build **context**'i ise her zaman checkout kökü.
+`context` compose semantiğinde tam olarak "COPY'lerin tabanı" demektir — bu davranış onu
+yok sayıyor.
 
 **Denenen ve işe yaramayan üç şey:**
 
@@ -199,10 +222,19 @@ verilmeli, `dockerfile` da o context'e göre çözülmeli — yani `docker build
 <context>/<dockerfile> <context>`. Bugünkü davranış `docker build -f
 <root>/<build>/<dockerfile> <root>`.
 
-**Repo tarafında geçici çözüm (uygulanmadı):** Beş Dockerfile'ın tüm COPY yollarını repo
-köküne göre yeniden yazmak ve compose'daki `context:` satırlarını köke çekmek. Çalışır ama
-her build'de tüm repo daemon'a gider ve compose'un standart semantiğinden sapar. Bu yüzden
-tercih edilmedi.
+**Repo tarafında uygulanan çözüm (commit `401397e`):** Beş Dockerfile'ın tüm COPY
+yolları repo köküne göre yeniden yazıldı, compose'daki beş `context:` satırı `../..`
+(repo kökü) yapıldı, köke bir `.dockerignore` eklendi.
+
+İlk denemede bu yol "tüm repo daemon'a gider" diye elenmişti; ölçünce itiraz çürüdü —
+Openship'in ortak context'i **4.7 MB** (temiz clone'da `node_modules` yok). Yerel
+`make deploy` için de sorun değil: kökteki `.dockerignore` `node_modules/`, `mobile/`,
+`.git/` gibi ağır dizinleri eliyor (yerel worktree eleme olmadan 1.2 GB).
+
+Asıl kazanç şu: Openship zaten tek ve kök-tabanlı bir context kuruyor, dolayısıyla
+Dockerfile'ları o varsayıma taşımak sapma değil, hizalanma. Düz `docker compose build`
+de aynı şekilde çalışıyor (`docker compose config` ile doğrulandı — beş context de repo
+kökünü gösteriyor).
 
 ---
 
@@ -255,6 +287,55 @@ olarak yeterli).
 
 ---
 
+### 11. MCP sunucusunda koleksiyon uçları `service '*' not found` veriyor — Aşıldı
+
+**Belirti:** Openship MCP sunucusu üzerinden `GET /projects/:id/services` ve
+`POST /projects/:id/services/sync` çağrıları şu hatayı döndürüyor:
+
+```json
+{ "error": "service '*' not found", "code": "NOT_FOUND" }
+```
+
+**Kök neden (çıkarım):** MCP aracı yol şablonunu `/services/*` gibi bir kalıba
+eşliyor ve `*`'ı `:serviceId` path parametresi olarak gönderiyor. Servis bazlı
+uçlar (`GET`/`PATCH .../services/<id>`) sorunsuz çalışıyor — yalnızca
+koleksiyon seviyesi kırık.
+
+**Nasıl geçtik:** Sync'e hiç gerek kalmadı; 10 servis zaten kayıtlıydı, her
+birini tek tek `PATCH .../services/<serviceId>` ile güncelledik. Servis ID'leri
+`GET /projects/:id/services/containers` uçundan alınabiliyor (o çalışıyor).
+
+**Olması gereken:** MCP yol eşlemesi düzeltilmeli. Bu haliyle MCP üzerinden
+**yeni** bir compose projesini servislerle donatmak mümkün değil — yalnızca
+mevcut servisleri düzenlemek mümkün.
+
+---
+
+### 12. `command` alanı secret'ı düz metin sızdırıyor — Açık (güvenlik)
+
+**Belirti:** API servis kaydını dönerken `environment` içindeki her değeri
+maskeliyor (`"••••••••"`), ama `command` alanını **olduğu gibi** döndürüyor:
+
+```json
+"environment": { "REDIS_PASSWORD": "••••••••" },
+"command": "redis-server /usr/local/etc/redis/redis.conf --requirepass 9Jiq21g3O2XZ..."
+```
+
+Compose'da `command:` içine `${REDIS_PASSWORD}` yazmak tamamen olağan
+(bkz. [redis.conf](new-backend/infrastructure/redis/redis.conf) — requirepass
+kasıtlı olarak komut satırından geliyor). Interpolasyon sync anında çözüldüğü
+için secret komut satırına gömülüyor ve maskeleme oraya bakmıyor.
+
+**Yan etki:** `command`'ı ayrıca göndermeyen bir PATCH eski değeri koruyor.
+Yani `environment.REDIS_PASSWORD`'ü güncelleyip `command`'a dokunmazsan redis
+**eski** parolayla ayağa kalkar, uygulama yeni parolayla bağlanmaya çalışır ve
+sessizce auth hatası alırsın.
+
+**Olması gereken:** Maskeleme `command` / `commandArgv` alanlarını da kapsamalı;
+en azından bilinen secret değerleri hangi alanda geçerse geçsin maskelenmeli.
+
+---
+
 ## Kusurların özeti
 
 | # | Kusur | Durum | Etki |
@@ -265,12 +346,16 @@ olarak yeterli).
 | 4 | Config yalnızca import'ta okunuyor | Aşıldı | Mevcut proje düzeltilemiyor |
 | 5 | `service sync` context tabanı yanlış | Aşıldı | Kök dışı compose'da her context bozuk |
 | 6 | `project connect` servise inmiyor | Aşıldı | Yanlış yönlendiren hata mesajı |
-| 7 | **Build context yok sayılıyor** | **AÇIK** | **Alt dizinden build eden her stack ölü** |
+| 7 | **Build context yok sayılıyor** | Openship'te AÇIK | Dockerfile'ları repo köküne taşımayan her stack ölü |
 | 8 | `/opt/openship/static` oluşturulmuyor | Aşıldı | Static deploy sunucuda hiç çalışmıyor |
 | 9 | `project delete` 301 ile patlıyor | Aşıldı | Proje silinemiyor |
 | 10 | `deploy --watch` ID döndürmüyor | Aşıldı | Kozmetik |
+| 11 | MCP koleksiyon uçları `service '*' not found` | Aşıldı | MCP'den yeni compose projesi kurulamıyor |
+| 12 | `command` secret'ı maskelemiyor | **AÇIK** | Secret sızıntısı + sessiz parola uyumsuzluğu |
 
-Kusur 7 kritik: diğer dokuzu geçici çözümle aşılabiliyor, bu aşılamıyor.
+Kusur 7 hâlâ Openship'in kendi kodunda duruyor; repo tarafında Dockerfile'ları kök
+context'e taşıyarak dolanılabiliyor (bkz. yukarısı). Kusur 12 güvenlik tarafında ve
+upstream'de düzeltilmesi gerekiyor.
 
 ---
 

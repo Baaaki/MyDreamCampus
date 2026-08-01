@@ -370,29 +370,42 @@ sokar.
 
 **Sync sonrası build context'lerini düzelt — zorunlu.** `service sync` mutlak
 context'i repo köküne değil **compose dosyasının dizinine** göre relatifleştirir
-(`service.ts` → `relativizeContext`), build tarafı ise bu değeri doğrudan
-`rootDirectory` olarak kullanır ve `..` segmentlerini temizlemez. Compose dosyası
-repo kökünde olsaydı iki taban çakışacağı için görünmezdi; bizim iç içe
-yerleşimimizde her build context'i checkout dizininin dışını gösterir:
+(`service.ts` → `relativizeContext`) ve `..` segmentlerini temizlemez, dolayısıyla
+ürettiği değerler checkout dizininin dışını gösterir.
 
-| Servis | Sync'in ürettiği | Olması gereken |
+Ayrıca Openship build fazında **servis başına context kurmuyor**: tek bir ortak
+context'i checkout kökünde açıp beşine de veriyor (`Preparing shared build
+context...`). `build` alanı yalnızca Dockerfile'ı bulmaya yarıyor
+(`<build>/<dockerfile>`). Bu yüzden repo, tüm Dockerfile'ları **repo kökü göreli**
+COPY yollarına taşıdı (commit `401397e`) — ayrıntı ve gerekçe:
+[OPENSHIP-PROBLEMS.md kusur 7](OPENSHIP-PROBLEMS.md).
+
+Doğru değerler bu yüzden artık şunlar:
+
+| Servis | `build` | `dockerfile` |
 |---|---|---|
-| `monolith` | `..` | `new-backend` |
-| `notification` | `..` | `new-backend` |
-| `migrate` | `..` | `new-backend` |
-| `seed` | `seed` | `new-backend/infrastructure/seed` |
-| `caddy` | `../../frontend` | `frontend` |
+| `monolith` | `.` | `new-backend/monolith/Dockerfile` |
+| `notification` | `.` | `new-backend/services/notification/Dockerfile` |
+| `migrate` | `.` | `new-backend/infrastructure/migrate/Dockerfile` |
+| `seed` | `.` | `new-backend/infrastructure/seed/Dockerfile` |
+| `caddy` | `.` | `frontend/Dockerfile` |
 
 Her biri için:
 
 ```bash
 curl -X PATCH https://<openship-host>/api/projects/<projectId>/services/<serviceId> \
   -H 'Authorization: Bearer <token>' -H 'Content-Type: application/json' \
-  -d '{"build": "new-backend"}'
+  -d '{"build": ".", "dockerfile": "new-backend/monolith/Dockerfile"}'
 ```
 
-Kalan 4 servis (`postgres`, `notification-postgres`, `rabbitmq`, `redis`,
+Kalan 5 servis (`postgres`, `notification-postgres`, `rabbitmq`, `redis`,
 `mailhog`) hazır imaj kullanıyor, `build` alanları yok — dokunma.
+
+> **MCP üzerinden gidiyorsan:** `POST /projects/:id/services/sync` ve
+> `GET /projects/:id/services` MCP sunucusunda `service '*' not found` ile patlıyor
+> (kusur 11). Servisler zaten kayıtlıysa sync'e gerek yok — her birini
+> `PATCH .../services/<serviceId>` ile güncelle. Servis ID'lerini
+> `GET /projects/:id/services/containers` verir.
 
 ### C4. Sadece `caddy`'yi dışa aç
 
@@ -430,6 +443,18 @@ PUBLIC_ORIGIN=https://campus.example.com     # sonda / YOK
 >
 > Monolith `ENVIRONMENT=production` ile çalışır ve secret'lar boş/default kalırsa
 > **başlamayı reddeder** — bilinçli bir önlem, sessiz kırık deploy olmaz.
+
+> **Parola rotasyonunda iki tuzak var.**
+>
+> 1. `POSTGRES_PASSWORD` ve `RABBITMQ_DEFAULT_PASS` yalnızca **boş data dizininde**
+>    uygulanır. Çalışan bir stack'te env'i değiştirmek DB kullanıcısının parolasını
+>    değiştirmez; uygulama yeni parolayla bağlanmaya çalışır ve auth hatası alır.
+>    Gerçekten rotate etmek istiyorsan volume'u boşalt (ya da yeni bir volume adı ver)
+>    — `seed` demo verisini zaten yeniden üretir.
+> 2. `redis` parolası `command:` içindeki `--requirepass`'ten geliyor. API `command`
+>    alanını **maskelemiyor ve PATCH'te korumuyor**: yalnızca `REDIS_PASSWORD` env'ini
+>    güncellersen redis eski parolayla ayağa kalkar. İkisini birlikte güncelle.
+>    Ayrıntı: [OPENSHIP-PROBLEMS.md kusur 12](OPENSHIP-PROBLEMS.md).
 
 ### C6. Deploy
 
