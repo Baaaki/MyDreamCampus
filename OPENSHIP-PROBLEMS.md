@@ -65,15 +65,29 @@ Aşağıdakiler yaşandıkları sırayla. "Aşıldı" = geçici çözüm bulundu
 **Belirti:** `openship.json` hiç uygulanmıyor, hata veya uyarı yok, proje
 auto-detection'a düşüyor.
 
-**Kök neden:** Şemanın kökünde `additionalProperties: false` var. Tanımsız tek bir alan
-(bizde `composePath`) dosyanın tamamını geçersiz kılıyor ve sessizce yok sayılıyor.
+**Kök neden — ilk teşhisimiz yanlıştı, düzeltildi.**
+
+İlk hâli: "şemanın kökündeki `additionalProperties: false` tanımsız tek bir alan yüzünden
+(bizde `composePath`) dosyanın tamamını geçersiz kılıyor."
+
+Yayınlanan şemada bu bayrak **gerçekten var** (2026-08-01'de
+<https://openship.io/openship.schema.json> çekilerek doğrulandı). Ama o dosya editör
+autocomplete'i için; **deploy yolundaki validator ayrı** ve orada bilinmeyen alanlar
+hata değil uyarı üretiyor. Yani dosyayı geçersiz kılan şey bu bayrak değil.
+
+Asıl mekanizma: config parse ediliyor, `errors` ve `warnings` üretiliyor, sonra
+**çağıran taraf bunları yere atıyor** — yalnızca `.config` alınıyor. JSON syntax hatası
+`config: null` döndürüyor, o da sessizce `undefined`'a düşüyor ve overlay hiç çalışmıyor.
+Tek satır log yok.
+
+> Bu maddeyi upstream'e taşırken dikkat: "additionalProperties dosyayı geçersiz kılıyor"
+> iddiası kod tarafından çürütülür. Doğru iddia "parse hataları çağıran tarafta yutuluyor".
 
 **Nasıl geçtik:** [openship.schema.json](https://openship.io/openship.schema.json) ile
-alan adlarını doğrulayıp `composePath`'i attık.
+alan adlarını doğrulayıp `composePath`'i attık. (Semptom gerçekti — sebep başkaymış.)
 
-**Olması gereken:** Geçersiz config build log'unda görünür bir uyarı üretmeli
-("openship.json ignored: unknown key 'composePath' at line N"). Sessiz yutma, kullanıcıyı
-saatlerce yanlış yere baktırıyor.
+**Olması gereken:** Parse sonucu build log'una basılmalı: hangi alan, hangi satır.
+Sessiz yutma, kullanıcıyı saatlerce yanlış yere baktırıyor.
 
 ---
 
