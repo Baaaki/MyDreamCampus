@@ -100,8 +100,8 @@ const mockCafeterias: Cafeteria[] = [
   },
   {
     id: '4',
-    name: 'Tınaztepe Yemekhanesi',
-    location: 'Tınaztepe Kampüsü',
+    name: 'Güney Kampüs Yemekhanesi',
+    location: 'Güney Kampüs',
     has_vegan_menu: true,
     serves_dinner: true,
     is_active: false,

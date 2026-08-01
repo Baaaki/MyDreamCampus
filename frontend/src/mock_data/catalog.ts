@@ -1,33 +1,33 @@
 import type { CourseCatalog, AvailableCourse, EnrollmentProgramResponse, Faculty, Department } from '@/lib/types';
 
-// DEU Fakülte ve Bölüm Yapısı
+// MDC Fakülte ve Bölüm Yapısı
 export const mockFaculties: Faculty[] = [
   {
-    id: 'fac-buca-egitim',
-    name: 'Buca Eğitim Fakültesi',
+    id: 'fac-egitim',
+    name: 'Eğitim Fakültesi',
     code: 'BEF',
     departments: [
-      { id: 'dept-bote', name: 'Bilgisayar ve Öğretim Teknolojileri Öğretmenliği', facultyId: 'fac-buca-egitim', code: 'BOTE' },
-      { id: 'dept-rpd', name: 'Rehberlik ve Psikolojik Danışmanlık', facultyId: 'fac-buca-egitim', code: 'RPD' },
-      { id: 'dept-muzik-ogr', name: 'Müzik Öğretmenliği', facultyId: 'fac-buca-egitim', code: 'MUZ' },
-      { id: 'dept-resim-ogr', name: 'Resim-İş Öğretmenliği', facultyId: 'fac-buca-egitim', code: 'RES' },
-      { id: 'dept-biyoloji-ogr', name: 'Biyoloji Öğretmenliği', facultyId: 'fac-buca-egitim', code: 'BIYO' },
-      { id: 'dept-fen-ogr', name: 'Fen Bilgisi Öğretmenliği', facultyId: 'fac-buca-egitim', code: 'FEN' },
-      { id: 'dept-fizik-ogr', name: 'Fizik Öğretmenliği', facultyId: 'fac-buca-egitim', code: 'FIZ' },
-      { id: 'dept-ilkmat-ogr', name: 'İlköğretim Matematik Öğretmenliği', facultyId: 'fac-buca-egitim', code: 'IMAT' },
-      { id: 'dept-kimya-ogr', name: 'Kimya Öğretmenliği', facultyId: 'fac-buca-egitim', code: 'KIM' },
-      { id: 'dept-mat-ogr', name: 'Matematik Öğretmenliği', facultyId: 'fac-buca-egitim', code: 'MAT' },
-      { id: 'dept-ozel-egitim', name: 'Özel Eğitim Öğretmenliği', facultyId: 'fac-buca-egitim', code: 'OZE' },
-      { id: 'dept-okul-oncesi', name: 'Okul Öncesi Öğretmenliği', facultyId: 'fac-buca-egitim', code: 'OKO' },
-      { id: 'dept-sinif-ogr', name: 'Sınıf Öğretmenliği', facultyId: 'fac-buca-egitim', code: 'SNF' },
-      { id: 'dept-cografya-ogr', name: 'Coğrafya Öğretmenliği', facultyId: 'fac-buca-egitim', code: 'COG' },
-      { id: 'dept-sosyal-ogr', name: 'Sosyal Bilgiler Öğretmenliği', facultyId: 'fac-buca-egitim', code: 'SOS' },
-      { id: 'dept-tarih-ogr', name: 'Tarih Öğretmenliği', facultyId: 'fac-buca-egitim', code: 'TAR' },
-      { id: 'dept-turk-edebiyat-ogr', name: 'Türk Dili ve Edebiyatı Öğretmenliği', facultyId: 'fac-buca-egitim', code: 'TDE' },
-      { id: 'dept-turkce-ogr', name: 'Türkçe Öğretmenliği', facultyId: 'fac-buca-egitim', code: 'TUR' },
-      { id: 'dept-almanca-ogr', name: 'Almanca Öğretmenliği', facultyId: 'fac-buca-egitim', code: 'ALM' },
-      { id: 'dept-fransizca-ogr', name: 'Fransızca Öğretmenliği', facultyId: 'fac-buca-egitim', code: 'FRA' },
-      { id: 'dept-ingilizce-ogr', name: 'İngilizce Öğretmenliği', facultyId: 'fac-buca-egitim', code: 'ING' },
+      { id: 'dept-bote', name: 'Bilgisayar ve Öğretim Teknolojileri Öğretmenliği', facultyId: 'fac-egitim', code: 'BOTE' },
+      { id: 'dept-rpd', name: 'Rehberlik ve Psikolojik Danışmanlık', facultyId: 'fac-egitim', code: 'RPD' },
+      { id: 'dept-muzik-ogr', name: 'Müzik Öğretmenliği', facultyId: 'fac-egitim', code: 'MUZ' },
+      { id: 'dept-resim-ogr', name: 'Resim-İş Öğretmenliği', facultyId: 'fac-egitim', code: 'RES' },
+      { id: 'dept-biyoloji-ogr', name: 'Biyoloji Öğretmenliği', facultyId: 'fac-egitim', code: 'BIYO' },
+      { id: 'dept-fen-ogr', name: 'Fen Bilgisi Öğretmenliği', facultyId: 'fac-egitim', code: 'FEN' },
+      { id: 'dept-fizik-ogr', name: 'Fizik Öğretmenliği', facultyId: 'fac-egitim', code: 'FIZ' },
+      { id: 'dept-ilkmat-ogr', name: 'İlköğretim Matematik Öğretmenliği', facultyId: 'fac-egitim', code: 'IMAT' },
+      { id: 'dept-kimya-ogr', name: 'Kimya Öğretmenliği', facultyId: 'fac-egitim', code: 'KIM' },
+      { id: 'dept-mat-ogr', name: 'Matematik Öğretmenliği', facultyId: 'fac-egitim', code: 'MAT' },
+      { id: 'dept-ozel-egitim', name: 'Özel Eğitim Öğretmenliği', facultyId: 'fac-egitim', code: 'OZE' },
+      { id: 'dept-okul-oncesi', name: 'Okul Öncesi Öğretmenliği', facultyId: 'fac-egitim', code: 'OKO' },
+      { id: 'dept-sinif-ogr', name: 'Sınıf Öğretmenliği', facultyId: 'fac-egitim', code: 'SNF' },
+      { id: 'dept-cografya-ogr', name: 'Coğrafya Öğretmenliği', facultyId: 'fac-egitim', code: 'COG' },
+      { id: 'dept-sosyal-ogr', name: 'Sosyal Bilgiler Öğretmenliği', facultyId: 'fac-egitim', code: 'SOS' },
+      { id: 'dept-tarih-ogr', name: 'Tarih Öğretmenliği', facultyId: 'fac-egitim', code: 'TAR' },
+      { id: 'dept-turk-edebiyat-ogr', name: 'Türk Dili ve Edebiyatı Öğretmenliği', facultyId: 'fac-egitim', code: 'TDE' },
+      { id: 'dept-turkce-ogr', name: 'Türkçe Öğretmenliği', facultyId: 'fac-egitim', code: 'TUR' },
+      { id: 'dept-almanca-ogr', name: 'Almanca Öğretmenliği', facultyId: 'fac-egitim', code: 'ALM' },
+      { id: 'dept-fransizca-ogr', name: 'Fransızca Öğretmenliği', facultyId: 'fac-egitim', code: 'FRA' },
+      { id: 'dept-ingilizce-ogr', name: 'İngilizce Öğretmenliği', facultyId: 'fac-egitim', code: 'ING' },
     ],
   },
   {
@@ -204,7 +204,7 @@ export const mockFaculties: Faculty[] = [
   },
   {
     id: 'fac-spor',
-    name: 'Necat Hepkon Spor Bilimleri Fakültesi',
+    name: 'Spor Bilimleri Fakültesi',
     code: 'SPR',
     departments: [
       { id: 'dept-antrenorluk', name: 'Antrenörlük Eğitimi', facultyId: 'fac-spor', code: 'ANT' },
@@ -243,7 +243,7 @@ export const mockFaculties: Faculty[] = [
 // Backward compatibility - flat departments list
 export const mockDepartments: Department[] = mockFaculties.flatMap(f => f.departments);
 
-// DEU Bilgisayar Bilimleri Müfredatı - Tam Liste
+// MDC Bilgisayar Bilimleri Müfredatı - Tam Liste
 export const mockCourseCatalog: CourseCatalog[] = [
   // ============ 1. DÖNEM (GÜZ) - ZORUNLU ============
   {
@@ -266,9 +266,9 @@ export const mockCourseCatalog: CourseCatalog[] = [
     coordinator: {
       title: 'Prof. Dr.',
       name: 'Fevzi Çakmak',
-      email: 'fevzi.cakmak@deu.edu.tr',
-      phone: '(0232) 301 79 36',
-      office: 'Atatürk İlkeleri ve İnkılap Tarihi Enstitüsü, Tınaztepe Yerleşkesi, 35390 Buca-İZMİR',
+      email: 'fevzi.cakmak@mydreamcampus.edu.tr',
+      phone: '(0850) 000 00 00',
+      office: 'Atatürk İlkeleri ve İnkılap Tarihi Enstitüsü, Merkez Yerleşke',
     },
     purpose: 'İmparatorluktan milli devlete geçişte, Türk toplumunun gelişim aşamalarını öğrencilere kavratmak',
     learning_outcomes_list: [

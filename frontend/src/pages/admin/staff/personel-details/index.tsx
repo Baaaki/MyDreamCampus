@@ -1241,7 +1241,7 @@ export default function StaffProfilePage() {
           </Button>
         </div>
       </div>
-      {/* Header - DEU Style */}
+      {/* Header - MDC Style */}
       <div className="bg-[#005a87] text-white">
         <div className="container mx-auto px-4 py-6">
           <div className="flex items-start justify-between">

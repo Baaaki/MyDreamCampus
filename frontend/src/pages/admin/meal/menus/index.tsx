@@ -543,7 +543,7 @@ const calcVeganCalories = (items: string[]): number => {
   return items.reduce((total, item) => total + getVeganMealCalories(item), 0);
 };
 
-// Örnek veri - DEU formatında (kaloriler otomatik hesaplanır)
+// Örnek veri - MDC formatında (kaloriler otomatik hesaplanır)
 const sampleMenuItems = {
   monday: ['YEŞİL MERCİMEK ÇORBASI', 'KURU FASULYE', 'PİRİNÇ PİLAVI', 'SÜTLAÇ', 'TURŞU'] as [string, string, string, string, string],
   tuesday: ['DOMATES ÇORBASI', 'PATATES OTURTMA', 'MAKARNA', 'MEYVE', 'HAYDARİ'] as [string, string, string, string, string],
@@ -1087,7 +1087,7 @@ export default function MenusPage() {
       <body>
         <div class="container">
           <div class="header">
-            <h1>DOKUZ EYLÜL ÜNİVERSİTESİ</h1>
+            <h1>MYDREAMCAMPUS ÜNİVERSİTESİ</h1>
             <h2>SAĞLIK KÜLTÜR VE SPOR DAİRE BAŞKANLIĞI</h2>
             <h3>${selectedYear} ${selectedMonthLabel.toUpperCase()} AYI - ${menuType}</h3>
           </div>
@@ -1377,9 +1377,9 @@ export default function MenusPage() {
           <Card className="dark:bg-gray-900 dark:border-gray-800 overflow-hidden">
             <CardHeader className="bg-blue-900 text-white text-center py-4">
               <div className="flex items-center justify-center gap-4">
-                <img src="/deu-logo.png" alt="DEU" className="h-12 w-12 hidden" />
+                <img src="/mdc-logo.png" alt="MDC" className="h-12 w-12 hidden" />
                 <div>
-                  <h2 className="text-lg font-bold">DOKUZ EYLÜL ÜNİVERSİTESİ</h2>
+                  <h2 className="text-lg font-bold">MYDREAMCAMPUS ÜNİVERSİTESİ</h2>
                   <h3 className="text-sm">SAĞLIK KÜLTÜR VE SPOR DAİRE BAŞKANLIĞI</h3>
                   <h4 className="text-base font-semibold mt-1">
                     {selectedYear} {selectedMonthLabel.toUpperCase()} AYI - YEMEK LİSTESİ
@@ -1458,9 +1458,9 @@ export default function MenusPage() {
           <Card className="dark:bg-gray-900 dark:border-gray-800 overflow-hidden">
             <CardHeader className="bg-green-800 text-white text-center py-4">
               <div className="flex items-center justify-center gap-4">
-                <img src="/deu-logo.png" alt="DEU" className="h-12 w-12 hidden" />
+                <img src="/mdc-logo.png" alt="MDC" className="h-12 w-12 hidden" />
                 <div>
-                  <h2 className="text-lg font-bold">DOKUZ EYLÜL ÜNİVERSİTESİ</h2>
+                  <h2 className="text-lg font-bold">MYDREAMCAMPUS ÜNİVERSİTESİ</h2>
                   <h3 className="text-sm">SAĞLIK KÜLTÜR VE SPOR DAİRE BAŞKANLIĞI</h3>
                   <h4 className="text-base font-semibold mt-1">
                     {selectedYear} {selectedMonthLabel.toUpperCase()} AYI - VEGAN MENÜ

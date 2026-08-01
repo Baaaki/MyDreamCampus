@@ -99,7 +99,7 @@ export const mockStaffProfiles: Record<string, StaffProfile> = {
             { id: '1', degree: 'Lisans', institution: 'ODTÜ Mühendislik Fakültesi Bilgisayar Mühendisliği', department: '', year: 1995 },
             { id: '2', degree: 'Yüksek Lisans', institution: 'ODTÜ Fen Bilimleri Enstitüsü Bilgisayar Mühendisliği', department: '', year: 1998 },
             { id: '3', degree: 'Doktora', institution: 'Stanford University Computer Science', department: '', year: 2003 },
-            { id: '4', degree: 'Profesör', institution: 'Dokuz Eylül Üniversitesi Mühendislik Fakültesi', department: '', year: 2015 },
+            { id: '4', degree: 'Profesör', institution: 'MyDreamCampus Üniversitesi Mühendislik Fakültesi', department: '', year: 2015 },
         ],
         articles: [
             { id: '1', title: 'Deep Learning Applications in Autonomous Systems', journal: 'IEEE TRANSACTIONS ON NEURAL NETWORKS', year: 2023, authors: 'Yılmaz A., Kaya M.', doi: '10.1109/TNN.2023.001', journalType: 'SCI', domesticInternational: 'YURTDIŞI', language: 'English', articleType: 'Research article' },
@@ -116,14 +116,14 @@ export const mockStaffProfiles: Record<string, StaffProfile> = {
         ],
         awards: [
             { id: '1', title: 'IEEE Senior Member', institution: 'IEEE', year: 2020 },
-            { id: '2', title: 'En İyi Araştırmacı Ödülü', institution: 'DEÜ Mühendislik Fakültesi', year: 2019 },
+            { id: '2', title: 'En İyi Araştırmacı Ödülü', institution: 'MDC Mühendislik Fakültesi', year: 2019 },
         ],
         scholarships: [
             { id: '1', title: 'Fulbright Doktora Bursu', institution: 'Fulbright Commission', year: 2000 },
         ],
         adminAssignments: [
-            { id: '1', title: 'Bölüm Başkanı', institution: 'DEÜ Bilgisayar Mühendisliği', startYear: 2021 },
-            { id: '2', title: 'Fakülte Kurulu Üyesi', institution: 'DEÜ Mühendislik Fakültesi', startYear: 2018 },
+            { id: '1', title: 'Bölüm Başkanı', institution: 'MDC Bilgisayar Mühendisliği', startYear: 2021 },
+            { id: '2', title: 'Fakülte Kurulu Üyesi', institution: 'MDC Mühendislik Fakültesi', startYear: 2018 },
         ],
     },
 
@@ -142,7 +142,7 @@ export const mockStaffProfiles: Record<string, StaffProfile> = {
             { id: '1', degree: 'Lisans', institution: 'İTÜ Bilgisayar Mühendisliği', department: '', year: 2005 },
             { id: '2', degree: 'Yüksek Lisans', institution: 'MIT Computer Science', department: '', year: 2008 },
             { id: '3', degree: 'Doktora', institution: 'MIT Computer Science', department: '', year: 2012 },
-            { id: '4', degree: 'Doçent', institution: 'Dokuz Eylül Üniversitesi', department: '', year: 2020 },
+            { id: '4', degree: 'Doçent', institution: 'MyDreamCampus Üniversitesi', department: '', year: 2020 },
         ],
         articles: [
             { id: '1', title: 'Machine Learning for Natural Language Processing', journal: 'COMPUTATIONAL LINGUISTICS', year: 2023, authors: 'Kaya M., Smith J.', doi: '10.1162/coli.2023.001', journalType: 'SCI', domesticInternational: 'YURTDIŞI', language: 'English', articleType: 'Research article' },
@@ -159,7 +159,7 @@ export const mockStaffProfiles: Record<string, StaffProfile> = {
         ],
         scholarships: [],
         adminAssignments: [
-            { id: '1', title: 'Yapay Zeka Laboratuvarı Koordinatörü', institution: 'DEÜ Bilgisayar Mühendisliği', startYear: 2020 },
+            { id: '1', title: 'Yapay Zeka Laboratuvarı Koordinatörü', institution: 'MDC Bilgisayar Mühendisliği', startYear: 2020 },
         ],
     },
 
@@ -178,7 +178,7 @@ export const mockStaffProfiles: Record<string, StaffProfile> = {
             { id: '1', degree: 'Lisans', institution: 'Boğaziçi Üniversitesi Matematik', department: '', year: 1990 },
             { id: '2', degree: 'Yüksek Lisans', institution: 'Cambridge University Mathematics', department: '', year: 1993 },
             { id: '3', degree: 'Doktora', institution: 'Cambridge University Applied Mathematics', department: '', year: 1997 },
-            { id: '4', degree: 'Profesör', institution: 'Dokuz Eylül Üniversitesi Fen Fakültesi', department: '', year: 2010 },
+            { id: '4', degree: 'Profesör', institution: 'MyDreamCampus Üniversitesi Fen Fakültesi', department: '', year: 2010 },
         ],
         articles: [
             { id: '1', title: 'Graph Theory Applications in Network Analysis', journal: 'JOURNAL OF COMBINATORIAL THEORY', year: 2023, authors: 'Demir A., Wilson R.', doi: '10.1016/jct.2023.001', journalType: 'SCI', domesticInternational: 'YURTDIŞI', language: 'English', articleType: 'Research article' },
@@ -200,8 +200,8 @@ export const mockStaffProfiles: Record<string, StaffProfile> = {
             { id: '1', title: 'British Council Scholarship', institution: 'British Council', year: 1991 },
         ],
         adminAssignments: [
-            { id: '1', title: 'Fen Fakültesi Dekan Yardımcısı', institution: 'DEÜ Fen Fakültesi', startYear: 2019 },
-            { id: '2', title: 'Matematik Bölüm Başkanı', institution: 'DEÜ Fen Fakültesi', startYear: 2015, endYear: 2019 },
+            { id: '1', title: 'Fen Fakültesi Dekan Yardımcısı', institution: 'MDC Fen Fakültesi', startYear: 2019 },
+            { id: '2', title: 'Matematik Bölüm Başkanı', institution: 'MDC Fen Fakültesi', startYear: 2015, endYear: 2019 },
         ],
     },
 
@@ -220,7 +220,7 @@ export const mockStaffProfiles: Record<string, StaffProfile> = {
             { id: '1', degree: 'Lisans', institution: 'Hacettepe Üniversitesi Fizik', department: '', year: 2008 },
             { id: '2', degree: 'Yüksek Lisans', institution: 'Max Planck Institute for Physics', department: '', year: 2011 },
             { id: '3', degree: 'Doktora', institution: 'Max Planck Institute for Physics', department: '', year: 2015 },
-            { id: '4', degree: 'Doçent', institution: 'Dokuz Eylül Üniversitesi', department: '', year: 2022 },
+            { id: '4', degree: 'Doçent', institution: 'MyDreamCampus Üniversitesi', department: '', year: 2022 },
         ],
         articles: [
             { id: '1', title: 'Quantum Entanglement in Multi-Particle Systems', journal: 'PHYSICAL REVIEW LETTERS', year: 2023, authors: 'Şahin F., Mueller H.', doi: '10.1103/prl.2023.001', journalType: 'SCI', domesticInternational: 'YURTDIŞI', language: 'English', articleType: 'Research article' },
@@ -239,7 +239,7 @@ export const mockStaffProfiles: Record<string, StaffProfile> = {
             { id: '1', title: 'DAAD Doktora Bursu', institution: 'DAAD', year: 2011 },
         ],
         adminAssignments: [
-            { id: '1', title: 'Fizik Bölümü Erasmus Koordinatörü', institution: 'DEÜ Fen Fakültesi', startYear: 2021 },
+            { id: '1', title: 'Fizik Bölümü Erasmus Koordinatörü', institution: 'MDC Fen Fakültesi', startYear: 2021 },
         ],
     },
 
@@ -274,7 +274,7 @@ export const mockStaffProfiles: Record<string, StaffProfile> = {
             { id: '1', title: 'DAAD Yüksek Lisans Bursu', institution: 'DAAD', year: 2011 },
         ],
         adminAssignments: [
-            { id: '1', title: 'Güç Elektroniği Lab. Sorumlusu', institution: 'DEÜ Elektrik-Elektronik Müh.', startYear: 2020 },
+            { id: '1', title: 'Güç Elektroniği Lab. Sorumlusu', institution: 'MDC Elektrik-Elektronik Müh.', startYear: 2020 },
         ],
     },
 
@@ -326,7 +326,7 @@ export const mockStaffProfiles: Record<string, StaffProfile> = {
             { id: '1', degree: 'Lisans', institution: 'Ege Üniversitesi Kimya', department: '', year: 1998 },
             { id: '2', degree: 'Yüksek Lisans', institution: 'Oxford University Chemistry', department: '', year: 2001 },
             { id: '3', degree: 'Doktora', institution: 'Oxford University Organic Chemistry', department: '', year: 2005 },
-            { id: '4', degree: 'Profesör', institution: 'Dokuz Eylül Üniversitesi', department: '', year: 2018 },
+            { id: '4', degree: 'Profesör', institution: 'MyDreamCampus Üniversitesi', department: '', year: 2018 },
         ],
         articles: [
             { id: '1', title: 'Green Chemistry Approaches in Pharmaceutical Synthesis', journal: 'JOURNAL OF THE AMERICAN CHEMICAL SOCIETY', year: 2023, authors: 'Koç Z., Brown M.', doi: '10.1021/jacs.2023.001', journalType: 'SCI', domesticInternational: 'YURTDIŞI', language: 'English', articleType: 'Research article' },
@@ -349,8 +349,8 @@ export const mockStaffProfiles: Record<string, StaffProfile> = {
             { id: '1', title: 'Chevening Scholarship', institution: 'British Council', year: 1999 },
         ],
         adminAssignments: [
-            { id: '1', title: 'Kimya Bölüm Başkanı', institution: 'DEÜ Fen Fakültesi', startYear: 2020 },
-            { id: '2', title: 'Fen Fakültesi Yönetim Kurulu Üyesi', institution: 'DEÜ Fen Fakültesi', startYear: 2018 },
+            { id: '1', title: 'Kimya Bölüm Başkanı', institution: 'MDC Fen Fakültesi', startYear: 2020 },
+            { id: '2', title: 'Fen Fakültesi Yönetim Kurulu Üyesi', institution: 'MDC Fen Fakültesi', startYear: 2018 },
         ],
     },
 };

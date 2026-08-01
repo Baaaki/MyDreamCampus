@@ -592,7 +592,7 @@ export default function AddCoursePage() {
                 <Input
                   id="coordinator_email"
                   type="email"
-                  placeholder="ornek@deu.edu.tr"
+                  placeholder="ornek@mydreamcampus.edu.tr"
                   value={formData.coordinator.email}
                   onChange={(e) => handleCoordinatorChange('email', e.target.value)}
                 />
@@ -601,7 +601,7 @@ export default function AddCoursePage() {
                 <Label htmlFor="coordinator_phone">Telefon</Label>
                 <Input
                   id="coordinator_phone"
-                  placeholder="0232 XXX XX XX"
+                  placeholder="0XXX XXX XX XX"
                   value={formData.coordinator.phone}
                   onChange={(e) => handleCoordinatorChange('phone', e.target.value)}
                 />
