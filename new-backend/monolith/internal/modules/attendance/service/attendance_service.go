@@ -3,6 +3,7 @@ package service
 import (
 	"context"
 	"encoding/json"
+	goerrors "errors"
 	"fmt"
 	"strings"
 	"time"
@@ -11,6 +12,7 @@ import (
 	"github.com/baaaki/mydreamcampus/monolith/internal/modules/attendance/dto"
 	"github.com/baaaki/mydreamcampus/monolith/internal/modules/attendance/errors"
 	"github.com/baaaki/mydreamcampus/monolith/internal/modules/attendance/repository"
+	"github.com/baaaki/mydreamcampus/shared/client"
 	"github.com/baaaki/mydreamcampus/shared/platform/clock"
 	"github.com/baaaki/mydreamcampus/shared/platform/logger"
 	sharedRepo "github.com/baaaki/mydreamcampus/shared/platform/repository"
@@ -998,11 +1000,21 @@ func (s *AttendanceService) checkSemesterEnforcement(ctx context.Context, semest
 	// Fetch hard_deadline from catalog service
 	semesterInfo, err := s.semesterClient.GetSemesterInfo(ctx, semester)
 	if err != nil {
+		// An unreachable catalog is not a semester without a hard deadline.
+		// The deadline binds admins too, so a check we cannot perform has to
+		// stop the request instead of waving it through.
+		if goerrors.Is(err, client.ErrUnavailable) {
+			logger.Error("catalog unreachable, refusing to skip semester enforcement",
+				zap.String("semester", semester),
+				zap.Error(err),
+			)
+			return errors.ErrSemesterInfoUnavailable
+		}
 		logger.Warn("failed to fetch semester info, skipping enforcement",
 			zap.String("semester", semester),
 			zap.Error(err),
 		)
-		return nil // graceful degradation: if catalog is unreachable, allow operation
+		return nil // graceful degradation: semester unknown to catalog
 	}
 
 	// Fetch period from local DB

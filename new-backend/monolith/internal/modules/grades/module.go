@@ -6,7 +6,6 @@ import (
 	"context"
 
 	"github.com/baaaki/mydreamcampus/monolith/internal/eventbus"
-	ccService "github.com/baaaki/mydreamcampus/monolith/internal/modules/course_catalog/service"
 	"github.com/baaaki/mydreamcampus/monolith/internal/modules/grades/handler"
 	"github.com/baaaki/mydreamcampus/monolith/internal/modules/grades/repository"
 	"github.com/baaaki/mydreamcampus/monolith/internal/modules/grades/service"
@@ -44,15 +43,13 @@ func New(
 	rabbitConn *rabbitmq.Connection,
 	periodRepo *platformRepo.SimplePeriodRepository,
 	auditLogger audit.Logger,
-	semesterSvc *ccService.SemesterService,
+	semesterClient service.SemesterClient,
 ) *Module {
 	cacheRepo := repository.NewCacheRepository(pool)
 	registrationRepo := repository.NewRegistrationRepository(pool)
 	scoreRepo := repository.NewScoreRepository(pool)
 	completedRepo := repository.NewCompletedRepository(pool)
 	outboxRepo := repository.NewOutboxRepository(pool)
-
-	semesterClient := service.NewInProcessSemesterClient(semesterSvc)
 
 	gradeSvc := service.NewGradeService(
 		pool,

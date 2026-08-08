@@ -1,12 +1,10 @@
 package handler
 
 import (
-	"bytes"
 	"context"
 	"encoding/json"
 	"errors"
 	"fmt"
-	"io"
 	"net/http"
 	"regexp"
 	"strconv"
@@ -14,6 +12,7 @@ import (
 
 	"github.com/baaaki/mydreamcampus/monolith/internal/modules/course_catalog/db"
 	"github.com/baaaki/mydreamcampus/monolith/internal/modules/course_catalog/repository"
+	"github.com/baaaki/mydreamcampus/monolith/internal/modules/course_catalog/service"
 	"github.com/baaaki/mydreamcampus/shared/events"
 	"github.com/baaaki/mydreamcampus/shared/platform/audit"
 	"github.com/baaaki/mydreamcampus/shared/platform/logger"
@@ -52,24 +51,25 @@ func isValidSemesterName(name string) bool {
 	return true
 }
 
-// ServiceURLs holds the base URLs of other services reached over internal
-// HTTP. Academic periods no longer travel this way — they are published as
-// events — so only meal's closed-day fan-out is left.
-type ServiceURLs struct {
-	Meal string
-}
-
 type SemesterStatusHandler struct {
-	repo           *repository.SemesterStatusRepository
-	periodRepo     *sharedRepo.SimplePeriodRepository
-	auditLogger    audit.Logger
-	serviceURLs    ServiceURLs
-	pool           *pgxpool.Pool
-	internalSecret string
+	repo        *repository.SemesterStatusRepository
+	periodRepo  *sharedRepo.SimplePeriodRepository
+	auditLogger audit.Logger
+	mealClient  service.MealClient
+	pool        *pgxpool.Pool
 }
 
-func NewSemesterStatusHandler(repo *repository.SemesterStatusRepository, periodRepo *sharedRepo.SimplePeriodRepository, auditLogger audit.Logger, serviceURLs ServiceURLs, pool *pgxpool.Pool, internalSecret string) *SemesterStatusHandler {
-	return &SemesterStatusHandler{repo: repo, periodRepo: periodRepo, auditLogger: auditLogger, serviceURLs: serviceURLs, pool: pool, internalSecret: internalSecret}
+func NewSemesterStatusHandler(repo *repository.SemesterStatusRepository, periodRepo *sharedRepo.SimplePeriodRepository, auditLogger audit.Logger, mealClient service.MealClient, pool *pgxpool.Pool) *SemesterStatusHandler {
+	return &SemesterStatusHandler{repo: repo, periodRepo: periodRepo, auditLogger: auditLogger, mealClient: mealClient, pool: pool}
+}
+
+// toClosedDays converts the request rows into the client's wire type.
+func toClosedDays(entries []closedDayEntry) []service.ClosedDay {
+	out := make([]service.ClosedDay, 0, len(entries))
+	for _, e := range entries {
+		out = append(out, service.ClosedDay{Date: e.Date, Reason: e.Reason})
+	}
+	return out
 }
 
 // RegisterRoutes mounts semester status management endpoints under admin group.
@@ -434,44 +434,12 @@ func insertPeriodEvent(ctx context.Context, qtx *db.Queries, periodType, action 
 	return nil
 }
 
-// distributeClosedDays sends closed days to meal-service via internal HTTP.
+// distributeClosedDays sends closed days to the meal service.
 func (h *SemesterStatusHandler) distributeClosedDays(ctx context.Context, closedDays []closedDayEntry) error {
-	if h.serviceURLs.Meal == "" {
-		return fmt.Errorf("meal service URL not configured")
+	if h.mealClient == nil {
+		return fmt.Errorf("meal client not configured")
 	}
-
-	payload := map[string]any{
-		"closed_days": closedDays,
-	}
-
-	body, err := json.Marshal(payload)
-	if err != nil {
-		return fmt.Errorf("failed to marshal closed days payload: %w", err)
-	}
-
-	url := h.serviceURLs.Meal + "/api/meals/internal/closed-days/batch"
-	req, err := http.NewRequestWithContext(ctx, http.MethodPost, url, bytes.NewReader(body))
-	if err != nil {
-		return fmt.Errorf("failed to create request: %w", err)
-	}
-	req.Header.Set("Content-Type", "application/json")
-	if h.internalSecret != "" {
-		req.Header.Set("X-Internal-Secret", h.internalSecret)
-	}
-
-	client := &http.Client{Timeout: 10 * time.Second}
-	resp, err := client.Do(req)
-	if err != nil {
-		return fmt.Errorf("HTTP call failed: %w", err)
-	}
-	defer func() { _ = resp.Body.Close() }()
-
-	if resp.StatusCode != http.StatusCreated && resp.StatusCode != http.StatusOK {
-		respBody, _ := io.ReadAll(io.LimitReader(resp.Body, 1024))
-		return fmt.Errorf("unexpected status %d: %s", resp.StatusCode, string(respBody))
-	}
-
-	return nil
+	return h.mealClient.CreateClosedDays(ctx, toClosedDays(closedDays))
 }
 
 // ListSemesters handles GET /admin/semesters
@@ -892,8 +860,8 @@ func (h *SemesterStatusHandler) DeletePlannedSemester(c *gin.Context) {
 	}
 
 	// Clean up meal service closed days (best effort)
-	if h.serviceURLs.Meal != "" {
-		if err := h.deleteRemoteResource(ctx, h.serviceURLs.Meal+"/api/meals/internal/closed-days/by-semester/"+semester.Name); err != nil {
+	if h.mealClient != nil {
+		if err := h.mealClient.DeleteClosedDays(ctx, semester.Name); err != nil {
 			handlerLogger.Warn("failed to delete meal closed days", zap.Error(err))
 		}
 	}
@@ -1032,63 +1000,8 @@ type updateSemesterRequest struct {
 
 // updateRemoteClosedDays replaces closed days for a semester in meal service.
 func (h *SemesterStatusHandler) updateRemoteClosedDays(ctx context.Context, semester string, closedDays []closedDayEntry) error {
-	if h.serviceURLs.Meal == "" {
-		return fmt.Errorf("meal service URL not configured")
+	if h.mealClient == nil {
+		return fmt.Errorf("meal client not configured")
 	}
-
-	payload := map[string]any{
-		"closed_days": closedDays,
-	}
-
-	body, err := json.Marshal(payload)
-	if err != nil {
-		return fmt.Errorf("failed to marshal closed days payload: %w", err)
-	}
-
-	url := h.serviceURLs.Meal + "/api/meals/internal/closed-days/by-semester/" + semester
-	req, err := http.NewRequestWithContext(ctx, http.MethodPut, url, bytes.NewReader(body))
-	if err != nil {
-		return fmt.Errorf("failed to create request: %w", err)
-	}
-	req.Header.Set("Content-Type", "application/json")
-	if h.internalSecret != "" {
-		req.Header.Set("X-Internal-Secret", h.internalSecret)
-	}
-
-	client := &http.Client{Timeout: 10 * time.Second}
-	resp, err := client.Do(req)
-	if err != nil {
-		return fmt.Errorf("HTTP call failed: %w", err)
-	}
-	defer func() { _ = resp.Body.Close() }()
-
-	if resp.StatusCode >= 400 {
-		respBody, _ := io.ReadAll(io.LimitReader(resp.Body, 1024))
-		return fmt.Errorf("unexpected status %d: %s", resp.StatusCode, string(respBody))
-	}
-	return nil
-}
-
-// deleteRemoteResource sends a DELETE request to a remote service URL.
-func (h *SemesterStatusHandler) deleteRemoteResource(ctx context.Context, url string) error {
-	req, err := http.NewRequestWithContext(ctx, http.MethodDelete, url, nil)
-	if err != nil {
-		return fmt.Errorf("failed to create request: %w", err)
-	}
-	if h.internalSecret != "" {
-		req.Header.Set("X-Internal-Secret", h.internalSecret)
-	}
-
-	client := &http.Client{Timeout: 10 * time.Second}
-	resp, err := client.Do(req)
-	if err != nil {
-		return fmt.Errorf("HTTP call failed: %w", err)
-	}
-	defer func() { _ = resp.Body.Close() }()
-
-	if resp.StatusCode >= 400 {
-		respBody, _ := io.ReadAll(io.LimitReader(resp.Body, 1024))
-		return fmt.Errorf("unexpected status %d: %s", resp.StatusCode, string(respBody))
-	}
-	return nil
+	return h.mealClient.ReplaceClosedDays(ctx, semester, toClosedDays(closedDays))
 }

@@ -10,19 +10,20 @@ import (
 // Config holds the entire monolith configuration. Modules read from a
 // shared instance; there is no per-module config struct.
 type Config struct {
-	Server      ServerConfig
-	Database    DatabaseConfig
-	RabbitMQ    RabbitMQConfig
-	Redis       RedisConfig
-	JWT         JWTConfig
-	Admin       AdminConfig
-	Outbox      OutboxConfig
-	QR          QRConfig
-	Reservation ReservationConfig
-	MealTime    MealTimeConfig
-	RateLimit   RateLimitConfig
-	Timeout     TimeoutConfig
-	Frontend    FrontendConfig
+	Server         ServerConfig
+	Database       DatabaseConfig
+	RabbitMQ       RabbitMQConfig
+	Redis          RedisConfig
+	JWT            JWTConfig
+	Admin          AdminConfig
+	Outbox         OutboxConfig
+	QR             QRConfig
+	Reservation    ReservationConfig
+	MealTime       MealTimeConfig
+	RateLimit      RateLimitConfig
+	Timeout        TimeoutConfig
+	Frontend       FrontendConfig
+	InternalClient InternalClientConfig
 }
 
 type ServerConfig struct {
@@ -32,6 +33,36 @@ type ServerConfig struct {
 	// (X-Internal-Secret header on /internal/* routes).
 	InternalSecret string `mapstructure:"INTERNAL_SERVICE_SECRET"`
 }
+
+// InternalClientConfig governs how modules reach each other.
+//
+// inprocess = modules call each other directly (monolith default)
+// http      = modules call each other over internal REST; the monolith calls
+//
+//	itself. Lets the client layer be exercised with real traffic
+//	before the services are actually split.
+type InternalClientConfig struct {
+	Mode string `mapstructure:"INTERNAL_CLIENT_MODE"`
+	// ServiceURLs is keyed by target name (staff, student, catalog,
+	// payment, meal). Empty entries fall back to this process.
+	ServiceURLs    map[string]string
+	TimeoutSeconds int `mapstructure:"INTERNAL_CLIENT_TIMEOUT_SECONDS"`
+	Breaker        CircuitBreakerConfig
+}
+
+// CircuitBreakerConfig tunes the per-target breaker in shared/client.
+type CircuitBreakerConfig struct {
+	MaxRequests         int `mapstructure:"CIRCUIT_BREAKER_MAX_REQUESTS"`
+	TimeoutSeconds      int `mapstructure:"CIRCUIT_BREAKER_TIMEOUT_SECONDS"`
+	ConsecutiveFailures int `mapstructure:"CIRCUIT_BREAKER_CONSECUTIVE_FAILURES"`
+}
+
+// InternalClientModeInProcess and InternalClientModeHTTP are the accepted
+// values of INTERNAL_CLIENT_MODE.
+const (
+	InternalClientModeInProcess = "inprocess"
+	InternalClientModeHTTP      = "http"
+)
 
 type DatabaseConfig struct {
 	URL string `mapstructure:"DB_URL"`
@@ -184,6 +215,25 @@ func Load() (*Config, error) {
 			StaticDir: viper.GetString("FRONTEND_STATIC_DIR"),
 			Enabled:   viper.GetBool("FRONTEND_STATIC_ENABLED"),
 		},
+		InternalClient: InternalClientConfig{
+			Mode: viper.GetString("INTERNAL_CLIENT_MODE"),
+			// Empty means "this process": in http mode the monolith calls
+			// itself through its own port. Phase 4 fills these with the
+			// per-service container addresses.
+			ServiceURLs: map[string]string{
+				"staff":   viper.GetString("STAFF_SERVICE_URL"),
+				"student": viper.GetString("STUDENT_SERVICE_URL"),
+				"catalog": viper.GetString("CATALOG_SERVICE_URL"),
+				"payment": viper.GetString("PAYMENT_SERVICE_URL"),
+				"meal":    viper.GetString("MEAL_SERVICE_URL"),
+			},
+			TimeoutSeconds: viper.GetInt("INTERNAL_CLIENT_TIMEOUT_SECONDS"),
+			Breaker: CircuitBreakerConfig{
+				MaxRequests:         viper.GetInt("CIRCUIT_BREAKER_MAX_REQUESTS"),
+				TimeoutSeconds:      viper.GetInt("CIRCUIT_BREAKER_TIMEOUT_SECONDS"),
+				ConsecutiveFailures: viper.GetInt("CIRCUIT_BREAKER_CONSECUTIVE_FAILURES"),
+			},
+		},
 	}
 
 	if err := cfg.Validate(); err != nil {
@@ -236,6 +286,14 @@ func setDefaults() {
 
 	viper.SetDefault("FRONTEND_STATIC_DIR", "./frontend_dist")
 	viper.SetDefault("FRONTEND_STATIC_ENABLED", false)
+
+	viper.SetDefault("INTERNAL_CLIENT_MODE", InternalClientModeInProcess)
+	viper.SetDefault("INTERNAL_CLIENT_TIMEOUT_SECONDS", 10)
+	// Five consecutive failures before tripping: one blip must not open the
+	// breaker. 30s open window covers a container restart (~5-10s).
+	viper.SetDefault("CIRCUIT_BREAKER_MAX_REQUESTS", 1)
+	viper.SetDefault("CIRCUIT_BREAKER_TIMEOUT_SECONDS", 30)
+	viper.SetDefault("CIRCUIT_BREAKER_CONSECUTIVE_FAILURES", 5)
 
 	// Meal service defaults
 	viper.SetDefault("QR_SECRET", "change-this-qr-secret-in-production")
@@ -290,6 +348,10 @@ func (c *Config) Validate() error {
 	}
 	if c.Outbox.BatchSize <= 0 {
 		return fmt.Errorf("OUTBOX_BATCH_SIZE must be positive")
+	}
+	if c.InternalClient.Mode != InternalClientModeInProcess && c.InternalClient.Mode != InternalClientModeHTTP {
+		return fmt.Errorf("INTERNAL_CLIENT_MODE must be %q or %q (got %q)",
+			InternalClientModeInProcess, InternalClientModeHTTP, c.InternalClient.Mode)
 	}
 	return nil
 }

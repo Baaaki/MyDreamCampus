@@ -41,6 +41,9 @@ var (
 	ErrSemesterEnded    = sharedErrors.New("SEMESTER_ENDED", "Dönem sona ermiştir — değişiklik yapılamaz", http.StatusForbidden)
 	ErrPeriodNotStarted = sharedErrors.New("PERIOD_NOT_STARTED", "Yoklama dönemi henüz başlamadı", http.StatusForbidden)
 	ErrPeriodEnded      = sharedErrors.New("PERIOD_ENDED", "Yoklama dönemi sona ermiştir", http.StatusForbidden)
+	// Raised when catalog cannot be reached: the hard deadline binds admins
+	// too, so an unverifiable deadline blocks the operation.
+	ErrSemesterInfoUnavailable = sharedErrors.New("SEMESTER_INFO_UNAVAILABLE", "Dönem bilgisi şu anda alınamıyor, lütfen birazdan tekrar deneyin", http.StatusServiceUnavailable)
 
 	// Repository-specific sentinel errors (for internal use)
 	ErrSessionNotFoundRepo = sharedErrors.ErrNotFoundRepo

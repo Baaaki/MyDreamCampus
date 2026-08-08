@@ -24,6 +24,9 @@ var (
 	ErrIncompleteAssessment = sharedErrors.New("INCOMPLETE_ASSESSMENT", "cannot lock assessment: not every student has a score entered", http.StatusBadRequest)
 	ErrGradingPeriodEnded   = sharedErrors.New("GRADING_PERIOD_ENDED", "grading period has ended", http.StatusForbidden)
 	ErrNoPeriodDefined      = sharedErrors.New("NO_PERIOD_DEFINED", "no active grading period defined for this semester", http.StatusBadRequest)
+	// Raised when catalog cannot be reached: the hard deadline binds admins
+	// too, so an unverifiable deadline blocks the edit.
+	ErrSemesterInfoUnavailable = sharedErrors.New("SEMESTER_INFO_UNAVAILABLE", "Dönem bilgisi şu anda alınamıyor, lütfen birazdan tekrar deneyin", http.StatusServiceUnavailable)
 
 	// Authorization errors (AppError for HTTP responses)
 	ErrNotCourseInstructor = sharedErrors.New("NOT_COURSE_INSTRUCTOR", "you are not the instructor of this course", http.StatusForbidden)

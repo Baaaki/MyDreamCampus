@@ -11,7 +11,6 @@ import (
 	"github.com/baaaki/mydreamcampus/monolith/internal/modules/attendance/repository"
 	"github.com/baaaki/mydreamcampus/monolith/internal/modules/attendance/service"
 	"github.com/baaaki/mydreamcampus/monolith/internal/modules/attendance/worker"
-	ccService "github.com/baaaki/mydreamcampus/monolith/internal/modules/course_catalog/service"
 	platformMiddleware "github.com/baaaki/mydreamcampus/shared/platform/middleware"
 	"github.com/baaaki/mydreamcampus/shared/platform/rabbitmq"
 	platformRepo "github.com/baaaki/mydreamcampus/shared/platform/repository"
@@ -49,7 +48,7 @@ func New(
 	pool *pgxpool.Pool,
 	redisClient *redis.Client,
 	rabbitConn *rabbitmq.Connection,
-	semesterSvc *ccService.SemesterService,
+	semesterClient service.SemesterClient,
 	periodRepo *platformRepo.SimplePeriodRepository,
 ) *Module {
 	cacheRepo := repository.NewCacheRepository(pool)
@@ -60,7 +59,6 @@ func New(
 
 	qrService := service.NewQRService()
 	redisService := service.NewRedisService(redisClient)
-	semesterClient := service.NewInProcessSemesterClient(semesterSvc)
 
 	attendanceSvc := service.NewAttendanceService(
 		cacheRepo, sessionRepo, attendanceRepo, outboxRepo,

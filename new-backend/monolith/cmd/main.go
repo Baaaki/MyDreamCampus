@@ -12,6 +12,7 @@ import (
 	"github.com/baaaki/mydreamcampus/monolith/internal/eventbus"
 	monolithHTTP "github.com/baaaki/mydreamcampus/monolith/internal/http"
 	"github.com/baaaki/mydreamcampus/monolith/internal/modules/attendance"
+	attendanceService "github.com/baaaki/mydreamcampus/monolith/internal/modules/attendance/service"
 	attendanceWorker "github.com/baaaki/mydreamcampus/monolith/internal/modules/attendance/worker"
 	"github.com/baaaki/mydreamcampus/monolith/internal/modules/auth"
 	coursecatalog "github.com/baaaki/mydreamcampus/monolith/internal/modules/course_catalog"
@@ -20,6 +21,7 @@ import (
 	enrollmentService "github.com/baaaki/mydreamcampus/monolith/internal/modules/enrollment/service"
 	enrollmentWorker "github.com/baaaki/mydreamcampus/monolith/internal/modules/enrollment/worker"
 	"github.com/baaaki/mydreamcampus/monolith/internal/modules/grades"
+	gradesService "github.com/baaaki/mydreamcampus/monolith/internal/modules/grades/service"
 	gradesWorker "github.com/baaaki/mydreamcampus/monolith/internal/modules/grades/worker"
 	"github.com/baaaki/mydreamcampus/monolith/internal/modules/meal"
 	mealService "github.com/baaaki/mydreamcampus/monolith/internal/modules/meal/service"
@@ -172,16 +174,49 @@ func main() {
 		logger.Fatal("failed to bootstrap auth module", zap.Error(err))
 	}
 
+	// One transport per target service. The closed-day fan-out to meal has
+	// always gone over HTTP, so its client is built in both modes.
+	transports := newInternalTransports(cfg)
+	httpMode := cfg.InternalClient.Mode == config.InternalClientModeHTTP
+	logger.Info("internal client mode", zap.String("mode", cfg.InternalClient.Mode))
+
 	staffModule := staff.New(cfg, pool)
-	studentStaffClient := studentService.NewInProcessStaffClient(staffModule.StaffService())
-	studentModule := student.New(cfg, pool, rabbitConn, studentStaffClient)
+
+	// The cross-module clients are chosen here, once. Everything downstream
+	// sees an interface and cannot tell which implementation it got.
+	var (
+		catalogStaffClient       catalogService.StaffClient
+		studentStaffClient       studentService.StaffServiceInterface
+		enrollmentStudentClient  enrollmentService.StudentClient
+		enrollmentCourseClient   enrollmentService.CourseCatalogClient
+		attendanceSemesterClient attendanceService.SemesterClient
+		gradesSemesterClient     gradesService.SemesterClient
+		mealPaymentClient        mealService.PaymentClient
+	)
+	if httpMode {
+		catalogStaffClient = catalogService.NewHTTPStaffClient(transports.staff)
+		studentStaffClient = studentService.NewHTTPStaffClient(transports.staff)
+		enrollmentStudentClient = enrollmentService.NewHTTPStudentClient(transports.student)
+		enrollmentCourseClient = enrollmentService.NewHTTPCourseCatalogClient(transports.catalog)
+		attendanceSemesterClient = attendanceService.NewHTTPSemesterClient(transports.catalog)
+		gradesSemesterClient = gradesService.NewHTTPSemesterClient(transports.catalog)
+		mealPaymentClient = mealService.NewHTTPPaymentClient(transports.payment)
+	}
+
+	studentModule := student.New(cfg, pool, rabbitConn, orInProcess(studentStaffClient,
+		func() studentService.StaffServiceInterface {
+			return studentService.NewInProcessStaffClient(staffModule.StaffService())
+		}))
 	if err := studentModule.Bootstrap(ctx); err != nil {
 		logger.Fatal("failed to bootstrap student module", zap.Error(err))
 	}
-	catalogModule := coursecatalog.New(cfg, pool, staffModule.StaffService())
 
-	enrollmentStudentClient := enrollmentService.NewInProcessStudentClient(studentModule.StudentService())
-	enrollmentCourseClient := enrollmentService.NewInProcessCourseCatalogClient(catalogModule.SemesterService())
+	catalogModule := coursecatalog.New(cfg, pool,
+		orInProcess(catalogStaffClient, func() catalogService.StaffClient {
+			return catalogService.NewInProcessStaffClient(staffModule.StaffService())
+		}),
+		catalogService.NewHTTPMealClient(transports.meal),
+	)
 
 	// Each module reads academic_periods from its own schema. Catalog stays the
 	// source of truth and pushes changes as events; nobody reads across a
@@ -191,18 +226,32 @@ func main() {
 	attendancePeriodRepo := platformRepo.NewSimplePeriodRepository(pool, "attendance")
 	gradesPeriodRepo := platformRepo.NewSimplePeriodRepository(pool, "grades")
 
-	enrollmentModule := enrollment.New(pool, rabbitConn, enrollmentStudentClient, enrollmentCourseClient, enrollmentPeriodRepo)
+	enrollmentModule := enrollment.New(pool, rabbitConn,
+		orInProcess(enrollmentStudentClient, func() enrollmentService.StudentClient {
+			return enrollmentService.NewInProcessStudentClient(studentModule.StudentService())
+		}),
+		orInProcess(enrollmentCourseClient, func() enrollmentService.CourseCatalogClient {
+			return enrollmentService.NewInProcessCourseCatalogClient(catalogModule.SemesterService())
+		}),
+		enrollmentPeriodRepo)
 	if err := enrollmentModule.Bootstrap(ctx); err != nil {
 		logger.Fatal("failed to bootstrap enrollment module", zap.Error(err))
 	}
 
-	attendanceModule := attendance.New(cfg, pool, redisClient.Client(), rabbitConn, catalogModule.SemesterService(), attendancePeriodRepo)
+	attendanceModule := attendance.New(cfg, pool, redisClient.Client(), rabbitConn,
+		orInProcess(attendanceSemesterClient, func() attendanceService.SemesterClient {
+			return attendanceService.NewInProcessSemesterClient(catalogModule.SemesterService())
+		}),
+		attendancePeriodRepo)
 	if err := attendanceModule.Bootstrap(ctx); err != nil {
 		logger.Fatal("failed to bootstrap attendance module", zap.Error(err))
 	}
 
 	gradesAuditLogger := catalogService.NewDirectAuditLogger(catalogModule.AuditRepo(), "grades")
-	gradesModule := grades.New(pool, rabbitConn, gradesPeriodRepo, gradesAuditLogger, catalogModule.SemesterService())
+	gradesModule := grades.New(pool, rabbitConn, gradesPeriodRepo, gradesAuditLogger,
+		orInProcess(gradesSemesterClient, func() gradesService.SemesterClient {
+			return gradesService.NewInProcessSemesterClient(catalogModule.SemesterService())
+		}))
 	if err := gradesModule.Bootstrap(ctx); err != nil {
 		logger.Fatal("failed to bootstrap grades module", zap.Error(err))
 	}
@@ -213,8 +262,10 @@ func main() {
 	}
 
 	mealAuditLogger := catalogService.NewDirectAuditLogger(catalogModule.AuditRepo(), "meal")
-	paymentAdapter := mealService.NewPaymentAdapter(paymentModule.PaymentService())
-	mealModule := meal.New(pool, redisClient.Client(), cfg, logger.Log, mealAuditLogger, rabbitConn, paymentAdapter)
+	mealModule := meal.New(pool, redisClient.Client(), cfg, logger.Log, mealAuditLogger, rabbitConn,
+		orInProcess(mealPaymentClient, func() mealService.PaymentClient {
+			return mealService.NewPaymentAdapter(paymentModule.PaymentService())
+		}))
 	if err := mealModule.Bootstrap(ctx); err != nil {
 		logger.Fatal("failed to bootstrap meal module", zap.Error(err))
 	}

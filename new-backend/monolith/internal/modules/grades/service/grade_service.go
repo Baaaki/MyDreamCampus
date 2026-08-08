@@ -3,6 +3,7 @@ package service
 import (
 	"context"
 	"encoding/json"
+	goerrors "errors"
 	"fmt"
 	"time"
 
@@ -10,6 +11,7 @@ import (
 	"github.com/baaaki/mydreamcampus/monolith/internal/modules/grades/dto"
 	"github.com/baaaki/mydreamcampus/monolith/internal/modules/grades/errors"
 	"github.com/baaaki/mydreamcampus/monolith/internal/modules/grades/repository"
+	"github.com/baaaki/mydreamcampus/shared/client"
 	"github.com/baaaki/mydreamcampus/shared/platform/audit"
 
 	"github.com/baaaki/mydreamcampus/shared/platform/clock"
@@ -102,7 +104,10 @@ func (s *GradeService) SubmitScore(ctx context.Context, instructorID uuid.UUID, 
 		isLocked = true
 	}
 
-	editResult := s.checkCanEditGrade(ctx, registration.Semester, &courseID, isLocked, false)
+	editResult, err := s.checkCanEditGrade(ctx, registration.Semester, &courseID, isLocked, false)
+	if err != nil {
+		return nil, err
+	}
 	if !editResult.Allowed {
 		if isLocked {
 			return nil, errors.ErrScoreLocked
@@ -211,7 +216,10 @@ func (s *GradeService) BulkSubmitScores(ctx context.Context, instructorID uuid.U
 	// 3. Grading-period check once — all entries share the same course+semester.
 	//    We pass isLocked=false here because per-row lock is evaluated below.
 	semester := registrations[0].Semester
-	editResult := s.checkCanEditGrade(ctx, semester, &courseID, false, false)
+	editResult, err := s.checkCanEditGrade(ctx, semester, &courseID, false, false)
+	if err != nil {
+		return nil, err
+	}
 	if !editResult.Allowed {
 		return nil, errors.ErrGradingPeriodEnded
 	}
@@ -884,7 +892,10 @@ func (s *GradeService) ProcessAppeal(ctx context.Context, req dto.AppealScoreReq
 	}
 
 	// Hard deadline check — admin appeal is still blocked after semester ends
-	editResult := s.checkCanEditGrade(ctx, completedCourse.Semester, nil, false, true)
+	editResult, err := s.checkCanEditGrade(ctx, completedCourse.Semester, nil, false, true)
+	if err != nil {
+		return nil, err
+	}
 	if !editResult.Allowed {
 		return nil, errors.ErrGradingPeriodEnded
 	}
@@ -1177,7 +1188,10 @@ func (s *GradeService) LockAssessmentBySlug(ctx context.Context, instructorID, c
 		return nil, errors.ErrInvalidSlug
 	}
 
-	editResult := s.checkCanEditGrade(ctx, course.Semester, &courseID, false, false)
+	editResult, err := s.checkCanEditGrade(ctx, course.Semester, &courseID, false, false)
+	if err != nil {
+		return nil, err
+	}
 	if !editResult.Allowed {
 		return nil, errors.ErrGradingPeriodEnded
 	}
@@ -1267,7 +1281,13 @@ func (s *GradeService) checkHardDeadlineByRegistration(ctx context.Context, regi
 
 	semesterInfo, err := s.semesterClient.GetSemesterInfo(ctx, reg.Semester)
 	if err != nil {
-		return nil // graceful degradation
+		// A deadline we cannot read is not a deadline that passed — but it is
+		// not one that holds either. Nobody may bypass it, so refuse instead
+		// of degrading when catalog itself is down.
+		if goerrors.Is(err, client.ErrUnavailable) {
+			return errors.ErrSemesterInfoUnavailable
+		}
+		return nil // graceful degradation: semester unknown to catalog
 	}
 
 	if clock.Now().After(semesterInfo.HardDeadline) {
@@ -1285,14 +1305,24 @@ func (s *GradeService) checkHardDeadlineByRegistration(ctx context.Context, regi
 // If no active period is defined, grading is allowed (no deadline enforced).
 // Semester enforcement: checks hard_deadline + admin bypass + period window.
 // Admin can override period but NOT hard_deadline.
-func (s *GradeService) checkCanEditGrade(ctx context.Context, semester string, courseID *uuid.UUID, isLocked bool, isAdmin bool) rules.GradeEditResult {
+// The error return is reserved for "the hard deadline could not be read":
+// catalog being down must block the edit, because the deadline it holds is
+// the one layer even an admin cannot bypass.
+func (s *GradeService) checkCanEditGrade(ctx context.Context, semester string, courseID *uuid.UUID, isLocked bool, isAdmin bool) (rules.GradeEditResult, error) {
 	// Fetch hard_deadline from catalog service
 	var hardDeadline *time.Time
 	if s.semesterClient != nil {
 		semesterInfo, err := s.semesterClient.GetSemesterInfo(ctx, semester)
-		if err == nil {
+		switch {
+		case err == nil:
 			hardDeadline = &semesterInfo.HardDeadline
-		} else {
+		case goerrors.Is(err, client.ErrUnavailable):
+			logger.Error("catalog unreachable, refusing to edit grade without the hard deadline",
+				zap.String("semester", semester),
+				zap.Error(err),
+			)
+			return rules.GradeEditResult{}, errors.ErrSemesterInfoUnavailable
+		default:
 			logger.Warn("failed to fetch semester info for hard_deadline check",
 				zap.String("semester", semester),
 				zap.Error(err),
@@ -1309,7 +1339,7 @@ func (s *GradeService) checkCanEditGrade(ctx context.Context, semester string, c
 			OverrideDeadline: nil,
 			IsAdminAction:    isAdmin,
 			HardDeadline:     hardDeadline,
-		})
+		}), nil
 	}
 
 	return rules.CanEditGrade(rules.GradeEditParams{
@@ -1318,5 +1348,5 @@ func (s *GradeService) checkCanEditGrade(ctx context.Context, semester string, c
 		OverrideDeadline: nil,
 		IsAdminAction:    isAdmin,
 		HardDeadline:     hardDeadline,
-	})
+	}), nil
 }

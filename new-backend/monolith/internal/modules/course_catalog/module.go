@@ -12,7 +12,6 @@ import (
 	"github.com/baaaki/mydreamcampus/monolith/internal/modules/course_catalog/handler"
 	"github.com/baaaki/mydreamcampus/monolith/internal/modules/course_catalog/repository"
 	"github.com/baaaki/mydreamcampus/monolith/internal/modules/course_catalog/service"
-	staffService "github.com/baaaki/mydreamcampus/monolith/internal/modules/staff/service"
 	"github.com/baaaki/mydreamcampus/shared/platform/audit"
 	platformHandler "github.com/baaaki/mydreamcampus/shared/platform/handler"
 	platformMiddleware "github.com/baaaki/mydreamcampus/shared/platform/middleware"
@@ -47,12 +46,14 @@ type Module struct {
 	timeHandler           *platformHandler.TimeHandler
 }
 
-// New constructs the course catalog module. Cross-module reads go through
-// the staff Service handle (in-process).
+// New constructs the course catalog module. The staff and meal clients come
+// from main.go so the same module runs against in-process adapters or the
+// internal REST ones.
 func New(
 	cfg *config.Config,
 	pool *pgxpool.Pool,
-	staff *staffService.StaffService,
+	staffClient service.StaffClient,
+	mealClient service.MealClient,
 ) *Module {
 	catalogRepo := repository.NewCatalogRepository(pool)
 	semesterRepo := repository.NewSemesterRepository(pool)
@@ -64,20 +65,11 @@ func New(
 	auditLogger := service.NewDirectAuditLogger(auditRepo, "course-catalog")
 	semesterStatusRepo := repository.NewSemesterStatusRepository(pool, auditLogger)
 
-	staffClient := service.NewInProcessStaffClient(staff)
 	catalogSvc := service.NewCatalogService(catalogRepo)
 	semesterSvc := service.NewSemesterService(
 		catalogRepo, semesterRepo, scheduleRepo, outboxRepo,
 		staffClient, periodRepo, semesterStatusRepo,
 	)
-
-	// Closed-day distribution to meal still goes over internal HTTP. Both
-	// live in the same binary today, so the URL points at our own port; the
-	// shared internal secret rides along as X-Internal-Secret and meal's
-	// /internal/* routes verify it. Academic periods left this path — they
-	// are published as events now.
-	loopback := "http://localhost:" + cfg.Server.Port
-	serviceURLs := handler.ServiceURLs{Meal: loopback}
 
 	return &Module{
 		cfg:                cfg,
@@ -97,7 +89,7 @@ func New(
 		catalogHandler:     handler.NewCatalogHandler(catalogSvc),
 		semesterHandler:    handler.NewSemesterHandler(semesterSvc),
 		semesterStatusHandler: handler.NewSemesterStatusHandler(
-			semesterStatusRepo, periodRepo, auditLogger, serviceURLs, pool, cfg.Server.InternalSecret,
+			semesterStatusRepo, periodRepo, auditLogger, mealClient, pool,
 		),
 		auditHandler:  handler.NewAuditHandler(auditRepo),
 		periodHandler: platformHandler.NewSimplePeriodHandler(periodRepo, semesterStatusRepo, auditLogger),

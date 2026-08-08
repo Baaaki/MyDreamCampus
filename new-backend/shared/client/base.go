@@ -29,6 +29,12 @@ import (
 // code they did when the call was an in-process function call.
 var ErrNotFound = errors.New("internal client: resource not found")
 
+// ErrUnavailable is in the chain of every error that means "the target could
+// not answer" — transport failure, 5xx, or an open breaker. Callers that
+// degrade gracefully on a missing record must NOT degrade on this one: a
+// check that cannot be performed is not a check that passed.
+var ErrUnavailable = errors.New("internal client: target service unavailable")
+
 // errServerSide marks a 5xx so the breaker counts it. It never leaves this
 // package — callers see the StatusError instead.
 var errServerSide = errors.New("internal client: server-side failure")
@@ -54,6 +60,15 @@ type StatusError struct {
 
 func (e *StatusError) Error() string {
 	return fmt.Sprintf("internal client: unexpected status %d: %s", e.StatusCode, e.Body)
+}
+
+// Unwrap puts ErrUnavailable in the chain of a 5xx so callers can tell "the
+// target broke" from "the target said no".
+func (e *StatusError) Unwrap() error {
+	if e.StatusCode >= 500 {
+		return ErrUnavailable
+	}
+	return nil
 }
 
 // BreakerConfig holds the thresholds the circuit breaker trips on. Values
@@ -179,10 +194,11 @@ func (b *Base) do(ctx context.Context, method, path string, in, out any) error {
 				zap.String("target", b.target),
 				zap.String("path", path),
 			)
-			return sharedErrors.WrapWithMessage(sharedErrors.ErrServiceUnavailable, err,
+			return sharedErrors.WrapWithMessage(sharedErrors.ErrServiceUnavailable,
+				fmt.Errorf("%w: %w", ErrUnavailable, err),
 				"Servis şu anda yanıt vermiyor, lütfen birazdan tekrar deneyin")
 		}
-		return fmt.Errorf("internal client: %s %s: %w", method, path, err)
+		return fmt.Errorf("internal client: %s %s: %w: %w", method, path, ErrUnavailable, err)
 	}
 	defer func() { _ = resp.Body.Close() }()
 

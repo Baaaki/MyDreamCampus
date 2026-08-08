@@ -96,6 +96,7 @@ func TestBase_Get_ServerErrorReturnsStatusError(t *testing.T) {
 	require.ErrorAs(t, err, &statusErr)
 	assert.Equal(t, http.StatusInternalServerError, statusErr.StatusCode)
 	assert.Contains(t, statusErr.Body, "boom")
+	assert.ErrorIs(t, err, ErrUnavailable, "5xx must be distinguishable from a business answer")
 }
 
 func TestBase_Get_BadRequestReturnsStatusError(t *testing.T) {
