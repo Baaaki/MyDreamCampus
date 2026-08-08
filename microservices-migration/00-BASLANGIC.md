@@ -88,7 +88,7 @@ için görünmez. Bu dosyalara **dokunma**.
 | Faz | Dosya | Konu | Durum |
 |---|---|---|---|
 | 0 | `faz-0-shared-platform-TAMAMLANDI.md` | `platform/` → `shared/platform/` taşıma | [x] |
-| 1 | `faz-1-veritabani-ayrimi.md` | Tek Postgres, 9 ayrı DB + 9 DB kullanıcısı | [ ] |
+| 1 | `faz-1-veritabani-ayrimi-TAMAMLANDI.md` | Tek Postgres, 9 ayrı DB + 9 DB kullanıcısı | [x] |
 | 2 | `faz-2-period-projeksiyonu.md` | `academic_periods` cross-service okumasını kaldır | [ ] |
 | 3 | `faz-3-http-client-katmani.md` | `shared/client/` internal REST client'ları | [ ] |
 | 4 | `faz-4-servis-iskeletleri.md` | 9 × `cmd/main.go` + `go.mod` + `Dockerfile` + `go.work` | [ ] |
@@ -97,7 +97,7 @@ için görünmez. Bu dosyalara **dokunma**.
 | 7 | `faz-7-e2e-dogrulama.md` | Uçtan uca golden path testi | [ ] |
 | 8 | `faz-8-temizlik.md` | `monolith/` kaldırma + doküman güncelleme | [ ] |
 
-**Sıradaki faz: 1**
+**Sıradaki faz: 2**
 
 ---
 
