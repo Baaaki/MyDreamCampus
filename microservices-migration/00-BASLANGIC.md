@@ -7,14 +7,39 @@
 
 ## Çalışma Protokolü
 
-1. Aşağıdaki **Durum Tablosu**'ndan sıradaki fazı bul (ilk `[ ]` olan satır).
+### Oturuma başlarken: "nerede kaldık?"
+
+```bash
+ls microservices-migration/          # -TAMAMLANDI.md ekli olanlar bitmiş
+git log --oneline -15                # gerçek ilerleme kaydı
+git status                           # yarım kalmış değişiklik var mı
+```
+
+**Çelişki olursa `git log` doğrudur.** Durum tablosu ve dosya adları elle
+güncelleniyor; oturum faz ortasında kesilirse güncellenmemiş olabilirler.
+`git status` kirliyse önceki oturum faz ortasında kesilmiş demektir — o fazın
+dosyasını aç ve kaldığın yerden devam et, baştan başlama.
+
+### Faz akışı
+
+1. Durum tablosundan sıradaki fazı bul (ilk `[ ]` olan satır).
 2. O fazın dosyasını oku, **sadece onu** uygula.
-3. Faz bitince:
+3. **Faz İÇİNDE ilerledikçe:**
+   - Her anlamlı birim bitince **commit at** — faz sonunu bekleme.
+     Faz 4 dokuz servis çıkarıyor: her servis kendi commit'i.
+     Faz 2/3 çok adımlı: mantıksal grup başına commit.
+   - Faz dosyasında alt kontrol listesi varsa (Faz 4 §D — 9 servislik tablo)
+     **her satır bitince işaretle**. Bu, oturum kesilirse tek kurtarma kaydın.
+4. Faz bitince:
    - Fazın "Bitiş Kriteri" bölümündeki doğrulama komutlarını çalıştır.
-   - Atomic commit at (commit mesajı faz dosyasının sonunda yazılı).
    - Dosyayı yeniden adlandır: `faz-N-xxx.md` → `faz-N-xxx-TAMAMLANDI.md`
-   - Bu dosyadaki durum tablosunda o satırı `[x]` yap.
-4. Sıradaki faza geç veya kullanıcıya "Faz N bitti" diye rapor et.
+   - Bu dosyadaki durum tablosunda o satırı `[x]`, "Sıradaki faz" satırını
+     bir sonraki numara yap.
+   - Bu iki güncellemeyi de commit'e dahil et — yoksa kayıt kodla senkron olmaz.
+5. Kullanıcıya "Faz N bitti" diye rapor et.
+
+**Kullanıcının tek yapması gereken:** yeni oturumda bu dosyayı okutmak.
+`CLAUDE.md` §0 zaten buraya yönlendiriyor, yani hatırlatması bile gerekmez.
 
 **Ortak referanslar** — faz dosyaları bunlara atıf yapar, sadece gerektiğinde aç:
 

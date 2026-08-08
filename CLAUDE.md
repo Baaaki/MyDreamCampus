@@ -6,6 +6,23 @@ Universite yonetim sistemi. Full-stack monorepo: Go moduler monolith (`new-backe
 
 ---
 
+## 0. AKTIF: Mikroservis Migrasyonu
+
+Proje mikroservise cevriliyor. **Backend'e dokunan her gorevden once
+[`microservices-migration/00-BASLANGIC.md`](microservices-migration/00-BASLANGIC.md)
+oku** — kullanici hatirlatmasa da. O dosya nerede kalindigini, siradaki fazi ve
+migrasyon boyunca gecerli kod kurallarini tutar.
+
+- Migrasyon dosyalarindan **sadece** baslangic dosyasini ve siradaki tek fazi ac.
+- `SYSTEM-DESIGN.md` bu migrasyon boyunca **gecersizdir** — monolith mimarisini
+  anlatiyor ve koddan sapmis durumda. Faz 8'de siliniyor.
+- Migrasyon bitince bu bolum kaldirilir (Faz 8, C1).
+
+Bu bolum, asagidaki §12 (Mimari Kararlar) tablosunun monolith satirlarini
+**gecersiz kilar** — hedef mimari icin `microservices-migration/01-REFERANS-MIMARI.md`.
+
+---
+
 ## 1. Cakisma Hiyerarsisi
 
 Cakisma durumunda **yukaridan asagiya** dogru oncelik (1 en yuksek):

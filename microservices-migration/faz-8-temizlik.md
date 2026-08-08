@@ -136,6 +136,7 @@ Caddy üzerinden auth-service'e gidiyor (Faz 5) — yol değişmediyse dokunma.
 
 | Bölüm | Yapılacak |
 |---|---|
+| **§0 (AKTIF: Mikroservis Migrasyonu)** | **Tamamen sil** — migrasyon bitti. Ama içindeki "hedef mimari için `01-REFERANS-MIMARI.md`" yönlendirmesini §15'e taşı, çünkü `SYSTEM-DESIGN.md` siliniyor (C2). |
 | Başlık paragrafı | "Go moduler monolith (`new-backend/`)" → "Go mikroservisler (`new-backend/services/`)" |
 | §2 Zorunlu okuma | `new-backend/monolith/**` satırını `new-backend/services/**` yap |
 | §4 Paket yöneticisi | `new-backend/monolith/` → servis dizinleri; `make sqlc-<module>` → servis kökünde `make sqlc` |
