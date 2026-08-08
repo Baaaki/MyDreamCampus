@@ -70,6 +70,35 @@ Kurallar:
 - Retry **yok** — çağrılar zaten request path'inde, kullanıcı hatayı görsün
 - 404 → `ErrNotFound` sentinel'i döner; çağıran taraf modül hatasına map'ler
 - 5xx → hata olarak döner, fail-open yapma
+- **`X-Request-ID` ileri taşınır** — aşağıya bak
+
+#### `X-Request-ID` propagasyonu (gelecekteki logging/tracing için)
+
+Gelen taraf **zaten çalışıyor**: `platform/middleware.RequestLogger` gelen
+`X-Request-ID` header'ını onurlandırıyor, yoksa üretiyor, context'e koyuyor ve
+response'a yazıyor. `logger.WithContext(ctx)` de otomatik olarak `request_id`
+alanını log satırına ekliyor.
+
+Eksik olan **giden** taraf. `Base` her isteğe context'teki ID'yi koymalı:
+
+```go
+// Aynı istek zincirinin farklı servislerdeki log satırlarını tek bir ID ile
+// birleştirir. Gelen yön middleware'de kurulu; burası olmazsa zincir servis
+// sınırında kopar ve sonradan eklemek her çağrı yerine dokunmak demek.
+if rid := logger.GetRequestID(ctx); rid != "" {
+    req.Header.Set("X-Request-ID", rid)
+}
+```
+
+Bu **6 satır**, migrasyonun gözlemlenebilirlik açısından en yüksek getirili
+parçası. Prometheus/Loki eklendiğinde `request_id` ile 9 servisin logu tek
+akışta izlenebilir hale gelir.
+
+**Event tarafı (opsiyonel, kullanıcıya sor):** Envelope
+(`{event_id, event_type, timestamp, data}`) bir `correlation_id` alanı
+taşırsa, HTTP zinciri asenkron tarafa da uzanır. Consumer'lar bilinmeyen alanı
+yok saydığı için geriye uyumlu. Ama bu bir **event şeması değişikliği** —
+CLAUDE.md §6 gereği uygulamadan önce kullanıcıya sor. Sormadan ekleme.
 
 `shared/platform/middleware/internal.go` (Faz 0'da taşındı) karşı taraf
 doğrulaması için hazır — yeniden yazma.

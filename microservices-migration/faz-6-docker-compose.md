@@ -97,6 +97,33 @@ Her servis için şablon:
 servisin yavaş açılması tüm stack'i bekletir. Servisler karşı taraf henüz
 ayakta değilken hata dönmeli, başlamayı reddetmemeli.
 
+**Servis konteynerlerine `healthcheck:` YAZMA.** Image'lar
+`gcr.io/distroless/static-debian12:nonroot` — içlerinde **shell, wget veya
+curl yok**. `test: ["CMD-SHELL", "wget ..."]` yazarsan konteyner sonsuza kadar
+`unhealthy` görünür. `depends_on` zaten sadece postgres / redis / rabbitmq /
+migrate'e bakıyor ve onların hepsinde çalışan healthcheck var — servisler için
+gerekmiyor.
+
+İleride gerekirse doğru çözüm: binary'ye `-health` bayrağı ekleyip
+`test: ["CMD", "/app/grades", "-health"]` yazmak. Şimdi yapma.
+
+### 2b. Log rotasyonu (zorunlu)
+
+16 konteynerin varsayılan json-file logu sınırsız büyür ve homeserver diskini
+doldurur. **Her servise** ekle:
+
+```yaml
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "3"
+```
+
+Konteyner başına tavan 30 MB, 16 konteyner için ~480 MB. Bu bir
+gözlemlenebilirlik özelliği değil, operasyonel hijyen — ileride Loki eklenince
+de gerekli kalır.
+
 ### 3. Kaynak limitleri
 
 Homeserver'da bir servisin kaçmasını engellemek için `mem_limit` zorunlu:
@@ -165,6 +192,27 @@ restart-%:
 `backend:` ve `notification:` hedefleri (host'ta `go run`) artık tek servis
 çalıştırmak için anlamlı değil — sil veya `run-%` deseniyle değiştir.
 
+### 7. Gözlemlenebilirlik overlay'i için yer aç (dosya oluşturma, sadece not)
+
+Prometheus/Grafana/Loki bu migrasyonun kapsamında **değil**. Ama compose zaten
+`base + standalone` overlay desenini kullanıyor — üçüncü bir overlay doğal ev:
+
+```make
+# İleride: make deploy OBSERVABILITY=1
+COMPOSE := -f $(COMPOSE_FILE) -f $(INFRA)/docker-compose.standalone.yml \
+           $(if $(OBSERVABILITY),-f $(INFRA)/docker-compose.observability.yml)
+```
+
+`docker-compose.observability.yml` dosyasını **şimdi oluşturma**. Sadece
+`COMPOSE` değişkenindeki bu deseni yorumla belgele ki sonradan eklerken
+Makefile'ı yeniden düşünmek gerekmesin.
+
+**Uyarı — yanlış doküman:** `SYSTEM-DESIGN.md` §10 ve §11
+*"Grafana/Loki/Promtail config dizinleri hazır ancak henüz compose'a ekli
+değil"* diyor. **Böyle bir dizin yok** — ne `main`'de ne `v0-microservices`
+tag'inde. Bu satırlara güvenip "config'ler hazır" varsayma. Faz 8'de
+düzeltiliyor.
+
 ---
 
 ## Başlatma ve Doğrulama
@@ -195,11 +243,16 @@ sudo docker stats --no-stream
 sudo docker compose -f new-backend/infrastructure/docker-compose.yml \
      -f new-backend/infrastructure/docker-compose.standalone.yml ps
 
-# 2. Her servis kendi /health'ini döndürüyor
-for p in 8081 8082 8083 8084 8085 8086 8087 8088 8089; do
-  sudo docker exec mydreamcampus-caddy wget -qO- http://auth-service:$p/health 2>/dev/null
+# 2. Her servis kendi /health'ini döndürüyor.
+#    Servis image'ları distroless (shell yok) — kontrol caddy konteynerinden
+#    yapılır, o caddy:2-alpine tabanlı ve wget içeriyor.
+for s in auth:8081 staff:8082 student:8083 catalog:8084 enrollment:8085 \
+         attendance:8086 grades:8087 meal:8088 payment:8089; do
+  name="${s%%:*}"; port="${s##*:}"
+  printf "%-12s " "$name"
+  sudo docker exec mydreamcampus-caddy \
+    wget -qO- --timeout=3 "http://${name}-service:${port}/health" || echo "ERISILEMEDI"
 done
-# (daha basiti: her konteynerin loglarında "server started" satırını ara)
 
 # 3. Gateway routing çalışıyor
 curl -s -o /dev/null -w "%{http_code}\n" localhost/api/auth/login    # 400/405 (401 değil ama 502 de değil)

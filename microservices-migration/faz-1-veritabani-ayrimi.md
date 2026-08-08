@@ -41,6 +41,25 @@ Toplam 9 veritabanı.
 
 ## Adımlar
 
+### 0. Kapı kontrolü — cross-schema foreign key
+
+DB'ler ayrılınca schema'lar arası foreign key **fiziksel olarak imkânsız**
+hale gelir (Postgres cross-database FK desteklemez). Böyle bir FK varsa
+migration bu fazda patlar.
+
+```bash
+cd new-backend/monolith/internal/modules
+grep -rn "REFERENCES [a-z_]*\." --include="*.sql" . | \
+  grep -vE "modules/([a-z_]+)/.*REFERENCES \1\."
+```
+
+**Bu komut boş dönmeli.** Plan yazılırken kontrol edildi ve temizdi — her
+`REFERENCES` kendi schema'sı içinde. Yine de çalıştır: araya yeni migration
+girmiş olabilir.
+
+Boş dönmezse **devam etme** — o FK'yı kaldırıp uygulama seviyesinde
+doğrulamaya çevirmek ayrı bir iştir, kullanıcıya bildir.
+
 ### 1. Init script'ini yaz
 
 Yeni dosya: `new-backend/infrastructure/postgres/init-databases.sh`

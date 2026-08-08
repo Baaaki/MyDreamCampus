@@ -149,6 +149,12 @@ En büyük iş burada (353 satır). Değişecekler:
 - §11 Bilinen eksikler → "HTTP loopback kalıntısı" maddesini **sil** (çözüldü),
   "meal/proto gRPC kalıntısı" notunu güncelle (gRPC ileride pilot olarak
   değerlendirilecek)
+- **§10 ve §11'deki yanlış iddiayı düzelt:** ikisi de *"Grafana/Loki/Promtail
+  config'leri hazır ama compose'a ekli değil"* diyor. Böyle bir dizin yok — ne
+  `main`'de ne `v0-microservices` tag'inde. Doğru ifade: *"Gözlemlenebilirlik
+  (Prometheus/Loki/Grafana) henüz kurulmadı. `shared/httpserver` tüm
+  servislerin ortak giriş noktası olduğu için `/metrics` tek yerden eklenebilir;
+  compose için üçüncü bir overlay dosyası öngörülüyor."*
 
 ### C3. `DEPLOY.md`
 

@@ -32,11 +32,19 @@ git mv monolith/internal/eventbus shared/eventbus
 3 dosya: `outbox_worker.go`, `topology.go`, `types.go`.
 
 `topology.go` içindeki `ModuleExchanges` listesi ve `DeclareDownstreamBindings`
-artık **her servis** tarafından çağrılacak. Exchange declare idempotent — 9
-servisin aynı exchange'i declare etmesi sorun değil. Binding'ler için ise:
-**her servis sadece KENDİ tükettiği kuyrukları declare etsin.** Faz 4'te
-`cmd/main.go`'daki tek büyük `downstreamBindings` listesi 9 parçaya bölünür
-(referans: `01-REFERANS-MIMARI.md` §3 tablosu — hangi kuyruk hangi servisin).
+artık **her servis** tarafından çağrılacak.
+
+**Exchange'ler:** Her servis `DeclareModuleExchanges` ile **9 exchange'in
+hepsini** declare eder, sadece kendi yayınladığını değil. Declare idempotent.
+Bunu daraltma — grades, `attendance.events`'ten tüketiyor ve attendance
+servisi henüz ayağa kalkmamışsa exchange yoktur, binding patlar ve grades
+başlangıçta çöker. Hepsini declare etmek bu başlangıç yarışını tamamen
+ortadan kaldırır.
+
+**Binding'ler:** Her servis **sadece KENDİ tükettiği** kuyrukları declare
+eder. `cmd/main.go`'daki tek büyük `downstreamBindings` listesi 9 parçaya
+bölünür (referans: `01-REFERANS-MIMARI.md` §3 tablosu — hangi kuyruk hangi
+servisin).
 
 ### A2. `internal/http/server.go` → `shared/httpserver/`
 
@@ -73,7 +81,54 @@ func (c *Config) Validate(opts ...ValidateOption) error
 veya servis kendi zorunlu alanlarını `main.go`'da kontrol etsin. İkincisi daha
 basit, onu tercih et.
 
-### A4. Import path'lerini güncelle
+### A4. Servisler arası DTO'ları `shared/contracts/`'a çıkar
+
+**Bu adım atlanırsa Faz 4 derlenmez.** Faz 3'te yazılan HTTP client'lar hâlâ
+karşı modülün DTO paketini import ediyor:
+
+```go
+// enrollment/service/clients.go
+catalogDTO "github.com/.../monolith/internal/modules/course_catalog/dto"
+studentDTO "github.com/.../monolith/internal/modules/student/dto"
+```
+
+Servisler ayrı Go modülü olunca bu import bir **modüller arası bağımlılık**
+haline gelir — teknik olarak `go.mod require` ile mümkün ama tam da kaldırmaya
+çalıştığımız coupling'i geri getirir.
+
+Servis sınırını geçen tipleri bul:
+
+```bash
+cd new-backend/monolith/internal/modules
+grep -rn "modules/[a-z_]*/dto\"" --include="*.go" . | \
+  grep -vE "modules/([a-z_]+)/.*modules/\1/dto"
+```
+
+Çıkan her tipi `shared/contracts/` altına taşı:
+
+```
+shared/contracts/
+├── student.go   # StudentResponse
+├── catalog.go   # SemesterCourseListItem, SemesterCourseResponse, SemesterInfo
+└── payment.go   # InitiatePaymentRequest/Response, RefundRequest/Response
+```
+
+Kurallar:
+- **Sadece sınırı geçen tipler** taşınır. Modülün iç DTO'ları yerinde kalır —
+  `shared/contracts/` bir çöplük değil, servisler arası **kontrat**tır.
+- Sağlayan servis kendi handler'ında `contracts.X` döner, tüketen servis
+  `contracts.X` okur. İki taraf da aynı tipi görür.
+- Bir alan eklemek geriye uyumlu; alan silmek/yeniden adlandırmak **breaking
+  change** — CLAUDE.md §6 gereği kullanıcıya sorulur.
+
+**Mevcut contract testlerini koru.** Repoda `enrollment/dto/event_contract_test.go`,
+`attendance/dto/event_contract_test.go`, `grades/dto/event_dto_test.go` var ve
+yorumları eski mikroservis servislerine atıfta bulunuyor — bunlar tam da bu
+sınırı korumak için yazılmıştı. Servisler ayrılınca **yeniden değer kazanıyorlar**.
+Sil me, servisle birlikte taşı, yorumlardaki eski yolları yeni servis
+yollarıyla güncelle.
+
+### A5. Import path'lerini güncelle
 
 ```bash
 cd new-backend
@@ -191,7 +246,21 @@ server.Run() + graceful shutdown
 ```
 
 Sırayı `monolith/cmd/main.go`'dan kopyala — özellikle Redis'in auth için
-**fatal** olduğu kısım korunmalı.
+**fatal** olduğu kısım ve 30 sn'lik graceful shutdown korunmalı (outbox
+worker'ı ve consumer'lar temiz kapanmalı, yoksa restart'ta yarım işlenmiş
+event kalır).
+
+**Log'a `service` alanı ekle** — gelecekte Loki'de `{service="grades"}`
+sorgusunun dayanağı. Her `main.go`'da logger init'ten hemen sonra:
+
+```go
+// 10 servisin logu tek akışa düşecek; hangi satırın kimden geldiği alandan
+// okunmalı. Sonradan eklemek 10 dosyaya tek tek dokunmak demek.
+logger.Log = logger.Log.With(zap.String("service", "grades"))
+```
+
+`logger.Init` imzasına servis adı parametresi eklemek de olur — hangisi
+`shared/platform/logger`'ın mevcut yapısına daha temiz oturuyorsa onu seç.
 
 ### 5. `/internal/*` route'larını kök altına al
 

@@ -156,6 +156,34 @@ yeniden yazılıyor. **Faz 3'ten önce** bu kuralı ihlal etme.
 
 ---
 
+## Gözlemlenebilirlik Hazırlığı (şimdi kurma, sadece yerini boş bırakma)
+
+Prometheus / Loki / Grafana **bu migrasyonun kapsamında değil.** Ama sonradan
+eklemesi pahalı olan iki şey var — onlar migrasyon sırasında yapılır, gerisi
+sonraya kalır.
+
+### Sonradan eklemesi PAHALI (migrasyon sırasında yapılacak)
+
+| Ne | Nerede | Neden sonradan pahalı |
+|---|---|---|
+| **`X-Request-ID` giden yönde taşıma** | Faz 3, `shared/client/base.go` | Sonradan eklemek her client çağrısına dokunmak demek. Gelen yön **zaten var** (`middleware/logger.go`) — sadece giden tarafı bağlanacak. |
+| **Log satırlarında `service` alanı** | Faz 4, her `main.go`'da `logger.Init` | Loki'de `{service="grades"}` sorgusu bunun üstüne kurulur. Sonradan eklemek 10 servise tek tek dokunmak. |
+| **Docker log rotasyonu** | Faz 6, compose | 16 konteynerin sınırsız json-file logu homeserver diskini doldurur. Operasyonel hijyen, gözlemlenebilirlik değil. |
+
+### Sonradan eklemesi UCUZ (şimdi yapma)
+
+| Ne | Neden ucuz |
+|---|---|
+| `/metrics` endpoint | Faz 4'te tüm servisler **tek** `shared/httpserver.NewServer`'dan geçiyor. Prometheus handler'ı oraya eklenince 10 servis birden kazanır — servis başına 0 satır. |
+| Prometheus/Grafana/Loki konteynerleri | Compose zaten `base + standalone` overlay desenini kullanıyor. Üçüncü bir `docker-compose.observability.yml` overlay'i doğal ev — Makefile'daki `COMPOSE` değişkenine bir `-f` eklemek yeterli. |
+| Trace (OpenTelemetry) | Request ID taşınıyorsa trace'e geçiş kademeli yapılabilir; şimdi OTel bağımlılığı eklemek erken. |
+| `/health` + `/ready` bazlı alerting | İkisi de her serviste zaten var. |
+
+**Kural:** Bu tablodaki "ucuz" satırlardan hiçbirini migrasyon sırasında kurma.
+Kapsam şişmesi, fazların bitiş kriterlerini bulanıklaştırır.
+
+---
+
 ## Geri Dönüş Noktaları
 
 Her faz kendi commit'inde. Bir faz bozarsa:
@@ -165,5 +193,11 @@ git log --oneline -12          # faz commit'lerini gör
 git revert <commit>            # tek fazı geri al
 ```
 
-Faz 1 ve 6 veri kaybı riski taşır (DB volume). O fazların dosyalarında
-yedekleme adımı var — atlama.
+**`git revert` veriyi geri getirmez.** Faz 1 (DB provisioning) ve Faz 6
+(volume silme) durum değiştirir; kodu geri almak DB'yi eski haline döndürmez.
+Bu iki fazın dosyasında `pg_dump` adımı var — **atlama**. Geri dönüş sırası:
+
+1. `git revert <faz commit>`
+2. `docker compose down -v` (volume'u sil)
+3. Yedekten geri yükle (`psql < yedek.sql`)
+4. `make deploy`
