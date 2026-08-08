@@ -121,10 +121,6 @@ func (m *Module) SemesterService() *service.SemesterService { return m.semesterS
 // metadata lookups.
 func (m *Module) CatalogService() *service.CatalogService { return m.catalogService }
 
-// PeriodRepo exposes the simple academic-period repository for downstream
-// modules that need the same view of semester deadlines.
-func (m *Module) PeriodRepo() *platformRepo.SimplePeriodRepository { return m.periodRepo }
-
 // AuditRepo provides the shared audit repository to other modules.
 func (m *Module) AuditRepo() *repository.AuditRepository { return m.auditRepo }
 

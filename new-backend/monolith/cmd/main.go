@@ -12,23 +12,28 @@ import (
 	"github.com/baaaki/mydreamcampus/monolith/internal/eventbus"
 	monolithHTTP "github.com/baaaki/mydreamcampus/monolith/internal/http"
 	"github.com/baaaki/mydreamcampus/monolith/internal/modules/attendance"
+	attendanceWorker "github.com/baaaki/mydreamcampus/monolith/internal/modules/attendance/worker"
 	"github.com/baaaki/mydreamcampus/monolith/internal/modules/auth"
 	coursecatalog "github.com/baaaki/mydreamcampus/monolith/internal/modules/course_catalog"
 	catalogService "github.com/baaaki/mydreamcampus/monolith/internal/modules/course_catalog/service"
 	"github.com/baaaki/mydreamcampus/monolith/internal/modules/enrollment"
 	enrollmentService "github.com/baaaki/mydreamcampus/monolith/internal/modules/enrollment/service"
+	enrollmentWorker "github.com/baaaki/mydreamcampus/monolith/internal/modules/enrollment/worker"
 	"github.com/baaaki/mydreamcampus/monolith/internal/modules/grades"
+	gradesWorker "github.com/baaaki/mydreamcampus/monolith/internal/modules/grades/worker"
 	"github.com/baaaki/mydreamcampus/monolith/internal/modules/meal"
 	mealService "github.com/baaaki/mydreamcampus/monolith/internal/modules/meal/service"
 	"github.com/baaaki/mydreamcampus/monolith/internal/modules/payment"
 	"github.com/baaaki/mydreamcampus/monolith/internal/modules/staff"
 	"github.com/baaaki/mydreamcampus/monolith/internal/modules/student"
+	"github.com/baaaki/mydreamcampus/shared/events"
 	"github.com/baaaki/mydreamcampus/shared/platform/audit"
 	"github.com/baaaki/mydreamcampus/shared/platform/database"
 	"github.com/baaaki/mydreamcampus/shared/platform/logger"
 	platformMiddleware "github.com/baaaki/mydreamcampus/shared/platform/middleware"
 	"github.com/baaaki/mydreamcampus/shared/platform/rabbitmq"
 	platformRedis "github.com/baaaki/mydreamcampus/shared/platform/redis"
+	platformRepo "github.com/baaaki/mydreamcampus/shared/platform/repository"
 	"github.com/baaaki/mydreamcampus/shared/platform/utils"
 	"go.uber.org/zap"
 )
@@ -147,6 +152,12 @@ func main() {
 		{Queue: "grades.finalize_requested", Exchange: "grades.events", RoutingKey: "grade.finalize.requested"},
 		// enrollment — passed-prerequisite projection for enrollment validation.
 		{Queue: "enrollment.sync_events", Exchange: "grades.events", RoutingKey: "grade.student.prerequisite.passed"},
+		// catalog owns every service's academic period and publishes one event
+		// per consumer; each consumer binds only its own period type, so the
+		// filtering happens at the broker rather than in the consumer.
+		{Queue: enrollmentWorker.QueuePeriodEvents, Exchange: "course_catalog.events", RoutingKey: events.PeriodEventRoutingPattern(platformRepo.PeriodTypeEnrollment)},
+		{Queue: gradesWorker.QueuePeriodEvents, Exchange: "course_catalog.events", RoutingKey: events.PeriodEventRoutingPattern(platformRepo.PeriodTypeGrading)},
+		{Queue: attendanceWorker.QueuePeriodEvents, Exchange: "course_catalog.events", RoutingKey: events.PeriodEventRoutingPattern(platformRepo.PeriodTypeAttendance)},
 	}
 	if err := eventbus.DeclareDownstreamBindings(publisher, downstreamBindings); err != nil {
 		logger.Fatal("failed to declare downstream bindings", zap.Error(err))
@@ -170,18 +181,26 @@ func main() {
 	enrollmentStudentClient := enrollmentService.NewInProcessStudentClient(studentModule.StudentService())
 	enrollmentCourseClient := enrollmentService.NewInProcessCourseCatalogClient(catalogModule.SemesterService())
 
-	enrollmentModule := enrollment.New(pool, rabbitConn, enrollmentStudentClient, enrollmentCourseClient, catalogModule.PeriodRepo())
+	// Each module reads academic_periods from its own schema. Catalog stays the
+	// source of truth and pushes changes as events; nobody reads across a
+	// schema boundary, which is what makes the split into separate databases
+	// possible.
+	enrollmentPeriodRepo := platformRepo.NewSimplePeriodRepository(pool, "enrollment")
+	attendancePeriodRepo := platformRepo.NewSimplePeriodRepository(pool, "attendance")
+	gradesPeriodRepo := platformRepo.NewSimplePeriodRepository(pool, "grades")
+
+	enrollmentModule := enrollment.New(pool, rabbitConn, enrollmentStudentClient, enrollmentCourseClient, enrollmentPeriodRepo)
 	if err := enrollmentModule.Bootstrap(ctx); err != nil {
 		logger.Fatal("failed to bootstrap enrollment module", zap.Error(err))
 	}
 
-	attendanceModule := attendance.New(cfg, pool, redisClient.Client(), rabbitConn, catalogModule.SemesterService(), catalogModule.PeriodRepo())
+	attendanceModule := attendance.New(cfg, pool, redisClient.Client(), rabbitConn, catalogModule.SemesterService(), attendancePeriodRepo)
 	if err := attendanceModule.Bootstrap(ctx); err != nil {
 		logger.Fatal("failed to bootstrap attendance module", zap.Error(err))
 	}
 
 	gradesAuditLogger := catalogService.NewDirectAuditLogger(catalogModule.AuditRepo(), "grades")
-	gradesModule := grades.New(pool, rabbitConn, catalogModule.PeriodRepo(), gradesAuditLogger, catalogModule.SemesterService())
+	gradesModule := grades.New(pool, rabbitConn, gradesPeriodRepo, gradesAuditLogger, catalogModule.SemesterService())
 	if err := gradesModule.Bootstrap(ctx); err != nil {
 		logger.Fatal("failed to bootstrap grades module", zap.Error(err))
 	}

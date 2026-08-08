@@ -36,6 +36,7 @@ type Module struct {
 
 	eventConsumer    *worker.EventConsumer
 	finalizeConsumer *worker.FinalizeConsumer
+	periodConsumer   *worker.PeriodConsumer
 }
 
 func New(
@@ -85,6 +86,7 @@ func New(
 		gradeHandler:     handler.NewGradeHandler(gradeSvc, studentGradeSvc),
 		eventConsumer:    worker.NewEventConsumer(rabbitmq.NewConsumer(rabbitConn), cacheRepo, registrationRepo),
 		finalizeConsumer: worker.NewFinalizeConsumer(rabbitmq.NewConsumer(rabbitConn), gradeSvc, completedRepo),
+		periodConsumer:   worker.NewPeriodConsumer(rabbitmq.NewConsumer(rabbitConn), periodRepo),
 	}
 }
 
@@ -95,14 +97,17 @@ func (m *Module) Name() string { return "grades" }
 func (m *Module) OutboxStore() eventbus.OutboxStore { return m.outboxStore }
 
 // Bootstrap starts the RabbitMQ consumers: sync events (student/course/
-// enrollment/attendance projections) and the finalize self-loop. Queue
-// bindings are pre-declared in main.go so events published before this
-// point are not lost.
+// enrollment/attendance projections), the finalize self-loop and the
+// academic-period projection. Queue bindings are pre-declared in main.go so
+// events published before this point are not lost.
 func (m *Module) Bootstrap(ctx context.Context) error {
 	if err := m.eventConsumer.Start(ctx); err != nil {
 		return err
 	}
-	return m.finalizeConsumer.Start(ctx)
+	if err := m.finalizeConsumer.Start(ctx); err != nil {
+		return err
+	}
+	return m.periodConsumer.Start(ctx)
 }
 
 // RegisterRoutes mounts /api/grades/*. All routes JWT-authed.

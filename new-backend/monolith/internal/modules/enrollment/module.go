@@ -4,8 +4,8 @@
 // Owns the enrollment schema (students_cache, semester_courses_cache,
 // course_sessions_cache, student_passed_prerequisites, enrollment_programs,
 // enrollment_program_courses, enrollment_rejection_logs, outbox_events,
-// processed_events). Reads academic_periods from the course_catalog
-// schema via platform/repository.SimplePeriodRepository.
+// processed_events, academic_periods). academic_periods is a projection of
+// catalog's enrollment-typed period, fed by PeriodConsumer.
 package enrollment
 
 import (
@@ -37,7 +37,8 @@ type Module struct {
 
 	enrollmentHandler *handler.EnrollmentHandler
 
-	eventConsumer *worker.EventConsumer
+	eventConsumer  *worker.EventConsumer
+	periodConsumer *worker.PeriodConsumer
 }
 
 func New(
@@ -65,6 +66,7 @@ func New(
 		enrollmentService:   enrollmentSvc,
 		enrollmentHandler:   handler.NewEnrollmentHandler(enrollmentSvc),
 		eventConsumer:       worker.NewEventConsumer(rabbitmq.NewConsumer(rabbitConn), passedPrereqRepo),
+		periodConsumer:      worker.NewPeriodConsumer(rabbitmq.NewConsumer(rabbitConn), periodRepo),
 	}
 }
 
@@ -74,11 +76,14 @@ func (m *Module) Name() string { return "enrollment" }
 // OutboxStore for the per-module outbox worker.
 func (m *Module) OutboxStore() eventbus.OutboxStore { return m.outboxStore }
 
-// Bootstrap starts the RabbitMQ consumer feeding the passed-prerequisite
-// projection. Queue bindings are pre-declared in main.go so events published
-// before this point are not lost.
+// Bootstrap starts the RabbitMQ consumers feeding the passed-prerequisite and
+// academic-period projections. Queue bindings are pre-declared in main.go so
+// events published before this point are not lost.
 func (m *Module) Bootstrap(ctx context.Context) error {
-	return m.eventConsumer.Start(ctx)
+	if err := m.eventConsumer.Start(ctx); err != nil {
+		return err
+	}
+	return m.periodConsumer.Start(ctx)
 }
 
 // RegisterRoutes mounts /api/enrollment/*. All routes JWT-authed.

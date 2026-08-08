@@ -38,9 +38,10 @@ type Module struct {
 	attendanceService *service.AttendanceService
 	attendanceHandler *handler.AttendanceHandler
 
-	eventConsumer *worker.EventConsumer
-	bufferFlusher *worker.BufferFlusher
-	sessionExpiry *worker.SessionExpiryHandler
+	eventConsumer  *worker.EventConsumer
+	periodConsumer *worker.PeriodConsumer
+	bufferFlusher  *worker.BufferFlusher
+	sessionExpiry  *worker.SessionExpiryHandler
 }
 
 func New(
@@ -81,18 +82,23 @@ func New(
 		attendanceService: attendanceSvc,
 		attendanceHandler: handler.NewAttendanceHandler(attendanceSvc),
 		eventConsumer:     worker.NewEventConsumer(rabbitmq.NewConsumer(rabbitConn), cacheRepo, eventRepo),
+		periodConsumer:    worker.NewPeriodConsumer(rabbitmq.NewConsumer(rabbitConn), periodRepo),
 		bufferFlusher:     worker.NewBufferFlusher(attendanceRepo, redisService),
 		sessionExpiry:     worker.NewSessionExpiryHandler(sessionRepo, redisService),
 	}
 }
 
 // Bootstrap starts the attendance background workers: the RabbitMQ event
-// consumer (student/course/enrollment cache sync), the Redis buffer
-// flusher (QR scans → DB) and the session expiry handler. Queue bindings
-// are pre-declared in main.go (eventbus.DeclareDownstreamBindings) so
-// events published before this consumer attaches are not lost.
+// consumer (student/course/enrollment cache sync), the academic-period
+// projection consumer, the Redis buffer flusher (QR scans → DB) and the
+// session expiry handler. Queue bindings are pre-declared in main.go
+// (eventbus.DeclareDownstreamBindings) so events published before these
+// consumers attach are not lost.
 func (m *Module) Bootstrap(ctx context.Context) error {
 	if err := m.eventConsumer.Start(ctx); err != nil {
+		return err
+	}
+	if err := m.periodConsumer.Start(ctx); err != nil {
 		return err
 	}
 	go m.bufferFlusher.Start(ctx)

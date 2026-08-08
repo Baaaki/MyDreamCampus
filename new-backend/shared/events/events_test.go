@@ -65,6 +65,34 @@ func TestWildcardRoutingKeys_AreValid(t *testing.T) {
 	}
 }
 
+// TestPeriodEventType_MatchesConsumerRoutingPattern is the one thing that must
+// hold for the period projection to work at all: what catalog publishes has to
+// be matched by the pattern each consumer binds. A drift here loses events
+// silently — the queue simply stays empty.
+func TestPeriodEventType_MatchesConsumerRoutingPattern(t *testing.T) {
+	consumers := []string{"enrollment", "grading", "attendance"}
+	actions := []string{PeriodActionCreated, PeriodActionUpdated, PeriodActionDeleted}
+
+	for _, consumer := range consumers {
+		pattern := PeriodEventRoutingPattern(consumer)
+		prefix := strings.TrimSuffix(pattern, "*")
+		assert.NotEqual(t, pattern, prefix, "%q must end with a wildcard segment", pattern)
+
+		for _, action := range actions {
+			eventType := PeriodEventType(consumer, action)
+			assert.True(t, strings.HasPrefix(eventType, prefix),
+				"%q is not matched by binding pattern %q", eventType, pattern)
+			assert.Equal(t, action, PeriodEventAction(eventType),
+				"consumers dispatch on the action parsed back out of %q", eventType)
+		}
+	}
+}
+
+func TestPeriodEventAction_ForeignEventType_ReturnsEmpty(t *testing.T) {
+	assert.Empty(t, PeriodEventAction(EventCourseSemesterCreated))
+	assert.Empty(t, PeriodEventAction(""))
+}
+
 func TestQueueNames_NotEmpty(t *testing.T) {
 	queues := []string{
 		QueueAuthStaffEvents,

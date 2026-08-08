@@ -1,3 +1,10 @@
+-- academic_periods now holds one row per period_type, not one per semester.
+-- Only DeletePeriodsBySemester below is still called (it clears every type for
+-- a semester, which is what semester deletion wants). Every other query here
+-- is unused and NOT type-scoped — reading through one would return an
+-- arbitrary service's period. Use SimplePeriodRepository, which scopes by
+-- type, or add the period_type predicate before wiring one of these up.
+
 -- name: CreatePeriod :one
 INSERT INTO course_catalog.academic_periods (semester, period_start, period_end, is_active)
 VALUES ($1, $2, $3, $4)
