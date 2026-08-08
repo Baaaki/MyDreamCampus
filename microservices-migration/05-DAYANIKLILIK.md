@@ -108,6 +108,48 @@ yavaşsa, breaker olmadan çağıran servis her istekte 10 saniye timeout bekler
 
 Breaker, hedefin ölü olduğunu öğrendikten sonra **beklemeden** hata dönüyor.
 
+### Kütüphane: `sony/gobreaker` — onaylandı
+
+Kullanıcı onayı alındı (CLAUDE.md §6). Kendi state machine'imizi yazmak yerine
+bu tercih edildi: yarım saatlik iş gibi görünen half-open geçişi klasik yarış
+koşulu tuzağıdır ve testini yazmak kütüphaneyi eklemekten pahalıdır.
+
+```bash
+cd new-backend/shared && go get github.com/sony/gobreaker/v2
+```
+
+- **Sürümü `go get` belirlesin**, dokümana sabitlenmedi.
+- **v1 / v2 farkına dikkat:** v2 generic API kullanıyor
+  (`NewCircuitBreaker[*http.Response]`), v1 kullanmıyor. Hangisi geldiyse ona
+  göre yaz — v2 gelirse tip parametresi zorunlu.
+- `shared/go.mod`'a giriyor, servisler `shared` üzerinden alıyor — 10 ayrı
+  `go.mod`'a tek tek eklenmiyor.
+- Transitive bağımlılık getirmiyor; `go mod tidy` sonrası `go.sum` tek satır
+  büyümeli. Daha fazlaysa yanlış paketi almışsındır.
+
+Yazacağımız kısım sadece `isFailure` predicate'i ve loglama (~40 satır):
+
+```go
+b := gobreaker.NewCircuitBreaker[*http.Response](gobreaker.Settings{
+    Name:        "staff-service",
+    MaxRequests: 1,                 // half-open sonda sayısı
+    Timeout:     30 * time.Second,  // açık kalma süresi
+    ReadyToTrip: func(c gobreaker.Counts) bool {
+        return c.ConsecutiveFailures >= 5
+    },
+    // Sessizce açılan breaker teşhisi en zor arızalardan biri.
+    OnStateChange: func(name string, from, to gobreaker.State) {
+        logger.Warn("circuit breaker state change",
+            zap.String("target", name),
+            zap.String("from", from.String()),
+            zap.String("to", to.String()))
+    },
+})
+```
+
+`MaxRequests`, `Timeout` ve `ReadyToTrip` eşiği config'ten okunsun
+(`CIRCUIT_BREAKER_*`), yukarıdaki sabitler sadece varsayılan.
+
 ### Yerleşim
 
 `shared/client/base.go` — tek yer. Yedi seam de oradan geçtiği için bir kez

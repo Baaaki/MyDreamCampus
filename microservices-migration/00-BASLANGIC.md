@@ -62,7 +62,8 @@
 | Sync iletişim | **Internal REST + `X-Internal-Secret`**. gRPC yok (ileride tek seam'de pilot yapılabilir). |
 | Async iletişim | **RabbitMQ + outbox pattern** — mevcut yapı korunuyor, değişmiyor |
 | Gateway | **Caddy**, path-prefix routing. Traefik/nginx değerlendirildi, elendi. |
-| Frontend / Mobil | **Hiç değişmiyor** — route prefix'leri servis sınırlarıyla 1:1 örtüşüyor |
+| Frontend / Mobil | **Hiç değişmiyor** — route prefix'leri servis sınırlarıyla 1:1 örtüşüyor. `Idempotency-Key` sunucuda opsiyonel, client sonradan ekler. |
+| Dayanıklılık | **Circuit breaker** (`sony/gobreaker`, hedef servis başına) + **HTTP idempotency** (Redis, sunucu tarafı) — `05-DAYANIKLILIK.md` |
 
 ---
 
@@ -95,6 +96,10 @@
 | Log | **Zap** | `fmt.Println`, `log` |
 
 Yeni kütüphane eklemek **kullanıcı onayı** gerektirir (CLAUDE.md §6).
+
+**Bu migrasyonda onaylanmış tek yeni kütüphane:** `github.com/sony/gobreaker`
+(circuit breaker, `shared/go.mod`'a girer — bkz. `05-DAYANIKLILIK.md` Bölüm B).
+Başka hiçbir bağımlılık onaysız eklenmez.
 
 **Ham SQL'in tek meşru istisnası:** `shared/platform/repository/simple_period_repository.go`.
 Zaten ham pgx sorgusu kullanıyor (schema-agnostik olması gerektiği için) ve

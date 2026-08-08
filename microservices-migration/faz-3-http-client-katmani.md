@@ -88,8 +88,19 @@ diğer halkalar: `03-IZLENEBILIRLIK.md`.
 
 #### Circuit breaker
 
-`Base`, hedef servis başına bir breaker taşır. Tarif, eşikler ve **"neyin
-hata sayıldığı"** kuralı: `05-DAYANIKLILIK.md` Bölüm B.
+`Base`, hedef servis başına bir breaker taşır. Kütüphane **onaylandı**:
+
+```bash
+cd new-backend/shared && go get github.com/sony/gobreaker/v2
+```
+
+Sürüm sabitlenmedi, `go get` çözsün. v2 generic API kullanıyor
+(`NewCircuitBreaker[*http.Response]`), v1 kullanmıyor — hangisi geldiyse ona
+göre yaz. `shared/go.mod`'a giriyor, servisler `shared` üzerinden alıyor.
+`go mod tidy` sonrası `go.sum` tek satır büyümeli; daha fazlaysa yanlış paket.
+
+Ayarlar, eşikler ve **"neyin hata sayıldığı"** kuralı: `05-DAYANIKLILIK.md`
+Bölüm B.
 
 En kritik detay oradan: **404 ve diğer 4xx hata sayılmaz.** "Öğrenci
 bulunamadı" geçerli bir iş cevabıdır; hata sayılırsa normal kullanımda breaker
