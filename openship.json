@@ -10,6 +10,7 @@
     "PUBLIC_HOST": ":80",
     "PUBLIC_ORIGIN": "",
     "POSTGRES_PASSWORD": { "value": "", "secret": true },
+    "SERVICE_DB_PASSWORD": { "value": "", "secret": true },
     "REDIS_PASSWORD": { "value": "", "secret": true },
     "RABBITMQ_PASSWORD": { "value": "", "secret": true },
     "JWT_SECRET": { "value": "", "secret": true },

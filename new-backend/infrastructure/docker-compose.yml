@@ -22,9 +22,16 @@ services:
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?POSTGRES_PASSWORD is required — see .env.example}
       POSTGRES_DB: mydreamcampus
       PGDATA: /var/lib/postgresql/data/pgdata
+      # Read by init-databases.sh — the shared password of the per-service
+      # roles (auth_svc, staff_svc, ...).
+      SERVICE_DB_PASSWORD: ${SERVICE_DB_PASSWORD:?SERVICE_DB_PASSWORD is required — see .env.example}
     volumes:
       - postgres-data:/var/lib/postgresql
       - ./postgres/init-dbs.sql:/docker-entrypoint-initdb.d/00-init.sql:ro
+      # Numeric prefix: the entrypoint runs initdb.d in lexical order, and the
+      # legacy monolith schemas have to land before the per-service databases.
+      # Both only ever run on an EMPTY volume.
+      - ./postgres/init-databases.sh:/docker-entrypoint-initdb.d/01-service-dbs.sh:ro
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U postgres -d mydreamcampus"]
       interval: 5s
@@ -99,8 +106,13 @@ services:
     container_name: mydreamcampus-migrate
     restart: "no"
     environment:
+      # Legacy targets: the single monolith database and the standalone
+      # notification one. Both go away once the services move off them.
       DB_URL: postgres://${POSTGRES_USER:-postgres}:${POSTGRES_PASSWORD:?POSTGRES_PASSWORD is required — see .env.example}@postgres:5432/mydreamcampus?sslmode=disable
       NOTIF_DB_URL: postgres://${POSTGRES_USER:-postgres}:${POSTGRES_PASSWORD:?POSTGRES_PASSWORD is required — see .env.example}@notification-postgres:5432/notification?sslmode=disable
+      # Per-service databases: migrate builds one DSN per service from these.
+      PG_HOST: postgres
+      SERVICE_DB_PASSWORD: ${SERVICE_DB_PASSWORD:?SERVICE_DB_PASSWORD is required — see .env.example}
     depends_on:
       postgres:
         condition: service_healthy

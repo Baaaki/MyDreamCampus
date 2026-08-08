@@ -237,7 +237,7 @@ Bu kararlar verilmis — yeniden sorma:
 |---|---|
 | Mimari | **Moduler monolith** (`new-backend/monolith`) — tek binary, 9 modul. Notification tek ayri servis (RabbitMQ consumer). |
 | Moduller arasi iletisim | **Sync okuma/validasyon:** in-process client interface (HTTP YOK, `X-Internal-Secret` YOK). **Side-effect/notify:** RabbitMQ event + outbox. Client -> backend HTTP, Caddy uzerinden. JWT dogrulamasi `platform/middleware.JWTAuth` ile process icinde. |
-| Database | PostgreSQL 18+. Monolith: tek DB, modul basina ayri schema + ayri goose version tablosu. Notification: kendi ayri DB'si (port 5433). |
+| Database | PostgreSQL 18+. **Servis basina ayri DB + ayri DB kullanicisi**, hepsi tek Postgres konteynerinde. Schema adlari korunuyor — `catalog` DB'sinin icinde `course_catalog` schema'si. Modul basina ayri goose version tablosu. (Monolith Faz 4'e kadar hala eski `mydreamcampus` DB'sini okuyor.) |
 | ORM/Query | sqlc + pgx/v5 (raw SQL yok, GORM yok) |
 | Migration | goose |
 | HTTP framework (Go) | Gin v1.11 |
