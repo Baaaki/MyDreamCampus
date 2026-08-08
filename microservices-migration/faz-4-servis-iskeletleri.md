@@ -321,6 +321,27 @@ yerde çözülür, 9 serviste kazanılır. Consumer'lara tek tek yazma.
 **`audit.InitSecurity(cfg.Server.Environment)` her serviste korunmalı**
 (`02-GUVENLIK.md` A09) — monolith `main.go`'sunda var, kopyalarken düşürme.
 
+**DLQ'yu bağla** (`04-PROD-HAZIRLIK.md` §1 — kritik). `ConsumeWithDLQ` ve
+`SetupDLQ` `shared/platform/rabbitmq`'da yazılı ama **hiçbir yerden
+çağrılmıyor**; tüm consumer'lar düz `Consume` kullanıyor ve hatada
+`Nack(requeue=true)` yapıyor — yani işlenemeyen bir mesaj sonsuza kadar
+kuyruğa geri dönüyor. Servis çıkarırken consumer'ları `ConsumeWithDLQ`'ya
+çevir, her kuyruk için `SetupDLQ` çağır, DLQ exchange/queue'larını
+`definitions.json`'a ekle.
+
+**Retention worker'ı başlat** (`04-PROD-HAZIRLIK.md` §2). `outbox_events`
+satırları `processed` işaretlenip **hiç silinmiyor**; `processed_events`
+sadece auth'ta temizleniyor. `shared/eventbus`'a ortak bir retention worker
+yaz, her `main.go`'da başlat:
+
+```go
+go eventbus.NewRetentionWorker(store, cfg.Timeout.ProcessedEventsRetentionDays,
+    cfg.Timeout.CleanupSchedulerIntervalHours).Start(ctx)
+```
+
+`03-IZLENEBILIRLIK.md`'nin eklediği `correlation_id` index'i bu tabloların
+büyümesini daha pahalı hale getiriyor — retention onunla birlikte gelmeli.
+
 ### 5. `/internal/*` route'larını kök altına al
 
 Faz 3'te `/api/<x>/internal/...` altındaydılar. Artık `RegisterPublicRoutes`

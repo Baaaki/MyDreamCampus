@@ -92,9 +92,20 @@ steps:
   - run: cd new-backend/services/${{ matrix.service }}-service && go vet ./... && go test ./...
 ```
 
-Integration job'undaki "start monolith → wait for health" bloğu, tek servis
-yerine `docker compose up` ile tüm stack'i ayağa kaldıracak şekilde
-değiştirilmeli (veya integration testi compose üzerinden çalıştırılmalı).
+Integration job'undaki "start monolith → wait for health" bloğu (satır
+~182-208) compose tabanlı **uçtan uca duman testine** çevrilmeli
+(`04-PROD-HAZIRLIK.md` §6):
+
+```
+docker compose up -d --build
+→ caddy /health bekle
+→ admin login → personel ekle → ders ekle → öğrenci ekle → ders seç
+→ her adımda HTTP kodunu doğrula
+→ hata durumunda `docker compose logs`u artifact olarak yükle
+```
+
+Faz 7 bir kerelik manuel doğrulama; otomatikleşmezse golden path üç ay içinde
+sessizce çürür ve 10 serviste hangi halkanın koptuğunu bulmak zorlaşır.
 
 ### B2. `.github/workflows/cd.yml`, `deploy.yml`, `security.yml`
 

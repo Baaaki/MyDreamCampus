@@ -23,6 +23,7 @@
 | `01-REFERANS-MIMARI.md` | Port / DB / servis / route / event tabloları | hepsi |
 | `02-GUVENLIK.md` | OWASP Top 10 karşılığı — bölünmenin yarattığı yeni risk yüzeyi | 1, 3, 4, 5, 6, 7, 8 |
 | `03-IZLENEBILIRLIK.md` | Uçtan uca istek takibi: HTTP + event zinciri | 3, 4, 5, 7 |
+| `04-PROD-HAZIRLIK.md` | İşletme boşlukları: DLQ, retention, yedekleme, timeout bütçesi | 4, 5, 6, 8 |
 
 > **`SYSTEM-DESIGN.md`'yi okuma, kaynak olarak kullanma.** O doküman monolith
 > mimarisini anlatıyor ve şimdiden koddan sapmış (var olmayan Grafana/Loki

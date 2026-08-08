@@ -187,6 +187,47 @@ logs-%:
 # Tek servisi yeniden başlat
 restart-%:
 	$(SUDO) docker compose $(COMPOSE) restart $*
+
+# Tek servisi yeniden derle ve başlat — diğer 15 konteynere dokunmadan.
+# Bu hedef olmadan herkes `make deploy` çalıştırır ve tüm stack'i yeniden
+# başlatır; bölünmenin operasyonel faydası kullanılmamış olur.
+deploy-%:
+	$(SUDO) docker compose $(COMPOSE) up -d --no-deps --build $*
+```
+
+### 6b. Yedekleme hedefleri (`04-PROD-HAZIRLIK.md` §3)
+
+Projede **hiç yedekleme yok** — `scripts/`, `Makefile`, `DEPLOY.md` içinde
+`pg_dump` geçmiyor. 9 DB'ye çıkmadan önce prosedür otursun.
+
+```make
+DB_BACKUP_DIR ?= $(HOME)/mydreamcampus-backups
+
+backup:
+	@mkdir -p $(DB_BACKUP_DIR)
+	$(SUDO) docker exec mydreamcampus-postgres pg_dumpall -U postgres \
+		| gzip > $(DB_BACKUP_DIR)/all-$$(date +%F-%H%M).sql.gz
+	@ls -lh $(DB_BACKUP_DIR) | tail -5
+
+# YIKICI — mevcut veritabanlarını ezer.
+restore:
+	@test -n "$(FILE)" || { echo "kullanim: make restore FILE=/yol/yedek.sql.gz"; exit 1; }
+	gunzip -c $(FILE) | $(SUDO) docker exec -i mydreamcampus-postgres psql -U postgres
+```
+
+Tek Postgres konteynerinde durdukları için `pg_dumpall` 9 DB'yi birden alıyor
+— DB kararımızın beklenmedik faydası. Günlük otomatik yedek için
+`scripts/systemd/` altındaki autodeploy timer deseni kopyalanabilir.
+
+### 6c. Timeout bütçesi (`04-PROD-HAZIRLIK.md` §5)
+
+`.env` değerlerinin zincirle tutarlı olduğunu doğrula — iç timeout dıştan
+**kısa** olmalı:
+
+```
+REQUEST_TIMEOUT_SECONDS=20     # servis HTTP sunucusu
+                               # servisler arası client: 10 sn (Faz 3, base.go)
+                               # Caddy upstream: 30 sn (varsayılan, dokunma)
 ```
 
 `backend:` ve `notification:` hedefleri (host'ta `go run`) artık tek servis

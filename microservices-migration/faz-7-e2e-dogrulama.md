@@ -122,6 +122,13 @@ sudo docker start mydreamcampus-rabbitmq
 
 # 4. Servis yeniden başlatma — tek servis, diğerlerini etkilemeden
 sudo docker restart mydreamcampus-grades
+#   → restart SIRASINDA /api/grades'e istek at: Caddy lb_try_duration
+#     sayesinde 502 DEĞİL, normal yanıt gelmeli (04-PROD-HAZIRLIK.md §4)
+
+# 5. Poison message DLQ'ya düşüyor mu (04-PROD-HAZIRLIK.md §1)
+#    Bir kuyruğa kasten bozuk payload yayınla (RabbitMQ UI → Publish message).
+#    Beklenen: N denemeden sonra DLQ'ya düşer, kuyruk tıkanmaz, CPU yanmaz.
+sudo docker exec mydreamcampus-rabbitmq rabbitmqctl list_queues name messages | grep dlq
 ```
 
 **2. maddede panic görürsen** HTTP client'ta nil kontrolü eksiktir → Faz 3'e dön.

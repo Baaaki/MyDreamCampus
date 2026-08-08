@@ -54,6 +54,17 @@ Frontend ve mobil **hiç değişmiyor** — route prefix'leri servis sınırlar�
 	# Her prefix İKİ matcher ile yazılıyor: ky "/api/students" (path yok,
 	# sadece query) isteği de atıyor ve o istek "/api/students/*" ile
 	# EŞLEŞMEZ. Tek matcher yazarsan liste endpointleri 404 olur.
+	# Her reverse_proxy bloğuna kısa yeniden deneme eklenir
+	# (04-PROD-HAZIRLIK.md §4). Tek servisi yeniden başlatmak mikroservisin
+	# asıl kazancı; retry olmadan bu kazanç kullanıcıya 502 olarak yansır.
+	#
+	#   reverse_proxy grades-service:8087 {
+	#       lb_try_duration 5s
+	#       lb_try_interval 250ms
+	#   }
+	#
+	# Aşağıda okunabilirlik için tek satır gösteriliyor — uygularken bloklu
+	# hale getir.
 	handle /api/auth /api/auth/*               { reverse_proxy auth-service:8081 }
 	handle /api/staff /api/staff/*             { reverse_proxy staff-service:8082 }
 	handle /api/admin-staff /api/admin-staff/* { reverse_proxy staff-service:8082 }
