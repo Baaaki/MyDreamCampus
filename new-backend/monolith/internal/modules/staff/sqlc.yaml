@@ -2,7 +2,10 @@ version: "2"
 sql:
   - engine: "postgresql"
     queries: "./sql/queries"
-    schema: "./sql/migrations"
+    # sqlc_schema first: it creates the schema the migrations reference.
+    schema:
+      - "./sql/sqlc_schema"
+      - "./sql/migrations"
     gen:
       go:
         package: "db"

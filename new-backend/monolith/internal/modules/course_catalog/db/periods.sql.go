@@ -12,6 +12,7 @@ import (
 )
 
 const createPeriod = `-- name: CreatePeriod :one
+
 INSERT INTO course_catalog.academic_periods (semester, period_start, period_end, is_active)
 VALUES ($1, $2, $3, $4)
 RETURNING id, semester, period_start, period_end, is_active, created_at, updated_at
@@ -24,14 +25,30 @@ type CreatePeriodParams struct {
 	IsActive    pgtype.Bool        `json:"is_active"`
 }
 
-func (q *Queries) CreatePeriod(ctx context.Context, arg CreatePeriodParams) (AcademicPeriod, error) {
+type CreatePeriodRow struct {
+	ID          pgtype.UUID        `json:"id"`
+	Semester    string             `json:"semester"`
+	PeriodStart pgtype.Timestamptz `json:"period_start"`
+	PeriodEnd   pgtype.Timestamptz `json:"period_end"`
+	IsActive    pgtype.Bool        `json:"is_active"`
+	CreatedAt   pgtype.Timestamptz `json:"created_at"`
+	UpdatedAt   pgtype.Timestamptz `json:"updated_at"`
+}
+
+// academic_periods now holds one row per period_type, not one per semester.
+// Only DeletePeriodsBySemester below is still called (it clears every type for
+// a semester, which is what semester deletion wants). Every other query here
+// is unused and NOT type-scoped — reading through one would return an
+// arbitrary service's period. Use SimplePeriodRepository, which scopes by
+// type, or add the period_type predicate before wiring one of these up.
+func (q *Queries) CreatePeriod(ctx context.Context, arg CreatePeriodParams) (CreatePeriodRow, error) {
 	row := q.db.QueryRow(ctx, createPeriod,
 		arg.Semester,
 		arg.PeriodStart,
 		arg.PeriodEnd,
 		arg.IsActive,
 	)
-	var i AcademicPeriod
+	var i CreatePeriodRow
 	err := row.Scan(
 		&i.ID,
 		&i.Semester,
@@ -69,9 +86,19 @@ WHERE semester = $1 AND is_active = true
 LIMIT 1
 `
 
-func (q *Queries) GetActivePeriodBySemester(ctx context.Context, semester string) (AcademicPeriod, error) {
+type GetActivePeriodBySemesterRow struct {
+	ID          pgtype.UUID        `json:"id"`
+	Semester    string             `json:"semester"`
+	PeriodStart pgtype.Timestamptz `json:"period_start"`
+	PeriodEnd   pgtype.Timestamptz `json:"period_end"`
+	IsActive    pgtype.Bool        `json:"is_active"`
+	CreatedAt   pgtype.Timestamptz `json:"created_at"`
+	UpdatedAt   pgtype.Timestamptz `json:"updated_at"`
+}
+
+func (q *Queries) GetActivePeriodBySemester(ctx context.Context, semester string) (GetActivePeriodBySemesterRow, error) {
 	row := q.db.QueryRow(ctx, getActivePeriodBySemester, semester)
-	var i AcademicPeriod
+	var i GetActivePeriodBySemesterRow
 	err := row.Scan(
 		&i.ID,
 		&i.Semester,
@@ -90,9 +117,19 @@ FROM course_catalog.academic_periods
 WHERE id = $1
 `
 
-func (q *Queries) GetPeriodByID(ctx context.Context, id pgtype.UUID) (AcademicPeriod, error) {
+type GetPeriodByIDRow struct {
+	ID          pgtype.UUID        `json:"id"`
+	Semester    string             `json:"semester"`
+	PeriodStart pgtype.Timestamptz `json:"period_start"`
+	PeriodEnd   pgtype.Timestamptz `json:"period_end"`
+	IsActive    pgtype.Bool        `json:"is_active"`
+	CreatedAt   pgtype.Timestamptz `json:"created_at"`
+	UpdatedAt   pgtype.Timestamptz `json:"updated_at"`
+}
+
+func (q *Queries) GetPeriodByID(ctx context.Context, id pgtype.UUID) (GetPeriodByIDRow, error) {
 	row := q.db.QueryRow(ctx, getPeriodByID, id)
-	var i AcademicPeriod
+	var i GetPeriodByIDRow
 	err := row.Scan(
 		&i.ID,
 		&i.Semester,
@@ -106,7 +143,7 @@ func (q *Queries) GetPeriodByID(ctx context.Context, id pgtype.UUID) (AcademicPe
 }
 
 const getPeriodBySemester = `-- name: GetPeriodBySemester :one
-SELECT id, semester, period_start, period_end, is_active, created_at, updated_at FROM course_catalog.academic_periods WHERE semester = $1 LIMIT 1
+SELECT id, semester, period_start, period_end, is_active, created_at, updated_at, period_type FROM course_catalog.academic_periods WHERE semester = $1 LIMIT 1
 `
 
 func (q *Queries) GetPeriodBySemester(ctx context.Context, semester string) (AcademicPeriod, error) {
@@ -120,6 +157,7 @@ func (q *Queries) GetPeriodBySemester(ctx context.Context, semester string) (Aca
 		&i.IsActive,
 		&i.CreatedAt,
 		&i.UpdatedAt,
+		&i.PeriodType,
 	)
 	return i, err
 }
@@ -130,15 +168,25 @@ FROM course_catalog.academic_periods
 ORDER BY semester DESC, created_at DESC
 `
 
-func (q *Queries) ListAllPeriods(ctx context.Context) ([]AcademicPeriod, error) {
+type ListAllPeriodsRow struct {
+	ID          pgtype.UUID        `json:"id"`
+	Semester    string             `json:"semester"`
+	PeriodStart pgtype.Timestamptz `json:"period_start"`
+	PeriodEnd   pgtype.Timestamptz `json:"period_end"`
+	IsActive    pgtype.Bool        `json:"is_active"`
+	CreatedAt   pgtype.Timestamptz `json:"created_at"`
+	UpdatedAt   pgtype.Timestamptz `json:"updated_at"`
+}
+
+func (q *Queries) ListAllPeriods(ctx context.Context) ([]ListAllPeriodsRow, error) {
 	rows, err := q.db.Query(ctx, listAllPeriods)
 	if err != nil {
 		return nil, err
 	}
 	defer rows.Close()
-	items := []AcademicPeriod{}
+	items := []ListAllPeriodsRow{}
 	for rows.Next() {
-		var i AcademicPeriod
+		var i ListAllPeriodsRow
 		if err := rows.Scan(
 			&i.ID,
 			&i.Semester,
@@ -165,15 +213,25 @@ WHERE semester = $1
 ORDER BY created_at DESC
 `
 
-func (q *Queries) ListPeriodsBySemester(ctx context.Context, semester string) ([]AcademicPeriod, error) {
+type ListPeriodsBySemesterRow struct {
+	ID          pgtype.UUID        `json:"id"`
+	Semester    string             `json:"semester"`
+	PeriodStart pgtype.Timestamptz `json:"period_start"`
+	PeriodEnd   pgtype.Timestamptz `json:"period_end"`
+	IsActive    pgtype.Bool        `json:"is_active"`
+	CreatedAt   pgtype.Timestamptz `json:"created_at"`
+	UpdatedAt   pgtype.Timestamptz `json:"updated_at"`
+}
+
+func (q *Queries) ListPeriodsBySemester(ctx context.Context, semester string) ([]ListPeriodsBySemesterRow, error) {
 	rows, err := q.db.Query(ctx, listPeriodsBySemester, semester)
 	if err != nil {
 		return nil, err
 	}
 	defer rows.Close()
-	items := []AcademicPeriod{}
+	items := []ListPeriodsBySemesterRow{}
 	for rows.Next() {
-		var i AcademicPeriod
+		var i ListPeriodsBySemesterRow
 		if err := rows.Scan(
 			&i.ID,
 			&i.Semester,
@@ -208,9 +266,19 @@ type UpdatePeriodParams struct {
 	ID        pgtype.UUID        `json:"id"`
 }
 
-func (q *Queries) UpdatePeriod(ctx context.Context, arg UpdatePeriodParams) (AcademicPeriod, error) {
+type UpdatePeriodRow struct {
+	ID          pgtype.UUID        `json:"id"`
+	Semester    string             `json:"semester"`
+	PeriodStart pgtype.Timestamptz `json:"period_start"`
+	PeriodEnd   pgtype.Timestamptz `json:"period_end"`
+	IsActive    pgtype.Bool        `json:"is_active"`
+	CreatedAt   pgtype.Timestamptz `json:"created_at"`
+	UpdatedAt   pgtype.Timestamptz `json:"updated_at"`
+}
+
+func (q *Queries) UpdatePeriod(ctx context.Context, arg UpdatePeriodParams) (UpdatePeriodRow, error) {
 	row := q.db.QueryRow(ctx, updatePeriod, arg.PeriodEnd, arg.IsActive, arg.ID)
-	var i AcademicPeriod
+	var i UpdatePeriodRow
 	err := row.Scan(
 		&i.ID,
 		&i.Semester,
@@ -227,7 +295,7 @@ const updatePeriodBySemesterSQL = `-- name: UpdatePeriodBySemesterSQL :one
 UPDATE course_catalog.academic_periods
 SET period_start = $2, period_end = $3, updated_at = NOW()
 WHERE semester = $1
-RETURNING id, semester, period_start, period_end, is_active, created_at, updated_at
+RETURNING id, semester, period_start, period_end, is_active, created_at, updated_at, period_type
 `
 
 type UpdatePeriodBySemesterSQLParams struct {
@@ -247,6 +315,7 @@ func (q *Queries) UpdatePeriodBySemesterSQL(ctx context.Context, arg UpdatePerio
 		&i.IsActive,
 		&i.CreatedAt,
 		&i.UpdatedAt,
+		&i.PeriodType,
 	)
 	return i, err
 }

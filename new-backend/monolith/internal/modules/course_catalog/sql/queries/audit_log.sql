@@ -3,6 +3,12 @@ INSERT INTO course_catalog.audit_log (service, actor_id, actor_role, action, res
 VALUES ($1, $2, $3, $4, $5, $6, $7)
 RETURNING *;
 
+-- name: InsertAuditLogFromEvent :exec
+-- Idempotent by event_id: the consumer may see the same message twice.
+INSERT INTO course_catalog.audit_log (event_id, service, actor_id, actor_role, action, resource_type, resource_id, details)
+VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
+ON CONFLICT (event_id) WHERE event_id IS NOT NULL DO NOTHING;
+
 -- name: ListAuditLog :many
 SELECT * FROM course_catalog.audit_log
 WHERE

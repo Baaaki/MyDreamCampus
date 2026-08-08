@@ -413,6 +413,7 @@ type AcademicPeriod struct {
 	IsActive    pgtype.Bool        `json:"is_active"`
 	CreatedAt   pgtype.Timestamptz `json:"created_at"`
 	UpdatedAt   pgtype.Timestamptz `json:"updated_at"`
+	PeriodType  string             `json:"period_type"`
 }
 
 type AuditLog struct {
@@ -425,6 +426,7 @@ type AuditLog struct {
 	ResourceType string             `json:"resource_type"`
 	ResourceID   pgtype.UUID        `json:"resource_id"`
 	Details      []byte             `json:"details"`
+	EventID      pgtype.UUID        `json:"event_id"`
 }
 
 type CourseCatalog struct {

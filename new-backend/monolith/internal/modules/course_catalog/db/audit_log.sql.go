@@ -35,7 +35,7 @@ func (q *Queries) CountAuditLog(ctx context.Context, arg CountAuditLogParams) (i
 const insertAuditLog = `-- name: InsertAuditLog :one
 INSERT INTO course_catalog.audit_log (service, actor_id, actor_role, action, resource_type, resource_id, details)
 VALUES ($1, $2, $3, $4, $5, $6, $7)
-RETURNING id, timestamp, service, actor_id, actor_role, action, resource_type, resource_id, details
+RETURNING id, timestamp, service, actor_id, actor_role, action, resource_type, resource_id, details, event_id
 `
 
 type InsertAuditLogParams struct {
@@ -69,12 +69,45 @@ func (q *Queries) InsertAuditLog(ctx context.Context, arg InsertAuditLogParams) 
 		&i.ResourceType,
 		&i.ResourceID,
 		&i.Details,
+		&i.EventID,
 	)
 	return i, err
 }
 
+const insertAuditLogFromEvent = `-- name: InsertAuditLogFromEvent :exec
+INSERT INTO course_catalog.audit_log (event_id, service, actor_id, actor_role, action, resource_type, resource_id, details)
+VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
+ON CONFLICT (event_id) WHERE event_id IS NOT NULL DO NOTHING
+`
+
+type InsertAuditLogFromEventParams struct {
+	EventID      pgtype.UUID `json:"event_id"`
+	Service      string      `json:"service"`
+	ActorID      pgtype.UUID `json:"actor_id"`
+	ActorRole    string      `json:"actor_role"`
+	Action       string      `json:"action"`
+	ResourceType string      `json:"resource_type"`
+	ResourceID   pgtype.UUID `json:"resource_id"`
+	Details      []byte      `json:"details"`
+}
+
+// Idempotent by event_id: the consumer may see the same message twice.
+func (q *Queries) InsertAuditLogFromEvent(ctx context.Context, arg InsertAuditLogFromEventParams) error {
+	_, err := q.db.Exec(ctx, insertAuditLogFromEvent,
+		arg.EventID,
+		arg.Service,
+		arg.ActorID,
+		arg.ActorRole,
+		arg.Action,
+		arg.ResourceType,
+		arg.ResourceID,
+		arg.Details,
+	)
+	return err
+}
+
 const listAuditLog = `-- name: ListAuditLog :many
-SELECT id, timestamp, service, actor_id, actor_role, action, resource_type, resource_id, details FROM course_catalog.audit_log
+SELECT id, timestamp, service, actor_id, actor_role, action, resource_type, resource_id, details, event_id FROM course_catalog.audit_log
 WHERE
     ($3::VARCHAR IS NULL OR service = $3) AND
     ($4::VARCHAR IS NULL OR action = $4) AND
@@ -116,6 +149,7 @@ func (q *Queries) ListAuditLog(ctx context.Context, arg ListAuditLogParams) ([]A
 			&i.ResourceType,
 			&i.ResourceID,
 			&i.Details,
+			&i.EventID,
 		); err != nil {
 			return nil, err
 		}
