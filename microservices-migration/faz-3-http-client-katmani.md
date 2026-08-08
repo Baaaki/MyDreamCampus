@@ -192,6 +192,27 @@ Her HTTP client için `httptest.NewServer` ile birim testi:
 Test isimlendirme: `TestHTTPStaffClient_GetInstructor_NotFoundMapsToSentinel`
 (CLAUDE.md §6).
 
+### 8. `new-backend/skills.md`'deki çelişkiyi kapat
+
+`skills.md` §1 hâlâ şunu diyor:
+
+> **Moduller arasi cagri**: In-process client interface — modul modulu HTTP ile CAGIRMAZ.
+
+Bu satır artık yanlış ve `skills.md` her backend görevinde zorunlu okuma
+(CLAUDE.md §2) — düzeltilmezse sonraki oturumlar planla çelişen talimat okur.
+
+O maddeyi şununla değiştir:
+
+```markdown
+- **Moduller arasi cagri**: Sync okuma/dogrulama icin **internal REST**
+  (`shared/client`, `X-Internal-Secret`). In-process client adapter'lari
+  mikroservis migrasyonunda kaldiriliyor — bkz.
+  `microservices-migration/00-BASLANGIC.md`. Side-effect/notify icin
+  RabbitMQ event (degismedi).
+```
+
+Dosyanın tamamının yeniden yazımı Faz 8'de. Burada **sadece bu satır**.
+
 ---
 
 ## Bitiş Kriteri

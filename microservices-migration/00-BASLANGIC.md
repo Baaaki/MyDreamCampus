@@ -65,6 +65,97 @@ gerektiğinde aç, baştan sona okuma.
 
 ---
 
+## Kod Yazım Kuralları
+
+> Bu migrasyon bir **refactor**, yeniden yazım değil. Varsayılan davranış:
+> kodu **taşı**, yeniden yazma. Bir dosyayı yeniden yazma ihtiyacı duyuyorsan
+> önce "bu gerçekten bu fazın kapsamında mı" diye sor.
+
+### Stack — sabit, tartışılmaz (CLAUDE.md §12)
+
+| Katman | Ne kullanılır | Ne KULLANILMAZ |
+|---|---|---|
+| Query | **sqlc + pgx/v5** | GORM, ham SQL string, `database/sql` |
+| Migration | **goose** | Elle DDL, uygulanmış migration'ı değiştirme |
+| HTTP | **Gin v1.11** | Yeni router, echo/fiber/chi |
+| Servisler arası sync | **net/http + `shared/client`** | gRPC (şimdilik), yeni RPC kütüphanesi |
+| Async | **RabbitMQ + outbox** | Doğrudan publish (payment istisnası hariç) |
+| Log | **Zap** | `fmt.Println`, `log` |
+
+Yeni kütüphane eklemek **kullanıcı onayı** gerektirir (CLAUDE.md §6).
+
+**Ham SQL'in tek meşru istisnası:** `shared/platform/repository/simple_period_repository.go`.
+Zaten ham pgx sorgusu kullanıyor (schema-agnostik olması gerektiği için) ve
+Faz 2 bunu koruyor. Yeni ham SQL **ekleme**.
+
+### Go idiomları
+
+- **Uber Go Style Guide** (CLAUDE.md §16) — mevcut kod bunu izliyor, sen de izle.
+- Hata sarmalama: `fmt.Errorf("...: %w", err)`. Kontrol: `errors.Is` / `errors.As`.
+  `err.Error()` string karşılaştırması **yapma**.
+- Interface'i **tüketen taraf** tanımlar — mevcut desen bu
+  (`StaffClient` catalog'da tanımlı, staff'ta değil). Bunu bozma.
+- Compile-time assertion koy: `var _ StaffClient = (*HTTPStaffClient)(nil)`.
+  Faz 3 ve 4'te servis sınırındaki her yeni implementasyon için zorunlu.
+- `context.Context` ilk parametre, struct'ta saklanmaz.
+- Request path'inde `panic` yok. `main.go`'daki `logger.Fatal` başlangıç
+  hataları için — o desen korunuyor.
+- Kabul edilen kısaltmalar mevcut koddan: `svc`, `repo`, `cfg`, `ctx`, `rg`.
+
+### Hata yapısı — korunacak, değiştirilmeyecek
+
+Mevcut zincir (`new-backend/skills.md` §8):
+
+```
+modül errors/ paketi (sentinel)  →  platform/errors.AppError  →  handler HTTP status
+```
+
+- `platform/errors.AppError`: `New` / `Wrap` / `WrapWithMessage`;
+  kontrol `IsNotFound` / `IsValidation` / `IsUnauthorized` / `IsForbidden` / `IsConflict`
+- HTTP'ye çeviri **sadece handler katmanında**
+- Kullanıcıya dönen mesaj **Türkçe**, log **İngilizce** (CLAUDE.md §3)
+
+**Migrasyona özel kritik kural:** In-process adapter'lar hata map'lemesi
+yapıyor (örnek: `InProcessStaffClient` staff'ın `ErrStaffNotFound`'unu
+catalog'un `ErrInstructorNotFound`'una çeviriyor). HTTP karşılıkları
+**aynı map'lemeyi birebir** yapmalı — 404 → aynı sentinel. Bu kaybolursa
+handler'lar yanlış status code üretir ve frontend hata ekranları bozulur.
+
+### Gin kullanımı
+
+- Middleware zinciri **mevcut haliyle korunur**: global
+  (`Recovery → SecurityHeaders → CORS → BodySizeLimit → RequestLogger →
+  IPRateLimit → SetCSRFToken`), route seviyesi
+  (`JWTAuth → CSRFProtection → UserRateLimit → RequireRole`).
+- Servisler ayrılınca bu zincir **her serviste tekrar kurulur** — JWT'yi her
+  servis kendi doğrular, auth'a RPC yok.
+- Handler'da iş kuralı yok: bind + validate + rol kontrolü. Kural service'te.
+- Route mount deseni (`/api/<Name()>`) korunuyor — Caddy routing buna dayanıyor.
+
+### Test
+
+- Test dosyaları paketin **yanında**, ayrı test ağacı yok.
+- İsimlendirme: `TestXxx_Scenario_ExpectedResult`.
+- Başarısız testi `t.Skip()` ile atlama.
+- Faz 3'te yazılan her HTTP client için `httptest` birim testi **zorunlu**.
+
+---
+
+## `new-backend/skills.md` ile Çelişki (Faz 3'te çözülüyor)
+
+`skills.md` §1 şunu diyor:
+
+> **Moduller arasi cagri**: In-process client interface — modul modulu HTTP ile CAGIRMAZ.
+
+Bu monolith kuralı. **Faz 3'ten itibaren geçersiz** — kullanıcı onaylı
+migrasyon planı bunun yerine geçer (CLAUDE.md §1 çakışma hiyerarşisi:
+kullanıcı prompt'u en üstte).
+
+Faz 3'te `skills.md`'ye bir uyarı satırı ekleniyor; dosyanın tamamı Faz 8'de
+yeniden yazılıyor. **Faz 3'ten önce** bu kuralı ihlal etme.
+
+---
+
 ## Geri Dönüş Noktaları
 
 Her faz kendi commit'inde. Bir faz bozarsa:
