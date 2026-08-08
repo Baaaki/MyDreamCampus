@@ -129,7 +129,23 @@ sudo docker restart mydreamcampus-grades
 
 ---
 
+## D2 — Uçtan Uca İzlenebilirlik
+
+`03-IZLENEBILIRLIK.md` "Doğrulama" bölümünü çalıştır.
+
+Başarı kriteri: öğrenci ekleme gibi çok servisli bir akışta tek
+`X-Request-ID` ile **beş servisin** logu ve outbox satırları bulunabilmeli
+(student → event → auth + attendance + grades + meal).
+
+Zincir kopuyorsa hangi halkada koptuğunu bul — `03-IZLENEBILIRLIK.md`'deki
+[2]-[7] numaraları hangi fazın hangi adımına döneceğini söylüyor.
+
+---
+
 ## E — Güvenlik Kontrolleri
+
+`02-GUVENLIK.md` faz tablosundaki **tüm** kapıları burada bir kez daha koştur.
+Aşağıdakiler o listenin en kritik dördü:
 
 ```bash
 # 1. Internal route'lar dışarıdan erişilemiyor
@@ -147,8 +163,22 @@ sudo docker exec mydreamcampus-postgres \
 #    → logout ol, eski token ile /api/attendance dene → 401
 ```
 
+```bash
+# 5. Rate limit kovası ortak mı (02-GUVENLIK.md A07)
+#    Aynı IP'den iki FARKLI servise dağıtılmış istekler ORTAK limite takılmalı.
+#    Ayrı ayrı limite takılıyorsa ServiceName sabiti Faz 4'te yanlış verilmiş.
+for i in $(seq 1 200); do
+  curl -s -o /dev/null localhost/api/catalog
+  curl -s -o /dev/null localhost/api/grades
+done
+curl -s -o /dev/null -w "%{http_code}\n" localhost/api/meals   # 429 bekleniyor
+```
+
 **4. madde kritik:** blacklist Redis'te ortak. Bir servis blacklist'i kontrol
 etmiyorsa logout o servis için işlemiyor demektir.
+
+**5. madde migrasyonun getirdiği regresyonu yakalar** — 429 gelmiyorsa
+saldırgan isteği servislere yayarak IP limitini 9 katına çıkarabiliyor.
 
 ---
 

@@ -72,33 +72,24 @@ Kurallar:
 - 5xx → hata olarak döner, fail-open yapma
 - **`X-Request-ID` ileri taşınır** — aşağıya bak
 
-#### `X-Request-ID` propagasyonu (gelecekteki logging/tracing için)
-
-Gelen taraf **zaten çalışıyor**: `platform/middleware.RequestLogger` gelen
-`X-Request-ID` header'ını onurlandırıyor, yoksa üretiyor, context'e koyuyor ve
-response'a yazıyor. `logger.WithContext(ctx)` de otomatik olarak `request_id`
-alanını log satırına ekliyor.
-
-Eksik olan **giden** taraf. `Base` her isteğe context'teki ID'yi koymalı:
+#### `X-Request-ID` propagasyonu
 
 ```go
 // Aynı istek zincirinin farklı servislerdeki log satırlarını tek bir ID ile
 // birleştirir. Gelen yön middleware'de kurulu; burası olmazsa zincir servis
-// sınırında kopar ve sonradan eklemek her çağrı yerine dokunmak demek.
+// sınırında kopar.
 if rid := logger.GetRequestID(ctx); rid != "" {
     req.Header.Set("X-Request-ID", rid)
 }
 ```
 
-Bu **6 satır**, migrasyonun gözlemlenebilirlik açısından en yüksek getirili
-parçası. Prometheus/Loki eklendiğinde `request_id` ile 9 servisin logu tek
-akışta izlenebilir hale gelir.
+Bu, uçtan uca izlenebilirlik zincirinin **3. halkası**. Zincirin tamamı ve
+diğer halkalar: `03-IZLENEBILIRLIK.md`.
 
-**Event tarafı (opsiyonel, kullanıcıya sor):** Envelope
-(`{event_id, event_type, timestamp, data}`) bir `correlation_id` alanı
-taşırsa, HTTP zinciri asenkron tarafa da uzanır. Consumer'lar bilinmeyen alanı
-yok saydığı için geriye uyumlu. Ama bu bir **event şeması değişikliği** —
-CLAUDE.md §6 gereği uygulamadan önce kullanıcıya sor. Sormadan ekleme.
+#### Güvenlik
+
+`/internal/*` route'ları bu fazda doğuyor — `02-GUVENLIK.md` A01 bölümündeki
+kuralları uygula: her route `InternalAuth` taşır, secret boşsa servis başlamaz.
 
 `shared/platform/middleware/internal.go` (Faz 0'da taşındı) karşı taraf
 doğrulaması için hazır — yeniden yazma.
@@ -241,6 +232,24 @@ O maddeyi şununla değiştir:
 ```
 
 Dosyanın tamamının yeniden yazımı Faz 8'de. Burada **sadece bu satır**.
+
+### 9. Outbox'a `correlation_id` ekle (izlenebilirlik halkaları 4-5)
+
+Tam tarif: `03-IZLENEBILIRLIK.md` [4] ve [5].
+
+Özet:
+- 8 modülün `outbox_events` tablosuna nullable `correlation_id UUID` kolonu +
+  kısmi index (migration yaz, çalıştırmayı kullanıcıya sor)
+- `make sqlc-<module>` → outbox insert query'sine kolonu ekle
+- Servis katmanı outbox'a yazarken `logger.GetRequestID(ctx)` değerini geçir
+- Event envelope'una `CorrelationID string \`json:"correlation_id,omitempty"\`` ekle
+
+**Neden Faz 4'te değil, burada:** modüller hâlâ monolith'te, migration'lar tek
+Makefile'dan (`make migrate-create-<module>`) yazılıyor. Faz 4'ten sonra aynı iş
+8 ayrı serviste tekrarlanır.
+
+**Neden 4. adımla birlikte yapılmalı:** audit event'i de outbox'tan geçiyor;
+ikisi aynı sqlc regenerate turunda halledilir.
 
 ---
 

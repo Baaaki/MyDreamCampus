@@ -87,6 +87,19 @@ Frontend ve mobil **hiç değişmiyor** — route prefix'leri servis sınırlar�
 }
 ```
 
+### İstek ID'si — kenarda üret
+
+`03-IZLENEBILIRLIK.md` [2]. Site bloğunun başına, `handle` kurallarından
+**önce**:
+
+```caddyfile
+	# Zincirin ilk halkası. Servise bırakılırsa kenardaki hop (Caddy access
+	# log'u) farklı bir ID taşır ve istek gerçek başlangıcından izlenemez.
+	# Client kendi ID'sini gönderdiyse (mobil debug) ezme.
+	@no_request_id not header X-Request-ID *
+	request_header @no_request_id X-Request-ID {http.request.uuid}
+```
+
 ---
 
 ## Dikkat Edilecekler

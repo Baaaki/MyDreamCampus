@@ -16,9 +16,13 @@
    - Bu dosyadaki durum tablosunda o satırı `[x]` yap.
 4. Sıradaki faza geç veya kullanıcıya "Faz N bitti" diye rapor et.
 
-**Ortak referans:** `01-REFERANS-MIMARI.md` — port tablosu, DB adları, servis
-isimleri, iletişim kontratları. Faz dosyaları buraya atıfta bulunur. Sadece
-gerektiğinde aç, baştan sona okuma.
+**Ortak referanslar** — faz dosyaları bunlara atıf yapar, sadece gerektiğinde aç:
+
+| Dosya | İçerik | Hangi fazlarda zorunlu |
+|---|---|---|
+| `01-REFERANS-MIMARI.md` | Port / DB / servis / route / event tabloları | hepsi |
+| `02-GUVENLIK.md` | OWASP Top 10 karşılığı — bölünmenin yarattığı yeni risk yüzeyi | 1, 3, 4, 5, 6, 7, 8 |
+| `03-IZLENEBILIRLIK.md` | Uçtan uca istek takibi: HTTP + event zinciri | 3, 4, 5, 7 |
 
 > **`SYSTEM-DESIGN.md`'yi okuma, kaynak olarak kullanma.** O doküman monolith
 > mimarisini anlatıyor ve şimdiden koddan sapmış (var olmayan Grafana/Loki
@@ -172,9 +176,10 @@ sonraya kalır.
 
 | Ne | Nerede | Neden sonradan pahalı |
 |---|---|---|
-| **`X-Request-ID` giden yönde taşıma** | Faz 3, `shared/client/base.go` | Sonradan eklemek her client çağrısına dokunmak demek. Gelen yön **zaten var** (`middleware/logger.go`) — sadece giden tarafı bağlanacak. |
+| **Uçtan uca istek takibi** (7 halka) | Faz 3, 4, 5 — tarifi `03-IZLENEBILIRLIK.md` | Zincirin **her** halkasına dokunmayı gerektirir: Caddy, HTTP client, outbox migration'ları (8 adet), envelope, consumer. Sonradan eklemek migrasyonu ikinci kez yapmak demek. |
 | **Log satırlarında `service` alanı** | Faz 4, her `main.go`'da `logger.Init` | Loki'de `{service="grades"}` sorgusu bunun üstüne kurulur. Sonradan eklemek 10 servise tek tek dokunmak. |
 | **Docker log rotasyonu** | Faz 6, compose | 16 konteynerin sınırsız json-file logu homeserver diskini doldurur. Operasyonel hijyen, gözlemlenebilirlik değil. |
+| **Güvenlik kapıları** | `02-GUVENLIK.md` faz tablosu | Rate limit kova ayrımı, internal route izolasyonu, DB CONNECT yetkisi — hepsi kurulduktan sonra düzeltmesi, kurarken doğru yapmaktan pahalı. |
 
 ### Sonradan eklemesi UCUZ (şimdi yapma)
 

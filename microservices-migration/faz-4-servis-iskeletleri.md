@@ -73,6 +73,10 @@ Yap:
    kuyruklar + tüm binding'ler (`01-REFERANS-MIMARI.md` §3 tabloları).
    Mevcut topolojiyi çalışan bir kurulumdan çıkarabilirsin:
    `curl -u user:pass http://localhost:15672/api/definitions > definitions.json`
+
+   **Dosya git'e girmeden `users`, `permissions`, `policies` bloklarını SİL.**
+   RabbitMQ'nun definitions çıktısı **parola hash'lerini içerir**; sadece
+   `exchanges`, `queues`, `bindings` kalmalı (`02-GUVENLIK.md` A02/A08).
 2. `rabbitmq.conf`'taki satırın yorumunu kaldır.
 3. Compose'da mount et (Faz 6):
    `- ./rabbitmq/definitions.json:/etc/rabbitmq/definitions.json:ro`
@@ -299,6 +303,23 @@ logger.Log = logger.Log.With(zap.String("service", "grades"))
 
 `logger.Init` imzasına servis adı parametresi eklemek de olur — hangisi
 `shared/platform/logger`'ın mevcut yapısına daha temiz oturuyorsa onu seç.
+
+**Rate limit kovası — `02-GUVENLIK.md` A07, atlanırsa güvenlik regresyonu:**
+
+```go
+// Global IP/user limitleri TÜM servislerde AYNI Redis kovasını paylaşmalı.
+// Buraya servis adı yazılırsa her servis kendi kovasını açar ve saldırgan
+// isteği 9 servise yayarak efektif limiti 9 katına çıkarır.
+ServiceName: "public"   // sabit — servis adı DEĞİL
+```
+
+**Consumer'da izlenebilirlik zincirini sürdür** (`03-IZLENEBILIRLIK.md` [6]):
+`shared/platform/rabbitmq`'daki ortak `Consume` sarmalayıcısına
+`ctx = logger.WithRequestIDValue(ctx, envelope.CorrelationID)` ekle — bir
+yerde çözülür, 9 serviste kazanılır. Consumer'lara tek tek yazma.
+
+**`audit.InitSecurity(cfg.Server.Environment)` her serviste korunmalı**
+(`02-GUVENLIK.md` A09) — monolith `main.go`'sunda var, kopyalarken düşürme.
 
 ### 5. `/internal/*` route'larını kök altına al
 
