@@ -412,6 +412,20 @@ dönemi için dört tipi de yazıyor ve üç projeksiyonu doğrudan dolduruyor
 (mesaj kuyruğu olmadan çalıştığı için — dosya attendance view tablolarında
 zaten aynı kısayolu kullanıyor).
 
+**Faz 7 için uyarı — seed'de öksüz bir attendance satırı var.** `seed.sql`
+eskiden beri `attendance.academic_periods`'a `2025-2026 Güz` için doğrudan bir
+satır yazıyor (dosyanın 141. satırı), ama catalog'da o döneme ait hiçbir period
+satırı yok. Faz 2 öncesi bu satır **ölü veriydi** — attendance da
+`course_catalog.academic_periods`'ı okuyordu, Güz orada olmadığı için kontrol
+fail-open'a düşüyordu. Şimdi attendance kendi tablosunu okuduğu için o satır
+**canlı** ve kaynaksız: catalog'dan gelen hiçbir event onu güncellemiyor.
+
+Pratikte zararsız (aralık açık, kontrol geçiyor) ve mevcut bir tutarsızlığın
+taşınması olduğu için `01-REFERANS-MIMARI.md` §8 gereği düzeltilmedi. Ama Faz
+7'de "attendance'ta neden fazladan bir dönem var" sorusu çıkarsa cevabı bu.
+Düzeltmek gerekirse doğru yol seed'e Güz için dört tipi de eklemek — bunun
+enrollment/grades demo senaryolarının davranışını değiştirebileceğine dikkat.
+
 **Kapsam dışı bırakılan (mevcut açık, taşındı):** `CreateSemester` `periods`
 alanı olmadan çağrılırsa hiç dönem satırı oluşmuyor; sonradan
 `PUT /admin/semesters/:id` ile dönem eklenemiyor çünkü güncelleme UPDATE
