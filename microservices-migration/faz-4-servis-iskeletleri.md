@@ -342,6 +342,21 @@ go eventbus.NewRetentionWorker(store, cfg.Timeout.ProcessedEventsRetentionDays,
 `03-IZLENEBILIRLIK.md`'nin eklediği `correlation_id` index'i bu tabloların
 büyümesini daha pahalı hale getiriyor — retention onunla birlikte gelmeli.
 
+**Idempotency middleware'ini route'lara bağla** (`05-DAYANIKLILIK.md` Bölüm A).
+Faz 3'te yazılan middleware, işaretli endpoint'lere `module.go`
+`RegisterRoutes` içinde eklenir — **global değil**, her isteğe Redis
+round-trip'i gereksiz. Bağlanacak endpoint'ler:
+
+| Servis | Endpoint |
+|---|---|
+| meal | rezervasyon oluştur / iptal / iade |
+| enrollment | program gönder, danışman onay / red |
+| grades | not girişi (tekil + bulk) |
+| attendance | manuel yoklama |
+| student, staff | oluşturma |
+
+QR tarama **bağlanmaz** — Redis `SADD` ile zaten atomik dedup var.
+
 ### 5. `/internal/*` route'larını kök altına al
 
 Faz 3'te `/api/<x>/internal/...` altındaydılar. Artık `RegisterPublicRoutes`

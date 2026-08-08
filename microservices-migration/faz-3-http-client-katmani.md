@@ -86,10 +86,23 @@ if rid := logger.GetRequestID(ctx); rid != "" {
 Bu, uçtan uca izlenebilirlik zincirinin **3. halkası**. Zincirin tamamı ve
 diğer halkalar: `03-IZLENEBILIRLIK.md`.
 
+#### Circuit breaker
+
+`Base`, hedef servis başına bir breaker taşır. Tarif, eşikler ve **"neyin
+hata sayıldığı"** kuralı: `05-DAYANIKLILIK.md` Bölüm B.
+
+En kritik detay oradan: **404 ve diğer 4xx hata sayılmaz.** "Öğrenci
+bulunamadı" geçerli bir iş cevabıdır; hata sayılırsa normal kullanımda breaker
+açılır ve çalışan servisi ölü ilan eder. Sadece `err != nil` ve `5xx` hatadır.
+
 #### Güvenlik
 
 `/internal/*` route'ları bu fazda doğuyor — `02-GUVENLIK.md` A01 bölümündeki
 kuralları uygula: her route `InternalAuth` taşır, secret boşsa servis başlamaz.
+
+Breaker'ın güvenlikle etkileşimi var: açıkken `SemesterInfo` alınamıyorsa
+"hard deadline yok" **varsayma, isteği reddet** (`05-DAYANIKLILIK.md` Bölüm B,
+"Güvenlikle etkileşim").
 
 `shared/platform/middleware/internal.go` (Faz 0'da taşındı) karşı taraf
 doğrulaması için hazır — yeniden yazma.
@@ -250,6 +263,24 @@ Makefile'dan (`make migrate-create-<module>`) yazılıyor. Faz 4'ten sonra aynı
 
 **Neden 4. adımla birlikte yapılmalı:** audit event'i de outbox'tan geçiyor;
 ikisi aynı sqlc regenerate turunda halledilir.
+
+### 10. HTTP idempotency middleware'i
+
+Tam tarif: `05-DAYANIKLILIK.md` Bölüm A.
+
+Yeni dosya: `shared/platform/middleware/idempotency.go`. `Idempotency-Key`
+header'ı + Redis (`idem:<servis>:<user_id>:<key>`, TTL 24 saat).
+
+Bu fazda **sadece middleware yazılır**; route'lara bağlanması Faz 4'te (her
+servisin `module.go`'sunda, işaretli endpoint'lerde).
+
+**Client tarafına dokunulmuyor.** Middleware header yoksa isteği aynen
+geçiriyor, yani "Frontend / Mobil hiç değişmiyor" kararı korunuyor. Client'ın
+header göndermesi ayrı bir iş kalemi.
+
+Redis erişilemezse **fail-open** — rate limit'in aksine. Idempotency bir
+güvenlik kontrolü değil; Redis düştü diye rezervasyon almayı durdurmak daha
+kötü.
 
 ---
 

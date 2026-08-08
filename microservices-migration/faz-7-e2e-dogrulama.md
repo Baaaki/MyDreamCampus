@@ -136,6 +136,17 @@ sudo docker exec mydreamcampus-rabbitmq rabbitmqctl list_queues name messages | 
 
 ---
 
+## D3 — Circuit Breaker ve Idempotency
+
+`05-DAYANIKLILIK.md` "Doğrulama" bölümündeki 5 testi çalıştır.
+
+En kritik olanı **5. test**: olmayan bir id ile 10 istek at, breaker
+**açılmamalı**. Açılıyorsa `isFailure` 404'ü hata sayıyor demektir — o haliyle
+breaker, olmamasından kötüdür (normal kullanımda çalışan servisleri ölü ilan
+eder).
+
+---
+
 ## D2 — Uçtan Uca İzlenebilirlik
 
 `03-IZLENEBILIRLIK.md` "Doğrulama" bölümünü çalıştır.

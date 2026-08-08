@@ -156,9 +156,9 @@ Hedef bütçe:
 | Servisler arası client timeout | **10 sn** | Faz 3, `base.go` — zaten belirtildi |
 | pgx sorgu / RabbitMQ publish | client'tan kısa | mevcut değerler yeterli |
 
-**Circuit breaker EKLEME.** Yedi sync seam var ve hepsi düşük hacimli
-doğrulama çağrısı. Timeout + hata dönmek bu ölçekte yeterli; circuit breaker
-bu proje için erken optimizasyon. Trafik büyürse yeniden değerlendir.
+**Circuit breaker ekleniyor** — kullanıcı kararı. Tarifi, eşikleri ve
+"neyin hata sayıldığı" kuralı: `05-DAYANIKLILIK.md` Bölüm B. Timeout bütçesi
+breaker'ın önkoşulu: breaker ancak timeout'lar tutarlıysa doğru çalışır.
 
 ---
 
@@ -203,7 +203,7 @@ düş ve ayrı iş kalemi olarak aç.
 |---|---|
 | Prometheus / Grafana / Loki | `00-BASLANGIC.md` gözlemlenebilirlik tablosu — seam'ler hazır, kurulum sonra |
 | OpenTelemetry | Correlation ID zinciri kurulduktan sonra doğal adım |
-| Circuit breaker | 7 düşük hacimli seam için erken optimizasyon (bkz. §5) |
+| Idempotency-Key'in **client tarafı** | Sunucu middleware'i Faz 3'te hazır olacak ve header'sız isteği geçirecek; frontend/mobil değişikliği ayrı iş (`05-DAYANIKLILIK.md` Bölüm A) |
 | Servisler arası mTLS | Tek makine, compose bridge network (`02-GUVENLIK.md` A02) |
 | Rolling deploy / zero-downtime | compose ile gerçek anlamda mümkün değil; Swarm/k8s gerekir. `lb_try_duration` (§4) pratikte yeterli. |
 | Yatay ölçekleme (replica) | Outbox worker ve bazı worker'lar tekil çalışacak şekilde yazılmış; replica öncesi leader election gerekir |
