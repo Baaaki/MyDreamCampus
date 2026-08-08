@@ -26,6 +26,7 @@ import (
 	"github.com/baaaki/mydreamcampus/monolith/internal/modules/payment"
 	"github.com/baaaki/mydreamcampus/monolith/internal/modules/staff"
 	"github.com/baaaki/mydreamcampus/monolith/internal/modules/student"
+	studentService "github.com/baaaki/mydreamcampus/monolith/internal/modules/student/service"
 	"github.com/baaaki/mydreamcampus/shared/events"
 	"github.com/baaaki/mydreamcampus/shared/platform/audit"
 	"github.com/baaaki/mydreamcampus/shared/platform/database"
@@ -171,8 +172,9 @@ func main() {
 		logger.Fatal("failed to bootstrap auth module", zap.Error(err))
 	}
 
-	staffModule := staff.New(pool)
-	studentModule := student.New(pool, rabbitConn, staffModule.StaffService())
+	staffModule := staff.New(cfg, pool)
+	studentStaffClient := studentService.NewInProcessStaffClient(staffModule.StaffService())
+	studentModule := student.New(cfg, pool, rabbitConn, studentStaffClient)
 	if err := studentModule.Bootstrap(ctx); err != nil {
 		logger.Fatal("failed to bootstrap student module", zap.Error(err))
 	}
@@ -205,7 +207,7 @@ func main() {
 		logger.Fatal("failed to bootstrap grades module", zap.Error(err))
 	}
 
-	paymentModule := payment.New(logger.Log, rabbitConn)
+	paymentModule := payment.New(cfg, logger.Log, rabbitConn)
 	if err := paymentModule.Bootstrap(ctx); err != nil {
 		logger.Fatal("failed to bootstrap payment module", zap.Error(err))
 	}

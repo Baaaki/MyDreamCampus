@@ -347,6 +347,49 @@ func (h *StudentHandler) GetMyAdvisees(c *gin.Context) {
 	c.JSON(http.StatusOK, response)
 }
 
+// ListStudentsByAdvisor serves GET /internal/students?advisor_id=X for
+// service-to-service reads. Unlike GetMyAdvisees the advisor comes from the
+// query string, so this handler must stay behind RequireInternalSecret —
+// on a user-facing route it would be an IDOR.
+func (h *StudentHandler) ListStudentsByAdvisor(c *gin.Context) {
+	ctx, cancel := context.WithTimeout(c.Request.Context(), requestTimeout)
+	defer cancel()
+
+	reqLogger := logger.WithContextAndFields(ctx,
+		zap.String("handler", "StudentHandler"),
+		zap.String("method", "ListStudentsByAdvisor"),
+	)
+
+	advisorID, err := uuid.Parse(c.Query("advisor_id"))
+	if err != nil {
+		c.JSON(http.StatusBadRequest, dto.ErrorResponse{
+			Error: "advisor_id must be a valid UUID",
+			Code:  errors.ErrValidation.Code,
+		})
+		return
+	}
+
+	response, err := h.service.ListStudentsByAdvisor(ctx, advisorID)
+	if err != nil {
+		if appErr, ok := errors.As(err); ok {
+			reqLogger.Warn("failed to list advisees", zap.Error(err))
+			c.JSON(appErr.HTTPStatus, dto.ErrorResponse{
+				Error: appErr.Message,
+				Code:  appErr.Code,
+			})
+			return
+		}
+		reqLogger.Error("unexpected error listing advisees", zap.Error(err))
+		c.JSON(http.StatusInternalServerError, dto.ErrorResponse{
+			Error: errors.ErrInternal.Message,
+			Code:  errors.ErrInternal.Code,
+		})
+		return
+	}
+
+	c.JSON(http.StatusOK, response)
+}
+
 // ListOrphanedStudents lists students without advisor
 func (h *StudentHandler) ListOrphanedStudents(c *gin.Context) {
 	ctx, cancel := context.WithTimeout(c.Request.Context(), requestTimeout)

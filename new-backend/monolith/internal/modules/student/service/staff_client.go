@@ -11,19 +11,17 @@ import (
 	"github.com/google/uuid"
 )
 
-// StaffClient calls into the staff module via in-process Go calls.
-// Replaces the original microservice's HTTP client (staff-service /internal
-// endpoints). Same interface (StaffServiceInterface in student_service.go)
-// so the StudentService construction does not change.
-type StaffClient struct {
+// InProcessStaffClient calls into the staff module via in-process Go calls.
+// Satisfies StaffServiceInterface (student_service.go) alongside
+// HTTPStaffClient; main.go picks one.
+type InProcessStaffClient struct {
 	staff *staffService.StaffService
 }
 
-// NewStaffClient adapts the staff module's StaffService for the student
-// service. Plan section 8 strategy 1 — cross-module reads via the public
-// in-process Service handle.
-func NewStaffClient(staff *staffService.StaffService) *StaffClient {
-	return &StaffClient{staff: staff}
+// NewInProcessStaffClient adapts the staff module's StaffService for the
+// student service — cross-module reads via the public in-process handle.
+func NewInProcessStaffClient(staff *staffService.StaffService) *InProcessStaffClient {
+	return &InProcessStaffClient{staff: staff}
 }
 
 // AdvisorDetails contains the advisor information StudentService needs.
@@ -36,7 +34,7 @@ type AdvisorDetails struct {
 // Returns "advisor not found" / "staff is not a teacher" / "advisor is
 // not active" sentinel errors so callers can distinguish — same surface
 // the HTTP client exposed before.
-func (c *StaffClient) GetAdvisorInfo(ctx context.Context, advisorID uuid.UUID) (*AdvisorDetails, error) {
+func (c *InProcessStaffClient) GetAdvisorInfo(ctx context.Context, advisorID uuid.UUID) (*AdvisorDetails, error) {
 	resp, err := c.staff.GetStaffByID(ctx, advisorID.String())
 	if err != nil {
 		if errors.Is(err, staffErrors.ErrStaffNotFound) {
@@ -60,14 +58,14 @@ func (c *StaffClient) GetAdvisorInfo(ctx context.Context, advisorID uuid.UUID) (
 }
 
 // ValidateAdvisor preserves the legacy alias used by some callers.
-func (c *StaffClient) ValidateAdvisor(ctx context.Context, advisorID uuid.UUID) error {
+func (c *InProcessStaffClient) ValidateAdvisor(ctx context.Context, advisorID uuid.UUID) error {
 	_, err := c.GetAdvisorInfo(ctx, advisorID)
 	return err
 }
 
 // GetInstructorsByDepartment returns the active instructor IDs for a
 // department. Backed by the staff module's GetInstructorsByDepartment.
-func (c *StaffClient) GetInstructorsByDepartment(ctx context.Context, department string) ([]uuid.UUID, error) {
+func (c *InProcessStaffClient) GetInstructorsByDepartment(ctx context.Context, department string) ([]uuid.UUID, error) {
 	list, err := c.staff.GetInstructorsByDepartment(ctx, department)
 	if err != nil {
 		return nil, fmt.Errorf("staff instructor lookup failed: %w", err)
@@ -85,4 +83,4 @@ func (c *StaffClient) GetInstructorsByDepartment(ctx context.Context, department
 
 // Compile-time check — drift between the staff module's API and
 // StudentService surfaces at build time, not runtime.
-var _ StaffServiceInterface = (*StaffClient)(nil)
+var _ StaffServiceInterface = (*InProcessStaffClient)(nil)

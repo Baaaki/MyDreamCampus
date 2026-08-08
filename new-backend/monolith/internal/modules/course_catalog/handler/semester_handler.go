@@ -25,6 +25,14 @@ func NewSemesterHandler(semesterService *service.SemesterService) *SemesterHandl
 	}
 }
 
+// RegisterInternalRoutes mounts the semester-course reads enrollment makes
+// over internal REST. The caller supplies a group already guarded by
+// RequireInternalSecret.
+func (h *SemesterHandler) RegisterInternalRoutes(rg *gin.RouterGroup) {
+	rg.GET("/semester-courses", h.ListSemesterCoursesInternal)
+	rg.GET("/semester-courses/:id", h.GetSemesterCourseByIDInternal)
+}
+
 // CreateSemesterCourse handles POST /api/v1/semesters/:semester_id/courses
 // Role: Admin
 func (h *SemesterHandler) CreateSemesterCourse(c *gin.Context) {
@@ -113,11 +121,19 @@ func (h *SemesterHandler) CreateSemesterCourse(c *gin.Context) {
 // GetSemesterCourseByID handles GET /api/v1/semesters/:semester_id/courses/:course_id
 // Role: Authenticated
 func (h *SemesterHandler) GetSemesterCourseByID(c *gin.Context) {
+	h.getSemesterCourseByID(c, c.Param("semester_id"), c.Param("course_id"))
+}
+
+// GetSemesterCourseByIDInternal handles GET /internal/semester-courses/:id?semester=
+// for enrollment. Same read, semester carried as a query parameter because
+// the internal tree has no /semesters/:semester_id prefix.
+func (h *SemesterHandler) GetSemesterCourseByIDInternal(c *gin.Context) {
+	h.getSemesterCourseByID(c, c.Query("semester"), c.Param("id"))
+}
+
+func (h *SemesterHandler) getSemesterCourseByID(c *gin.Context, semester, courseID string) {
 	ctx, cancel := context.WithTimeout(c.Request.Context(), requestTimeout)
 	defer cancel()
-
-	semester := c.Param("semester_id")
-	courseID := c.Param("course_id")
 
 	reqLogger := logger.WithContextAndFields(ctx,
 		zap.String("handler", "SemesterHandler"),
@@ -162,10 +178,19 @@ func (h *SemesterHandler) GetSemesterCourseByID(c *gin.Context) {
 // ListSemesterCourses handles GET /api/v1/semesters/:semester_id/courses
 // Role: Authenticated
 func (h *SemesterHandler) ListSemesterCourses(c *gin.Context) {
+	h.listSemesterCourses(c, c.Param("semester_id"))
+}
+
+// ListSemesterCoursesInternal handles
+// GET /internal/semester-courses?semester=&department=&class_level= for
+// enrollment. Filters bind from the query exactly as on the user-facing route.
+func (h *SemesterHandler) ListSemesterCoursesInternal(c *gin.Context) {
+	h.listSemesterCourses(c, c.Query("semester"))
+}
+
+func (h *SemesterHandler) listSemesterCourses(c *gin.Context, semester string) {
 	ctx, cancel := context.WithTimeout(c.Request.Context(), requestTimeout)
 	defer cancel()
-
-	semester := c.Param("semester_id")
 
 	reqLogger := logger.WithContextAndFields(ctx,
 		zap.String("handler", "SemesterHandler"),

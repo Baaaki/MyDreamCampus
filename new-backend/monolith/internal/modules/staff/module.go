@@ -7,6 +7,7 @@
 package staff
 
 import (
+	"github.com/baaaki/mydreamcampus/monolith/config"
 	"github.com/baaaki/mydreamcampus/monolith/internal/eventbus"
 	"github.com/baaaki/mydreamcampus/monolith/internal/modules/staff/handler"
 	"github.com/baaaki/mydreamcampus/monolith/internal/modules/staff/repository"
@@ -19,6 +20,7 @@ import (
 
 // Module is the staff module's wiring root.
 type Module struct {
+	cfg  *config.Config
 	pool *pgxpool.Pool
 
 	staffRepo          *repository.StaffRepository
@@ -37,7 +39,7 @@ type Module struct {
 // New wires repositories, services and handlers from shared infra.
 // rabbitmq + redis are not used by staff yet (no consumer, no rate-limit
 // state); they're plumbed through main.go to other modules instead.
-func New(pool *pgxpool.Pool) *Module {
+func New(cfg *config.Config, pool *pgxpool.Pool) *Module {
 	staffRepo := repository.NewStaffRepository(pool)
 	outboxRepo := repository.NewOutboxRepository(pool)
 	teacherProfileRepo := repository.NewTeacherProfileRepository(pool)
@@ -46,6 +48,7 @@ func New(pool *pgxpool.Pool) *Module {
 	teacherProfileSvc := service.NewTeacherProfileService(teacherProfileRepo)
 
 	return &Module{
+		cfg:                   cfg,
 		pool:                  pool,
 		staffRepo:             staffRepo,
 		outboxRepo:            outboxRepo,
@@ -70,15 +73,24 @@ func (m *Module) OutboxStore() eventbus.OutboxStore { return m.outboxStore }
 // return type to a small Service interface backed by an HTTP client.
 func (m *Module) StaffService() *service.StaffService { return m.staffService }
 
-// RegisterRoutes mounts /api/staff/*. Internal service-to-service routes
-// the original microservice exposed under /internal/staff/* are gone —
-// other modules now reach the staff service via the in-process Service
-// interface.
+// RegisterRoutes mounts /api/staff/*, including the /internal sub-tree
+// catalog and student call over internal REST.
 func (m *Module) RegisterRoutes(rg *gin.RouterGroup) {
 	// Public profile lookup under the API prefix — no auth required so
 	// anonymous visitors can browse instructor pages. Mounted before the
 	// JWT-protected group so the public route wins the match.
 	rg.GET("/profile/:id", m.teacherProfileHandler.GetTeacherProfileByStaffID)
+
+	// Internal sub-tree — same reads as the JWT routes above, reached by
+	// other services with the shared secret instead of a user token. Mounted
+	// before rg.Use(JWTAuth()) so it does not inherit the user auth chain.
+	// Phase 4 moves this group out of /api, where Caddy cannot reach it.
+	internal := rg.Group("/internal")
+	internal.Use(platformMiddleware.RequireInternalSecret(m.cfg.Server.InternalSecret))
+	{
+		internal.GET("/staff/:id", m.staffHandler.GetStaffByID)
+		internal.GET("/staff", m.staffHandler.GetInstructorsByDepartment)
+	}
 
 	rg.Use(platformMiddleware.JWTAuth())
 	rg.Use(platformMiddleware.CSRFProtection())

@@ -10,8 +10,8 @@ package student
 import (
 	"context"
 
+	"github.com/baaaki/mydreamcampus/monolith/config"
 	"github.com/baaaki/mydreamcampus/monolith/internal/eventbus"
-	staffService "github.com/baaaki/mydreamcampus/monolith/internal/modules/staff/service"
 	"github.com/baaaki/mydreamcampus/monolith/internal/modules/student/handler"
 	"github.com/baaaki/mydreamcampus/monolith/internal/modules/student/repository"
 	"github.com/baaaki/mydreamcampus/monolith/internal/modules/student/service"
@@ -23,6 +23,7 @@ import (
 )
 
 type Module struct {
+	cfg  *config.Config
 	pool *pgxpool.Pool
 
 	studentRepo         *repository.StudentRepository
@@ -34,19 +35,20 @@ type Module struct {
 
 	studentService *service.StudentService
 	importService  *service.ImportService
-	staffClient    *service.StaffClient
+	staffClient    service.StaffServiceInterface
 
 	studentHandler *handler.StudentHandler
 	consumer       *worker.EventConsumer
 }
 
-// New wires the module from shared infra. The staff service handle is
-// passed in so cross-module reads (advisor lookup) happen in-process
-// instead of via HTTP.
+// New wires the module from shared infra. The staff client comes from
+// main.go so the advisor lookup can run either in-process or over internal
+// REST without the module knowing which.
 func New(
+	cfg *config.Config,
 	pool *pgxpool.Pool,
 	rabbitConn *rabbitmq.Connection,
-	staff *staffService.StaffService,
+	staffClient service.StaffServiceInterface,
 ) *Module {
 	studentRepo := repository.NewStudentRepository(pool)
 	outboxRepo := repository.NewOutboxRepository(pool)
@@ -54,14 +56,13 @@ func New(
 	importRepo := repository.NewImportRepository(pool)
 	importJobsRepo := repository.NewImportJobsRepository(pool)
 
-	staffClient := service.NewStaffClient(staff)
-
 	studentSvc := service.NewStudentService(studentRepo, staffClient)
 	importSvc := service.NewImportService(importRepo, studentRepo, staffClient)
 
 	consumer := worker.NewEventConsumer(rabbitmq.NewConsumer(rabbitConn), studentRepo, processedEventsRepo)
 
 	return &Module{
+		cfg:                 cfg,
 		pool:                pool,
 		studentRepo:         studentRepo,
 		outboxRepo:          outboxRepo,
@@ -97,8 +98,18 @@ func (m *Module) Bootstrap(ctx context.Context) error {
 }
 
 // RegisterRoutes mounts /api/student/*. All routes are JWT-protected;
-// admin-only ones get an extra RequireAdmin().
+// admin-only ones get an extra RequireAdmin(). The /internal sub-tree is
+// the exception — enrollment reaches it with the shared secret.
 func (m *Module) RegisterRoutes(rg *gin.RouterGroup) {
+	// Mounted before rg.Use(JWTAuth()) so service-to-service reads do not
+	// inherit the user auth chain. Phase 4 moves this group out of /api.
+	internal := rg.Group("/internal")
+	internal.Use(platformMiddleware.RequireInternalSecret(m.cfg.Server.InternalSecret))
+	{
+		internal.GET("/students/:id", m.studentHandler.GetStudentByID)
+		internal.GET("/students", m.studentHandler.ListStudentsByAdvisor)
+	}
+
 	rg.Use(platformMiddleware.JWTAuth())
 	rg.Use(platformMiddleware.CSRFProtection())
 	rg.Use(platformMiddleware.UserRateLimit())

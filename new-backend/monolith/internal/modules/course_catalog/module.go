@@ -159,6 +159,7 @@ func (m *Module) RegisterRoutes(rg *gin.RouterGroup) {
 	internal.Use(platformMiddleware.RequireInternalSecret(m.cfg.Server.InternalSecret))
 	{
 		m.semesterStatusHandler.RegisterInternalRoutes(internal)
+		m.semesterHandler.RegisterInternalRoutes(internal)
 		m.auditHandler.RegisterInternalRoutes(internal)
 	}
 }
