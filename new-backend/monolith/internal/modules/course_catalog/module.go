@@ -59,7 +59,7 @@ func New(
 	scheduleRepo := repository.NewScheduleRepository(pool)
 	outboxRepo := repository.NewOutboxRepository(pool)
 	auditRepo := repository.NewAuditRepository(pool)
-	periodRepo := platformRepo.NewSimplePeriodRepository(pool)
+	periodRepo := platformRepo.NewSimplePeriodRepository(pool, "course_catalog")
 
 	auditLogger := service.NewDirectAuditLogger(auditRepo, "course-catalog")
 	semesterStatusRepo := repository.NewSemesterStatusRepository(pool, auditLogger)
@@ -71,17 +71,13 @@ func New(
 		staffClient, periodRepo, semesterStatusRepo,
 	)
 
-	// SemesterStatusHandler still does HTTP calls to other modules for
-	// period distribution. They all live in the same monolith binary now,
-	// so the URL points at our own port. The shared internal secret rides
-	// along as X-Internal-Secret; target /internal/* routes verify it.
+	// Closed-day distribution to meal still goes over internal HTTP. Both
+	// live in the same binary today, so the URL points at our own port; the
+	// shared internal secret rides along as X-Internal-Secret and meal's
+	// /internal/* routes verify it. Academic periods left this path — they
+	// are published as events now.
 	loopback := "http://localhost:" + cfg.Server.Port
-	serviceURLs := handler.ServiceURLs{
-		Enrollment: loopback,
-		Grades:     loopback,
-		Attendance: loopback,
-		Meal:       loopback,
-	}
+	serviceURLs := handler.ServiceURLs{Meal: loopback}
 
 	return &Module{
 		cfg:                cfg,
@@ -160,9 +156,8 @@ func (m *Module) RegisterRoutes(rg *gin.RouterGroup) {
 		}
 	}
 
-	// Internal sub-tree — service-to-service in the legacy world. Other
-	// modules can still reach these via loopback HTTP until the
-	// period-distribution flow is rewritten as in-process calls.
+	// Internal sub-tree — service-to-service semester lookups plus the
+	// period republish hook used to backfill cold consumer projections.
 	// Shared-secret auth keeps them off the public surface.
 	internal := rg.Group("/internal")
 	internal.Use(platformMiddleware.RequireInternalSecret(m.cfg.Server.InternalSecret))

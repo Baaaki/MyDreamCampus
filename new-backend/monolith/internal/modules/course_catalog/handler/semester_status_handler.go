@@ -14,11 +14,11 @@ import (
 
 	"github.com/baaaki/mydreamcampus/monolith/internal/modules/course_catalog/db"
 	"github.com/baaaki/mydreamcampus/monolith/internal/modules/course_catalog/repository"
+	"github.com/baaaki/mydreamcampus/shared/events"
 	"github.com/baaaki/mydreamcampus/shared/platform/audit"
 	"github.com/baaaki/mydreamcampus/shared/platform/logger"
 	sharedRepo "github.com/baaaki/mydreamcampus/shared/platform/repository"
 	"github.com/baaaki/mydreamcampus/shared/platform/utils"
-	"github.com/baaaki/mydreamcampus/shared/events"
 	"github.com/gin-gonic/gin"
 	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5/pgconn"
@@ -52,12 +52,11 @@ func isValidSemesterName(name string) bool {
 	return true
 }
 
-// ServiceURLs holds the base URLs of other services for period distribution.
+// ServiceURLs holds the base URLs of other services reached over internal
+// HTTP. Academic periods no longer travel this way — they are published as
+// events — so only meal's closed-day fan-out is left.
 type ServiceURLs struct {
-	Enrollment string
-	Grades     string
-	Attendance string
-	Meal       string
+	Meal string
 }
 
 type SemesterStatusHandler struct {
@@ -91,6 +90,7 @@ func (h *SemesterStatusHandler) RegisterRoutes(rg *gin.RouterGroup) {
 func (h *SemesterStatusHandler) RegisterInternalRoutes(rg *gin.RouterGroup) {
 	rg.GET("/semesters/:name/status", h.IsSemesterActive)
 	rg.GET("/semesters/:name/info", h.GetSemesterInfo)
+	rg.POST("/periods/republish", h.RepublishPeriods)
 }
 
 type periodTimeRange struct {
@@ -193,7 +193,8 @@ func (h *SemesterStatusHandler) CreateSemester(c *gin.Context) {
 
 	handlerLogger.Info("semester created", zap.String("name", req.Name))
 
-	// Semester setup distributes periods to each service via internal HTTP calls.
+	// Semester setup records every service's period here and announces the
+	// consumer ones as events.
 	// This is intentionally NOT a single atomic endpoint — the steps are separated so that
 	// in the future, a "department_head" role can handle course creation (step 2)
 	// while admin handles semester creation (step 1) and activation (step 3).
@@ -223,98 +224,213 @@ func (h *SemesterStatusHandler) CreateSemester(c *gin.Context) {
 	c.JSON(http.StatusCreated, resp)
 }
 
-// distributePeriods sends period creation requests to each service.
-// Catalog period is created locally, others via internal HTTP.
-func (h *SemesterStatusHandler) distributePeriods(ctx context.Context, semester string, hardDeadline time.Time, periods *semesterPeriods) []string {
+// periodTarget pairs one period type with the range the admin submitted for it.
+type periodTarget struct {
+	periodType string
+	pr         *periodTimeRange
+}
+
+// periodTargets orders the four period types as the request carries them.
+func periodTargets(periods *semesterPeriods) []periodTarget {
+	return []periodTarget{
+		{sharedRepo.PeriodTypeCatalog, periods.Catalog},
+		{sharedRepo.PeriodTypeEnrollment, periods.Enrollment},
+		{sharedRepo.PeriodTypeGrading, periods.Grading},
+		{sharedRepo.PeriodTypeAttendance, periods.Attendance},
+	}
+}
+
+// acceptPeriodTargets drops the unset types and rejects the ones running past
+// the semester's hard deadline, returning one error string per rejection.
+func acceptPeriodTargets(targets []periodTarget, hardDeadline time.Time) ([]periodTarget, []string) {
+	accepted := make([]periodTarget, 0, len(targets))
 	var errs []string
-
-	type periodTarget struct {
-		name    string
-		pr      *periodTimeRange
-		url     string
-		isLocal bool
-	}
-
-	targets := []periodTarget{
-		{"catalog", periods.Catalog, "", true},
-		{"enrollment", periods.Enrollment, h.serviceURLs.Enrollment + "/api/enrollment", false},
-		{"grading", periods.Grading, h.serviceURLs.Grades + "/api/grades", false},
-		{"attendance", periods.Attendance, h.serviceURLs.Attendance + "/api/attendance", false},
-	}
-
 	for _, t := range targets {
 		if t.pr == nil {
 			continue
 		}
-
-		// Validation: period.end must not exceed hard_deadline
 		if t.pr.End.After(hardDeadline) {
-			errs = append(errs, fmt.Sprintf("%s: period end exceeds hard_deadline", t.name))
+			errs = append(errs, fmt.Sprintf("%s: period end exceeds hard_deadline", t.periodType))
 			continue
 		}
+		accepted = append(accepted, t)
+	}
+	return accepted, errs
+}
 
-		if t.isLocal {
-			// Create locally in catalog DB
-			_, err := h.periodRepo.CreatePeriod(ctx, sharedRepo.SimplePeriod{
-				Semester:    semester,
-				PeriodStart: t.pr.Start,
-				PeriodEnd:   t.pr.End,
-				IsActive:    true,
-			})
-			if err != nil {
-				errs = append(errs, fmt.Sprintf("%s: %v", t.name, err))
-			}
-		} else {
-			// Internal endpoint: called by catalog-service during semester setup to create
-			// this service's period. Protected by X-Internal-Secret header.
-			// Not exposed to external clients.
-			if err := h.createRemotePeriod(ctx, t.url, semester, t.pr); err != nil {
-				errs = append(errs, fmt.Sprintf("%s: %v", t.name, err))
-			}
+// distributePeriods writes all four period rows into catalog's table — the
+// source of truth — and queues one outbox event per consuming service so it
+// can refresh its local projection. Rows and events share a transaction: a
+// consumer must never be told about a period that was rolled back.
+func (h *SemesterStatusHandler) distributePeriods(ctx context.Context, semester string, hardDeadline time.Time, periods *semesterPeriods) []string {
+	targets, errs := acceptPeriodTargets(periodTargets(periods), hardDeadline)
+	if len(targets) == 0 {
+		return errs
+	}
+
+	tx, err := h.pool.Begin(ctx)
+	if err != nil {
+		return append(errs, fmt.Sprintf("periods: %v", err))
+	}
+	// Rollback after successful commit is a no-op returning ErrTxClosed — safe to discard.
+	defer func() { _ = tx.Rollback(ctx) }()
+
+	qtx := db.New(tx)
+	for _, t := range targets {
+		period, err := h.periodRepo.CreatePeriodOfTypeTx(ctx, tx, sharedRepo.SimplePeriod{
+			Semester:    semester,
+			PeriodStart: t.pr.Start,
+			PeriodEnd:   t.pr.End,
+			IsActive:    true,
+		}, t.periodType)
+		if err != nil {
+			return append(errs, fmt.Sprintf("%s: %v", t.periodType, err))
+		}
+		// Catalog reads its own row directly, so it needs no event.
+		if t.periodType == sharedRepo.PeriodTypeCatalog {
+			continue
+		}
+		if err := queuePeriodEvent(ctx, qtx, period, t.periodType, events.PeriodActionCreated); err != nil {
+			return append(errs, fmt.Sprintf("%s: %v", t.periodType, err))
 		}
 	}
 
+	if err := tx.Commit(ctx); err != nil {
+		return append(errs, fmt.Sprintf("periods: %v", err))
+	}
 	return errs
 }
 
-func (h *SemesterStatusHandler) createRemotePeriod(ctx context.Context, baseURL, semester string, pr *periodTimeRange) error {
-	if baseURL == "" {
-		return fmt.Errorf("service URL not configured")
+// updateDistributedPeriods moves the period rows of the types the request
+// carries and queues an *.updated event for each consuming service. Same
+// transaction rule as distributePeriods.
+func (h *SemesterStatusHandler) updateDistributedPeriods(ctx context.Context, semester string, hardDeadline time.Time, periods *semesterPeriods) []string {
+	targets, errs := acceptPeriodTargets(periodTargets(periods), hardDeadline)
+	if len(targets) == 0 {
+		return errs
 	}
 
-	payload := map[string]any{
-		"semester":     semester,
-		"period_start": pr.Start.Format(time.RFC3339),
-		"period_end":   pr.End.Format(time.RFC3339),
-	}
-
-	body, err := json.Marshal(payload)
+	tx, err := h.pool.Begin(ctx)
 	if err != nil {
-		return fmt.Errorf("failed to marshal period payload: %w", err)
+		return append(errs, fmt.Sprintf("periods: %v", err))
+	}
+	defer func() { _ = tx.Rollback(ctx) }()
+
+	qtx := db.New(tx)
+	for _, t := range targets {
+		period, err := h.periodRepo.UpdatePeriodBySemesterAndTypeTx(ctx, tx, semester, t.periodType, t.pr.Start, t.pr.End)
+		if err != nil {
+			return append(errs, fmt.Sprintf("%s: %v", t.periodType, err))
+		}
+		if t.periodType == sharedRepo.PeriodTypeCatalog {
+			continue
+		}
+		if err := queuePeriodEvent(ctx, qtx, period, t.periodType, events.PeriodActionUpdated); err != nil {
+			return append(errs, fmt.Sprintf("%s: %v", t.periodType, err))
+		}
 	}
 
-	url := baseURL + "/internal/periods"
-	req, err := http.NewRequestWithContext(ctx, http.MethodPost, url, bytes.NewReader(body))
+	if err := tx.Commit(ctx); err != nil {
+		return append(errs, fmt.Sprintf("periods: %v", err))
+	}
+	return errs
+}
+
+// RepublishPeriods re-queues every consumer period as an *.updated event.
+// Needed once per existing installation: periods created before this endpoint
+// existed were never announced, so the consumers' projections start empty and
+// their period checks silently degrade to fail-open. Idempotent — consumers
+// upsert, so it can be called as often as needed.
+// POST /internal/periods/republish
+func (h *SemesterStatusHandler) RepublishPeriods(c *gin.Context) {
+	ctx, cancel := context.WithTimeout(c.Request.Context(), requestTimeout)
+	defer cancel()
+
+	handlerLogger := logger.WithContextAndFields(ctx,
+		zap.String("handler", "SemesterStatusHandler"),
+		zap.String("method", "RepublishPeriods"),
+	)
+
+	periods, err := h.periodRepo.ListProjectedPeriods(ctx)
 	if err != nil {
-		return fmt.Errorf("failed to create request: %w", err)
+		handlerLogger.Error("failed to list projected periods", zap.Error(err))
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to list periods", "code": "INTERNAL_ERROR"})
+		return
 	}
-	req.Header.Set("Content-Type", "application/json")
-	if h.internalSecret != "" {
-		req.Header.Set("X-Internal-Secret", h.internalSecret)
+	if len(periods) == 0 {
+		c.JSON(http.StatusOK, gin.H{"republished": 0})
+		return
 	}
 
-	client := &http.Client{Timeout: 10 * time.Second}
-	resp, err := client.Do(req)
+	tx, err := h.pool.Begin(ctx)
 	if err != nil {
-		return fmt.Errorf("HTTP call failed: %w", err)
+		handlerLogger.Error("failed to begin transaction", zap.Error(err))
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "internal error", "code": "INTERNAL_ERROR"})
+		return
 	}
-	defer func() { _ = resp.Body.Close() }()
+	defer func() { _ = tx.Rollback(ctx) }()
 
-	if resp.StatusCode != http.StatusCreated && resp.StatusCode != http.StatusOK {
-		respBody, _ := io.ReadAll(io.LimitReader(resp.Body, 1024))
-		return fmt.Errorf("unexpected status %d: %s", resp.StatusCode, string(respBody))
+	qtx := db.New(tx)
+	for _, p := range periods {
+		if err := queuePeriodEvent(ctx, qtx, &p.SimplePeriod, p.PeriodType, events.PeriodActionUpdated); err != nil {
+			handlerLogger.Error("failed to queue period event", zap.Error(err),
+				zap.String("semester", p.Semester), zap.String("period_type", p.PeriodType))
+			c.JSON(http.StatusInternalServerError, gin.H{"error": "internal error", "code": "INTERNAL_ERROR"})
+			return
+		}
 	}
 
+	if err := tx.Commit(ctx); err != nil {
+		handlerLogger.Error("failed to commit transaction", zap.Error(err))
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "internal error", "code": "INTERNAL_ERROR"})
+		return
+	}
+
+	handlerLogger.Info("academic periods republished", zap.Int("count", len(periods)))
+	c.JSON(http.StatusOK, gin.H{"republished": len(periods)})
+}
+
+// queuePeriodEvent writes one period projection event to catalog's outbox.
+// The routing key doubles as the event type so each consumer binds only its
+// own period type and the broker does the filtering.
+func queuePeriodEvent(ctx context.Context, qtx *db.Queries, p *sharedRepo.SimplePeriod, periodType, action string) error {
+	payload, err := json.Marshal(map[string]any{
+		"id":           p.ID.String(),
+		"semester":     p.Semester,
+		"period_type":  periodType,
+		"period_start": p.PeriodStart.Format(time.RFC3339),
+		"period_end":   p.PeriodEnd.Format(time.RFC3339),
+		"is_active":    p.IsActive,
+	})
+	if err != nil {
+		return fmt.Errorf("marshal period event payload: %w", err)
+	}
+	return insertPeriodEvent(ctx, qtx, periodType, action, payload)
+}
+
+// queuePeriodDeletedEvent announces that a semester's period is gone. Only the
+// semester is carried — consumers delete by semester, and the row is already
+// gone on this side.
+func queuePeriodDeletedEvent(ctx context.Context, qtx *db.Queries, semester, periodType string) error {
+	payload, err := json.Marshal(map[string]any{
+		"semester":    semester,
+		"period_type": periodType,
+	})
+	if err != nil {
+		return fmt.Errorf("marshal period event payload: %w", err)
+	}
+	return insertPeriodEvent(ctx, qtx, periodType, events.PeriodActionDeleted, payload)
+}
+
+func insertPeriodEvent(ctx context.Context, qtx *db.Queries, periodType, action string, payload []byte) error {
+	eventType := events.PeriodEventType(periodType, action)
+	if _, err := qtx.CreateOutboxEvent(ctx, db.CreateOutboxEventParams{
+		EventType:  eventType,
+		RoutingKey: eventType,
+		Payload:    payload,
+	}); err != nil {
+		return fmt.Errorf("queue %s event: %w", eventType, err)
+	}
 	return nil
 }
 
@@ -743,11 +859,23 @@ func (h *SemesterStatusHandler) DeletePlannedSemester(c *gin.Context) {
 		return
 	}
 
-	// Delete catalog periods
+	// Delete every period type for this semester — catalog's own row and the
+	// consumer rows alike.
 	if err := qtx.DeletePeriodsBySemester(ctx, semester.Name); err != nil {
 		handlerLogger.Error("failed to delete periods", zap.Error(err))
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "internal error", "code": "INTERNAL_ERROR"})
 		return
+	}
+
+	// Consumers must forget the semester too, or their local projection keeps
+	// enforcing a deadline for a semester that no longer exists.
+	for _, periodType := range sharedRepo.ProjectedPeriodTypes {
+		if err := queuePeriodDeletedEvent(ctx, qtx, semester.Name, periodType); err != nil {
+			handlerLogger.Error("failed to queue period deleted event", zap.Error(err),
+				zap.String("period_type", periodType))
+			c.JSON(http.StatusInternalServerError, gin.H{"error": "internal error", "code": "INTERNAL_ERROR"})
+			return
+		}
 	}
 
 	// Delete semester
@@ -761,22 +889,6 @@ func (h *SemesterStatusHandler) DeletePlannedSemester(c *gin.Context) {
 		handlerLogger.Error("failed to commit transaction", zap.Error(err))
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "internal error", "code": "INTERNAL_ERROR"})
 		return
-	}
-
-	// Clean up remote service periods (best effort)
-	remoteServices := []struct{ name, url string }{
-		{"enrollment", h.serviceURLs.Enrollment + "/api/enrollment"},
-		{"grades", h.serviceURLs.Grades + "/api/grades"},
-		{"attendance", h.serviceURLs.Attendance + "/api/attendance"},
-	}
-	for _, svc := range remoteServices {
-		if svc.url == "" {
-			continue
-		}
-		if err := h.deleteRemoteResource(ctx, svc.url+"/internal/periods/by-semester/"+semester.Name); err != nil {
-			handlerLogger.Warn("failed to delete remote period",
-				zap.String("service", svc.name), zap.Error(err))
-		}
 	}
 
 	// Clean up meal service closed days (best effort)
@@ -867,44 +979,11 @@ func (h *SemesterStatusHandler) UpdatePlannedSemester(c *gin.Context) {
 
 	var updateErrors []string
 
-	// Update periods if provided
+	// Update periods if provided — catalog's rows are the source of truth and
+	// each consumer type also gets an event.
 	if req.Periods != nil {
-		// Update catalog local period
-		if req.Periods.Catalog != nil {
-			if req.Periods.Catalog.End.After(req.HardDeadline) {
-				updateErrors = append(updateErrors, "catalog: period end exceeds hard_deadline")
-			} else {
-				_, err := h.periodRepo.UpdatePeriodBySemester(ctx, semester.Name, req.Periods.Catalog.Start, req.Periods.Catalog.End)
-				if err != nil {
-					updateErrors = append(updateErrors, fmt.Sprintf("catalog: %v", err))
-				}
-			}
-		}
-
-		// Update remote service periods
-		type remotePeriod struct {
-			name string
-			pr   *periodTimeRange
-			url  string
-		}
-		remotes := []remotePeriod{
-			{"enrollment", req.Periods.Enrollment, h.serviceURLs.Enrollment + "/api/enrollment"},
-			{"grading", req.Periods.Grading, h.serviceURLs.Grades + "/api/grades"},
-			{"attendance", req.Periods.Attendance, h.serviceURLs.Attendance + "/api/attendance"},
-		}
-
-		for _, r := range remotes {
-			if r.pr == nil {
-				continue
-			}
-			if r.pr.End.After(req.HardDeadline) {
-				updateErrors = append(updateErrors, fmt.Sprintf("%s: period end exceeds hard_deadline", r.name))
-				continue
-			}
-			if err := h.updateRemotePeriod(ctx, r.url, semester.Name, r.pr); err != nil {
-				updateErrors = append(updateErrors, fmt.Sprintf("%s: %v", r.name, err))
-			}
-		}
+		updateErrors = append(updateErrors,
+			h.updateDistributedPeriods(ctx, semester.Name, req.HardDeadline, req.Periods)...)
 	}
 
 	// Update closed days if provided
@@ -949,46 +1028,6 @@ type updateSemesterRequest struct {
 	HardDeadline time.Time        `json:"hard_deadline" binding:"required"`
 	Periods      *semesterPeriods `json:"periods,omitempty"`
 	ClosedDays   []closedDayEntry `json:"closed_days,omitempty"`
-}
-
-// updateRemotePeriod sends a PUT request to update a remote service period.
-func (h *SemesterStatusHandler) updateRemotePeriod(ctx context.Context, baseURL, semester string, pr *periodTimeRange) error {
-	if baseURL == "" {
-		return fmt.Errorf("service URL not configured")
-	}
-
-	payload := map[string]any{
-		"period_start": pr.Start.Format(time.RFC3339),
-		"period_end":   pr.End.Format(time.RFC3339),
-	}
-
-	body, err := json.Marshal(payload)
-	if err != nil {
-		return fmt.Errorf("failed to marshal period payload: %w", err)
-	}
-
-	url := baseURL + "/internal/periods/by-semester/" + semester
-	req, err := http.NewRequestWithContext(ctx, http.MethodPut, url, bytes.NewReader(body))
-	if err != nil {
-		return fmt.Errorf("failed to create request: %w", err)
-	}
-	req.Header.Set("Content-Type", "application/json")
-	if h.internalSecret != "" {
-		req.Header.Set("X-Internal-Secret", h.internalSecret)
-	}
-
-	client := &http.Client{Timeout: 10 * time.Second}
-	resp, err := client.Do(req)
-	if err != nil {
-		return fmt.Errorf("HTTP call failed: %w", err)
-	}
-	defer func() { _ = resp.Body.Close() }()
-
-	if resp.StatusCode >= 400 {
-		respBody, _ := io.ReadAll(io.LimitReader(resp.Body, 1024))
-		return fmt.Errorf("unexpected status %d: %s", resp.StatusCode, string(respBody))
-	}
-	return nil
 }
 
 // updateRemoteClosedDays replaces closed days for a semester in meal service.

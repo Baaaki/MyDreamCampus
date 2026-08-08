@@ -1,26 +1,28 @@
 package events
 
+import "strings"
+
 // ============================================================================
 // EVENT NAMES (Used in outbox publisher & consumer handlers)
 // ============================================================================
 
 // Auth Service Events
 const (
-	EventTypeUserRegistered               = "user.registered"
-	EventTypeUserPasswordResetRequested   = "user.password_reset_requested"
+	EventTypeUserRegistered             = "user.registered"
+	EventTypeUserPasswordResetRequested = "user.password_reset_requested"
 )
 
 // Staff Service Events
 const (
-	EventStaffCreated = "staff.created"
-	EventStaffUpdated = "staff.updated"
+	EventStaffCreated     = "staff.created"
+	EventStaffUpdated     = "staff.updated"
 	EventStaffDeactivated = "staff.deactivated"
 )
 
 // Student Service Events
 const (
-	EventStudentCreated = "student.created"
-	EventStudentUpdated = "student.updated"
+	EventStudentCreated     = "student.created"
+	EventStudentUpdated     = "student.updated"
 	EventStudentDeactivated = "student.deactivated"
 )
 
@@ -29,6 +31,48 @@ const (
 	// Semester Course Events
 	EventCourseSemesterCreated = "course.semester.created"
 )
+
+// Academic period projection events. Catalog owns the period definitions and
+// publishes one event per consuming service; the routing key doubles as the
+// event type:
+//
+//	course_catalog.period.<consumer>.<action>
+//
+// Each consumer binds a single <consumer> value, so the broker does the
+// filtering and a consumer only ever switches on <action>.
+const (
+	periodEventPrefix = "course_catalog.period."
+
+	PeriodActionCreated = "created"
+	PeriodActionUpdated = "updated"
+	PeriodActionDeleted = "deleted"
+)
+
+// PeriodEventType builds the routing key / event type for one consumer.
+// consumer is a period type ("enrollment", "grading", "attendance").
+func PeriodEventType(consumer, action string) string {
+	return periodEventPrefix + consumer + "." + action
+}
+
+// PeriodEventRoutingPattern is the topic pattern a consumer binds to receive
+// every action for its own period type.
+func PeriodEventRoutingPattern(consumer string) string {
+	return periodEventPrefix + consumer + ".*"
+}
+
+// PeriodEventAction returns the trailing action of a period event type, or an
+// empty string when the type is not a period event.
+func PeriodEventAction(eventType string) string {
+	if !strings.HasPrefix(eventType, periodEventPrefix) {
+		return ""
+	}
+	rest := eventType[len(periodEventPrefix):]
+	idx := strings.LastIndex(rest, ".")
+	if idx < 0 {
+		return ""
+	}
+	return rest[idx+1:]
+}
 
 // Grades Service Events
 const (
@@ -75,20 +119,20 @@ const (
 
 const (
 	// Auth events routing keys
-	RoutingKeyUserRegistered               = "user.registered"
-	RoutingKeyUserPasswordResetRequested   = "user.password_reset_requested"
+	RoutingKeyUserRegistered             = "user.registered"
+	RoutingKeyUserPasswordResetRequested = "user.password_reset_requested"
 
 	// Staff events routing keys
-	RoutingKeyStaffCreated = "staff.created"
-	RoutingKeyStaffUpdated = "staff.updated"
+	RoutingKeyStaffCreated     = "staff.created"
+	RoutingKeyStaffUpdated     = "staff.updated"
 	RoutingKeyStaffDeactivated = "staff.deactivated"
-	RoutingKeyStaffAll     = "staff.*"
+	RoutingKeyStaffAll         = "staff.*"
 
 	// Student events routing keys
-	RoutingKeyStudentCreated = "student.created"
-	RoutingKeyStudentUpdated = "student.updated"
+	RoutingKeyStudentCreated     = "student.created"
+	RoutingKeyStudentUpdated     = "student.updated"
 	RoutingKeyStudentDeactivated = "student.deactivated"
-	RoutingKeyStudentAll     = "student.*"
+	RoutingKeyStudentAll         = "student.*"
 
 	// Course events routing keys
 	RoutingKeyCourseCreated = "course.*.created"
