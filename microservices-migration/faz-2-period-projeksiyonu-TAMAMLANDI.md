@@ -392,6 +392,32 @@ kullanıyor (semester'ın tüm tiplerini siler — istenen davranış). Kullanı
 diğerlerine `sql/queries/periods.sql` başında uyarı düşüldü. Faz 4 servis
 başına sqlc kuracağı için bu tooling kırığı orada çözülmeli.
 
+**5. Backfill tek başına yetmiyordu — veri migration'ı gerekti (00015).**
+Adım 9 "republish mevcut dönemleri yeniden yayınlar" diyor, ama mevcut
+kurulumda **tüketici tipli hiç satır yok**: eski HTTP fan-out'u hiç
+çalışmadığı için `course_catalog.academic_periods` sadece catalog tipli
+satırlar içeriyordu. `ListProjectedPeriods` (`period_type <> 'catalog'`) boş
+küme döndürüyor → republish 0 event yayınlıyor → projeksiyonlar boş kalıyor
+→ dönem kontrolü sessizce fail-open oluyor.
+
+`00015_backfill_consumer_period_types.sql` her catalog satırını üç tüketici
+tipine kopyalıyor. Bu **davranış koruyucu**: Faz 2 öncesi üç servis de zaten
+o tek catalog satırını okuyordu, yani kopyalanan değerler tam olarak eskiden
+uygulanan tarihler.
+
+Ayrıca `infrastructure/seed/seed.sql` düzeltildi: `ON CONFLICT (semester)`
+artık eşleşen bir unique index bulamıyor (00014 onu `(semester, period_type)`
+ile değiştirdi) — seed olduğu gibi bırakılsa hata verirdi. Seed şimdi Bahar
+dönemi için dört tipi de yazıyor ve üç projeksiyonu doğrudan dolduruyor
+(mesaj kuyruğu olmadan çalıştığı için — dosya attendance view tablolarında
+zaten aynı kısayolu kullanıyor).
+
+**Kapsam dışı bırakılan (mevcut açık, taşındı):** `CreateSemester` `periods`
+alanı olmadan çağrılırsa hiç dönem satırı oluşmuyor; sonradan
+`PUT /admin/semesters/:id` ile dönem eklenemiyor çünkü güncelleme UPDATE
+(satır yok → `no rows in result set`). Faz 2 öncesi de aynıydı (uzak POST vs
+PUT). `01-REFERANS-MIMARI.md` §8 gereği düzeltilmedi.
+
 **4. Fan-out artık transactional.** Adım 5'in istediği gibi 4 satır + 3 outbox
 event tek transaction'da. `DeletePlannedSemester` de aynı tx'te 3 `deleted`
 event yazıyor. `UpdatePlannedSemester` benzer şekilde 4 satırı güncelleyip 3

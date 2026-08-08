@@ -233,9 +233,9 @@ ON CONFLICT (student_id, reservation_date, meal_time) WHERE status IN ('pending'
 -- A standalone enrollment window in a SEPARATE semester ('2025-2026 Bahar')
 -- so nobody has an existing approved program blocking a fresh submission (the
 -- '2025-2026 Güz' programs above are approved and per-semester exclusive). The
--- enrollment period check reads course_catalog.academic_periods only — no
--- 'semesters' row is needed, so the single-active-semester constraint is
--- untouched.
+-- enrollment period check reads enrollment.academic_periods, a projection of
+-- catalog's enrollment-typed row — no 'semesters' row is needed, so the
+-- single-active-semester constraint is untouched.
 --
 -- Expected behaviour when a student POSTs a program for '2025-2026 Bahar'
 -- containing the Bahar CENG201 offering:
@@ -245,9 +245,32 @@ ON CONFLICT (student_id, reservation_date, meal_time) WHERE status IN ('pending'
 --   reject  → Kerem, Naz    (class_level 1 < 2 → ErrInvalidClassLevel, a
 --             different, earlier guard — not the prerequisite check)
 
--- 9a. Open enrollment window for the demo semester.
-INSERT INTO course_catalog.academic_periods (semester, period_start, period_end, is_active)
-VALUES ('2025-2026 Bahar', NOW() - INTERVAL '1 day', NOW() + INTERVAL '30 days', true)
+-- 9a. Open enrollment window for the demo semester. Catalog holds one row per
+-- consuming service (source of truth); the services themselves read the local
+-- projections below, normally filled by catalog's period events. The seed runs
+-- without the message bus, so it writes them directly — same shortcut it
+-- already takes for attendance's view tables.
+INSERT INTO course_catalog.academic_periods (semester, period_start, period_end, is_active, period_type)
+SELECT '2025-2026 Bahar', NOW() - INTERVAL '1 day', NOW() + INTERVAL '30 days', true, t.period_type
+FROM (VALUES ('catalog'), ('enrollment'), ('grading'), ('attendance')) AS t(period_type)
+ON CONFLICT (semester, period_type) DO NOTHING;
+
+INSERT INTO enrollment.academic_periods (id, semester, period_start, period_end, is_active)
+SELECT id, semester, period_start, period_end, COALESCE(is_active, true)
+FROM course_catalog.academic_periods
+WHERE semester = '2025-2026 Bahar' AND period_type = 'enrollment'
+ON CONFLICT (semester) DO NOTHING;
+
+INSERT INTO grades.academic_periods (id, semester, period_start, period_end, is_active)
+SELECT id, semester, period_start, period_end, COALESCE(is_active, true)
+FROM course_catalog.academic_periods
+WHERE semester = '2025-2026 Bahar' AND period_type = 'grading'
+ON CONFLICT (semester) DO NOTHING;
+
+INSERT INTO attendance.academic_periods (id, semester, period_start, period_end, is_active)
+SELECT id, semester, period_start, period_end, COALESCE(is_active, true)
+FROM course_catalog.academic_periods
+WHERE semester = '2025-2026 Bahar' AND period_type = 'attendance'
 ON CONFLICT (semester) DO NOTHING;
 
 -- 9b. Bahar CENG201 offering, carrying the prerequisite snapshot the enrollment
