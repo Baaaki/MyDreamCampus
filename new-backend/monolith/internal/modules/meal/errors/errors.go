@@ -3,7 +3,7 @@ package errors
 import (
 	"net/http"
 
-	sharedErrors "github.com/baaaki/mydreamcampus/monolith/internal/platform/errors"
+	sharedErrors "github.com/baaaki/mydreamcampus/shared/platform/errors"
 )
 
 // ============================================================================

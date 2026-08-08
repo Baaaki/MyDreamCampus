@@ -16,9 +16,9 @@ import (
 	"github.com/baaaki/mydreamcampus/monolith/internal/modules/enrollment/repository"
 	"github.com/baaaki/mydreamcampus/monolith/internal/modules/enrollment/service"
 	"github.com/baaaki/mydreamcampus/monolith/internal/modules/enrollment/worker"
-	platformMiddleware "github.com/baaaki/mydreamcampus/monolith/internal/platform/middleware"
-	"github.com/baaaki/mydreamcampus/monolith/internal/platform/rabbitmq"
-	platformRepo "github.com/baaaki/mydreamcampus/monolith/internal/platform/repository"
+	platformMiddleware "github.com/baaaki/mydreamcampus/shared/platform/middleware"
+	"github.com/baaaki/mydreamcampus/shared/platform/rabbitmq"
+	platformRepo "github.com/baaaki/mydreamcampus/shared/platform/repository"
 	"github.com/gin-gonic/gin"
 	"github.com/jackc/pgx/v5/pgxpool"
 )

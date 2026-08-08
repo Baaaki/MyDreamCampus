@@ -4,7 +4,7 @@ import (
 	"fmt"
 	"net/http"
 
-	sharedErrors "github.com/baaaki/mydreamcampus/monolith/internal/platform/errors"
+	sharedErrors "github.com/baaaki/mydreamcampus/shared/platform/errors"
 )
 
 // ScheduleConflictError wraps the sentinel error and carries conflict details

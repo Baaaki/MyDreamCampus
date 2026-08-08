@@ -11,8 +11,8 @@ import (
 	"github.com/baaaki/mydreamcampus/monolith/internal/modules/staff/handler"
 	"github.com/baaaki/mydreamcampus/monolith/internal/modules/staff/repository"
 	"github.com/baaaki/mydreamcampus/monolith/internal/modules/staff/service"
-	platformHandler "github.com/baaaki/mydreamcampus/monolith/internal/platform/handler"
-	platformMiddleware "github.com/baaaki/mydreamcampus/monolith/internal/platform/middleware"
+	platformHandler "github.com/baaaki/mydreamcampus/shared/platform/handler"
+	platformMiddleware "github.com/baaaki/mydreamcampus/shared/platform/middleware"
 	"github.com/gin-gonic/gin"
 	"github.com/jackc/pgx/v5/pgxpool"
 )

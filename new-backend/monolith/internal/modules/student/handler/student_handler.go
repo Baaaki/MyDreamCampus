@@ -8,8 +8,8 @@ import (
 
 	"github.com/baaaki/mydreamcampus/monolith/internal/modules/student/dto"
 	"github.com/baaaki/mydreamcampus/monolith/internal/modules/student/service"
-	"github.com/baaaki/mydreamcampus/monolith/internal/platform/errors"
-	"github.com/baaaki/mydreamcampus/monolith/internal/platform/logger"
+	"github.com/baaaki/mydreamcampus/shared/platform/errors"
+	"github.com/baaaki/mydreamcampus/shared/platform/logger"
 	"github.com/gin-gonic/gin"
 	"github.com/google/uuid"
 	"go.uber.org/zap"

@@ -7,8 +7,8 @@ import (
 
 	"github.com/baaaki/mydreamcampus/monolith/internal/modules/auth/db"
 	serviceErrors "github.com/baaaki/mydreamcampus/monolith/internal/modules/auth/errors"
-	sharedErrors "github.com/baaaki/mydreamcampus/monolith/internal/platform/errors"
-	"github.com/baaaki/mydreamcampus/monolith/internal/platform/utils"
+	sharedErrors "github.com/baaaki/mydreamcampus/shared/platform/errors"
+	"github.com/baaaki/mydreamcampus/shared/platform/utils"
 	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgxpool"

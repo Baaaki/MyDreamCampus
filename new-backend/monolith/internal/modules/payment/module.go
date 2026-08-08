@@ -4,7 +4,7 @@ import (
 	"context"
 
 	"github.com/baaaki/mydreamcampus/monolith/internal/modules/payment/service"
-	"github.com/baaaki/mydreamcampus/monolith/internal/platform/rabbitmq"
+	"github.com/baaaki/mydreamcampus/shared/platform/rabbitmq"
 	"github.com/gin-gonic/gin"
 	"go.uber.org/zap"
 )

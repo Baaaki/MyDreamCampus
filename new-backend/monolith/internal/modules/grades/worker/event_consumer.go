@@ -8,9 +8,9 @@ import (
 	"github.com/baaaki/mydreamcampus/monolith/internal/modules/grades/db"
 	"github.com/baaaki/mydreamcampus/monolith/internal/modules/grades/dto"
 	"github.com/baaaki/mydreamcampus/monolith/internal/modules/grades/repository"
-	"github.com/baaaki/mydreamcampus/monolith/internal/platform/logger"
-	"github.com/baaaki/mydreamcampus/monolith/internal/platform/rabbitmq"
-	"github.com/baaaki/mydreamcampus/monolith/internal/platform/utils"
+	"github.com/baaaki/mydreamcampus/shared/platform/logger"
+	"github.com/baaaki/mydreamcampus/shared/platform/rabbitmq"
+	"github.com/baaaki/mydreamcampus/shared/platform/utils"
 	"github.com/jackc/pgx/v5"
 	"go.uber.org/zap"
 )

@@ -9,7 +9,7 @@ import (
 	"github.com/baaaki/mydreamcampus/monolith/internal/modules/attendance/db"
 	"github.com/baaaki/mydreamcampus/monolith/internal/modules/attendance/repository"
 	"github.com/baaaki/mydreamcampus/monolith/internal/modules/attendance/service"
-	"github.com/baaaki/mydreamcampus/monolith/internal/platform/logger"
+	"github.com/baaaki/mydreamcampus/shared/platform/logger"
 	"go.uber.org/zap"
 )
 

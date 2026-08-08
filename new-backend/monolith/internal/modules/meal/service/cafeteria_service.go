@@ -8,8 +8,8 @@ import (
 	"github.com/baaaki/mydreamcampus/monolith/internal/modules/meal/dto"
 	serviceErrors "github.com/baaaki/mydreamcampus/monolith/internal/modules/meal/errors"
 	"github.com/baaaki/mydreamcampus/monolith/internal/modules/meal/repository"
-	sharedErrors "github.com/baaaki/mydreamcampus/monolith/internal/platform/errors"
-	"github.com/baaaki/mydreamcampus/monolith/internal/platform/utils"
+	sharedErrors "github.com/baaaki/mydreamcampus/shared/platform/errors"
+	"github.com/baaaki/mydreamcampus/shared/platform/utils"
 	"github.com/google/uuid"
 	"go.uber.org/zap"
 )

@@ -7,7 +7,7 @@ import (
 	"time"
 
 	"github.com/baaaki/mydreamcampus/monolith/internal/modules/grades/dto"
-	"github.com/baaaki/mydreamcampus/monolith/internal/platform/clock"
+	"github.com/baaaki/mydreamcampus/shared/platform/clock"
 	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5/pgtype"
 	"github.com/stretchr/testify/assert"

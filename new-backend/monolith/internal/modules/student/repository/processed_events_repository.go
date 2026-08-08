@@ -3,7 +3,7 @@ package repository
 import (
 	"context"
 	"fmt"
-	sharedErrors "github.com/baaaki/mydreamcampus/monolith/internal/platform/errors"
+	sharedErrors "github.com/baaaki/mydreamcampus/shared/platform/errors"
 
 	"github.com/baaaki/mydreamcampus/monolith/internal/modules/student/db"
 	"github.com/jackc/pgx/v5/pgxpool"

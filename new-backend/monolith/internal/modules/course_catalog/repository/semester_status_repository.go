@@ -5,9 +5,9 @@ import (
 	"time"
 
 	"github.com/baaaki/mydreamcampus/monolith/internal/modules/course_catalog/db"
-	"github.com/baaaki/mydreamcampus/monolith/internal/platform/audit"
-	"github.com/baaaki/mydreamcampus/monolith/internal/platform/logger"
-	"github.com/baaaki/mydreamcampus/monolith/internal/platform/utils"
+	"github.com/baaaki/mydreamcampus/shared/platform/audit"
+	"github.com/baaaki/mydreamcampus/shared/platform/logger"
+	"github.com/baaaki/mydreamcampus/shared/platform/utils"
 	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5/pgxpool"
 	"go.uber.org/zap"

@@ -28,11 +28,12 @@ new-backend/
     cmd/main.go              # tum modul wiring + outbox worker'lar + downstream binding'ler
     internal/http/server.go  # Module interface: Name() + RegisterRoutes(rg)
     internal/eventbus/       # OutboxWorker, exchange topolojisi, DownstreamBinding
-    internal/platform/       # ortak: errors, middleware, logger, database, redis, rabbitmq, handler
     internal/modules/<m>/    # module.go + dto/ repository/ service/ handler/ errors/ worker/
                              #   db/ (generated)  sql/{migrations,queries}/  sqlc.yaml
   services/notification/     # AYRI binary — RabbitMQ consumer (consumer/delivery/templates), kendi sqlc+goose
   shared/events/             # event envelope tipleri
+  shared/platform/           # ortak: errors, middleware, logger, database, redis, rabbitmq, handler
+                             #   AYRI Go modulu — servisler de import edebilsin diye internal/ altinda degil
   infrastructure/            # docker-compose.yml, seed, Caddy
 ```
 

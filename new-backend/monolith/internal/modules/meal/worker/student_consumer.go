@@ -7,7 +7,7 @@ import (
 	"github.com/baaaki/mydreamcampus/monolith/internal/modules/meal/db"
 	"github.com/baaaki/mydreamcampus/monolith/internal/modules/meal/dto"
 	"github.com/baaaki/mydreamcampus/monolith/internal/modules/meal/repository"
-	"github.com/baaaki/mydreamcampus/monolith/internal/platform/utils"
+	"github.com/baaaki/mydreamcampus/shared/platform/utils"
 	"github.com/google/uuid"
 	"go.uber.org/zap"
 )

@@ -8,9 +8,9 @@ import (
 	"github.com/baaaki/mydreamcampus/monolith/internal/modules/meal/db"
 	"github.com/baaaki/mydreamcampus/monolith/internal/modules/meal/dto"
 	"github.com/baaaki/mydreamcampus/monolith/internal/modules/meal/repository"
-	"github.com/baaaki/mydreamcampus/monolith/internal/platform/clock"
-	sharedErrors "github.com/baaaki/mydreamcampus/monolith/internal/platform/errors"
-	"github.com/baaaki/mydreamcampus/monolith/internal/platform/utils"
+	"github.com/baaaki/mydreamcampus/shared/platform/clock"
+	sharedErrors "github.com/baaaki/mydreamcampus/shared/platform/errors"
+	"github.com/baaaki/mydreamcampus/shared/platform/utils"
 	"go.uber.org/zap"
 )
 

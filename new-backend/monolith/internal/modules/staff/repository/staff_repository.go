@@ -8,8 +8,8 @@ import (
 
 	"github.com/baaaki/mydreamcampus/monolith/internal/modules/staff/db"
 	serviceErrors "github.com/baaaki/mydreamcampus/monolith/internal/modules/staff/errors"
-	sharedErrors "github.com/baaaki/mydreamcampus/monolith/internal/platform/errors"
-	"github.com/baaaki/mydreamcampus/monolith/internal/platform/utils"
+	sharedErrors "github.com/baaaki/mydreamcampus/shared/platform/errors"
+	"github.com/baaaki/mydreamcampus/shared/platform/utils"
 	"github.com/baaaki/mydreamcampus/shared/events"
 	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5"

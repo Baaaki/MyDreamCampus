@@ -4,8 +4,8 @@ import (
 	"context"
 	"fmt"
 
-	"github.com/baaaki/mydreamcampus/monolith/internal/platform/logger"
-	"github.com/baaaki/mydreamcampus/monolith/internal/platform/rabbitmq"
+	"github.com/baaaki/mydreamcampus/shared/platform/logger"
+	"github.com/baaaki/mydreamcampus/shared/platform/rabbitmq"
 	"go.uber.org/zap"
 )
 

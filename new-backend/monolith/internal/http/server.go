@@ -9,9 +9,9 @@ import (
 	"time"
 
 	"github.com/baaaki/mydreamcampus/monolith/config"
-	platformHandler "github.com/baaaki/mydreamcampus/monolith/internal/platform/handler"
-	"github.com/baaaki/mydreamcampus/monolith/internal/platform/logger"
-	platformMiddleware "github.com/baaaki/mydreamcampus/monolith/internal/platform/middleware"
+	platformHandler "github.com/baaaki/mydreamcampus/shared/platform/handler"
+	"github.com/baaaki/mydreamcampus/shared/platform/logger"
+	platformMiddleware "github.com/baaaki/mydreamcampus/shared/platform/middleware"
 	"github.com/gin-gonic/gin"
 	"go.uber.org/zap"
 )

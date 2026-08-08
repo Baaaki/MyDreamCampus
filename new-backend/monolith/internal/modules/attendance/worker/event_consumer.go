@@ -7,9 +7,9 @@ import (
 	"github.com/baaaki/mydreamcampus/monolith/internal/modules/attendance/db"
 	"github.com/baaaki/mydreamcampus/monolith/internal/modules/attendance/dto"
 	"github.com/baaaki/mydreamcampus/monolith/internal/modules/attendance/repository"
-	"github.com/baaaki/mydreamcampus/monolith/internal/platform/logger"
-	"github.com/baaaki/mydreamcampus/monolith/internal/platform/rabbitmq"
-	"github.com/baaaki/mydreamcampus/monolith/internal/platform/utils"
+	"github.com/baaaki/mydreamcampus/shared/platform/logger"
+	"github.com/baaaki/mydreamcampus/shared/platform/rabbitmq"
+	"github.com/baaaki/mydreamcampus/shared/platform/utils"
 	"github.com/google/uuid"
 	"go.uber.org/zap"
 )

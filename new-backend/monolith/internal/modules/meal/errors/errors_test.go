@@ -4,7 +4,7 @@ import (
 	"net/http"
 	"testing"
 
-	sharedErrors "github.com/baaaki/mydreamcampus/monolith/internal/platform/errors"
+	sharedErrors "github.com/baaaki/mydreamcampus/shared/platform/errors"
 	"github.com/stretchr/testify/assert"
 )
 

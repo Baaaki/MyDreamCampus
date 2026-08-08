@@ -7,8 +7,8 @@ import (
 
 	"github.com/baaaki/mydreamcampus/monolith/internal/modules/attendance/dto"
 	"github.com/baaaki/mydreamcampus/monolith/internal/modules/attendance/service"
-	sharedErrors "github.com/baaaki/mydreamcampus/monolith/internal/platform/errors"
-	"github.com/baaaki/mydreamcampus/monolith/internal/platform/logger"
+	sharedErrors "github.com/baaaki/mydreamcampus/shared/platform/errors"
+	"github.com/baaaki/mydreamcampus/shared/platform/logger"
 	"github.com/gin-gonic/gin"
 	"github.com/google/uuid"
 	"go.uber.org/zap"

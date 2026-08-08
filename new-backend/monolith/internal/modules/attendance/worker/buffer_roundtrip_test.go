@@ -6,7 +6,7 @@ import (
 	"time"
 
 	"github.com/baaaki/mydreamcampus/monolith/internal/modules/attendance/db"
-	"github.com/baaaki/mydreamcampus/monolith/internal/platform/utils"
+	"github.com/baaaki/mydreamcampus/shared/platform/utils"
 	"github.com/google/uuid"
 )
 

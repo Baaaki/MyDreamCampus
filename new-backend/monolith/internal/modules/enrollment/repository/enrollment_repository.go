@@ -8,9 +8,9 @@ import (
 	"hash/crc64"
 
 	"github.com/baaaki/mydreamcampus/monolith/internal/modules/enrollment/db"
-	sharedErrors "github.com/baaaki/mydreamcampus/monolith/internal/platform/errors"
-	"github.com/baaaki/mydreamcampus/monolith/internal/platform/logger"
-	"github.com/baaaki/mydreamcampus/monolith/internal/platform/utils"
+	sharedErrors "github.com/baaaki/mydreamcampus/shared/platform/errors"
+	"github.com/baaaki/mydreamcampus/shared/platform/logger"
+	"github.com/baaaki/mydreamcampus/shared/platform/utils"
 	"github.com/baaaki/mydreamcampus/shared/events"
 	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5"

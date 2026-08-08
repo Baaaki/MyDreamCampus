@@ -6,7 +6,7 @@ import (
 	"time"
 
 	"github.com/baaaki/mydreamcampus/monolith/internal/modules/meal/db"
-	"github.com/baaaki/mydreamcampus/monolith/internal/platform/audit"
+	"github.com/baaaki/mydreamcampus/shared/platform/audit"
 	"github.com/gin-gonic/gin"
 	"github.com/jackc/pgx/v5/pgtype"
 	"go.uber.org/zap"

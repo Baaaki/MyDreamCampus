@@ -5,7 +5,7 @@ import (
 	"time"
 
 	"github.com/baaaki/mydreamcampus/monolith/internal/modules/meal/repository"
-	"github.com/baaaki/mydreamcampus/monolith/internal/platform/clock"
+	"github.com/baaaki/mydreamcampus/shared/platform/clock"
 	"go.uber.org/zap"
 )
 

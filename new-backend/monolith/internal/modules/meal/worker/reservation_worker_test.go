@@ -4,7 +4,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/baaaki/mydreamcampus/monolith/internal/platform/clock"
+	"github.com/baaaki/mydreamcampus/shared/platform/clock"
 	"github.com/stretchr/testify/assert"
 )
 

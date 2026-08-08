@@ -7,7 +7,7 @@ import (
 
 	staffErrors "github.com/baaaki/mydreamcampus/monolith/internal/modules/staff/errors"
 	staffService "github.com/baaaki/mydreamcampus/monolith/internal/modules/staff/service"
-	sharedErrors "github.com/baaaki/mydreamcampus/monolith/internal/platform/errors"
+	sharedErrors "github.com/baaaki/mydreamcampus/shared/platform/errors"
 	"github.com/google/uuid"
 )
 

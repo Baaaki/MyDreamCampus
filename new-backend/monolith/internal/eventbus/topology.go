@@ -3,7 +3,7 @@ package eventbus
 import (
 	"fmt"
 
-	"github.com/baaaki/mydreamcampus/monolith/internal/platform/rabbitmq"
+	"github.com/baaaki/mydreamcampus/shared/platform/rabbitmq"
 )
 
 // ModuleExchanges lists every per-module topic exchange the monolith owns.

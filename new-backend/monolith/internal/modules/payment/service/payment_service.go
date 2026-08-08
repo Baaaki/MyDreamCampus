@@ -5,8 +5,8 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/baaaki/mydreamcampus/monolith/internal/platform/clock"
-	"github.com/baaaki/mydreamcampus/monolith/internal/platform/rabbitmq"
+	"github.com/baaaki/mydreamcampus/shared/platform/clock"
+	"github.com/baaaki/mydreamcampus/shared/platform/rabbitmq"
 	"github.com/google/uuid"
 	"go.uber.org/zap"
 )
