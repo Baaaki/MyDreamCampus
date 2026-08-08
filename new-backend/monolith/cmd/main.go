@@ -17,6 +17,7 @@ import (
 	"github.com/baaaki/mydreamcampus/monolith/internal/modules/auth"
 	coursecatalog "github.com/baaaki/mydreamcampus/monolith/internal/modules/course_catalog"
 	catalogService "github.com/baaaki/mydreamcampus/monolith/internal/modules/course_catalog/service"
+	catalogWorker "github.com/baaaki/mydreamcampus/monolith/internal/modules/course_catalog/worker"
 	"github.com/baaaki/mydreamcampus/monolith/internal/modules/enrollment"
 	enrollmentService "github.com/baaaki/mydreamcampus/monolith/internal/modules/enrollment/service"
 	enrollmentWorker "github.com/baaaki/mydreamcampus/monolith/internal/modules/enrollment/worker"
@@ -158,6 +159,10 @@ func main() {
 		// catalog owns every service's academic period and publishes one event
 		// per consumer; each consumer binds only its own period type, so the
 		// filtering happens at the broker rather than in the consumer.
+		// catalog owns audit_log; grades and meal publish their entries
+		// instead of writing across the schema boundary.
+		{Queue: catalogWorker.QueueAuditEvents, Exchange: "grades.events", RoutingKey: audit.EventAuditEntryCreated},
+		{Queue: catalogWorker.QueueAuditEvents, Exchange: "meal.events", RoutingKey: audit.EventAuditEntryCreated},
 		{Queue: enrollmentWorker.QueuePeriodEvents, Exchange: "course_catalog.events", RoutingKey: events.PeriodEventRoutingPattern(platformRepo.PeriodTypeEnrollment)},
 		{Queue: gradesWorker.QueuePeriodEvents, Exchange: "course_catalog.events", RoutingKey: events.PeriodEventRoutingPattern(platformRepo.PeriodTypeGrading)},
 		{Queue: attendanceWorker.QueuePeriodEvents, Exchange: "course_catalog.events", RoutingKey: events.PeriodEventRoutingPattern(platformRepo.PeriodTypeAttendance)},
@@ -211,12 +216,15 @@ func main() {
 		logger.Fatal("failed to bootstrap student module", zap.Error(err))
 	}
 
-	catalogModule := coursecatalog.New(cfg, pool,
+	catalogModule := coursecatalog.New(cfg, pool, rabbitConn,
 		orInProcess(catalogStaffClient, func() catalogService.StaffClient {
 			return catalogService.NewInProcessStaffClient(staffModule.StaffService())
 		}),
 		catalogService.NewHTTPMealClient(transports.meal),
 	)
+	if err := catalogModule.Bootstrap(ctx); err != nil {
+		logger.Fatal("failed to bootstrap catalog module", zap.Error(err))
+	}
 
 	// Each module reads academic_periods from its own schema. Catalog stays the
 	// source of truth and pushes changes as events; nobody reads across a
@@ -247,8 +255,7 @@ func main() {
 		logger.Fatal("failed to bootstrap attendance module", zap.Error(err))
 	}
 
-	gradesAuditLogger := catalogService.NewDirectAuditLogger(catalogModule.AuditRepo(), "grades")
-	gradesModule := grades.New(pool, rabbitConn, gradesPeriodRepo, gradesAuditLogger,
+	gradesModule := grades.New(pool, rabbitConn, gradesPeriodRepo,
 		orInProcess(gradesSemesterClient, func() gradesService.SemesterClient {
 			return gradesService.NewInProcessSemesterClient(catalogModule.SemesterService())
 		}))
@@ -261,8 +268,7 @@ func main() {
 		logger.Fatal("failed to bootstrap payment module", zap.Error(err))
 	}
 
-	mealAuditLogger := catalogService.NewDirectAuditLogger(catalogModule.AuditRepo(), "meal")
-	mealModule := meal.New(pool, redisClient.Client(), cfg, logger.Log, mealAuditLogger, rabbitConn,
+	mealModule := meal.New(pool, redisClient.Client(), cfg, logger.Log, rabbitConn,
 		orInProcess(mealPaymentClient, func() mealService.PaymentClient {
 			return mealService.NewPaymentAdapter(paymentModule.PaymentService())
 		}))

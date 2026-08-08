@@ -42,7 +42,6 @@ func New(
 	pool *pgxpool.Pool,
 	rabbitConn *rabbitmq.Connection,
 	periodRepo *platformRepo.SimplePeriodRepository,
-	auditLogger audit.Logger,
 	semesterClient service.SemesterClient,
 ) *Module {
 	cacheRepo := repository.NewCacheRepository(pool)
@@ -50,6 +49,10 @@ func New(
 	scoreRepo := repository.NewScoreRepository(pool)
 	completedRepo := repository.NewCompletedRepository(pool)
 	outboxRepo := repository.NewOutboxRepository(pool)
+
+	// Audit entries leave through this module's outbox; catalog consumes
+	// them and owns the row. No cross-module write any more.
+	auditLogger := audit.NewEventAuditLogger(repository.NewAuditOutbox(outboxRepo), "grades")
 
 	gradeSvc := service.NewGradeService(
 		pool,

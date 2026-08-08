@@ -44,7 +44,6 @@ func New(
 	redisClient *redis.Client,
 	cfg *config.Config,
 	logger *zap.Logger,
-	auditLogger audit.Logger,
 	rabbitConn *rabbitmq.Connection,
 	paymentClient service.PaymentClient,
 ) *Module {
@@ -53,7 +52,6 @@ func New(
 		redis:         redisClient,
 		cfg:           cfg,
 		logger:        logger,
-		auditLogger:   auditLogger,
 		rabbitConn:    rabbitConn,
 		paymentClient: paymentClient,
 	}
@@ -76,6 +74,10 @@ func (m *Module) Bootstrap(ctx context.Context) error {
 	studentCacheRepo := repository.NewStudentCacheRepository(m.pool)
 
 	m.outboxStore = repository.NewOutboxStore(outboxRepo)
+
+	// Audit entries leave through this module's outbox; catalog consumes
+	// them and owns the row. No cross-module write any more.
+	m.auditLogger = audit.NewEventAuditLogger(repository.NewAuditOutbox(outboxRepo), "meal")
 
 	// Clients (now injected via New)
 

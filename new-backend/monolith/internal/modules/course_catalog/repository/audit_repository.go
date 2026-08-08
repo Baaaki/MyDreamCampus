@@ -23,6 +23,12 @@ func (r *AuditRepository) InsertAuditLog(ctx context.Context, params db.InsertAu
 	return r.queries.InsertAuditLog(ctx, params)
 }
 
+// InsertAuditLogFromEvent writes an entry that arrived over RabbitMQ. The
+// event id makes it a no-op on redelivery.
+func (r *AuditRepository) InsertAuditLogFromEvent(ctx context.Context, params db.InsertAuditLogFromEventParams) error {
+	return r.queries.InsertAuditLogFromEvent(ctx, params)
+}
+
 func (r *AuditRepository) ListAuditLog(ctx context.Context, params db.ListAuditLogParams) ([]db.AuditLog, error) {
 	return r.queries.ListAuditLog(ctx, params)
 }

@@ -7,14 +7,18 @@
 package coursecatalog
 
 import (
+	"context"
+
 	"github.com/baaaki/mydreamcampus/monolith/config"
 	"github.com/baaaki/mydreamcampus/monolith/internal/eventbus"
 	"github.com/baaaki/mydreamcampus/monolith/internal/modules/course_catalog/handler"
 	"github.com/baaaki/mydreamcampus/monolith/internal/modules/course_catalog/repository"
 	"github.com/baaaki/mydreamcampus/monolith/internal/modules/course_catalog/service"
+	"github.com/baaaki/mydreamcampus/monolith/internal/modules/course_catalog/worker"
 	"github.com/baaaki/mydreamcampus/shared/platform/audit"
 	platformHandler "github.com/baaaki/mydreamcampus/shared/platform/handler"
 	platformMiddleware "github.com/baaaki/mydreamcampus/shared/platform/middleware"
+	"github.com/baaaki/mydreamcampus/shared/platform/rabbitmq"
 	platformRepo "github.com/baaaki/mydreamcampus/shared/platform/repository"
 	"github.com/gin-gonic/gin"
 	"github.com/jackc/pgx/v5/pgxpool"
@@ -44,6 +48,8 @@ type Module struct {
 	auditHandler          *handler.AuditHandler
 	periodHandler         *platformHandler.SimplePeriodHandler
 	timeHandler           *platformHandler.TimeHandler
+
+	auditConsumer *worker.AuditConsumer
 }
 
 // New constructs the course catalog module. The staff and meal clients come
@@ -52,6 +58,7 @@ type Module struct {
 func New(
 	cfg *config.Config,
 	pool *pgxpool.Pool,
+	rabbitConn *rabbitmq.Connection,
 	staffClient service.StaffClient,
 	mealClient service.MealClient,
 ) *Module {
@@ -92,9 +99,16 @@ func New(
 			semesterStatusRepo, periodRepo, auditLogger, mealClient, pool,
 		),
 		auditHandler:  handler.NewAuditHandler(auditRepo),
+		auditConsumer: worker.NewAuditConsumer(rabbitmq.NewConsumer(rabbitConn), auditRepo),
 		periodHandler: platformHandler.NewSimplePeriodHandler(periodRepo, semesterStatusRepo, auditLogger),
 		timeHandler:   platformHandler.NewTimeHandler(),
 	}
+}
+
+// Bootstrap starts the audit consumer: grades and meal publish their audit
+// entries now instead of writing into this module's table.
+func (m *Module) Bootstrap(ctx context.Context) error {
+	return m.auditConsumer.Start(ctx)
 }
 
 // Name is the URL slug under /api. Plan section 0.2 names the module
@@ -112,9 +126,6 @@ func (m *Module) SemesterService() *service.SemesterService { return m.semesterS
 // CatalogService is the in-process handle other modules use for course
 // metadata lookups.
 func (m *Module) CatalogService() *service.CatalogService { return m.catalogService }
-
-// AuditRepo provides the shared audit repository to other modules.
-func (m *Module) AuditRepo() *repository.AuditRepository { return m.auditRepo }
 
 // RegisterRoutes mounts /api/catalog/*. Public endpoints (anonymous
 // course browsing) live before the JWT-auth chain so the public router
