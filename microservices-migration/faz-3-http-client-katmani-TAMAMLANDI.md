@@ -314,8 +314,8 @@ grep -rn "AuditRepo()" --include="*.go" new-backend/monolith   # boş dönmeli
 **Asıl doğrulama — HTTP modunda golden path** (kullanıcı çalıştırır):
 
 ```bash
-# Monolith'i http modunda başlat
-INTERNAL_CLIENT_MODE=http make backend
+# Monolith'i http modunda başlat (Makefile hedefi: run)
+INTERNAL_CLIENT_MODE=http make run
 
 # Sonra tarayıcıda / curl ile:
 #  - admin login
