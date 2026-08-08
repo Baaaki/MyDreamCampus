@@ -352,3 +352,47 @@ feat(shared): project academic periods into enrollment, attendance and grades
 1. Bu dosyayı yeniden adlandır: `faz-2-period-projeksiyonu-TAMAMLANDI.md`
 2. `00-BASLANGIC.md` durum tablosunda Faz 2 satırını `[x]` yap
 3. "Sıradaki faz" satırını **3** yap
+
+---
+
+## Uygulama Notları (plandan sapmalar — Faz 4 bunları bilmek zorunda)
+
+**1. Consumer'larda `processed_events` kullanılmadı.** Adım 7 idempotency için
+`processed_events` tablosunu şart koşuyordu; üç consumer da yerine doğal
+idempotency kullanıyor (`UpsertPeriod` semester üzerinde ON CONFLICT,
+`DeletePeriodBySemester` semester üzerinde). Nedenleri:
+
+- **grades'te `processed_events` tablosu yok** — plan yanlış varsayıyordu.
+  Doğrulama: `monolith/internal/modules/grades/worker/event_consumer.go:35`
+  bunu açıkça belirtiyor. Eklemek yeni migration + sqlc + repo demekti.
+- Mevcut kod tabanında emsal var: enrollment'ın `EventConsumer`'ı da aynı
+  gerekçeyle dedup yapmıyor (upsert doğal idempotent).
+- Plan "aynı tx'te işaretle" diyordu; bu üç modülde bu tablolar için
+  tx-aware repo yok, yani dedup zaten atomik olmayacaktı.
+
+Faz 4'te consumer'lar servislere taşınırken bu karar aynen korunabilir.
+
+**2. Catalog instance'ı `period_type='catalog'` ile scope'lanıyor.** Adım 4
+sadece "typed metotlar ekle" diyordu, ama bir semester'da artık 4 satır var:
+`GetActivePeriodBySemester` type filtresi olmadan rastgele bir servisin
+dönemini döndürebilirdi. `SimplePeriodRepository`'nin catalog handle'ında
+**tüm eski metotlar** `period_type='catalog'`'a scope'lanıyor. Sonuç: admin
+period CRUD'u (`/api/catalog/admin/periods`) ve frontend'in gördüğü liste Faz
+2 öncesiyle bire bir aynı — projeksiyon satırları o yüzeye sızmıyor. Bir
+consumer'ın dönemini değiştirmenin tek yolu `PUT /admin/semesters/:id`
+(event yayınlayan yol).
+
+**3. `make sqlc-<modul>` tüm modüllerde kırık — Faz 2'den önce de kırıktı.**
+`schema "<x>" does not exist`: schema'lar migration'larda değil
+`infrastructure/postgres/init-databases.sh` içinde yaratılıyor, sqlc ise
+sadece `sql/migrations` dizinini okuyor. Bu yüzden catalog'un generated
+`db/` kodu `period_type` kolonunu görmüyor. Sorun değil: el yazımı kod
+generated period sorgularından **sadece** `DeletePeriodsBySemester`'ı
+kullanıyor (semester'ın tüm tiplerini siler — istenen davranış). Kullanılmayan
+diğerlerine `sql/queries/periods.sql` başında uyarı düşüldü. Faz 4 servis
+başına sqlc kuracağı için bu tooling kırığı orada çözülmeli.
+
+**4. Fan-out artık transactional.** Adım 5'in istediği gibi 4 satır + 3 outbox
+event tek transaction'da. `DeletePlannedSemester` de aynı tx'te 3 `deleted`
+event yazıyor. `UpdatePlannedSemester` benzer şekilde 4 satırı güncelleyip 3
+`updated` event yazıyor (plan bunu "aynı şekilde yap" diye geçiyordu).
