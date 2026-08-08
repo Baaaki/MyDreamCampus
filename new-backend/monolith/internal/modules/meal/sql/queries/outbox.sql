@@ -1,10 +1,10 @@
 -- name: CreateOutboxEvent :one
-INSERT INTO meal.outbox_events (aggregate_id, aggregate_type, event_type, payload, max_retries)
-VALUES ($1, $2, $3, $4, $5)
-RETURNING id, aggregate_id, aggregate_type, event_type, payload, status, retry_count, max_retries, next_retry_at, last_error, created_at, published_at;
+INSERT INTO meal.outbox_events (aggregate_id, aggregate_type, event_type, payload, max_retries, correlation_id)
+VALUES ($1, $2, $3, $4, $5, $6)
+RETURNING id, aggregate_id, aggregate_type, event_type, payload, status, retry_count, max_retries, next_retry_at, last_error, created_at, published_at, correlation_id;
 
 -- name: GetPendingOutboxEvents :many
-SELECT id, aggregate_id, aggregate_type, event_type, payload, status, retry_count, max_retries, next_retry_at, last_error, created_at, published_at
+SELECT id, aggregate_id, aggregate_type, event_type, payload, status, retry_count, max_retries, next_retry_at, last_error, created_at, published_at, correlation_id
 FROM meal.outbox_events
 WHERE status = 'pending'
   AND (next_retry_at IS NULL OR next_retry_at <= NOW())
@@ -28,7 +28,7 @@ SET retry_count = retry_count + 1, next_retry_at = $2, last_error = $3
 WHERE id = $1;
 
 -- name: GetFailedOutboxEvents :many
-SELECT id, aggregate_id, aggregate_type, event_type, payload, status, retry_count, max_retries, next_retry_at, last_error, created_at, published_at
+SELECT id, aggregate_id, aggregate_type, event_type, payload, status, retry_count, max_retries, next_retry_at, last_error, created_at, published_at, correlation_id
 FROM meal.outbox_events
 WHERE status = 'failed'
 ORDER BY created_at DESC

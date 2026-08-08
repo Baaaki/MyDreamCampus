@@ -55,16 +55,17 @@ func (ns NullOutboxStatusEnum) Value() (driver.Value, error) {
 }
 
 type OutboxEvent struct {
-	ID           pgtype.UUID      `json:"id"`
-	EventType    string           `json:"event_type"`
-	RoutingKey   string           `json:"routing_key"`
-	Payload      []byte           `json:"payload"`
-	Status       OutboxStatusEnum `json:"status"`
-	RetryCount   int16            `json:"retry_count"`
-	MaxRetries   int16            `json:"max_retries"`
-	ErrorMessage *string          `json:"error_message"`
-	CreatedAt    pgtype.Timestamp `json:"created_at"`
-	ProcessedAt  pgtype.Timestamp `json:"processed_at"`
+	ID            pgtype.UUID      `json:"id"`
+	EventType     string           `json:"event_type"`
+	RoutingKey    string           `json:"routing_key"`
+	Payload       []byte           `json:"payload"`
+	Status        OutboxStatusEnum `json:"status"`
+	RetryCount    int16            `json:"retry_count"`
+	MaxRetries    int16            `json:"max_retries"`
+	ErrorMessage  *string          `json:"error_message"`
+	CreatedAt     pgtype.Timestamp `json:"created_at"`
+	ProcessedAt   pgtype.Timestamp `json:"processed_at"`
+	CorrelationID pgtype.UUID      `json:"correlation_id"`
 }
 
 type ProcessedEvent struct {

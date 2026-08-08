@@ -59,12 +59,13 @@ func (s *OutboxStore) Reset(ctx context.Context, id uuid.UUID) error {
 
 func rowToEvent(r db.OutboxEvent) eventbus.OutboxEvent {
 	return eventbus.OutboxEvent{
-		ID:         utils.PgtypeToUUID(r.ID),
-		EventType:  r.EventType,
-		RoutingKey: r.RoutingKey,
-		Payload:    r.Payload,
-		CreatedAt:  r.CreatedAt.Time,
-		RetryCount: r.RetryCount,
-		MaxRetries: r.MaxRetries,
+		ID:            utils.PgtypeToUUID(r.ID),
+		EventType:     r.EventType,
+		RoutingKey:    r.RoutingKey,
+		Payload:       r.Payload,
+		CreatedAt:     r.CreatedAt.Time,
+		RetryCount:    r.RetryCount,
+		MaxRetries:    r.MaxRetries,
+		CorrelationID: utils.CorrelationIDString(r.CorrelationID),
 	}
 }

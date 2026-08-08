@@ -12,9 +12,9 @@ import (
 )
 
 const createOutboxEvent = `-- name: CreateOutboxEvent :one
-INSERT INTO meal.outbox_events (aggregate_id, aggregate_type, event_type, payload, max_retries)
-VALUES ($1, $2, $3, $4, $5)
-RETURNING id, aggregate_id, aggregate_type, event_type, payload, status, retry_count, max_retries, next_retry_at, last_error, created_at, published_at
+INSERT INTO meal.outbox_events (aggregate_id, aggregate_type, event_type, payload, max_retries, correlation_id)
+VALUES ($1, $2, $3, $4, $5, $6)
+RETURNING id, aggregate_id, aggregate_type, event_type, payload, status, retry_count, max_retries, next_retry_at, last_error, created_at, published_at, correlation_id
 `
 
 type CreateOutboxEventParams struct {
@@ -23,6 +23,7 @@ type CreateOutboxEventParams struct {
 	EventType     string      `json:"event_type"`
 	Payload       []byte      `json:"payload"`
 	MaxRetries    int16       `json:"max_retries"`
+	CorrelationID pgtype.UUID `json:"correlation_id"`
 }
 
 func (q *Queries) CreateOutboxEvent(ctx context.Context, arg CreateOutboxEventParams) (OutboxEvent, error) {
@@ -32,6 +33,7 @@ func (q *Queries) CreateOutboxEvent(ctx context.Context, arg CreateOutboxEventPa
 		arg.EventType,
 		arg.Payload,
 		arg.MaxRetries,
+		arg.CorrelationID,
 	)
 	var i OutboxEvent
 	err := row.Scan(
@@ -47,12 +49,13 @@ func (q *Queries) CreateOutboxEvent(ctx context.Context, arg CreateOutboxEventPa
 		&i.LastError,
 		&i.CreatedAt,
 		&i.PublishedAt,
+		&i.CorrelationID,
 	)
 	return i, err
 }
 
 const getFailedOutboxEvents = `-- name: GetFailedOutboxEvents :many
-SELECT id, aggregate_id, aggregate_type, event_type, payload, status, retry_count, max_retries, next_retry_at, last_error, created_at, published_at
+SELECT id, aggregate_id, aggregate_type, event_type, payload, status, retry_count, max_retries, next_retry_at, last_error, created_at, published_at, correlation_id
 FROM meal.outbox_events
 WHERE status = 'failed'
 ORDER BY created_at DESC
@@ -81,6 +84,7 @@ func (q *Queries) GetFailedOutboxEvents(ctx context.Context, limit int32) ([]Out
 			&i.LastError,
 			&i.CreatedAt,
 			&i.PublishedAt,
+			&i.CorrelationID,
 		); err != nil {
 			return nil, err
 		}
@@ -93,7 +97,7 @@ func (q *Queries) GetFailedOutboxEvents(ctx context.Context, limit int32) ([]Out
 }
 
 const getPendingOutboxEvents = `-- name: GetPendingOutboxEvents :many
-SELECT id, aggregate_id, aggregate_type, event_type, payload, status, retry_count, max_retries, next_retry_at, last_error, created_at, published_at
+SELECT id, aggregate_id, aggregate_type, event_type, payload, status, retry_count, max_retries, next_retry_at, last_error, created_at, published_at, correlation_id
 FROM meal.outbox_events
 WHERE status = 'pending'
   AND (next_retry_at IS NULL OR next_retry_at <= NOW())
@@ -124,6 +128,7 @@ func (q *Queries) GetPendingOutboxEvents(ctx context.Context, limit int32) ([]Ou
 			&i.LastError,
 			&i.CreatedAt,
 			&i.PublishedAt,
+			&i.CorrelationID,
 		); err != nil {
 			return nil, err
 		}

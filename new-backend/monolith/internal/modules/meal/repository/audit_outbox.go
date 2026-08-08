@@ -31,6 +31,7 @@ func NewAuditOutbox(repo *OutboxRepository) *AuditOutbox {
 
 func (a *AuditOutbox) QueueAuditEvent(ctx context.Context, payload []byte) error {
 	if _, err := a.repo.CreateOutboxEvent(ctx, db.CreateOutboxEventParams{
+		CorrelationID: utils.CorrelationIDFromContext(ctx),
 		AggregateID:   utils.UUIDToPgtype(uuid.New()),
 		AggregateType: auditAggregateType,
 		EventType:     audit.EventAuditEntryCreated,

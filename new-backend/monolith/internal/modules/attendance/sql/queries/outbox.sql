@@ -1,9 +1,9 @@
 -- name: CreateOutboxEvent :exec
-INSERT INTO attendance.outbox_events (event_type, routing_key, payload)
-VALUES ($1, $2, $3);
+INSERT INTO attendance.outbox_events (event_type, routing_key, payload, correlation_id)
+VALUES ($1, $2, $3, $4);
 
 -- name: GetPendingOutboxEvents :many
-SELECT id, event_type, routing_key, payload, retry_count, max_retries
+SELECT id, event_type, routing_key, payload, retry_count, max_retries, correlation_id
 FROM attendance.outbox_events
 WHERE status = 'pending'
 ORDER BY created_at ASC
@@ -25,7 +25,7 @@ SET retry_count = retry_count + 1,
 WHERE id = $1;
 
 -- name: GetFailedOutboxEvents :many
-SELECT id, event_type, routing_key, payload, retry_count, max_retries
+SELECT id, event_type, routing_key, payload, retry_count, max_retries, correlation_id
 FROM attendance.outbox_events
 WHERE status = 'failed'
 ORDER BY created_at ASC

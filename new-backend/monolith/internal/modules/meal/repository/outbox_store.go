@@ -5,6 +5,7 @@ import (
 
 	"github.com/baaaki/mydreamcampus/monolith/internal/eventbus"
 
+	"github.com/baaaki/mydreamcampus/shared/platform/utils"
 	"github.com/google/uuid"
 )
 
@@ -25,13 +26,14 @@ func (s *OutboxStore) GetPending(ctx context.Context, limit int32) ([]eventbus.O
 	events := make([]eventbus.OutboxEvent, len(rows))
 	for i, row := range rows {
 		events[i] = eventbus.OutboxEvent{
-			ID:         row.ID.Bytes,
-			EventType:  row.EventType,
-			RoutingKey: row.EventType, // using event_type as routing key
-			Payload:    row.Payload,
-			RetryCount: row.RetryCount,
-			MaxRetries: row.MaxRetries,
-			CreatedAt:  row.CreatedAt.Time,
+			ID:            row.ID.Bytes,
+			EventType:     row.EventType,
+			RoutingKey:    row.EventType, // using event_type as routing key
+			Payload:       row.Payload,
+			RetryCount:    row.RetryCount,
+			MaxRetries:    row.MaxRetries,
+			CreatedAt:     row.CreatedAt.Time,
+			CorrelationID: utils.CorrelationIDString(row.CorrelationID),
 		}
 	}
 	return events, nil
@@ -46,13 +48,14 @@ func (s *OutboxStore) GetFailed(ctx context.Context, limit int32) ([]eventbus.Ou
 	events := make([]eventbus.OutboxEvent, len(rows))
 	for i, row := range rows {
 		events[i] = eventbus.OutboxEvent{
-			ID:         row.ID.Bytes,
-			EventType:  row.EventType,
-			RoutingKey: row.EventType,
-			Payload:    row.Payload,
-			RetryCount: row.RetryCount,
-			MaxRetries: row.MaxRetries,
-			CreatedAt:  row.CreatedAt.Time,
+			ID:            row.ID.Bytes,
+			EventType:     row.EventType,
+			RoutingKey:    row.EventType,
+			Payload:       row.Payload,
+			RetryCount:    row.RetryCount,
+			MaxRetries:    row.MaxRetries,
+			CreatedAt:     row.CreatedAt.Time,
+			CorrelationID: utils.CorrelationIDString(row.CorrelationID),
 		}
 	}
 	return events, nil

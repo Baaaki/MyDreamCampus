@@ -425,9 +425,10 @@ func queuePeriodDeletedEvent(ctx context.Context, qtx *db.Queries, semester, per
 func insertPeriodEvent(ctx context.Context, qtx *db.Queries, periodType, action string, payload []byte) error {
 	eventType := events.PeriodEventType(periodType, action)
 	if _, err := qtx.CreateOutboxEvent(ctx, db.CreateOutboxEventParams{
-		EventType:  eventType,
-		RoutingKey: eventType,
-		Payload:    payload,
+		CorrelationID: utils.CorrelationIDFromContext(ctx),
+		EventType:     eventType,
+		RoutingKey:    eventType,
+		Payload:       payload,
 	}); err != nil {
 		return fmt.Errorf("queue %s event: %w", eventType, err)
 	}
@@ -566,9 +567,10 @@ func (h *SemesterStatusHandler) ActivateSemester(c *gin.Context) {
 		}
 
 		_, err = qtx.CreateOutboxEvent(ctx, db.CreateOutboxEventParams{
-			EventType:  events.EventCourseSemesterCreated,
-			RoutingKey: events.EventCourseSemesterCreated,
-			Payload:    payloadJSON,
+			CorrelationID: utils.CorrelationIDFromContext(ctx),
+			EventType:     events.EventCourseSemesterCreated,
+			RoutingKey:    events.EventCourseSemesterCreated,
+			Payload:       payloadJSON,
 		})
 		if err != nil {
 			handlerLogger.Error("failed to create outbox event", zap.Error(err),

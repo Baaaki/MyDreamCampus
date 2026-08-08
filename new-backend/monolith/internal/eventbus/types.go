@@ -19,6 +19,10 @@ type OutboxEvent struct {
 	CreatedAt  time.Time
 	RetryCount int16
 	MaxRetries int16
+	// CorrelationID is the request that produced the event, empty for
+	// worker- and scheduler-driven ones. It rides along in the envelope so
+	// the chain survives the hop through the broker.
+	CorrelationID string
 }
 
 // OutboxStore is the contract every module repository implements so the worker

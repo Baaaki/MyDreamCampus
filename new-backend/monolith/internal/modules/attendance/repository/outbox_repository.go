@@ -38,9 +38,10 @@ func (r *OutboxRepository) MarkOutboxEventFailed(ctx context.Context, id pgtype.
 
 func (r *OutboxRepository) CreateOutboxEvent(ctx context.Context, eventType, routingKey string, payload []byte) error {
 	return r.queries.CreateOutboxEvent(ctx, db.CreateOutboxEventParams{
-		EventType:  eventType,
-		RoutingKey: routingKey,
-		Payload:    payload,
+		CorrelationID: utils.CorrelationIDFromContext(ctx),
+		EventType:     eventType,
+		RoutingKey:    routingKey,
+		Payload:       payload,
 	})
 }
 

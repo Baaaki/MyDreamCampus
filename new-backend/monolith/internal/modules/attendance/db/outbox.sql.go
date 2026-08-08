@@ -12,23 +12,29 @@ import (
 )
 
 const createOutboxEvent = `-- name: CreateOutboxEvent :exec
-INSERT INTO attendance.outbox_events (event_type, routing_key, payload)
-VALUES ($1, $2, $3)
+INSERT INTO attendance.outbox_events (event_type, routing_key, payload, correlation_id)
+VALUES ($1, $2, $3, $4)
 `
 
 type CreateOutboxEventParams struct {
-	EventType  string `json:"event_type"`
-	RoutingKey string `json:"routing_key"`
-	Payload    []byte `json:"payload"`
+	EventType     string      `json:"event_type"`
+	RoutingKey    string      `json:"routing_key"`
+	Payload       []byte      `json:"payload"`
+	CorrelationID pgtype.UUID `json:"correlation_id"`
 }
 
 func (q *Queries) CreateOutboxEvent(ctx context.Context, arg CreateOutboxEventParams) error {
-	_, err := q.db.Exec(ctx, createOutboxEvent, arg.EventType, arg.RoutingKey, arg.Payload)
+	_, err := q.db.Exec(ctx, createOutboxEvent,
+		arg.EventType,
+		arg.RoutingKey,
+		arg.Payload,
+		arg.CorrelationID,
+	)
 	return err
 }
 
 const getFailedOutboxEvents = `-- name: GetFailedOutboxEvents :many
-SELECT id, event_type, routing_key, payload, retry_count, max_retries
+SELECT id, event_type, routing_key, payload, retry_count, max_retries, correlation_id
 FROM attendance.outbox_events
 WHERE status = 'failed'
 ORDER BY created_at ASC
@@ -36,12 +42,13 @@ LIMIT $1
 `
 
 type GetFailedOutboxEventsRow struct {
-	ID         pgtype.UUID `json:"id"`
-	EventType  string      `json:"event_type"`
-	RoutingKey string      `json:"routing_key"`
-	Payload    []byte      `json:"payload"`
-	RetryCount pgtype.Int2 `json:"retry_count"`
-	MaxRetries pgtype.Int2 `json:"max_retries"`
+	ID            pgtype.UUID `json:"id"`
+	EventType     string      `json:"event_type"`
+	RoutingKey    string      `json:"routing_key"`
+	Payload       []byte      `json:"payload"`
+	RetryCount    pgtype.Int2 `json:"retry_count"`
+	MaxRetries    pgtype.Int2 `json:"max_retries"`
+	CorrelationID pgtype.UUID `json:"correlation_id"`
 }
 
 func (q *Queries) GetFailedOutboxEvents(ctx context.Context, limit int32) ([]GetFailedOutboxEventsRow, error) {
@@ -60,6 +67,7 @@ func (q *Queries) GetFailedOutboxEvents(ctx context.Context, limit int32) ([]Get
 			&i.Payload,
 			&i.RetryCount,
 			&i.MaxRetries,
+			&i.CorrelationID,
 		); err != nil {
 			return nil, err
 		}
@@ -72,7 +80,7 @@ func (q *Queries) GetFailedOutboxEvents(ctx context.Context, limit int32) ([]Get
 }
 
 const getPendingOutboxEvents = `-- name: GetPendingOutboxEvents :many
-SELECT id, event_type, routing_key, payload, retry_count, max_retries
+SELECT id, event_type, routing_key, payload, retry_count, max_retries, correlation_id
 FROM attendance.outbox_events
 WHERE status = 'pending'
 ORDER BY created_at ASC
@@ -80,12 +88,13 @@ LIMIT $1
 `
 
 type GetPendingOutboxEventsRow struct {
-	ID         pgtype.UUID `json:"id"`
-	EventType  string      `json:"event_type"`
-	RoutingKey string      `json:"routing_key"`
-	Payload    []byte      `json:"payload"`
-	RetryCount pgtype.Int2 `json:"retry_count"`
-	MaxRetries pgtype.Int2 `json:"max_retries"`
+	ID            pgtype.UUID `json:"id"`
+	EventType     string      `json:"event_type"`
+	RoutingKey    string      `json:"routing_key"`
+	Payload       []byte      `json:"payload"`
+	RetryCount    pgtype.Int2 `json:"retry_count"`
+	MaxRetries    pgtype.Int2 `json:"max_retries"`
+	CorrelationID pgtype.UUID `json:"correlation_id"`
 }
 
 func (q *Queries) GetPendingOutboxEvents(ctx context.Context, limit int32) ([]GetPendingOutboxEventsRow, error) {
@@ -104,6 +113,7 @@ func (q *Queries) GetPendingOutboxEvents(ctx context.Context, limit int32) ([]Ge
 			&i.Payload,
 			&i.RetryCount,
 			&i.MaxRetries,
+			&i.CorrelationID,
 		); err != nil {
 			return nil, err
 		}

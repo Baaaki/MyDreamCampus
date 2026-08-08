@@ -12,32 +12,39 @@ import (
 )
 
 const createOutboxEvent = `-- name: CreateOutboxEvent :one
-INSERT INTO enrollment.outbox_events (event_type, routing_key, payload)
-VALUES ($1, $2, $3)
-RETURNING id, event_type, routing_key, payload, status, retry_count, max_retries, created_at, processed_at, error_message
+INSERT INTO enrollment.outbox_events (event_type, routing_key, payload, correlation_id)
+VALUES ($1, $2, $3, $4)
+RETURNING id, event_type, routing_key, payload, status, retry_count, max_retries, created_at, processed_at, error_message, correlation_id
 `
 
 type CreateOutboxEventParams struct {
-	EventType  string `json:"event_type"`
-	RoutingKey string `json:"routing_key"`
-	Payload    []byte `json:"payload"`
+	EventType     string      `json:"event_type"`
+	RoutingKey    string      `json:"routing_key"`
+	Payload       []byte      `json:"payload"`
+	CorrelationID pgtype.UUID `json:"correlation_id"`
 }
 
 type CreateOutboxEventRow struct {
-	ID           pgtype.UUID          `json:"id"`
-	EventType    string               `json:"event_type"`
-	RoutingKey   string               `json:"routing_key"`
-	Payload      []byte               `json:"payload"`
-	Status       NullOutboxStatusEnum `json:"status"`
-	RetryCount   pgtype.Int2          `json:"retry_count"`
-	MaxRetries   pgtype.Int2          `json:"max_retries"`
-	CreatedAt    pgtype.Timestamp     `json:"created_at"`
-	ProcessedAt  pgtype.Timestamp     `json:"processed_at"`
-	ErrorMessage pgtype.Text          `json:"error_message"`
+	ID            pgtype.UUID          `json:"id"`
+	EventType     string               `json:"event_type"`
+	RoutingKey    string               `json:"routing_key"`
+	Payload       []byte               `json:"payload"`
+	Status        NullOutboxStatusEnum `json:"status"`
+	RetryCount    pgtype.Int2          `json:"retry_count"`
+	MaxRetries    pgtype.Int2          `json:"max_retries"`
+	CreatedAt     pgtype.Timestamp     `json:"created_at"`
+	ProcessedAt   pgtype.Timestamp     `json:"processed_at"`
+	ErrorMessage  pgtype.Text          `json:"error_message"`
+	CorrelationID pgtype.UUID          `json:"correlation_id"`
 }
 
 func (q *Queries) CreateOutboxEvent(ctx context.Context, arg CreateOutboxEventParams) (CreateOutboxEventRow, error) {
-	row := q.db.QueryRow(ctx, createOutboxEvent, arg.EventType, arg.RoutingKey, arg.Payload)
+	row := q.db.QueryRow(ctx, createOutboxEvent,
+		arg.EventType,
+		arg.RoutingKey,
+		arg.Payload,
+		arg.CorrelationID,
+	)
 	var i CreateOutboxEventRow
 	err := row.Scan(
 		&i.ID,
@@ -50,12 +57,13 @@ func (q *Queries) CreateOutboxEvent(ctx context.Context, arg CreateOutboxEventPa
 		&i.CreatedAt,
 		&i.ProcessedAt,
 		&i.ErrorMessage,
+		&i.CorrelationID,
 	)
 	return i, err
 }
 
 const getFailedOutboxEvents = `-- name: GetFailedOutboxEvents :many
-SELECT id, event_type, routing_key, payload, status, retry_count, max_retries, created_at, processed_at, error_message
+SELECT id, event_type, routing_key, payload, status, retry_count, max_retries, created_at, processed_at, error_message, correlation_id
 FROM enrollment.outbox_events
 WHERE status = 'failed' AND retry_count < max_retries
 ORDER BY created_at ASC
@@ -63,16 +71,17 @@ LIMIT $1
 `
 
 type GetFailedOutboxEventsRow struct {
-	ID           pgtype.UUID          `json:"id"`
-	EventType    string               `json:"event_type"`
-	RoutingKey   string               `json:"routing_key"`
-	Payload      []byte               `json:"payload"`
-	Status       NullOutboxStatusEnum `json:"status"`
-	RetryCount   pgtype.Int2          `json:"retry_count"`
-	MaxRetries   pgtype.Int2          `json:"max_retries"`
-	CreatedAt    pgtype.Timestamp     `json:"created_at"`
-	ProcessedAt  pgtype.Timestamp     `json:"processed_at"`
-	ErrorMessage pgtype.Text          `json:"error_message"`
+	ID            pgtype.UUID          `json:"id"`
+	EventType     string               `json:"event_type"`
+	RoutingKey    string               `json:"routing_key"`
+	Payload       []byte               `json:"payload"`
+	Status        NullOutboxStatusEnum `json:"status"`
+	RetryCount    pgtype.Int2          `json:"retry_count"`
+	MaxRetries    pgtype.Int2          `json:"max_retries"`
+	CreatedAt     pgtype.Timestamp     `json:"created_at"`
+	ProcessedAt   pgtype.Timestamp     `json:"processed_at"`
+	ErrorMessage  pgtype.Text          `json:"error_message"`
+	CorrelationID pgtype.UUID          `json:"correlation_id"`
 }
 
 func (q *Queries) GetFailedOutboxEvents(ctx context.Context, limit int32) ([]GetFailedOutboxEventsRow, error) {
@@ -95,6 +104,7 @@ func (q *Queries) GetFailedOutboxEvents(ctx context.Context, limit int32) ([]Get
 			&i.CreatedAt,
 			&i.ProcessedAt,
 			&i.ErrorMessage,
+			&i.CorrelationID,
 		); err != nil {
 			return nil, err
 		}
@@ -107,7 +117,7 @@ func (q *Queries) GetFailedOutboxEvents(ctx context.Context, limit int32) ([]Get
 }
 
 const getPendingOutboxEvents = `-- name: GetPendingOutboxEvents :many
-SELECT id, event_type, routing_key, payload, status, retry_count, max_retries, created_at, processed_at, error_message
+SELECT id, event_type, routing_key, payload, status, retry_count, max_retries, created_at, processed_at, error_message, correlation_id
 FROM enrollment.outbox_events
 WHERE status = 'pending'
 ORDER BY created_at ASC
@@ -115,16 +125,17 @@ LIMIT $1
 `
 
 type GetPendingOutboxEventsRow struct {
-	ID           pgtype.UUID          `json:"id"`
-	EventType    string               `json:"event_type"`
-	RoutingKey   string               `json:"routing_key"`
-	Payload      []byte               `json:"payload"`
-	Status       NullOutboxStatusEnum `json:"status"`
-	RetryCount   pgtype.Int2          `json:"retry_count"`
-	MaxRetries   pgtype.Int2          `json:"max_retries"`
-	CreatedAt    pgtype.Timestamp     `json:"created_at"`
-	ProcessedAt  pgtype.Timestamp     `json:"processed_at"`
-	ErrorMessage pgtype.Text          `json:"error_message"`
+	ID            pgtype.UUID          `json:"id"`
+	EventType     string               `json:"event_type"`
+	RoutingKey    string               `json:"routing_key"`
+	Payload       []byte               `json:"payload"`
+	Status        NullOutboxStatusEnum `json:"status"`
+	RetryCount    pgtype.Int2          `json:"retry_count"`
+	MaxRetries    pgtype.Int2          `json:"max_retries"`
+	CreatedAt     pgtype.Timestamp     `json:"created_at"`
+	ProcessedAt   pgtype.Timestamp     `json:"processed_at"`
+	ErrorMessage  pgtype.Text          `json:"error_message"`
+	CorrelationID pgtype.UUID          `json:"correlation_id"`
 }
 
 func (q *Queries) GetPendingOutboxEvents(ctx context.Context, limit int32) ([]GetPendingOutboxEventsRow, error) {
@@ -147,6 +158,7 @@ func (q *Queries) GetPendingOutboxEvents(ctx context.Context, limit int32) ([]Ge
 			&i.CreatedAt,
 			&i.ProcessedAt,
 			&i.ErrorMessage,
+			&i.CorrelationID,
 		); err != nil {
 			return nil, err
 		}

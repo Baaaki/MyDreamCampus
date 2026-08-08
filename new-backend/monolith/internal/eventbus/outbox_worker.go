@@ -102,11 +102,16 @@ func (w *OutboxWorker) processEvents(ctx context.Context) {
 
 		// Envelope shape shared with all consumers (notification service +
 		// module workers) — changing a key here is a breaking contract change.
+		// correlation_id is omitted when absent, so consumers that predate it
+		// keep parsing the envelope unchanged.
 		message := map[string]any{
 			"event_id":   ev.ID.String(),
 			"event_type": ev.EventType,
 			"timestamp":  ev.CreatedAt,
 			"data":       payload,
+		}
+		if ev.CorrelationID != "" {
+			message["correlation_id"] = ev.CorrelationID
 		}
 
 		if err := w.publisher.Publish(ctx, w.exchange, ev.RoutingKey, message); err != nil {

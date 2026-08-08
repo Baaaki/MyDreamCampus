@@ -6,6 +6,7 @@ import (
 
 	"github.com/baaaki/mydreamcampus/monolith/internal/modules/grades/db"
 	"github.com/baaaki/mydreamcampus/shared/platform/audit"
+	"github.com/baaaki/mydreamcampus/shared/platform/utils"
 )
 
 // AuditOutbox routes audit entries through grades' own outbox instead of
@@ -20,9 +21,10 @@ func NewAuditOutbox(repo *OutboxRepository) *AuditOutbox {
 
 func (a *AuditOutbox) QueueAuditEvent(ctx context.Context, payload []byte) error {
 	if _, err := a.repo.CreateOutboxEvent(ctx, db.CreateOutboxEventParams{
-		EventType:  audit.EventAuditEntryCreated,
-		RoutingKey: audit.EventAuditEntryCreated,
-		Payload:    payload,
+		CorrelationID: utils.CorrelationIDFromContext(ctx),
+		EventType:     audit.EventAuditEntryCreated,
+		RoutingKey:    audit.EventAuditEntryCreated,
+		Payload:       payload,
 	}); err != nil {
 		return fmt.Errorf("queue audit event: %w", err)
 	}

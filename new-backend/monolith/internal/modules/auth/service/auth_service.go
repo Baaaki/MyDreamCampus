@@ -11,12 +11,12 @@ import (
 	"github.com/baaaki/mydreamcampus/monolith/internal/modules/auth/dto"
 	serviceErrors "github.com/baaaki/mydreamcampus/monolith/internal/modules/auth/errors"
 	"github.com/baaaki/mydreamcampus/monolith/internal/modules/auth/repository"
+	"github.com/baaaki/mydreamcampus/shared/events"
 	"github.com/baaaki/mydreamcampus/shared/platform/clock"
 	sharedErrors "github.com/baaaki/mydreamcampus/shared/platform/errors"
 	"github.com/baaaki/mydreamcampus/shared/platform/logger"
 	"github.com/baaaki/mydreamcampus/shared/platform/redis"
 	"github.com/baaaki/mydreamcampus/shared/platform/utils"
-	"github.com/baaaki/mydreamcampus/shared/events"
 	"github.com/golang-jwt/jwt/v5"
 	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5/pgtype"
@@ -590,9 +590,10 @@ func (s *AuthService) RequestPasswordReset(ctx context.Context, email string) er
 	))
 
 	_, err = s.authRepo.CreateOutboxEvent(ctx, db.CreateOutboxEventParams{
-		EventType:  events.EventTypeUserPasswordResetRequested,
-		RoutingKey: events.RoutingKeyUserPasswordResetRequested,
-		Payload:    payloadBytes,
+		CorrelationID: utils.CorrelationIDFromContext(ctx),
+		EventType:     events.EventTypeUserPasswordResetRequested,
+		RoutingKey:    events.RoutingKeyUserPasswordResetRequested,
+		Payload:       payloadBytes,
 	})
 	if err != nil {
 		return sharedErrors.Wrap(sharedErrors.ErrInternal, fmt.Errorf("failed to create outbox event: %w", err))

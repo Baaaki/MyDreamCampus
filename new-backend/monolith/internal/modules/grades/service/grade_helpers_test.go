@@ -53,7 +53,7 @@ func TestBuildFinalizeRequestedEventParams(t *testing.T) {
 	courseID := uuid.New()
 	instructorID := uuid.New()
 
-	params, err := buildFinalizeRequestedEventParams(courseID, instructorID, finalizeTriggerInstructor)
+	params, err := buildFinalizeRequestedEventParams(t.Context(), courseID, instructorID, finalizeTriggerInstructor)
 	require.NoError(t, err)
 	require.NotNil(t, params)
 
@@ -82,14 +82,14 @@ func TestBuildGradeSubmittedEventParams(t *testing.T) {
 	studentID := uuid.New()
 
 	t.Run("returns nil params when score is nil", func(t *testing.T) {
-		params, err := buildGradeSubmittedEventParams(studentID, "CS101", "midterm", nil)
+		params, err := buildGradeSubmittedEventParams(t.Context(), studentID, "CS101", "midterm", nil)
 		assert.NoError(t, err)
 		assert.Nil(t, params, "nil score is an absence-only upsert and must not publish")
 	})
 
 	t.Run("emits event when score is present", func(t *testing.T) {
 		score := 87.5
-		params, err := buildGradeSubmittedEventParams(studentID, "CS101", "midterm", &score)
+		params, err := buildGradeSubmittedEventParams(t.Context(), studentID, "CS101", "midterm", &score)
 		require.NoError(t, err)
 		require.NotNil(t, params)
 

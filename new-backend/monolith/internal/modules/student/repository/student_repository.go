@@ -8,9 +8,9 @@ import (
 
 	"github.com/baaaki/mydreamcampus/monolith/internal/modules/student/db"
 	serviceErrors "github.com/baaaki/mydreamcampus/monolith/internal/modules/student/errors"
+	"github.com/baaaki/mydreamcampus/shared/events"
 	sharedErrors "github.com/baaaki/mydreamcampus/shared/platform/errors"
 	"github.com/baaaki/mydreamcampus/shared/platform/utils"
-	"github.com/baaaki/mydreamcampus/shared/events"
 	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgconn"
@@ -299,9 +299,10 @@ func (r *StudentRepository) CreateStudentWithEvent(ctx context.Context, params d
 		return db.Student{}, fmt.Errorf("%w: failed to marshal event payload: %v", sharedErrors.ErrQueryFailed, err)
 	}
 	_, err = qtx.CreateOutboxEvent(ctx, db.CreateOutboxEventParams{
-		EventType:  events.EventStudentCreated,
-		RoutingKey: events.RoutingKeyStudentCreated,
-		Payload:    payload,
+		CorrelationID: utils.CorrelationIDFromContext(ctx),
+		EventType:     events.EventStudentCreated,
+		RoutingKey:    events.RoutingKeyStudentCreated,
+		Payload:       payload,
 	})
 	if err != nil {
 		return db.Student{}, fmt.Errorf("%w: failed to create outbox event: %v", sharedErrors.ErrQueryFailed, err)
@@ -378,9 +379,10 @@ func (r *StudentRepository) UpdateStudentWithEvent(ctx context.Context, id uuid.
 		return db.Student{}, fmt.Errorf("%w: failed to marshal event payload: %v", sharedErrors.ErrQueryFailed, err)
 	}
 	_, err = qtx.CreateOutboxEvent(ctx, db.CreateOutboxEventParams{
-		EventType:  events.EventStudentUpdated,
-		RoutingKey: events.RoutingKeyStudentUpdated,
-		Payload:    payload,
+		CorrelationID: utils.CorrelationIDFromContext(ctx),
+		EventType:     events.EventStudentUpdated,
+		RoutingKey:    events.RoutingKeyStudentUpdated,
+		Payload:       payload,
 	})
 	if err != nil {
 		return db.Student{}, fmt.Errorf("%w: failed to create outbox event: %v", sharedErrors.ErrQueryFailed, err)
@@ -419,9 +421,10 @@ func (r *StudentRepository) SoftDeleteStudentWithEvent(ctx context.Context, id u
 		return fmt.Errorf("%w: failed to marshal event payload: %v", sharedErrors.ErrQueryFailed, err)
 	}
 	_, err = qtx.CreateOutboxEvent(ctx, db.CreateOutboxEventParams{
-		EventType:  events.EventStudentDeactivated,
-		RoutingKey: events.RoutingKeyStudentDeactivated,
-		Payload:    payload,
+		CorrelationID: utils.CorrelationIDFromContext(ctx),
+		EventType:     events.EventStudentDeactivated,
+		RoutingKey:    events.RoutingKeyStudentDeactivated,
+		Payload:       payload,
 	})
 	if err != nil {
 		return fmt.Errorf("%w: failed to create outbox event: %v", sharedErrors.ErrQueryFailed, err)
@@ -525,9 +528,10 @@ func (r *StudentRepository) BulkAssignAdvisor(ctx context.Context, studentIDs []
 			return fmt.Errorf("%w: failed to marshal event payload: %v", sharedErrors.ErrQueryFailed, err)
 		}
 		_, err = qtx.CreateOutboxEvent(ctx, db.CreateOutboxEventParams{
-			EventType:  events.EventStudentUpdated,
-			RoutingKey: events.RoutingKeyStudentUpdated,
-			Payload:    payload,
+			CorrelationID: utils.CorrelationIDFromContext(ctx),
+			EventType:     events.EventStudentUpdated,
+			RoutingKey:    events.RoutingKeyStudentUpdated,
+			Payload:       payload,
 		})
 		if err != nil {
 			return fmt.Errorf("%w: failed to create outbox event: %v", sharedErrors.ErrQueryFailed, err)

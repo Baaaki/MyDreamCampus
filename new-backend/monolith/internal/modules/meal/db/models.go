@@ -223,6 +223,7 @@ type OutboxEvent struct {
 	LastError     pgtype.Text        `json:"last_error"`
 	CreatedAt     pgtype.Timestamptz `json:"created_at"`
 	PublishedAt   pgtype.Timestamptz `json:"published_at"`
+	CorrelationID pgtype.UUID        `json:"correlation_id"`
 }
 
 type ProcessedEvent struct {

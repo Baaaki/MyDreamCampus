@@ -12,10 +12,10 @@ import (
 	"github.com/baaaki/mydreamcampus/monolith/internal/modules/auth/db"
 	"github.com/baaaki/mydreamcampus/monolith/internal/modules/auth/dto"
 	"github.com/baaaki/mydreamcampus/monolith/internal/modules/auth/repository"
+	"github.com/baaaki/mydreamcampus/shared/events"
 	sharedErrors "github.com/baaaki/mydreamcampus/shared/platform/errors"
 	"github.com/baaaki/mydreamcampus/shared/platform/logger"
 	"github.com/baaaki/mydreamcampus/shared/platform/utils"
-	"github.com/baaaki/mydreamcampus/shared/events"
 	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5/pgxpool"
 	"go.uber.org/zap"
@@ -135,9 +135,10 @@ func (s *EventService) HandleStudentCreated(ctx context.Context, event dto.Stude
 			"student",
 		))
 		_, err = queries.CreateOutboxEvent(ctx, db.CreateOutboxEventParams{
-			EventType:  events.EventTypeUserRegistered,
-			RoutingKey: events.RoutingKeyUserRegistered,
-			Payload:    payloadBytes,
+			CorrelationID: utils.CorrelationIDFromContext(ctx),
+			EventType:     events.EventTypeUserRegistered,
+			RoutingKey:    events.RoutingKeyUserRegistered,
+			Payload:       payloadBytes,
 		})
 		if err != nil {
 			return fmt.Errorf("%w: failed to create outbox event: %v", sharedErrors.ErrQueryFailed, err)
@@ -247,9 +248,10 @@ func (s *EventService) HandleStaffCreated(ctx context.Context, event dto.StaffCr
 			event.Data.Role,
 		))
 		_, err = queries.CreateOutboxEvent(ctx, db.CreateOutboxEventParams{
-			EventType:  events.EventTypeUserRegistered,
-			RoutingKey: events.RoutingKeyUserRegistered,
-			Payload:    payloadBytes,
+			CorrelationID: utils.CorrelationIDFromContext(ctx),
+			EventType:     events.EventTypeUserRegistered,
+			RoutingKey:    events.RoutingKeyUserRegistered,
+			Payload:       payloadBytes,
 		})
 		if err != nil {
 			return fmt.Errorf("%w: failed to create outbox event: %v", sharedErrors.ErrQueryFailed, err)

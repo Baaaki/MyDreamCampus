@@ -8,10 +8,10 @@ import (
 	"hash/crc64"
 
 	"github.com/baaaki/mydreamcampus/monolith/internal/modules/enrollment/db"
+	"github.com/baaaki/mydreamcampus/shared/events"
 	sharedErrors "github.com/baaaki/mydreamcampus/shared/platform/errors"
 	"github.com/baaaki/mydreamcampus/shared/platform/logger"
 	"github.com/baaaki/mydreamcampus/shared/platform/utils"
-	"github.com/baaaki/mydreamcampus/shared/events"
 	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgtype"
@@ -112,9 +112,10 @@ func (r *EnrollmentRepository) CreateProgramWithCoursesAndEvent(
 		return db.EnrollmentProgram{}, fmt.Errorf("%w: failed to marshal submitted event payload: %v", sharedErrors.ErrInternal, err)
 	}
 	_, err = qtx.CreateOutboxEvent(ctx, db.CreateOutboxEventParams{
-		EventType:  events.EventEnrollmentProgramSubmitted,
-		RoutingKey: events.RoutingKeyEnrollmentProgramSubmitted,
-		Payload:    payload,
+		CorrelationID: utils.CorrelationIDFromContext(ctx),
+		EventType:     events.EventEnrollmentProgramSubmitted,
+		RoutingKey:    events.RoutingKeyEnrollmentProgramSubmitted,
+		Payload:       payload,
 	})
 	if err != nil {
 		return db.EnrollmentProgram{}, fmt.Errorf("%w: failed to create outbox event: %v", sharedErrors.ErrQueryFailed, err)
@@ -225,9 +226,10 @@ func (r *EnrollmentRepository) ApproveProgramWithEvent(
 		return db.EnrollmentProgram{}, fmt.Errorf("%w: failed to marshal approved event payload: %v", sharedErrors.ErrInternal, err)
 	}
 	_, err = qtx.CreateOutboxEvent(ctx, db.CreateOutboxEventParams{
-		EventType:  "enrollment.program.approved",
-		RoutingKey: "enrollment.program.approved",
-		Payload:    payload,
+		CorrelationID: utils.CorrelationIDFromContext(ctx),
+		EventType:     "enrollment.program.approved",
+		RoutingKey:    "enrollment.program.approved",
+		Payload:       payload,
 	})
 	if err != nil {
 		return db.EnrollmentProgram{}, fmt.Errorf("%w: failed to create outbox event: %v", sharedErrors.ErrQueryFailed, err)
@@ -275,9 +277,10 @@ func (r *EnrollmentRepository) RejectProgramWithEventAndLog(
 		return fmt.Errorf("%w: failed to marshal rejected event payload: %v", sharedErrors.ErrInternal, err)
 	}
 	_, err = qtx.CreateOutboxEvent(ctx, db.CreateOutboxEventParams{
-		EventType:  events.EventEnrollmentProgramRejected,
-		RoutingKey: events.RoutingKeyEnrollmentProgramRejected,
-		Payload:    payload,
+		CorrelationID: utils.CorrelationIDFromContext(ctx),
+		EventType:     events.EventEnrollmentProgramRejected,
+		RoutingKey:    events.RoutingKeyEnrollmentProgramRejected,
+		Payload:       payload,
 	})
 	if err != nil {
 		return fmt.Errorf("%w: failed to create outbox event: %v", sharedErrors.ErrQueryFailed, err)
@@ -365,9 +368,10 @@ func (r *EnrollmentRepository) CancelProgramWithEvent(
 		return fmt.Errorf("%w: failed to marshal cancelled event payload: %v", sharedErrors.ErrInternal, err)
 	}
 	_, err = qtx.CreateOutboxEvent(ctx, db.CreateOutboxEventParams{
-		EventType:  events.EventEnrollmentProgramCancelled,
-		RoutingKey: events.RoutingKeyEnrollmentProgramCancelled,
-		Payload:    payload,
+		CorrelationID: utils.CorrelationIDFromContext(ctx),
+		EventType:     events.EventEnrollmentProgramCancelled,
+		RoutingKey:    events.RoutingKeyEnrollmentProgramCancelled,
+		Payload:       payload,
 	})
 	if err != nil {
 		return fmt.Errorf("%w: failed to create outbox event: %v", sharedErrors.ErrQueryFailed, err)

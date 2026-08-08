@@ -7,9 +7,9 @@ import (
 
 	"github.com/baaaki/mydreamcampus/monolith/internal/modules/student/dto"
 	"github.com/baaaki/mydreamcampus/monolith/internal/modules/student/repository"
+	"github.com/baaaki/mydreamcampus/shared/events"
 	"github.com/baaaki/mydreamcampus/shared/platform/logger"
 	"github.com/baaaki/mydreamcampus/shared/platform/rabbitmq"
-	"github.com/baaaki/mydreamcampus/shared/events"
 	"go.uber.org/zap"
 )
 

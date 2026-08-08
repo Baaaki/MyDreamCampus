@@ -141,7 +141,7 @@ func (s *GradeService) SubmitScore(ctx context.Context, instructorID uuid.UUID, 
 		GradedBy:       instructorID,
 	}
 
-	eventParams, err := buildGradeSubmittedEventParams(registration.StudentID, registration.CourseCode, req.Slug, req.Score)
+	eventParams, err := buildGradeSubmittedEventParams(ctx, registration.StudentID, registration.CourseCode, req.Slug, req.Score)
 	if err != nil {
 		logger.Error("failed to build grade.submitted event", zap.Error(err))
 		return nil, err
@@ -274,7 +274,7 @@ func (s *GradeService) BulkSubmitScores(ctx context.Context, instructorID uuid.U
 			}
 		}
 
-		eventParams, err := buildGradeSubmittedEventParams(reg.StudentID, reg.CourseCode, req.Slug, e.Score)
+		eventParams, err := buildGradeSubmittedEventParams(ctx, reg.StudentID, reg.CourseCode, req.Slug, e.Score)
 		if err != nil {
 			logger.Error("bulk: failed to build grade.submitted event", zap.Error(err), zap.String("registration_id", e.RegistrationID.String()))
 			continue
@@ -534,9 +534,10 @@ func (s *GradeService) AutoFinalize(ctx context.Context, courseID uuid.UUID, ins
 
 				prereqPayload, _ := json.Marshal(prereqEvent)
 				if _, err := outboxQtx.CreateOutboxEvent(ctx, db.CreateOutboxEventParams{
-					EventType:  "grade.student.prerequisite.passed",
-					RoutingKey: "grade.student.prerequisite.passed",
-					Payload:    prereqPayload,
+					CorrelationID: utils.CorrelationIDFromContext(ctx),
+					EventType:     "grade.student.prerequisite.passed",
+					RoutingKey:    "grade.student.prerequisite.passed",
+					Payload:       prereqPayload,
 				}); err != nil {
 					logger.Error("failed to create prerequisite passed outbox event", zap.Error(err))
 					return nil, fmt.Errorf("create prerequisite outbox event: %w", err)
@@ -575,9 +576,10 @@ func (s *GradeService) AutoFinalize(ctx context.Context, courseID uuid.UUID, ins
 
 	finalizedPayload, _ := json.Marshal(finalizedEvent)
 	if _, err := outboxQtx.CreateOutboxEvent(ctx, db.CreateOutboxEventParams{
-		EventType:  "grade.finalized",
-		RoutingKey: "grade.finalized",
-		Payload:    finalizedPayload,
+		CorrelationID: utils.CorrelationIDFromContext(ctx),
+		EventType:     "grade.finalized",
+		RoutingKey:    "grade.finalized",
+		Payload:       finalizedPayload,
 	}); err != nil {
 		logger.Error("failed to create finalized outbox event", zap.Error(err))
 		return nil, fmt.Errorf("create finalized outbox event: %w", err)
@@ -829,7 +831,7 @@ const (
 // buildFinalizeRequestedEventParams marshals a grade.finalize.requested event
 // into outbox params. Consumed internally by the grades-service's finalize
 // worker to run AutoFinalize off the request path.
-func buildFinalizeRequestedEventParams(courseID, instructorID uuid.UUID, triggeredBy string) (*db.CreateOutboxEventParams, error) {
+func buildFinalizeRequestedEventParams(ctx context.Context, courseID, instructorID uuid.UUID, triggeredBy string) (*db.CreateOutboxEventParams, error) {
 	event := dto.GradeFinalizeRequestedEvent{
 		EventType: "grade.finalize.requested",
 		Timestamp: clock.Now(),
@@ -844,16 +846,17 @@ func buildFinalizeRequestedEventParams(courseID, instructorID uuid.UUID, trigger
 	}
 
 	return &db.CreateOutboxEventParams{
-		EventType:  "grade.finalize.requested",
-		RoutingKey: "grade.finalize.requested",
-		Payload:    payload,
+		CorrelationID: utils.CorrelationIDFromContext(ctx),
+		EventType:     "grade.finalize.requested",
+		RoutingKey:    "grade.finalize.requested",
+		Payload:       payload,
 	}, nil
 }
 
 // buildGradeSubmittedEventParams marshals a grade.submitted event into
 // outbox params. Returns nil params when there's no numeric score to publish
 // (e.g. absence-only upserts don't carry a score).
-func buildGradeSubmittedEventParams(studentID uuid.UUID, courseCode string, slug string, score *float64) (*db.CreateOutboxEventParams, error) {
+func buildGradeSubmittedEventParams(ctx context.Context, studentID uuid.UUID, courseCode string, slug string, score *float64) (*db.CreateOutboxEventParams, error) {
 	if score == nil {
 		return nil, nil
 	}
@@ -873,9 +876,10 @@ func buildGradeSubmittedEventParams(studentID uuid.UUID, courseCode string, slug
 	}
 
 	return &db.CreateOutboxEventParams{
-		EventType:  "grade.submitted",
-		RoutingKey: "grade.submitted",
-		Payload:    payload,
+		CorrelationID: utils.CorrelationIDFromContext(ctx),
+		EventType:     "grade.submitted",
+		RoutingKey:    "grade.submitted",
+		Payload:       payload,
 	}, nil
 }
 
@@ -1018,9 +1022,10 @@ func (s *GradeService) ProcessAppeal(ctx context.Context, req dto.AppealScoreReq
 
 			prereqPayload, _ := json.Marshal(prereqEvent)
 			if _, err := s.outboxRepo.WithTx(tx).CreateOutboxEvent(ctx, db.CreateOutboxEventParams{
-				EventType:  "grade.student.prerequisite.passed",
-				RoutingKey: "grade.student.prerequisite.passed",
-				Payload:    prereqPayload,
+				CorrelationID: utils.CorrelationIDFromContext(ctx),
+				EventType:     "grade.student.prerequisite.passed",
+				RoutingKey:    "grade.student.prerequisite.passed",
+				Payload:       prereqPayload,
 			}); err != nil {
 				logger.Error("failed to create prerequisite passed outbox event after appeal", zap.Error(err))
 				return nil, err
@@ -1254,7 +1259,7 @@ func (s *GradeService) LockAssessmentBySlug(ctx context.Context, instructorID, c
 // outbox worker publishes it to RabbitMQ and the finalize consumer runs the
 // actual AutoFinalize computation off the request path.
 func (s *GradeService) emitFinalizeRequested(ctx context.Context, courseID, instructorID uuid.UUID, triggeredBy string) error {
-	eventParams, err := buildFinalizeRequestedEventParams(courseID, instructorID, triggeredBy)
+	eventParams, err := buildFinalizeRequestedEventParams(ctx, courseID, instructorID, triggeredBy)
 	if err != nil {
 		return err
 	}

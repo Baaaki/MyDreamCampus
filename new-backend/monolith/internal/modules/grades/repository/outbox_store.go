@@ -5,6 +5,7 @@ import (
 
 	"github.com/baaaki/mydreamcampus/monolith/internal/eventbus"
 	"github.com/baaaki/mydreamcampus/monolith/internal/modules/grades/db"
+	"github.com/baaaki/mydreamcampus/shared/platform/utils"
 	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5/pgtype"
 )
@@ -26,13 +27,14 @@ func (s *OutboxStore) GetPending(ctx context.Context, limit int32) ([]eventbus.O
 	events := make([]eventbus.OutboxEvent, len(rows))
 	for i, row := range rows {
 		events[i] = eventbus.OutboxEvent{
-			ID:         row.ID,
-			EventType:  row.EventType,
-			RoutingKey: row.RoutingKey,
-			Payload:    row.Payload,
-			RetryCount: row.RetryCount.Int16,
-			MaxRetries: row.MaxRetries.Int16,
-			CreatedAt:  row.CreatedAt.Time,
+			ID:            row.ID,
+			EventType:     row.EventType,
+			RoutingKey:    row.RoutingKey,
+			Payload:       row.Payload,
+			RetryCount:    row.RetryCount.Int16,
+			MaxRetries:    row.MaxRetries.Int16,
+			CreatedAt:     row.CreatedAt.Time,
+			CorrelationID: utils.CorrelationIDString(row.CorrelationID),
 		}
 	}
 	return events, nil

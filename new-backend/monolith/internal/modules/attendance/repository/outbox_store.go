@@ -30,11 +30,12 @@ func (s *OutboxStore) GetPending(ctx context.Context, batchSize int32) ([]eventb
 		}
 
 		result[i] = eventbus.OutboxEvent{
-			ID:         e.ID.Bytes,
-			EventType:  e.EventType,
-			RoutingKey: e.RoutingKey,
-			Payload:    e.Payload,
-			RetryCount: retryCount,
+			ID:            e.ID.Bytes,
+			EventType:     e.EventType,
+			RoutingKey:    e.RoutingKey,
+			Payload:       e.Payload,
+			RetryCount:    retryCount,
+			CorrelationID: utils.CorrelationIDString(e.CorrelationID),
 		}
 	}
 	return result, nil
@@ -64,11 +65,12 @@ func (s *OutboxStore) GetFailed(ctx context.Context, batchSize int32) ([]eventbu
 		}
 
 		result[i] = eventbus.OutboxEvent{
-			ID:         e.ID.Bytes,
-			EventType:  e.EventType,
-			RoutingKey: e.RoutingKey,
-			Payload:    e.Payload,
-			RetryCount: retryCount,
+			ID:            e.ID.Bytes,
+			EventType:     e.EventType,
+			RoutingKey:    e.RoutingKey,
+			Payload:       e.Payload,
+			RetryCount:    retryCount,
+			CorrelationID: utils.CorrelationIDString(e.CorrelationID),
 		}
 	}
 	return result, nil

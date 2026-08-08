@@ -8,9 +8,9 @@ import (
 
 	"github.com/baaaki/mydreamcampus/monolith/internal/modules/staff/db"
 	serviceErrors "github.com/baaaki/mydreamcampus/monolith/internal/modules/staff/errors"
+	"github.com/baaaki/mydreamcampus/shared/events"
 	sharedErrors "github.com/baaaki/mydreamcampus/shared/platform/errors"
 	"github.com/baaaki/mydreamcampus/shared/platform/utils"
-	"github.com/baaaki/mydreamcampus/shared/events"
 	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgconn"
@@ -74,9 +74,10 @@ func (r *StaffRepository) CreateStaffWithEvent(ctx context.Context, params db.Cr
 		return db.Staff{}, fmt.Errorf("%w: failed to marshal event payload: %v", sharedErrors.ErrQueryFailed, err)
 	}
 	_, err = qtx.CreateOutboxEvent(ctx, db.CreateOutboxEventParams{
-		EventType:  events.EventStaffCreated,
-		RoutingKey: events.RoutingKeyStaffCreated,
-		Payload:    payload,
+		CorrelationID: utils.CorrelationIDFromContext(ctx),
+		EventType:     events.EventStaffCreated,
+		RoutingKey:    events.RoutingKeyStaffCreated,
+		Payload:       payload,
 	})
 	if err != nil {
 		return db.Staff{}, fmt.Errorf("%w: failed to create outbox event: %v", sharedErrors.ErrQueryFailed, err)
@@ -141,9 +142,10 @@ func (r *StaffRepository) UpdateStaffWithEvent(ctx context.Context, id uuid.UUID
 		return db.Staff{}, fmt.Errorf("%w: failed to marshal event payload: %v", sharedErrors.ErrQueryFailed, err)
 	}
 	_, err = qtx.CreateOutboxEvent(ctx, db.CreateOutboxEventParams{
-		EventType:  events.EventStaffUpdated,
-		RoutingKey: events.RoutingKeyStaffUpdated,
-		Payload:    payload,
+		CorrelationID: utils.CorrelationIDFromContext(ctx),
+		EventType:     events.EventStaffUpdated,
+		RoutingKey:    events.RoutingKeyStaffUpdated,
+		Payload:       payload,
 	})
 	if err != nil {
 		return db.Staff{}, fmt.Errorf("%w: failed to create outbox event: %v", sharedErrors.ErrQueryFailed, err)
@@ -182,9 +184,10 @@ func (r *StaffRepository) SoftDeleteStaffWithEvent(ctx context.Context, id uuid.
 		return fmt.Errorf("%w: failed to marshal event payload: %v", sharedErrors.ErrQueryFailed, err)
 	}
 	_, err = qtx.CreateOutboxEvent(ctx, db.CreateOutboxEventParams{
-		EventType:  events.EventStaffDeactivated,
-		RoutingKey: events.RoutingKeyStaffDeactivated,
-		Payload:    payload,
+		CorrelationID: utils.CorrelationIDFromContext(ctx),
+		EventType:     events.EventStaffDeactivated,
+		RoutingKey:    events.RoutingKeyStaffDeactivated,
+		Payload:       payload,
 	})
 	if err != nil {
 		return fmt.Errorf("%w: failed to create outbox event: %v", sharedErrors.ErrQueryFailed, err)

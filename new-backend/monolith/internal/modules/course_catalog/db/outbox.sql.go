@@ -12,19 +12,25 @@ import (
 )
 
 const createOutboxEvent = `-- name: CreateOutboxEvent :one
-INSERT INTO course_catalog.outbox_events (event_type, routing_key, payload)
-VALUES ($1, $2, $3)
-RETURNING id, event_type, routing_key, payload, status, retry_count, max_retries, created_at, processed_at, error_message
+INSERT INTO course_catalog.outbox_events (event_type, routing_key, payload, correlation_id)
+VALUES ($1, $2, $3, $4)
+RETURNING id, event_type, routing_key, payload, status, retry_count, max_retries, created_at, processed_at, error_message, correlation_id
 `
 
 type CreateOutboxEventParams struct {
-	EventType  string `json:"event_type"`
-	RoutingKey string `json:"routing_key"`
-	Payload    []byte `json:"payload"`
+	EventType     string      `json:"event_type"`
+	RoutingKey    string      `json:"routing_key"`
+	Payload       []byte      `json:"payload"`
+	CorrelationID pgtype.UUID `json:"correlation_id"`
 }
 
 func (q *Queries) CreateOutboxEvent(ctx context.Context, arg CreateOutboxEventParams) (OutboxEvent, error) {
-	row := q.db.QueryRow(ctx, createOutboxEvent, arg.EventType, arg.RoutingKey, arg.Payload)
+	row := q.db.QueryRow(ctx, createOutboxEvent,
+		arg.EventType,
+		arg.RoutingKey,
+		arg.Payload,
+		arg.CorrelationID,
+	)
 	var i OutboxEvent
 	err := row.Scan(
 		&i.ID,
@@ -37,12 +43,13 @@ func (q *Queries) CreateOutboxEvent(ctx context.Context, arg CreateOutboxEventPa
 		&i.CreatedAt,
 		&i.ProcessedAt,
 		&i.ErrorMessage,
+		&i.CorrelationID,
 	)
 	return i, err
 }
 
 const getFailedEventsForRetry = `-- name: GetFailedEventsForRetry :many
-SELECT id, event_type, routing_key, payload, status, retry_count, max_retries, created_at, processed_at, error_message
+SELECT id, event_type, routing_key, payload, status, retry_count, max_retries, created_at, processed_at, error_message, correlation_id
 FROM course_catalog.outbox_events
 WHERE status = 'failed' AND retry_count < max_retries
 ORDER BY created_at ASC
@@ -69,6 +76,7 @@ func (q *Queries) GetFailedEventsForRetry(ctx context.Context, limit int32) ([]O
 			&i.CreatedAt,
 			&i.ProcessedAt,
 			&i.ErrorMessage,
+			&i.CorrelationID,
 		); err != nil {
 			return nil, err
 		}
@@ -81,7 +89,7 @@ func (q *Queries) GetFailedEventsForRetry(ctx context.Context, limit int32) ([]O
 }
 
 const getPendingEvents = `-- name: GetPendingEvents :many
-SELECT id, event_type, routing_key, payload, status, retry_count, max_retries, created_at, processed_at, error_message
+SELECT id, event_type, routing_key, payload, status, retry_count, max_retries, created_at, processed_at, error_message, correlation_id
 FROM course_catalog.outbox_events
 WHERE status = 'pending'
 ORDER BY created_at ASC
@@ -108,6 +116,7 @@ func (q *Queries) GetPendingEvents(ctx context.Context, limit int32) ([]OutboxEv
 			&i.CreatedAt,
 			&i.ProcessedAt,
 			&i.ErrorMessage,
+			&i.CorrelationID,
 		); err != nil {
 			return nil, err
 		}

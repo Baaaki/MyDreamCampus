@@ -14,21 +14,27 @@ import (
 
 const createOutboxEvent = `-- name: CreateOutboxEvent :one
 INSERT INTO grades.outbox_events (
-    event_type, routing_key, payload, status, retry_count, max_retries
+    event_type, routing_key, payload, correlation_id, status, retry_count, max_retries
 ) VALUES (
-    $1, $2, $3, 'pending', 0, 3
+    $1, $2, $3, $4, 'pending', 0, 3
 )
-RETURNING id, event_type, routing_key, payload, status, retry_count, max_retries, created_at, processed_at, error_message
+RETURNING id, event_type, routing_key, payload, status, retry_count, max_retries, created_at, processed_at, error_message, correlation_id
 `
 
 type CreateOutboxEventParams struct {
-	EventType  string `json:"event_type"`
-	RoutingKey string `json:"routing_key"`
-	Payload    []byte `json:"payload"`
+	EventType     string      `json:"event_type"`
+	RoutingKey    string      `json:"routing_key"`
+	Payload       []byte      `json:"payload"`
+	CorrelationID pgtype.UUID `json:"correlation_id"`
 }
 
 func (q *Queries) CreateOutboxEvent(ctx context.Context, arg CreateOutboxEventParams) (GradesOutboxEvent, error) {
-	row := q.db.QueryRow(ctx, createOutboxEvent, arg.EventType, arg.RoutingKey, arg.Payload)
+	row := q.db.QueryRow(ctx, createOutboxEvent,
+		arg.EventType,
+		arg.RoutingKey,
+		arg.Payload,
+		arg.CorrelationID,
+	)
 	var i GradesOutboxEvent
 	err := row.Scan(
 		&i.ID,
@@ -41,12 +47,13 @@ func (q *Queries) CreateOutboxEvent(ctx context.Context, arg CreateOutboxEventPa
 		&i.CreatedAt,
 		&i.ProcessedAt,
 		&i.ErrorMessage,
+		&i.CorrelationID,
 	)
 	return i, err
 }
 
 const getPendingOutboxEvents = `-- name: GetPendingOutboxEvents :many
-SELECT id, event_type, routing_key, payload, status, retry_count, max_retries, created_at, processed_at, error_message FROM grades.outbox_events
+SELECT id, event_type, routing_key, payload, status, retry_count, max_retries, created_at, processed_at, error_message, correlation_id FROM grades.outbox_events
 WHERE status = 'pending'
 ORDER BY created_at
 LIMIT $1
@@ -72,6 +79,7 @@ func (q *Queries) GetPendingOutboxEvents(ctx context.Context, limit int32) ([]Gr
 			&i.CreatedAt,
 			&i.ProcessedAt,
 			&i.ErrorMessage,
+			&i.CorrelationID,
 		); err != nil {
 			return nil, err
 		}

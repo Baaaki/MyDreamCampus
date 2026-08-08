@@ -114,16 +114,17 @@ type ImportJob struct {
 }
 
 type OutboxEvent struct {
-	ID           pgtype.UUID      `json:"id"`
-	EventType    string           `json:"event_type"`
-	RoutingKey   string           `json:"routing_key"`
-	Payload      []byte           `json:"payload"`
-	Status       OutboxStatusEnum `json:"status"`
-	RetryCount   int16            `json:"retry_count"`
-	MaxRetries   int16            `json:"max_retries"`
-	CreatedAt    pgtype.Timestamp `json:"created_at"`
-	ProcessedAt  pgtype.Timestamp `json:"processed_at"`
-	ErrorMessage pgtype.Text      `json:"error_message"`
+	ID            pgtype.UUID      `json:"id"`
+	EventType     string           `json:"event_type"`
+	RoutingKey    string           `json:"routing_key"`
+	Payload       []byte           `json:"payload"`
+	Status        OutboxStatusEnum `json:"status"`
+	RetryCount    int16            `json:"retry_count"`
+	MaxRetries    int16            `json:"max_retries"`
+	CreatedAt     pgtype.Timestamp `json:"created_at"`
+	ProcessedAt   pgtype.Timestamp `json:"processed_at"`
+	ErrorMessage  pgtype.Text      `json:"error_message"`
+	CorrelationID pgtype.UUID      `json:"correlation_id"`
 }
 
 type ProcessedEvent struct {

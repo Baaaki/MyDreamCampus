@@ -176,16 +176,17 @@ type GradesCoursesView struct {
 }
 
 type GradesOutboxEvent struct {
-	ID           uuid.UUID                  `json:"id"`
-	EventType    string                     `json:"event_type"`
-	RoutingKey   string                     `json:"routing_key"`
-	Payload      []byte                     `json:"payload"`
-	Status       NullGradesOutboxStatusEnum `json:"status"`
-	RetryCount   pgtype.Int2                `json:"retry_count"`
-	MaxRetries   pgtype.Int2                `json:"max_retries"`
-	CreatedAt    pgtype.Timestamp           `json:"created_at"`
-	ProcessedAt  pgtype.Timestamp           `json:"processed_at"`
-	ErrorMessage pgtype.Text                `json:"error_message"`
+	ID            uuid.UUID                  `json:"id"`
+	EventType     string                     `json:"event_type"`
+	RoutingKey    string                     `json:"routing_key"`
+	Payload       []byte                     `json:"payload"`
+	Status        NullGradesOutboxStatusEnum `json:"status"`
+	RetryCount    pgtype.Int2                `json:"retry_count"`
+	MaxRetries    pgtype.Int2                `json:"max_retries"`
+	CreatedAt     pgtype.Timestamp           `json:"created_at"`
+	ProcessedAt   pgtype.Timestamp           `json:"processed_at"`
+	ErrorMessage  pgtype.Text                `json:"error_message"`
+	CorrelationID pgtype.UUID                `json:"correlation_id"`
 }
 
 type GradesPrerequisiteCoursesView struct {

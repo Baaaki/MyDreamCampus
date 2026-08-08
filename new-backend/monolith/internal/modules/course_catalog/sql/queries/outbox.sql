@@ -1,10 +1,10 @@
 -- name: CreateOutboxEvent :one
-INSERT INTO course_catalog.outbox_events (event_type, routing_key, payload)
-VALUES ($1, $2, $3)
-RETURNING id, event_type, routing_key, payload, status, retry_count, max_retries, created_at, processed_at, error_message;
+INSERT INTO course_catalog.outbox_events (event_type, routing_key, payload, correlation_id)
+VALUES ($1, $2, $3, $4)
+RETURNING id, event_type, routing_key, payload, status, retry_count, max_retries, created_at, processed_at, error_message, correlation_id;
 
 -- name: GetPendingEvents :many
-SELECT id, event_type, routing_key, payload, status, retry_count, max_retries, created_at, processed_at, error_message
+SELECT id, event_type, routing_key, payload, status, retry_count, max_retries, created_at, processed_at, error_message, correlation_id
 FROM course_catalog.outbox_events
 WHERE status = 'pending'
 ORDER BY created_at ASC
@@ -21,7 +21,7 @@ SET status = 'failed', retry_count = retry_count + 1, error_message = $2
 WHERE id = $1;
 
 -- name: GetFailedEventsForRetry :many
-SELECT id, event_type, routing_key, payload, status, retry_count, max_retries, created_at, processed_at, error_message
+SELECT id, event_type, routing_key, payload, status, retry_count, max_retries, created_at, processed_at, error_message, correlation_id
 FROM course_catalog.outbox_events
 WHERE status = 'failed' AND retry_count < max_retries
 ORDER BY created_at ASC

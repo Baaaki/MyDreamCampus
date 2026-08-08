@@ -62,24 +62,26 @@ func (s *OutboxStore) Reset(ctx context.Context, id uuid.UUID) error {
 
 func pendingRowToEvent(r db.GetPendingOutboxEventsRow) eventbus.OutboxEvent {
 	return eventbus.OutboxEvent{
-		ID:         utils.PgtypeToUUID(r.ID),
-		EventType:  r.EventType,
-		RoutingKey: r.RoutingKey,
-		Payload:    r.Payload,
-		CreatedAt:  r.CreatedAt.Time,
-		RetryCount: r.RetryCount,
-		MaxRetries: r.MaxRetries,
+		ID:            utils.PgtypeToUUID(r.ID),
+		EventType:     r.EventType,
+		RoutingKey:    r.RoutingKey,
+		Payload:       r.Payload,
+		CreatedAt:     r.CreatedAt.Time,
+		RetryCount:    r.RetryCount,
+		MaxRetries:    r.MaxRetries,
+		CorrelationID: utils.CorrelationIDString(r.CorrelationID),
 	}
 }
 
 func failedRowToEvent(r db.GetFailedOutboxEventsRow) eventbus.OutboxEvent {
 	return eventbus.OutboxEvent{
-		ID:         utils.PgtypeToUUID(r.ID),
-		EventType:  r.EventType,
-		RoutingKey: r.RoutingKey,
-		Payload:    r.Payload,
-		CreatedAt:  r.CreatedAt.Time,
-		RetryCount: r.RetryCount,
-		MaxRetries: r.MaxRetries,
+		ID:            utils.PgtypeToUUID(r.ID),
+		EventType:     r.EventType,
+		RoutingKey:    r.RoutingKey,
+		Payload:       r.Payload,
+		CreatedAt:     r.CreatedAt.Time,
+		RetryCount:    r.RetryCount,
+		MaxRetries:    r.MaxRetries,
+		CorrelationID: utils.CorrelationIDString(r.CorrelationID),
 	}
 }

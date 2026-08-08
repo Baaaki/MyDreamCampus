@@ -1,8 +1,8 @@
 -- name: CreateOutboxEvent :one
 INSERT INTO grades.outbox_events (
-    event_type, routing_key, payload, status, retry_count, max_retries
+    event_type, routing_key, payload, correlation_id, status, retry_count, max_retries
 ) VALUES (
-    $1, $2, $3, 'pending', 0, 3
+    $1, $2, $3, $4, 'pending', 0, 3
 )
 RETURNING *;
 

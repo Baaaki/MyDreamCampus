@@ -226,6 +226,7 @@ func (r *ReservationRepository) CancelReservationWithRefund(ctx context.Context,
 	}
 
 	_, err = qtx.CreateOutboxEvent(ctx, db.CreateOutboxEventParams{
+		CorrelationID: utils.CorrelationIDFromContext(ctx),
 		AggregateID:   utils.UUIDToPgtype(reservationID),
 		AggregateType: "reservation",
 		EventType:     "meal.reservation.cancelled",
@@ -292,6 +293,7 @@ func (r *ReservationRepository) ConfirmReservationsWithEvents(ctx context.Contex
 		}
 
 		_, err = qtx.CreateOutboxEvent(ctx, db.CreateOutboxEventParams{
+			CorrelationID: utils.CorrelationIDFromContext(ctx),
 			AggregateID:   utils.UUIDToPgtype(reservationIDs[i]),
 			AggregateType: "reservation",
 			EventType:     "meal.reservation.created",
