@@ -79,3 +79,8 @@ func (c *InProcessCourseCatalogClient) GetCoursesByIDs(ctx context.Context, seme
 	}
 	return res, nil
 }
+
+// Compile-time assertions — the in-process and HTTP clients must stay
+// interchangeable.
+var _ StudentClient = (*InProcessStudentClient)(nil)
+var _ CourseCatalogClient = (*InProcessCourseCatalogClient)(nil)

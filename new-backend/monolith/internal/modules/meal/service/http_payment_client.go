@@ -34,7 +34,4 @@ func (c *HTTPPaymentClient) RequestRefund(ctx context.Context, req dto.RefundReq
 	return &resp, nil
 }
 
-var (
-	_ PaymentClient = (*HTTPPaymentClient)(nil)
-	_ PaymentClient = (*PaymentAdapter)(nil)
-)
+var _ PaymentClient = (*HTTPPaymentClient)(nil)

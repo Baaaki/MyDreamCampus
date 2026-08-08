@@ -50,3 +50,7 @@ func (c *InProcessSemesterClient) GetSemesterInfo(ctx context.Context, semester 
 		IsPastDeadline: isPast,
 	}, nil
 }
+
+// Compile-time assertion — the in-process and HTTP clients must stay
+// interchangeable.
+var _ SemesterClient = (*InProcessSemesterClient)(nil)

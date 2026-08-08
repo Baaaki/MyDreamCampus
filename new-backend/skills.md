@@ -13,7 +13,11 @@ Tek binary monolith (`new-backend/monolith`) + ayri notification servisi. 9 modu
 - **Query**: sqlc + pgx/v5 — raw SQL string YAPMA, GORM YAPMA. `internal/modules/*/db/` generated — elle DUZENLEME.
 - **Migration**: goose. Uygulanmis migration'i degistirme, yeni dosya ekle. Calistirma (`migrate-up`) kullanici onayi ister.
 - **Event publish**: Outbox pattern zorunlu — service transaction icinde outbox tablosuna yaz, publisher'i dogrudan cagirma.
-- **Moduller arasi cagri**: In-process client interface (ornek: `enrollment/service.NewInProcessStudentClient`) — modul modulu HTTP ile CAGIRMAZ. Side-effect/notify icin RabbitMQ event.
+- **Moduller arasi cagri**: Sync okuma/dogrulama icin **internal REST**
+  (`shared/client`, `X-Internal-Secret`). In-process client adapter'lari
+  mikroservis migrasyonunda kaldiriliyor — bkz.
+  `microservices-migration/00-BASLANGIC.md`. Side-effect/notify icin
+  RabbitMQ event (degismedi).
 - **sqlc rename**: Her modulun `sqlc.yaml`'inda schema prefix'i Go adindan dusuren `rename:` blogu var (`auth_user` → `User`). Yeni tablo eklerken rename satirini da ekle.
 - **Yeni modul / yeni event semasi**: once kullaniciya sor (CLAUDE.md §6).
 

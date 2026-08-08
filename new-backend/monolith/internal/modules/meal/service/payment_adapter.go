@@ -61,3 +61,7 @@ func (a *PaymentAdapter) RequestRefund(ctx context.Context, req dto.RefundReques
 		Message:  resp.Message,
 	}, nil
 }
+
+// Compile-time assertion — the in-process and HTTP clients must stay
+// interchangeable.
+var _ PaymentClient = (*PaymentAdapter)(nil)

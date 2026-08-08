@@ -90,14 +90,14 @@ için görünmez. Bu dosyalara **dokunma**.
 | 0 | `faz-0-shared-platform-TAMAMLANDI.md` | `platform/` → `shared/platform/` taşıma | [x] |
 | 1 | `faz-1-veritabani-ayrimi-TAMAMLANDI.md` | Tek Postgres, 9 ayrı DB + 9 DB kullanıcısı | [x] |
 | 2 | `faz-2-period-projeksiyonu-TAMAMLANDI.md` | `academic_periods` cross-service okumasını kaldır | [x] |
-| 3 | `faz-3-http-client-katmani.md` | `shared/client/` internal REST client'ları | [ ] |
+| 3 | `faz-3-http-client-katmani-TAMAMLANDI.md` | `shared/client/` internal REST client'ları | [x] |
 | 4 | `faz-4-servis-iskeletleri.md` | 9 × `cmd/main.go` + `go.mod` + `Dockerfile` + `go.work` | [ ] |
 | 5 | `faz-5-caddy-gateway.md` | Caddyfile path-prefix routing | [ ] |
 | 6 | `faz-6-docker-compose.md` | 16 konteynerli compose + kaynak limitleri | [ ] |
 | 7 | `faz-7-e2e-dogrulama.md` | Uçtan uca golden path testi | [ ] |
 | 8 | `faz-8-temizlik.md` | `monolith/` kaldırma + doküman güncelleme | [ ] |
 
-**Sıradaki faz: 3**
+**Sıradaki faz: 4**
 
 ---
 

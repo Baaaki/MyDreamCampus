@@ -88,7 +88,5 @@ func (c *HTTPCourseCatalogClient) GetCoursesByIDs(ctx context.Context, semester 
 	return res, nil
 }
 
-var (
-	_ StudentClient       = (*HTTPStudentClient)(nil)
-	_ CourseCatalogClient = (*HTTPCourseCatalogClient)(nil)
-)
+var _ StudentClient = (*HTTPStudentClient)(nil)
+var _ CourseCatalogClient = (*HTTPCourseCatalogClient)(nil)
