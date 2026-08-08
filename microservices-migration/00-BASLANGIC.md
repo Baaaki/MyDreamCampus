@@ -36,7 +36,31 @@ dosyasını aç ve kaldığın yerden devam et, baştan başlama.
    - Bu dosyadaki durum tablosunda o satırı `[x]`, "Sıradaki faz" satırını
      bir sonraki numara yap.
    - Bu iki güncellemeyi de commit'e dahil et — yoksa kayıt kodla senkron olmaz.
-5. Kullanıcıya "Faz N bitti" diye rapor et.
+5. **Doküman senkronu** — aşağıdaki tabloda o faza ait satır varsa uygula.
+6. Kullanıcıya "Faz N bitti" diye rapor et.
+
+### Doküman Senkronu — hangi faz hangi satırı geçersiz kılıyor
+
+`CLAUDE.md` her oturumda otomatik yükleniyor. Bir faz onun bir satırını yanlış
+hale getirdiği anda düzeltilmeli — Faz 8'e biriktirilirse aradaki her oturum
+yanlış talimat okur.
+
+| Faz sonunda | Dosya | Ne yapılacak |
+|---|---|---|
+| **1** | `CLAUDE.md` §12 "Database" satırı | "tek DB, modul basina ayri schema" → "servis basina ayri DB (tek Postgres konteyneri), schema adlari korunuyor" |
+| **3** | `CLAUDE.md` §12 "Moduller arasi iletisim" satırı | "in-process client interface (HTTP YOK, `X-Internal-Secret` YOK)" → "internal REST + `X-Internal-Secret`; side-effect icin RabbitMQ event" |
+| **3** | `new-backend/skills.md` §1 | "modul modulu HTTP ile CAGIRMAZ" maddesi — tam metin Faz 3 adım 8'de |
+| **4** | `CLAUDE.md` giriş (satır 3) | "Go moduler monolith (`new-backend/`)" → "Go mikroservisler (`new-backend/services/`)" |
+| **4** | `CLAUDE.md` §2 tablosu | `new-backend/monolith/**` → `new-backend/services/**` |
+| **4** | `CLAUDE.md` §4 tablosu | `new-backend/monolith/` satırı → servis dizinleri, `make sqlc` servis kökünden |
+| **4** | `CLAUDE.md` §14 tablosu | generated yollar → `services/<x>-service/internal/db/` |
+| **5** | `CLAUDE.md` §13 | Caddy satırı: tek upstream → path-prefix routing |
+| **8** | hepsi | Son süpürme + `SYSTEM-DESIGN.md` silme + §0 kaldırma (Faz 8 C bölümü) |
+
+**`frontend/skills.md` ve `mobile/skills.md` hiç değişmiyor** — ikisinde de
+backend mimarisine tek atıf yok (`monolith`, `8080`, `backend` kelimeleri
+geçmiyor). Route prefix'leri servis sınırlarıyla örtüştüğü için bölünme onlar
+için görünmez. Bu dosyalara **dokunma**.
 
 **Kullanıcının tek yapması gereken:** yeni oturumda bu dosyayı okutmak.
 `CLAUDE.md` §0 zaten buraya yönlendiriyor, yani hatırlatması bile gerekmez.

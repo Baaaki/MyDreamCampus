@@ -132,18 +132,27 @@ Caddy üzerinden auth-service'e gidiyor (Faz 5) — yol değişmediyse dokunma.
 
 ## C — Dokümantasyon
 
-### C1. `CLAUDE.md` — en kritik dosya
+### C1. `CLAUDE.md` — son süpürme
+
+**Çoğu satır zaten düzeltilmiş olmalı.** `00-BASLANGIC.md`'deki "Doküman
+Senkronu" tablosu gereği §12 Faz 1 ve 3'te, giriş/§2/§4/§14 Faz 4'te, §13
+Faz 5'te güncellendi. Burada kalan:
 
 | Bölüm | Yapılacak |
 |---|---|
-| **§0 (AKTIF: Mikroservis Migrasyonu)** | **Tamamen sil** — migrasyon bitti. Ama içindeki "hedef mimari için `01-REFERANS-MIMARI.md`" yönlendirmesini §15'e taşı, çünkü `SYSTEM-DESIGN.md` siliniyor (C2). |
-| Başlık paragrafı | "Go moduler monolith (`new-backend/`)" → "Go mikroservisler (`new-backend/services/`)" |
-| §2 Zorunlu okuma | `new-backend/monolith/**` satırını `new-backend/services/**` yap |
-| §4 Paket yöneticisi | `new-backend/monolith/` → servis dizinleri; `make sqlc-<module>` → servis kökünde `make sqlc` |
-| §12 Mimari kararlar | **Mimari** satırı: "Modüler monolith" → "Mikroservis (10 servis)". **Modüller arası iletişim** satırı: in-process client → **internal REST + X-Internal-Secret**. **Database** satırı: tek DB + schema → **servis başına ayrı DB, tek Postgres konteyneri**. |
-| §13 Portlar | Tabloyu `01-REFERANS-MIMARI.md` §1 ve §4 ile değiştir |
-| §14 Generated dosyalar | Yolları `services/<x>-service/internal/db/` yap |
+| **§0 (AKTIF: Mikroservis Migrasyonu)** | **Tamamen sil** — migrasyon bitti. İçindeki "hedef mimari için `01-REFERANS-MIMARI.md`" yönlendirmesini §15'e taşı, çünkü `SYSTEM-DESIGN.md` siliniyor (C2). |
+| §12 "Mimari" satırı | "Modüler monolith" → "Mikroservis (10 servis)". Önceki fazlar bu satıra dokunmadı — sadece Database ve iletişim satırları güncellendi. |
+| §11 Subagent kullanımi | "3+ modulu tarayan" → "3+ servisi tarayan" |
+| §15 Detayli rehberler | `SYSTEM-DESIGN.md` linki → `microservices-migration/01-REFERANS-MIMARI.md` |
 | §7 Commit scope | `catalog` scope'u zaten var, değişiklik gerekmez |
+
+Kalan monolith izlerini tara:
+
+```bash
+grep -n "monolith\|moduler monolith\|in-process\|schema per\|modul basina ayri schema" CLAUDE.md
+```
+
+Sadece `v0-microservices` tag'ine yapılan tarihsel atıflar kalmalı.
 
 ### C2. `SYSTEM-DESIGN.md` — yeniden yazma, **sil**
 
@@ -199,8 +208,24 @@ Mimari özeti ve "nasıl çalıştırılır" bölümü.
 
 ### C5. `new-backend/skills.md`
 
-Backend geliştirme rehberi — modül şablonu yerine servis şablonu, `make`
-komutları servis köküne taşındı.
+Backend geliştirme rehberi. Faz 3'te **tek satırı** düzeltilmişti (modüller
+arası HTTP çelişkisi); burada tamamı yeniden yazılıyor:
+
+- Başlık: "Go Moduler Monolith" → "Go Mikroservisler"
+- §1 Sert kurallar: çalışma dizini artık servis kökü; DB satırı servis başına
+  ayrı DB; kuyruk declare sahipliği kuralı (`01-REFERANS-MIMARI.md` §3.1)
+- §2 Dizin yapısı → `01-REFERANS-MIMARI.md` §5
+- §3 Make komutları → servis kökünden (`make sqlc`, `make migrate-up`)
+- §4-5 Yeni endpoint / yeni servis workflow'u
+- §6 Event: **yeni kuyruk eklerken hem servisin declare koduna hem
+  `definitions.json`'a eklenmeli** (Faz 4 bakım notu)
+- **Yeni bölüm:** dayanıklılık — circuit breaker `isFailure` kuralı,
+  idempotency middleware'i hangi endpoint'lere bağlanır
+  (`05-DAYANIKLILIK.md` özeti)
+
+**`frontend/skills.md` ve `mobile/skills.md`'ye DOKUNMA.** İkisinde de backend
+mimarisine tek atıf yok — `monolith`, `microservice`, `8080`, `backend`
+kelimeleri hiç geçmiyor. Bölünme onlar için görünmez.
 
 ### C6. Bu migrasyon klasörü
 
