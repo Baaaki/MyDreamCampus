@@ -46,6 +46,44 @@ eder. `cmd/main.go`'daki tek büyük `downstreamBindings` listesi 9 parçaya
 bölünür (referans: `01-REFERANS-MIMARI.md` §3 tablosu — hangi kuyruk hangi
 servisin).
 
+**Yanlış sahipliği düzelt:** `payment/service/payment_service.go:76-79`
+`meal.payment_completed_queue` ve `meal.payment_failed_queue`'yu declare edip
+bind ediyor — yani **publisher, consumer'ın kuyruğunu tanımlıyor**. Bu satırları
+payment'tan **sil**; meal zaten aynı kuyrukları
+`meal/worker/event_consumer.go`'da declare ediyor.
+
+### A1b. `definitions.json` — pre-declare garantisini koru
+
+Monolith'te binding'ler `main.go`'da merkezi olarak pre-declare ediliyordu ve
+yorumu şunu söylüyordu: *"consumer offline olsa da mesaj birikmeye devam
+eder"*. Servisler ayrılınca bu garanti kaybolur — meal-service hiç ayağa
+kalkmadıysa `payment.completed` mesajları exchange'e düşer ve **sessizce
+kaybolur** (binding yok).
+
+Çözüm hazır bekliyor: `infrastructure/rabbitmq/rabbitmq.conf` içinde şu satır
+**yorumlu** duruyor:
+
+```
+# management.load_definitions = /etc/rabbitmq/definitions.json
+```
+
+Yap:
+
+1. `infrastructure/rabbitmq/definitions.json` oluştur — 9 exchange + tüm
+   kuyruklar + tüm binding'ler (`01-REFERANS-MIMARI.md` §3 tabloları).
+   Mevcut topolojiyi çalışan bir kurulumdan çıkarabilirsin:
+   `curl -u user:pass http://localhost:15672/api/definitions > definitions.json`
+2. `rabbitmq.conf`'taki satırın yorumunu kaldır.
+3. Compose'da mount et (Faz 6):
+   `- ./rabbitmq/definitions.json:/etc/rabbitmq/definitions.json:ro`
+
+Servis içi declare'leri **silme** — idempotent, ve tek servisi
+`definitions.json` olmadan lokal çalıştırabilmeyi sağlıyor. `definitions.json`
+emniyet kemeri, tek kaynak değil.
+
+**Bakım notu:** Yeni kuyruk eklerken hem servisin declare koduna hem
+`definitions.json`'a eklenmeli. Bunu Faz 8'de `skills.md`'ye kural olarak yaz.
+
 ### A2. `internal/http/server.go` → `shared/httpserver/`
 
 ```bash

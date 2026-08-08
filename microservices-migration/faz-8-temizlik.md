@@ -133,28 +133,44 @@ Caddy üzerinden auth-service'e gidiyor (Faz 5) — yol değişmediyse dokunma.
 | §14 Generated dosyalar | Yolları `services/<x>-service/internal/db/` yap |
 | §7 Commit scope | `catalog` scope'u zaten var, değişiklik gerekmez |
 
-### C2. `SYSTEM-DESIGN.md`
+### C2. `SYSTEM-DESIGN.md` — yeniden yazma, **sil**
 
-En büyük iş burada (353 satır). Değişecekler:
+353 satırın tamamı monolith mimarisini anlatıyor ve bugün bile koddan sapmış
+durumda (var olmayan Grafana/Loki config dizinlerini "hazır" gösteriyor,
+`/internal/periods` fan-out'unu çalışıyor gibi anlatıyor). Migrasyondan sonra
+**tek satırı** doğru kalmıyor.
 
-- §1 Genel bakış + ASCII diyagram → `01-REFERANS-MIMARI.md` §4 ve bu
-  klasördeki hedef şema
-- §2 HTTP katmanı → "moduller arası sync iletişim" paragrafı internal REST'i
-  anlatmalı
-- §4.1 Modül şablonu → servis şablonu (dizin yapısı `01-REFERANS-MIMARI.md` §5)
-- §4.2 Her modülün "Sync bağımlılık" satırları → HTTP client'lara güncelle
-- §5 Veri mimarisi → schema-per-module değil, **database-per-service**
-- §6 Event mimarisi → yeni kuyruklar (period, audit) eklendi
-- §10 Altyapı → 16 konteyner
-- §11 Bilinen eksikler → "HTTP loopback kalıntısı" maddesini **sil** (çözüldü),
-  "meal/proto gRPC kalıntısı" notunu güncelle (gRPC ileride pilot olarak
-  değerlendirilecek)
-- **§10 ve §11'deki yanlış iddiayı düzelt:** ikisi de *"Grafana/Loki/Promtail
-  config'leri hazır ama compose'a ekli değil"* diyor. Böyle bir dizin yok — ne
-  `main`'de ne `v0-microservices` tag'inde. Doğru ifade: *"Gözlemlenebilirlik
-  (Prometheus/Loki/Grafana) henüz kurulmadı. `shared/httpserver` tüm
-  servislerin ortak giriş noktası olduğu için `/metrics` tek yerden eklenebilir;
-  compose için üçüncü bir overlay dosyası öngörülüyor."*
+Kullanıcı kararı: bu doküman kaynak olarak kullanılmıyor.
+
+```bash
+git rm SYSTEM-DESIGN.md
+```
+
+Git geçmişi koruyor — gerekirse `git show <commit>:SYSTEM-DESIGN.md` ile
+bakılır.
+
+**Yerine geçen mimari kaydı:**
+
+| Ne | Nerede |
+|---|---|
+| Servis / port / DB / route tablosu | `microservices-migration/01-REFERANS-MIMARI.md` §1 |
+| Sync bağımlılık haritası + internal endpoint kontratları | §2 |
+| Event haritası + kuyruk sahipliği | §3 |
+| Konteyner haritası + kaynak tahminleri | §4 |
+| Repo yapısı | §5 |
+| Env değişkenleri | §6 |
+| Sabit mimari kararlar | `CLAUDE.md` §12-13 |
+| Backend geliştirme rehberi | `new-backend/skills.md` |
+
+Bu yüzden `microservices-migration/` klasörü **silinmiyor** (bkz. C6) —
+`01-REFERANS-MIMARI.md` artık projenin mimari referansı.
+
+`README.md` ve `CLAUDE.md` içindeki `SYSTEM-DESIGN.md` linklerini
+`microservices-migration/01-REFERANS-MIMARI.md`'ye çevir.
+
+Silmek yerine yeniden yazmayı tercih edersen kullanıcıya sor — ama iki ayrı
+mimari dokümanı senkron tutmanın maliyeti, tek doğru kaynağın değerinden
+yüksek.
 
 ### C3. `DEPLOY.md`
 
@@ -176,13 +192,21 @@ komutları servis köküne taşındı.
 
 ### C6. Bu migrasyon klasörü
 
-`microservices-migration/` klasörünü **silme**. Tarihsel referans olarak dursun
-— `00-BASLANGIC.md`'nin başına bir satır ekle:
+`microservices-migration/` klasörünü **silme** — `01-REFERANS-MIMARI.md`
+`SYSTEM-DESIGN.md`'nin yerine geçen mimari kaydı oldu (C2).
+
+`00-BASLANGIC.md`'nin başına ekle:
 
 ```
-> MIGRASYON TAMAMLANDI (<tarih>). Bu klasör tarihsel referanstır.
-> Güncel mimari için SYSTEM-DESIGN.md'ye bak.
+> MIGRASYON TAMAMLANDI (<tarih>). Faz dosyaları tarihsel referanstır.
+> GÜNCEL MİMARİ: 01-REFERANS-MIMARI.md (bu klasörde) — projenin mimari
+> kaynağı odur, faz dosyaları değil.
 ```
+
+`01-REFERANS-MIMARI.md`'den de migrasyona özgü kalıntıları temizle:
+"Faz 2'de eklenecek" / "Faz 3'te eklenecek" başlıklarını kaldır, o kuyrukları
+ana tabloya taşı. §7 (Blokerler ve hangi fazda çözüldükleri) tablosunu sil —
+artık hepsi çözüldü.
 
 ---
 
@@ -195,7 +219,11 @@ grep -rn "monolith" --include="*.go" --include="*.yml" --include="Dockerfile" \
 
 # 2. Dokümanlar tutarlı
 grep -rn "modüler monolith\|moduler monolith\|schema-per-module\|schema per module" \
-  CLAUDE.md SYSTEM-DESIGN.md README.md DEPLOY.md
+  CLAUDE.md README.md DEPLOY.md new-backend/skills.md
+
+# 2b. SYSTEM-DESIGN.md silindi ve hiçbir yerden linklenmiyor
+test ! -f SYSTEM-DESIGN.md && echo "silindi"
+grep -rn "SYSTEM-DESIGN" --include="*.md" --include="*.go" . | grep -v microservices-migration
 
 # 3. Tam yeniden kurulum çalışıyor (temiz volume)
 sudo docker compose -f new-backend/infrastructure/docker-compose.yml \

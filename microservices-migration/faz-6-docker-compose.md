@@ -207,11 +207,28 @@ COMPOSE := -f $(COMPOSE_FILE) -f $(INFRA)/docker-compose.standalone.yml \
 `COMPOSE` değişkenindeki bu deseni yorumla belgele ki sonradan eklerken
 Makefile'ı yeniden düşünmek gerekmesin.
 
-**Uyarı — yanlış doküman:** `SYSTEM-DESIGN.md` §10 ve §11
-*"Grafana/Loki/Promtail config dizinleri hazır ancak henüz compose'a ekli
-değil"* diyor. **Böyle bir dizin yok** — ne `main`'de ne `v0-microservices`
-tag'inde. Bu satırlara güvenip "config'ler hazır" varsayma. Faz 8'de
-düzeltiliyor.
+Gözlemlenebilirlik altyapısı **sıfırdan kurulacak** — repoda hazır
+Grafana/Loki/Promtail config'i yok (`SYSTEM-DESIGN.md` var diyor, yanlış; o
+doküman kaynak değil, bkz. `00-BASLANGIC.md`).
+
+### 8. `definitions.json` mount'u
+
+Faz 4'te oluşturulan RabbitMQ topoloji dosyasını bağla:
+
+```yaml
+  rabbitmq:
+    volumes:
+      - rabbitmq-data:/var/lib/rabbitmq
+      - ./rabbitmq/rabbitmq.conf:/etc/rabbitmq/rabbitmq.conf:ro
+      - ./rabbitmq/definitions.json:/etc/rabbitmq/definitions.json:ro
+```
+
+`rabbitmq.conf`'ta `management.load_definitions` satırının yorumu Faz 4'te
+kaldırılmıştı — dosya mount edilmezse RabbitMQ **başlamaz**. İkisi birlikte
+gider.
+
+Doğrulama: `http://localhost:15672` → Queues sekmesinde, hiçbir servis
+başlamamışken bile tüm kuyruklar görünmeli.
 
 ---
 

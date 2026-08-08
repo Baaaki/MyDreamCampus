@@ -20,6 +20,12 @@
 isimleri, iletişim kontratları. Faz dosyaları buraya atıfta bulunur. Sadece
 gerektiğinde aç, baştan sona okuma.
 
+> **`SYSTEM-DESIGN.md`'yi okuma, kaynak olarak kullanma.** O doküman monolith
+> mimarisini anlatıyor ve şimdiden koddan sapmış (var olmayan Grafana/Loki
+> config'lerini "hazır" gösteriyor, bozuk `/internal/periods` fan-out'unu
+> çalışıyor gibi anlatıyor). Mimari bilgi için `01-REFERANS-MIMARI.md`,
+> davranış için **koda** bak. Dosya Faz 8'de siliniyor.
+
 ---
 
 ## Durum Tablosu

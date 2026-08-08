@@ -3,6 +3,14 @@
 > Bu bir faz dosyası değil, **sözlük**. Faz dosyaları buraya atıf yapar.
 > Baştan sona okuma — ihtiyacın olan tabloyu bul.
 
+> **Kaynak: kod.** Bu dosyadaki tablolar `cmd/main.go`, modül `module.go`
+> dosyaları, `worker/` consumer'ları ve migration `.sql`'lerinden çıkarıldı.
+>
+> **`SYSTEM-DESIGN.md`'yi kaynak olarak KULLANMA.** O doküman monolith
+> mimarisini anlatıyor ve bazı yerlerde koddan sapmış durumda (örnek: var
+> olmayan Grafana/Loki config dizinlerini "hazır" gösteriyor). Bir bilgiyi
+> oradan alma — koda bak.
+
 ---
 
 ## 1. Servis Tablosu
@@ -108,6 +116,31 @@ idempotency anahtarı, `processed_events` tablosuyla kontrol edilir.
 
 **Kural:** Her publish outbox üzerinden (istisna: payment — DB'si yok).
 Her consumer idempotent.
+
+### 3.1 Kuyruk Declare Sorumluluğu — bugün dağınık, Faz 4'te toplanıyor
+
+Koda bakıldığında kuyruklar **üç ayrı mekanizmayla** tanımlanıyor:
+
+| Mekanizma | Nerede | Hangi kuyruklar |
+|---|---|---|
+| Merkezi pre-declare | `cmd/main.go` → `downstreamBindings` | `auth_events_queue`, `student.staff_events`, `attendance.sync_events`, `grades.sync_events`, `grades.finalize_requested`, `enrollment.sync_events` |
+| **Publisher declare ediyor** | `payment/service/payment_service.go:76-79` | `meal.payment_completed_queue`, `meal.payment_failed_queue` |
+| Consumer kendi declare ediyor | `meal/worker/event_consumer.go` | `meal.student_*_queue` (3 adet) + yukarıdaki iki payment kuyruğu (tekrar) |
+| Servis kendi declare ediyor | `services/notification/internal/consumer/setup.go` | `notification_events_queue` |
+
+**İkinci satır yanlış sahiplik:** payment, meal'in kuyruğunu tanımlıyor.
+Servisler ayrılınca payment-service, meal-service'in kuyruğunu declare eder
+hale gelir — meal hiç ayağa kalkmasa bile. Faz 4 bunu düzeltiyor.
+
+**Hedef kural (Faz 4):**
+1. Kuyruğu **tüketen servis** declare eder. Publisher asla başkasının
+   kuyruğunu tanımlamaz.
+2. Kayıp riskine karşı topoloji ayrıca **`definitions.json`** ile RabbitMQ
+   boot'unda yüklenir (bkz. Faz 4). Böylece bir tüketici hiç başlamamış olsa
+   bile binding vardır ve mesaj kuyrukta birikir — monolith'teki
+   "pre-declare" garantisi korunur.
+3. Servis içi declare'ler **kalır** (idempotent). Dev ortamında tek servis
+   `definitions.json` olmadan da çalışabilsin.
 
 ---
 
