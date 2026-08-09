@@ -2,13 +2,16 @@ go 1.26
 
 toolchain go1.26.4
 
+// The monolith is gone from the workspace: nine services own its modules
+// now and only cmd/ husk, tests and go.mod remain. Phase 8 deletes the
+// directory; until then it stays on disk but out of the build.
 use (
-	./monolith
 	./services/attendance-service
 	./services/auth-service
 	./services/catalog-service
 	./services/enrollment-service
 	./services/grades-service
+	./services/meal-service
 	./services/notification
 	./services/payment-service
 	./services/staff-service

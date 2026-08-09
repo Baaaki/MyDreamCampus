@@ -1,0 +1,103 @@
+package service
+
+import (
+	"context"
+	"encoding/json"
+	"errors"
+
+	"github.com/baaaki/mydreamcampus/meal/internal/db"
+	"github.com/baaaki/mydreamcampus/meal/internal/dto"
+	"github.com/baaaki/mydreamcampus/meal/internal/repository"
+	"github.com/baaaki/mydreamcampus/shared/platform/clock"
+	sharedErrors "github.com/baaaki/mydreamcampus/shared/platform/errors"
+	"github.com/baaaki/mydreamcampus/shared/platform/utils"
+	"go.uber.org/zap"
+)
+
+type MenuService struct {
+	menuRepo *repository.MenuRepository
+	logger   *zap.Logger
+}
+
+func NewMenuService(menuRepo *repository.MenuRepository, logger *zap.Logger) *MenuService {
+	return &MenuService{
+		menuRepo: menuRepo,
+		logger:   logger,
+	}
+}
+
+// CreateOrUpdateMonthlyMenu creates or updates monthly menu (Admin only)
+func (s *MenuService) CreateOrUpdateMonthlyMenu(ctx context.Context, req dto.CreateMonthlyMenuRequest) (*dto.MonthlyMenuResponse, error) {
+	// Marshal menu data to JSONB
+	menuDataJSON, err := json.Marshal(req.MenuData)
+	if err != nil {
+		s.logger.Error("failed to marshal menu data", zap.Error(err))
+		return nil, sharedErrors.ErrBadRequest
+	}
+
+	menu, err := s.menuRepo.UpsertMonthlyMenu(ctx, db.UpsertMonthlyMenuParams{
+		Year:     utils.ClampToInt16(req.Year),
+		Month:    utils.ClampToInt16(req.Month),
+		MenuData: menuDataJSON,
+	})
+	if err != nil {
+		s.logger.Error("failed to upsert monthly menu", zap.Error(err))
+		return nil, err
+	}
+
+	// Unmarshal menu data for response
+	var menuData map[string]any
+	if err := json.Unmarshal(menu.MenuData, &menuData); err != nil {
+		s.logger.Error("failed to unmarshal menu data", zap.Error(err))
+		return nil, sharedErrors.ErrQueryFailed
+	}
+
+	s.logger.Info("monthly menu saved", zap.Int("year", req.Year), zap.Int("month", req.Month))
+
+	return &dto.MonthlyMenuResponse{
+		Year:      int(menu.Year),
+		Month:     int(menu.Month),
+		MenuData:  menuData,
+		CreatedAt: menu.CreatedAt.Time,
+		UpdatedAt: menu.UpdatedAt.Time,
+	}, nil
+}
+
+// GetMonthlyMenu returns monthly menu (Public - no auth required)
+func (s *MenuService) GetMonthlyMenu(ctx context.Context, year, month int) (*dto.MonthlyMenuResponse, error) {
+	// If year/month not provided, use current date
+	if year == 0 || month == 0 {
+		now := clock.Now()
+		if year == 0 {
+			year = now.Year()
+		}
+		if month == 0 {
+			month = int(now.Month())
+		}
+	}
+
+	menu, err := s.menuRepo.GetMonthlyMenu(ctx, db.GetMonthlyMenuParams{
+		Year:  utils.ClampToInt16(year),
+		Month: utils.ClampToInt16(month),
+	})
+	if err != nil {
+		if errors.Is(err, sharedErrors.ErrNotFoundRepo) {
+			return nil, sharedErrors.ErrNotFound
+		}
+		s.logger.Error("failed to get monthly menu", zap.Error(err))
+		return nil, err
+	}
+
+	// Unmarshal menu data for response
+	var menuData map[string]any
+	if err := json.Unmarshal(menu.MenuData, &menuData); err != nil {
+		s.logger.Error("failed to unmarshal menu data", zap.Error(err))
+		return nil, sharedErrors.ErrQueryFailed
+	}
+
+	return &dto.MonthlyMenuResponse{
+		Year:     int(menu.Year),
+		Month:    int(menu.Month),
+		MenuData: menuData,
+	}, nil
+}
