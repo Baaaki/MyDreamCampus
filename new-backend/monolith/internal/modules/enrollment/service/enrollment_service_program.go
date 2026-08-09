@@ -4,8 +4,8 @@ import (
 	"context"
 	"encoding/json"
 
-	catalogDTO "github.com/baaaki/mydreamcampus/monolith/internal/modules/course_catalog/dto"
 	"github.com/baaaki/mydreamcampus/monolith/internal/modules/enrollment/dto"
+	"github.com/baaaki/mydreamcampus/shared/contracts"
 	sharedErrors "github.com/baaaki/mydreamcampus/shared/platform/errors"
 	"github.com/baaaki/mydreamcampus/shared/platform/logger"
 	"github.com/baaaki/mydreamcampus/shared/platform/utils"
@@ -70,7 +70,7 @@ func (s *EnrollmentService) GetMyEnrollments(ctx context.Context, studentID uuid
 
 			var scheduleSessions []dto.ScheduleSession
 			if val, ok := catalogMap[cID]; ok {
-				if catalogSessions, ok := val.([]catalogDTO.ScheduleSession); ok {
+				if catalogSessions, ok := val.([]contracts.ScheduleSession); ok {
 					for _, s := range catalogSessions {
 						var intSlots []int
 						for _, sl := range s.SlotNumbers {

@@ -3,15 +3,13 @@ package dto
 import (
 	"time"
 
+	"github.com/baaaki/mydreamcampus/shared/contracts"
 	"github.com/google/uuid"
 )
 
-// Prerequisite represents a prerequisite course
-type Prerequisite struct {
-	ID         uuid.UUID `json:"id"`
-	CourseCode string    `json:"course_code"`
-	CourseName string    `json:"course_name"`
-}
+// Prerequisite rides along inside SemesterCourseResponse, so it crosses the
+// boundary with it — canonical definition in shared/contracts.
+type Prerequisite = contracts.Prerequisite
 
 // CourseCoordinator represents the course coordinator information
 type CourseCoordinator struct {

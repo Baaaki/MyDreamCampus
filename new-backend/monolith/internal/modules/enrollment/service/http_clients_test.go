@@ -8,10 +8,9 @@ import (
 	"net/url"
 	"testing"
 
-	catalogDTO "github.com/baaaki/mydreamcampus/monolith/internal/modules/course_catalog/dto"
-	studentDTO "github.com/baaaki/mydreamcampus/monolith/internal/modules/student/dto"
-	studentErrors "github.com/baaaki/mydreamcampus/monolith/internal/modules/student/errors"
+	enrollmentErrors "github.com/baaaki/mydreamcampus/monolith/internal/modules/enrollment/errors"
 	"github.com/baaaki/mydreamcampus/shared/client"
+	"github.com/baaaki/mydreamcampus/shared/contracts"
 	"github.com/baaaki/mydreamcampus/shared/platform/logger"
 	"github.com/google/uuid"
 	"github.com/stretchr/testify/assert"
@@ -35,7 +34,7 @@ func TestHTTPStudentClient_GetStudentByID_ReturnsStudent(t *testing.T) {
 	var gotPath, gotSecret string
 	c := NewHTTPStudentClient(newTestBase(t, func(w http.ResponseWriter, r *http.Request) {
 		gotPath, gotSecret = r.URL.Path, r.Header.Get("X-Internal-Secret")
-		_ = json.NewEncoder(w).Encode(studentDTO.StudentResponse{
+		_ = json.NewEncoder(w).Encode(contracts.StudentResponse{
 			ID: id.String(), StudentNumber: "20250001", FirstName: "Ada", ClassLevel: 2,
 		})
 	}))
@@ -54,7 +53,7 @@ func TestHTTPStudentClient_GetStudentByID_NotFoundMapsToSentinel(t *testing.T) {
 	}))
 
 	_, err := c.GetStudentByID(context.Background(), uuid.New())
-	assert.ErrorIs(t, err, studentErrors.ErrStudentNotFound)
+	assert.ErrorIs(t, err, enrollmentErrors.ErrStudentNotFound)
 }
 
 func TestHTTPStudentClient_GetStudentByID_ServerErrorIsNotNotFound(t *testing.T) {
@@ -64,7 +63,7 @@ func TestHTTPStudentClient_GetStudentByID_ServerErrorIsNotNotFound(t *testing.T)
 
 	_, err := c.GetStudentByID(context.Background(), uuid.New())
 	require.Error(t, err)
-	assert.NotErrorIs(t, err, studentErrors.ErrStudentNotFound)
+	assert.NotErrorIs(t, err, enrollmentErrors.ErrStudentNotFound)
 	assert.ErrorIs(t, err, client.ErrUnavailable)
 }
 
@@ -73,9 +72,8 @@ func TestHTTPStudentClient_GetStudentsByAdvisorID_ReturnsStudents(t *testing.T) 
 	var gotAdvisor string
 	c := NewHTTPStudentClient(newTestBase(t, func(w http.ResponseWriter, r *http.Request) {
 		gotAdvisor = r.URL.Query().Get("advisor_id")
-		_ = json.NewEncoder(w).Encode(studentDTO.MyAdviseesResponse{
-			Students:   []studentDTO.StudentResponse{{ID: uuid.NewString(), FirstName: "Ada"}},
-			TotalCount: 1,
+		_ = json.NewEncoder(w).Encode(adviseeList{
+			Students: []contracts.StudentResponse{{ID: uuid.NewString(), FirstName: "Ada"}},
 		})
 	}))
 
@@ -91,8 +89,8 @@ func TestHTTPCourseCatalogClient_GetAvailableCourses_SendsFilters(t *testing.T) 
 	var gotQuery url.Values
 	c := NewHTTPCourseCatalogClient(newTestBase(t, func(w http.ResponseWriter, r *http.Request) {
 		gotQuery = r.URL.Query()
-		_ = json.NewEncoder(w).Encode(catalogDTO.ListSemesterCoursesResponse{
-			Data: []catalogDTO.SemesterCourseListItem{{CourseCode: "BLM101"}},
+		_ = json.NewEncoder(w).Encode(semesterCourseList{
+			Data: []contracts.SemesterCourseListItem{{CourseCode: "BLM101"}},
 		})
 	}))
 
@@ -111,7 +109,7 @@ func TestHTTPCourseCatalogClient_GetCoursesByIDs_FetchesEach(t *testing.T) {
 	var paths []string
 	c := NewHTTPCourseCatalogClient(newTestBase(t, func(w http.ResponseWriter, r *http.Request) {
 		paths = append(paths, r.URL.Path)
-		_ = json.NewEncoder(w).Encode(catalogDTO.SemesterCourseResponse{CourseCode: "BLM" + r.URL.Query().Get("semester")})
+		_ = json.NewEncoder(w).Encode(contracts.SemesterCourseResponse{CourseCode: "BLM" + r.URL.Query().Get("semester")})
 	}))
 
 	courses, err := c.GetCoursesByIDs(context.Background(), "2025-2026-Fall", []uuid.UUID{first, second})

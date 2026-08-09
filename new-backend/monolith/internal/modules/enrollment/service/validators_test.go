@@ -3,8 +3,8 @@ package service
 import (
 	"testing"
 
-	catalogDTO "github.com/baaaki/mydreamcampus/monolith/internal/modules/course_catalog/dto"
 	serviceErrors "github.com/baaaki/mydreamcampus/monolith/internal/modules/enrollment/errors"
+	"github.com/baaaki/mydreamcampus/shared/contracts"
 	"github.com/google/uuid"
 	"github.com/stretchr/testify/assert"
 )
@@ -63,8 +63,8 @@ func TestValidateCourseSelection(t *testing.T) {
 }
 
 func TestValidateCoursesAgainstStudent(t *testing.T) {
-	cs := func(dept string, level int16) catalogDTO.SemesterCourseResponse {
-		return catalogDTO.SemesterCourseResponse{
+	cs := func(dept string, level int16) contracts.SemesterCourseResponse {
+		return contracts.SemesterCourseResponse{
 			CourseCode: "CS101",
 			Department: dept,
 			ClassLevel: level,
@@ -73,7 +73,7 @@ func TestValidateCoursesAgainstStudent(t *testing.T) {
 
 	t.Run("all matching", func(t *testing.T) {
 		err := validateCoursesAgainstStudent(
-			[]catalogDTO.SemesterCourseResponse{cs("CS", 1), cs("CS", 2)},
+			[]contracts.SemesterCourseResponse{cs("CS", 1), cs("CS", 2)},
 			"CS", 2,
 		)
 		assert.NoError(t, err)
@@ -81,7 +81,7 @@ func TestValidateCoursesAgainstStudent(t *testing.T) {
 
 	t.Run("first course wrong department", func(t *testing.T) {
 		err := validateCoursesAgainstStudent(
-			[]catalogDTO.SemesterCourseResponse{cs("EE", 1), cs("CS", 1)},
+			[]contracts.SemesterCourseResponse{cs("EE", 1), cs("CS", 1)},
 			"CS", 2,
 		)
 		assert.ErrorIs(t, err, serviceErrors.ErrInvalidDepartment,
@@ -90,7 +90,7 @@ func TestValidateCoursesAgainstStudent(t *testing.T) {
 
 	t.Run("level above student", func(t *testing.T) {
 		err := validateCoursesAgainstStudent(
-			[]catalogDTO.SemesterCourseResponse{cs("CS", 3)},
+			[]contracts.SemesterCourseResponse{cs("CS", 3)},
 			"CS", 2,
 		)
 		assert.ErrorIs(t, err, serviceErrors.ErrInvalidClassLevel,
@@ -99,7 +99,7 @@ func TestValidateCoursesAgainstStudent(t *testing.T) {
 
 	t.Run("at student level", func(t *testing.T) {
 		err := validateCoursesAgainstStudent(
-			[]catalogDTO.SemesterCourseResponse{cs("CS", 2)},
+			[]contracts.SemesterCourseResponse{cs("CS", 2)},
 			"CS", 2,
 		)
 		assert.NoError(t, err, "level == student level is allowed (>= boundary)")
@@ -107,7 +107,7 @@ func TestValidateCoursesAgainstStudent(t *testing.T) {
 
 	t.Run("below student level", func(t *testing.T) {
 		err := validateCoursesAgainstStudent(
-			[]catalogDTO.SemesterCourseResponse{cs("CS", 1)},
+			[]contracts.SemesterCourseResponse{cs("CS", 1)},
 			"CS", 3,
 		)
 		assert.NoError(t, err, "lower-level courses are allowed (retake / catch-up)")

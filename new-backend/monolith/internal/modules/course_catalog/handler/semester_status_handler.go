@@ -13,6 +13,7 @@ import (
 	"github.com/baaaki/mydreamcampus/monolith/internal/modules/course_catalog/db"
 	"github.com/baaaki/mydreamcampus/monolith/internal/modules/course_catalog/repository"
 	"github.com/baaaki/mydreamcampus/monolith/internal/modules/course_catalog/service"
+	"github.com/baaaki/mydreamcampus/shared/contracts"
 	"github.com/baaaki/mydreamcampus/shared/events"
 	"github.com/baaaki/mydreamcampus/shared/platform/audit"
 	"github.com/baaaki/mydreamcampus/shared/platform/logger"
@@ -711,11 +712,11 @@ func (h *SemesterStatusHandler) GetSemesterInfo(c *gin.Context) {
 		return
 	}
 
-	c.JSON(http.StatusOK, gin.H{
-		"name":             info.Name,
-		"status":           info.Status,
-		"hard_deadline":    info.HardDeadline.Format(time.RFC3339),
-		"is_past_deadline": info.IsPastDeadline,
+	c.JSON(http.StatusOK, contracts.SemesterInfo{
+		Name:           info.Name,
+		Status:         info.Status,
+		HardDeadline:   info.HardDeadline,
+		IsPastDeadline: info.IsPastDeadline,
 	})
 }
 

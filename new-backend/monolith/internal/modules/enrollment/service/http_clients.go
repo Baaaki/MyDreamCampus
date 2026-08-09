@@ -7,15 +7,25 @@ import (
 	"net/url"
 	"strconv"
 
-	catalogDTO "github.com/baaaki/mydreamcampus/monolith/internal/modules/course_catalog/dto"
-	studentDTO "github.com/baaaki/mydreamcampus/monolith/internal/modules/student/dto"
-	studentErrors "github.com/baaaki/mydreamcampus/monolith/internal/modules/student/errors"
+	enrollmentErrors "github.com/baaaki/mydreamcampus/monolith/internal/modules/enrollment/errors"
 	"github.com/baaaki/mydreamcampus/shared/client"
+	"github.com/baaaki/mydreamcampus/shared/contracts"
 	"github.com/google/uuid"
 )
 
 // listPageSize matches the in-process adapter's "give me everything" limit.
 const listPageSize = 1000
+
+// adviseeList and semesterCourseList are the slices of the providers' paged
+// responses this client reads. Declared locally so enrollment does not depend
+// on student's or catalog's pagination DTOs.
+type adviseeList struct {
+	Students []contracts.StudentResponse `json:"students"`
+}
+
+type semesterCourseList struct {
+	Data []contracts.SemesterCourseListItem `json:"data"`
+}
 
 // HTTPStudentClient implements StudentClient over internal REST.
 type HTTPStudentClient struct {
@@ -26,23 +36,24 @@ func NewHTTPStudentClient(base *client.Base) *HTTPStudentClient {
 	return &HTTPStudentClient{base: base}
 }
 
-func (c *HTTPStudentClient) GetStudentByID(ctx context.Context, id uuid.UUID) (studentDTO.StudentResponse, error) {
-	var resp studentDTO.StudentResponse
+func (c *HTTPStudentClient) GetStudentByID(ctx context.Context, id uuid.UUID) (contracts.StudentResponse, error) {
+	var resp contracts.StudentResponse
 	if err := c.base.Get(ctx, "/internal/students/"+url.PathEscape(id.String()), &resp); err != nil {
 		if errors.Is(err, client.ErrNotFound) {
-			// Same AppError the in-process path returns, so the handler still
-			// answers 404 STUDENT_NOT_FOUND.
-			return studentDTO.StudentResponse{}, studentErrors.ErrStudentNotFound
+			// Enrollment's own sentinel maps to the same 404 STUDENT_NOT_FOUND
+			// the in-process path produced through student's AppError, so the
+			// handler answer is unchanged.
+			return contracts.StudentResponse{}, enrollmentErrors.ErrStudentNotFound
 		}
-		return studentDTO.StudentResponse{}, err
+		return contracts.StudentResponse{}, err
 	}
 	return resp, nil
 }
 
-func (c *HTTPStudentClient) GetStudentsByAdvisorID(ctx context.Context, advisorID uuid.UUID) ([]studentDTO.StudentResponse, error) {
+func (c *HTTPStudentClient) GetStudentsByAdvisorID(ctx context.Context, advisorID uuid.UUID) ([]contracts.StudentResponse, error) {
 	query := url.Values{"advisor_id": {advisorID.String()}}
 
-	var resp studentDTO.MyAdviseesResponse
+	var resp adviseeList
 	if err := c.base.Get(ctx, "/internal/students?"+query.Encode(), &resp); err != nil {
 		return nil, err
 	}
@@ -58,7 +69,7 @@ func NewHTTPCourseCatalogClient(base *client.Base) *HTTPCourseCatalogClient {
 	return &HTTPCourseCatalogClient{base: base}
 }
 
-func (c *HTTPCourseCatalogClient) GetAvailableCourses(ctx context.Context, department string, classLevel int16, semester string) ([]catalogDTO.SemesterCourseListItem, error) {
+func (c *HTTPCourseCatalogClient) GetAvailableCourses(ctx context.Context, department string, classLevel int16, semester string) ([]contracts.SemesterCourseListItem, error) {
 	query := url.Values{
 		"semester":    {semester},
 		"department":  {department},
@@ -67,19 +78,19 @@ func (c *HTTPCourseCatalogClient) GetAvailableCourses(ctx context.Context, depar
 		"limit":       {strconv.Itoa(listPageSize)},
 	}
 
-	var resp catalogDTO.ListSemesterCoursesResponse
+	var resp semesterCourseList
 	if err := c.base.Get(ctx, "/internal/semester-courses?"+query.Encode(), &resp); err != nil {
 		return nil, err
 	}
 	return resp.Data, nil
 }
 
-func (c *HTTPCourseCatalogClient) GetCoursesByIDs(ctx context.Context, semester string, ids []uuid.UUID) ([]catalogDTO.SemesterCourseResponse, error) {
+func (c *HTTPCourseCatalogClient) GetCoursesByIDs(ctx context.Context, semester string, ids []uuid.UUID) ([]contracts.SemesterCourseResponse, error) {
 	query := url.Values{"semester": {semester}}.Encode()
 
-	var res []catalogDTO.SemesterCourseResponse
+	var res []contracts.SemesterCourseResponse
 	for _, id := range ids {
-		var course catalogDTO.SemesterCourseResponse
+		var course contracts.SemesterCourseResponse
 		if err := c.base.Get(ctx, "/internal/semester-courses/"+url.PathEscape(id.String())+"?"+query, &course); err != nil {
 			return nil, fmt.Errorf("course not found: %w", err)
 		}

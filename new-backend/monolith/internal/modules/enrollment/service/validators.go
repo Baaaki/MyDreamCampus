@@ -1,8 +1,8 @@
 package service
 
 import (
-	catalogDTO "github.com/baaaki/mydreamcampus/monolith/internal/modules/course_catalog/dto"
 	serviceErrors "github.com/baaaki/mydreamcampus/monolith/internal/modules/enrollment/errors"
+	"github.com/baaaki/mydreamcampus/shared/contracts"
 	"github.com/google/uuid"
 )
 
@@ -37,7 +37,7 @@ func validateCourseSelection(courseIDs []uuid.UUID) error {
 // because the catalog can serve cross-department courses for shared classes;
 // guarding here keeps that possibility from leaking into enrollment by
 // accident.
-func validateCoursesAgainstStudent(courses []catalogDTO.SemesterCourseResponse, studentDept string, studentClassLevel int16) error {
+func validateCoursesAgainstStudent(courses []contracts.SemesterCourseResponse, studentDept string, studentClassLevel int16) error {
 	for _, course := range courses {
 		if course.Department != studentDept {
 			return serviceErrors.ErrInvalidDepartment

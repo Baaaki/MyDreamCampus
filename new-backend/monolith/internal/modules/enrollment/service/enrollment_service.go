@@ -5,12 +5,11 @@ import (
 	"fmt"
 	"time"
 
-	catalogDTO "github.com/baaaki/mydreamcampus/monolith/internal/modules/course_catalog/dto"
 	"github.com/baaaki/mydreamcampus/monolith/internal/modules/enrollment/db"
 	"github.com/baaaki/mydreamcampus/monolith/internal/modules/enrollment/dto"
 	serviceErrors "github.com/baaaki/mydreamcampus/monolith/internal/modules/enrollment/errors"
 	"github.com/baaaki/mydreamcampus/monolith/internal/modules/enrollment/repository"
-	studentDTO "github.com/baaaki/mydreamcampus/monolith/internal/modules/student/dto"
+	"github.com/baaaki/mydreamcampus/shared/contracts"
 	sharedErrors "github.com/baaaki/mydreamcampus/shared/platform/errors"
 	"github.com/baaaki/mydreamcampus/shared/platform/logger"
 	sharedRepo "github.com/baaaki/mydreamcampus/shared/platform/repository"
@@ -323,7 +322,7 @@ func (s *EnrollmentService) CreateEnrollmentProgram(ctx context.Context, req dto
 // (student_passed_prerequisites, fed by grades' prerequisite.passed events).
 // Matching is by course_code: semester course ids are regenerated every term,
 // the code is the stable identity of a course.
-func (s *EnrollmentService) checkPrerequisites(ctx context.Context, studentID uuid.UUID, course catalogDTO.SemesterCourseResponse) error {
+func (s *EnrollmentService) checkPrerequisites(ctx context.Context, studentID uuid.UUID, course contracts.SemesterCourseResponse) error {
 	for _, p := range course.Prerequisites {
 		passed, err := s.passedPrereqRepo.HasPassedPrerequisite(ctx, studentID, p.CourseCode)
 		if err != nil {
@@ -338,7 +337,7 @@ func (s *EnrollmentService) checkPrerequisites(ctx context.Context, studentID uu
 }
 
 // Helper: Create program with capacity check (transaction)
-func (s *EnrollmentService) createProgramWithCapacityCheck(ctx context.Context, req dto.CreateEnrollmentRequest, courses []catalogDTO.SemesterCourseResponse, student studentDTO.StudentResponse) (db.EnrollmentProgram, error) {
+func (s *EnrollmentService) createProgramWithCapacityCheck(ctx context.Context, req dto.CreateEnrollmentRequest, courses []contracts.SemesterCourseResponse, student contracts.StudentResponse) (db.EnrollmentProgram, error) {
 	// Create program parameters
 	programParams := db.CreateEnrollmentProgramParams{
 		StudentID: utils.UUIDToPgtype(req.StudentID),
@@ -469,7 +468,7 @@ func (s *EnrollmentService) CancelMyEnrollment(ctx context.Context, studentID uu
 }
 
 // Helper: Build program response with course details
-func (s *EnrollmentService) buildProgramResponse(ctx context.Context, program db.EnrollmentProgram, courses []catalogDTO.SemesterCourseResponse) dto.EnrollmentProgramResponse {
+func (s *EnrollmentService) buildProgramResponse(ctx context.Context, program db.EnrollmentProgram, courses []contracts.SemesterCourseResponse) dto.EnrollmentProgramResponse {
 	coursesDTO := make([]dto.CourseBasic, 0, len(courses))
 	for _, course := range courses {
 		coursesDTO = append(coursesDTO, dto.CourseBasic{
@@ -492,7 +491,7 @@ func (s *EnrollmentService) buildProgramResponse(ctx context.Context, program db
 }
 
 // Helper: Check schedule conflicts
-func (s *EnrollmentService) checkScheduleConflict(courses []catalogDTO.SemesterCourseResponse) error {
+func (s *EnrollmentService) checkScheduleConflict(courses []contracts.SemesterCourseResponse) error {
 	scheduleMap := make(map[string]bool)
 	for _, course := range courses {
 		for _, session := range course.ScheduleSessions {

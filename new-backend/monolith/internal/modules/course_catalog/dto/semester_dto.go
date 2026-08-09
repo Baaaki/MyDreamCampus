@@ -1,24 +1,20 @@
 package dto
 
 import (
-	"time"
-
+	"github.com/baaaki/mydreamcampus/shared/contracts"
 	"github.com/google/uuid"
 )
 
-// ScheduleSession represents a single schedule session (day + slot numbers + session type)
-type ScheduleSession struct {
-	DayOfWeek   string  `json:"day_of_week"`
-	SlotNumbers []int16 `json:"slot_numbers"`
-	SessionType string  `json:"session_type" binding:"required,oneof=theory lab"` // "theory" or "lab"
-}
-
-// AssessmentItem represents a single assessment component
-type AssessmentItem struct {
-	Slug   string `json:"slug"`
-	Name   string `json:"name"`
-	Weight int16  `json:"weight"`
-}
+// The course shapes below leave this service — enrollment reads them off
+// /internal/semester-courses. Their canonical definition is in
+// shared/contracts so both sides compile against one struct; the aliases
+// keep the module's own code reading dto.X.
+type (
+	ScheduleSession        = contracts.ScheduleSession
+	AssessmentItem         = contracts.AssessmentItem
+	SemesterCourseResponse = contracts.SemesterCourseResponse
+	SemesterCourseListItem = contracts.SemesterCourseListItem
+)
 
 // CreateSemesterCourseRequest represents the request to create a semester course
 type CreateSemesterCourseRequest struct {
@@ -30,43 +26,6 @@ type CreateSemesterCourseRequest struct {
 	MaxCapacity        int16             `json:"max_capacity" binding:"required,min=1,max=1000"`
 	AssessmentSchema   []AssessmentItem  `json:"assessment_schema" binding:"required,min=1,dive"`
 	ScheduleSessions   []ScheduleSession `json:"schedule_sessions" binding:"required,min=1,dive"`
-}
-
-// SemesterCourseResponse represents a semester course in API responses
-type SemesterCourseResponse struct {
-	ID                 uuid.UUID         `json:"id"`
-	Semester           string            `json:"semester"`
-	CourseCode         string            `json:"course_code"`
-	CourseName         string            `json:"course_name"`
-	Department         string            `json:"department"`
-	Credits            int16             `json:"credits"`
-	ClassLevel         int16             `json:"class_level"`
-	InstructorID       uuid.UUID         `json:"instructor_id"`
-	InstructorFullname string            `json:"instructor_fullname"`
-	ClassroomLocation  string            `json:"classroom_location"`
-	MaxCapacity        int16             `json:"max_capacity"`
-	AssessmentSchema   []AssessmentItem  `json:"assessment_schema"`
-	ScheduleSessions   []ScheduleSession `json:"schedule_sessions"`
-	Prerequisites      []Prerequisite    `json:"prerequisites,omitempty"`
-	CreatedAt          time.Time         `json:"created_at"`
-	UpdatedAt          time.Time         `json:"updated_at"`
-}
-
-// SemesterCourseListItem represents a semester course in list responses
-type SemesterCourseListItem struct {
-	ID                 uuid.UUID         `json:"id"`
-	Semester           string            `json:"semester"`
-	CourseCode         string            `json:"course_code"`
-	CourseName         string            `json:"course_name"`
-	Department         string            `json:"department"`
-	Credits            int16             `json:"credits"`
-	ClassLevel         int16             `json:"class_level"`
-	InstructorID       uuid.UUID         `json:"instructor_id"`
-	InstructorFullname string            `json:"instructor_fullname"`
-	ClassroomLocation  string            `json:"classroom_location"`
-	MaxCapacity        int16             `json:"max_capacity"`
-	AssessmentSchema   []AssessmentItem  `json:"assessment_schema"`
-	ScheduleSessions   []ScheduleSession `json:"schedule_sessions"`
 }
 
 // ListSemesterCoursesRequest represents query parameters for listing semester courses

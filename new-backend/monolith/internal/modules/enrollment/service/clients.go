@@ -6,21 +6,21 @@ import (
 
 	catalogDTO "github.com/baaaki/mydreamcampus/monolith/internal/modules/course_catalog/dto"
 	catalogService "github.com/baaaki/mydreamcampus/monolith/internal/modules/course_catalog/service"
-	studentDTO "github.com/baaaki/mydreamcampus/monolith/internal/modules/student/dto"
 	studentService "github.com/baaaki/mydreamcampus/monolith/internal/modules/student/service"
+	"github.com/baaaki/mydreamcampus/shared/contracts"
 	"github.com/google/uuid"
 )
 
 // StudentClient defines the interface for communicating with the Student module
 type StudentClient interface {
-	GetStudentByID(ctx context.Context, id uuid.UUID) (studentDTO.StudentResponse, error)
-	GetStudentsByAdvisorID(ctx context.Context, advisorID uuid.UUID) ([]studentDTO.StudentResponse, error)
+	GetStudentByID(ctx context.Context, id uuid.UUID) (contracts.StudentResponse, error)
+	GetStudentsByAdvisorID(ctx context.Context, advisorID uuid.UUID) ([]contracts.StudentResponse, error)
 }
 
 // CourseCatalogClient defines the interface for communicating with the Course Catalog module
 type CourseCatalogClient interface {
-	GetAvailableCourses(ctx context.Context, department string, classLevel int16, semester string) ([]catalogDTO.SemesterCourseListItem, error)
-	GetCoursesByIDs(ctx context.Context, semester string, ids []uuid.UUID) ([]catalogDTO.SemesterCourseResponse, error)
+	GetAvailableCourses(ctx context.Context, department string, classLevel int16, semester string) ([]contracts.SemesterCourseListItem, error)
+	GetCoursesByIDs(ctx context.Context, semester string, ids []uuid.UUID) ([]contracts.SemesterCourseResponse, error)
 }
 
 // InProcessStudentClient implements StudentClient by directly calling the Student module's public service
@@ -32,11 +32,11 @@ func NewInProcessStudentClient(svc *studentService.StudentService) *InProcessStu
 	return &InProcessStudentClient{svc: svc}
 }
 
-func (c *InProcessStudentClient) GetStudentByID(ctx context.Context, id uuid.UUID) (studentDTO.StudentResponse, error) {
+func (c *InProcessStudentClient) GetStudentByID(ctx context.Context, id uuid.UUID) (contracts.StudentResponse, error) {
 	return c.svc.GetStudentByID(ctx, id.String())
 }
 
-func (c *InProcessStudentClient) GetStudentsByAdvisorID(ctx context.Context, advisorID uuid.UUID) ([]studentDTO.StudentResponse, error) {
+func (c *InProcessStudentClient) GetStudentsByAdvisorID(ctx context.Context, advisorID uuid.UUID) ([]contracts.StudentResponse, error) {
 	resp, err := c.svc.ListStudentsByAdvisor(ctx, advisorID)
 	if err != nil {
 		return nil, err
@@ -53,7 +53,7 @@ func NewInProcessCourseCatalogClient(svc *catalogService.SemesterService) *InPro
 	return &InProcessCourseCatalogClient{svc: svc}
 }
 
-func (c *InProcessCourseCatalogClient) GetAvailableCourses(ctx context.Context, department string, classLevel int16, semester string) ([]catalogDTO.SemesterCourseListItem, error) {
+func (c *InProcessCourseCatalogClient) GetAvailableCourses(ctx context.Context, department string, classLevel int16, semester string) ([]contracts.SemesterCourseListItem, error) {
 	req := catalogDTO.ListSemesterCoursesRequest{
 		Department: &department,
 		ClassLevel: &classLevel,
@@ -68,8 +68,8 @@ func (c *InProcessCourseCatalogClient) GetAvailableCourses(ctx context.Context, 
 	return resp.Data, nil
 }
 
-func (c *InProcessCourseCatalogClient) GetCoursesByIDs(ctx context.Context, semester string, ids []uuid.UUID) ([]catalogDTO.SemesterCourseResponse, error) {
-	var res []catalogDTO.SemesterCourseResponse
+func (c *InProcessCourseCatalogClient) GetCoursesByIDs(ctx context.Context, semester string, ids []uuid.UUID) ([]contracts.SemesterCourseResponse, error) {
+	var res []contracts.SemesterCourseResponse
 	for _, id := range ids {
 		course, err := c.svc.GetSemesterCourseByID(ctx, semester, id.String())
 		if err != nil {

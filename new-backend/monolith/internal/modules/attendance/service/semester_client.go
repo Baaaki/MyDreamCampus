@@ -5,15 +5,12 @@ import (
 	"time"
 
 	ccService "github.com/baaaki/mydreamcampus/monolith/internal/modules/course_catalog/service"
+	"github.com/baaaki/mydreamcampus/shared/contracts"
 )
 
-// SemesterInfo contains the essential semester data needed by attendance for enforcement.
-type SemesterInfo struct {
-	Name           string    `json:"name"`
-	Status         string    `json:"status"`
-	HardDeadline   time.Time `json:"hard_deadline"`
-	IsPastDeadline bool      `json:"is_past_deadline"`
-}
+// SemesterInfo is catalog's payload, not attendance's own shape — the
+// definition lives in shared/contracts so provider and consumer cannot drift.
+type SemesterInfo = contracts.SemesterInfo
 
 type SemesterClient interface {
 	GetSemesterInfo(ctx context.Context, semester string) (*SemesterInfo, error)

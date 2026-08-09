@@ -1,10 +1,13 @@
 package dto
 
 import (
-	"time"
-
+	"github.com/baaaki/mydreamcampus/shared/contracts"
 	"github.com/google/uuid"
 )
+
+// StudentResponse leaves this service — enrollment reads it off
+// /internal/students. Canonical definition lives in shared/contracts.
+type StudentResponse = contracts.StudentResponse
 
 // CreateStudentRequest represents the request body for creating a student
 type CreateStudentRequest struct {
@@ -27,24 +30,6 @@ type UpdateStudentRequest struct {
 	ClassLevel *int16     `json:"class_level" binding:"omitempty,min=1,max=6"`
 	AdvisorID  *uuid.UUID `json:"advisor_id"`
 	Status     *string    `json:"status" binding:"omitempty,oneof=active graduated suspended withdrawn"`
-}
-
-// StudentResponse represents student response
-type StudentResponse struct {
-	ID             string    `json:"id"`
-	StudentNumber  string    `json:"student_number"`
-	FirstName      string    `json:"first_name"`
-	LastName       string    `json:"last_name"`
-	Email          string    `json:"email"`
-	Faculty        string    `json:"faculty"`
-	Department     string    `json:"department"`
-	EnrollmentYear int       `json:"enrollment_year"`
-	ClassLevel     int16     `json:"class_level"`
-	AdvisorID      *string   `json:"advisor_id,omitempty"`
-	AdvisorName    *string   `json:"advisor_name,omitempty"`
-	Status         string    `json:"status"`
-	CreatedAt      time.Time `json:"created_at"`
-	UpdatedAt      time.Time `json:"updated_at"`
 }
 
 // AdvisorInfo represents advisor basic information (used for bulk operations)
