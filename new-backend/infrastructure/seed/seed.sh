@@ -3,8 +3,12 @@
 # so the event chain fires and every service projection (incl. the auth login
 # user) is populated correctly — a raw SQL insert would skip those projections.
 #
-# The API half goes through the GATEWAY, not one service: /api/staff,
-# /api/catalog and /api/students live in three different containers now.
+# The API half talks to each service directly rather than through Caddy. Going
+# through the gateway looked tidier but breaks on the edge's own behaviour:
+# PUBLIC_HOST without a scheme turns Caddy's automatic HTTPS on, so :80 answers
+# every request with a 308 to https://, and the seed would have to follow a
+# redirect to a certificate issued for a different name. Nothing about seeding
+# needs the edge — these are four internal addresses on the compose network.
 #
 # The relational half used to be one seed.sql against one database. The schemas
 # are separate databases today, so it is one file per database, ordered, with
@@ -20,7 +24,10 @@
 # projection flag — no event needed) so a demo login isn't interrupted.
 set -eu
 
-API="${API_URL:-http://caddy:80}"
+AUTH_URL="${AUTH_SERVICE_URL:-http://auth-service:8081}"
+STAFF_URL="${STAFF_SERVICE_URL:-http://staff-service:8082}"
+STUDENT_URL="${STUDENT_SERVICE_URL:-http://student-service:8083}"
+CATALOG_URL="${CATALOG_SERVICE_URL:-http://catalog-service:8084}"
 : "${ADMIN_EMAIL:?ADMIN_EMAIL required}"
 : "${ADMIN_INITIAL_PASSWORD:?ADMIN_INITIAL_PASSWORD required}"
 
@@ -29,21 +36,23 @@ if [ "${SEED_DEMO:-true}" != "true" ]; then
 	exit 0
 fi
 
-# --- 1. wait for the stack to answer through the gateway ---
-echo ">> waiting for the gateway at $API/health ..."
-i=0
-until curl -fsS "$API/health" >/dev/null 2>&1; do
-	i=$((i + 1))
-	if [ "$i" -gt 60 ]; then
-		echo "!! the backend did not become healthy in time"
-		exit 1
-	fi
-	sleep 2
+# --- 1. wait for the four services this seed writes through ---
+for url in "$AUTH_URL" "$STAFF_URL" "$STUDENT_URL" "$CATALOG_URL"; do
+	echo ">> waiting for $url/health ..."
+	i=0
+	until curl -fsS "$url/health" >/dev/null 2>&1; do
+		i=$((i + 1))
+		if [ "$i" -gt 60 ]; then
+			echo "!! $url did not become healthy in time"
+			exit 1
+		fi
+		sleep 2
+	done
 done
 
 # --- 2. login as admin ---
 echo ">> logging in as $ADMIN_EMAIL"
-LOGIN_BODY=$(curl -fsS -X POST "$API/api/auth/login" \
+LOGIN_BODY=$(curl -fsS -X POST "$AUTH_URL/api/auth/login" \
 	-H 'Content-Type: application/json' \
 	-d "$(jq -n --arg e "$ADMIN_EMAIL" --arg p "$ADMIN_INITIAL_PASSWORD" '{email:$e,password:$p}')")
 TOKEN=$(printf '%s' "$LOGIN_BODY" | jq -r '.access_token // empty')
@@ -54,7 +63,7 @@ fi
 AUTH="Authorization: Bearer $TOKEN"
 
 # --- 3. idempotency: skip if the first demo student already exists ---
-if curl -fsS "$API/api/students?limit=200" -H "$AUTH" 2>/dev/null | grep -q "2021510001"; then
+if curl -fsS "$STUDENT_URL/api/students?limit=200" -H "$AUTH" 2>/dev/null | grep -q "2021510001"; then
 	echo ">> demo data already present — skipping."
 	exit 0
 fi
@@ -62,25 +71,25 @@ fi
 # POST helper: never aborts the run on a single failure (unique-constraint 409s
 # on re-run are expected and harmless). Prints status + a snippet on error.
 post() {
-	_path="$1"; _json="$2"
-	_code=$(curl -sS -o /tmp/resp -w '%{http_code}' -X POST "$API/$_path" \
+	_url="$1"; _json="$2"
+	_code=$(curl -sS -o /tmp/resp -w '%{http_code}' -X POST "$_url" \
 		-H "$AUTH" -H 'Content-Type: application/json' -d "$_json")
 	if [ "$_code" -ge 400 ]; then
-		echo "   [$_code] POST /$_path  ->  $(head -c 200 /tmp/resp)"
+		echo "   [$_code] POST $_url  ->  $(head -c 200 /tmp/resp)"
 	else
-		echo "   [$_code] POST /$_path"
+		echo "   [$_code] POST $_url"
 	fi
 	return 0
 }
 
 echo ">> creating teachers"
-jq -c '.[]' /seed/data/teachers.json | while IFS= read -r row; do post "api/staff" "$row"; done
+jq -c '.[]' /seed/data/teachers.json | while IFS= read -r row; do post "$STAFF_URL/api/staff" "$row"; done
 
 echo ">> creating courses"
-jq -c '.[]' /seed/data/courses.json | while IFS= read -r row; do post "api/catalog/courses" "$row"; done
+jq -c '.[]' /seed/data/courses.json | while IFS= read -r row; do post "$CATALOG_URL/api/catalog/courses" "$row"; done
 
 echo ">> creating students"
-jq -c '.[]' /seed/data/students.json | while IFS= read -r row; do post "api/students" "$row"; done
+jq -c '.[]' /seed/data/students.json | while IFS= read -r row; do post "$STUDENT_URL/api/students" "$row"; done
 
 # --- 4. relational demo data, one database at a time ---
 if [ -z "${SERVICE_DB_PASSWORD:-}" ]; then

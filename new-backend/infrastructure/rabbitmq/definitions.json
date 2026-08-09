@@ -6,6 +6,24 @@
       "name": "/"
     }
   ],
+  "users": [
+    {
+      "name": "@RABBITMQ_USER@",
+      "password": "@RABBITMQ_PASSWORD@",
+      "tags": [
+        "administrator"
+      ]
+    }
+  ],
+  "permissions": [
+    {
+      "user": "@RABBITMQ_USER@",
+      "vhost": "/",
+      "configure": ".*",
+      "write": ".*",
+      "read": ".*"
+    }
+  ],
   "exchanges": [
     {
       "name": "auth.events",

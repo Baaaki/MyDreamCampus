@@ -108,8 +108,20 @@ services:
       # Loaded at boot (management.load_definitions): every queue and binding
       # exists before any service connects, so a message published while its
       # consumer has never run still lands in the queue instead of being
-      # discarded by the topic exchange.
-      - ./rabbitmq/definitions.json:/etc/rabbitmq/definitions.json:ro
+      # discarded by the topic exchange. Mounted as a template — see below.
+      - ./rabbitmq/definitions.json:/etc/rabbitmq/definitions.template.json:ro
+    # Render the credentials into the definitions file, then hand over to the
+    # image's own entrypoint. Configuring a definitions file suppresses default
+    # user creation, so the users have to come from the file; keeping them as
+    # placeholders in git is what lets the topology be tracked at all.
+    entrypoint: ["/bin/sh", "-c"]
+    command:
+      - |
+        set -e
+        sed -e "s|@RABBITMQ_USER@|$$RABBITMQ_DEFAULT_USER|g" \
+            -e "s|@RABBITMQ_PASSWORD@|$$RABBITMQ_DEFAULT_PASS|g" \
+            /etc/rabbitmq/definitions.template.json > /tmp/definitions.json
+        exec docker-entrypoint.sh rabbitmq-server
     healthcheck:
       test: ["CMD", "rabbitmq-diagnostics", "-q", "ping"]
       interval: 10s
@@ -180,7 +192,12 @@ services:
       dockerfile: new-backend/services/auth-service/Dockerfile
     image: mydreamcampus-auth:latest
     container_name: mydreamcampus-auth
-    mem_limit: 192m
+    # Sized for Argon2id, not for idle: every hash and every verify allocates
+    # 64 MB (utils.DefaultParams.Memory), so a handful of concurrent logins —
+    # or the burst of user-creation events a seed produces — is hundreds of
+    # megabytes of transient buffers. Measured 147 MB after eleven hashes at
+    # rest; 192 MB would OOM-kill this container under three parallel logins.
+    mem_limit: 384m
     environment:
       <<: *service-env
       PORT: "8081"
@@ -355,9 +372,13 @@ services:
     mem_limit: 64m
     logging: *logging
     environment:
-      # Through the gateway, not a single service: the seed drives staff,
-      # catalog and student endpoints, which now live in three containers.
-      API_URL: http://caddy:80
+      # Straight to each service, not through Caddy: the edge redirects :80 to
+      # https whenever PUBLIC_HOST carries no scheme, and none of this needs an
+      # edge. seed.sh defaults to these same values.
+      AUTH_SERVICE_URL: http://auth-service:8081
+      STAFF_SERVICE_URL: http://staff-service:8082
+      STUDENT_SERVICE_URL: http://student-service:8083
+      CATALOG_SERVICE_URL: http://catalog-service:8084
       SEED_DEMO: ${SEED_DEMO:-true}
       ADMIN_EMAIL: ${ADMIN_EMAIL:-admin@university.edu.tr}
       ADMIN_INITIAL_PASSWORD: ${ADMIN_INITIAL_PASSWORD:?set ADMIN_INITIAL_PASSWORD in .env}
@@ -366,7 +387,13 @@ services:
       PG_HOST: postgres
       SERVICE_DB_PASSWORD: ${SERVICE_DB_PASSWORD:?SERVICE_DB_PASSWORD is required — see .env.example}
     depends_on:
-      caddy:
+      auth-service:
+        condition: service_started
+      staff-service:
+        condition: service_started
+      student-service:
+        condition: service_started
+      catalog-service:
         condition: service_started
 
   # Public edge: serves the SPA and reverse-proxies each /api prefix to its own

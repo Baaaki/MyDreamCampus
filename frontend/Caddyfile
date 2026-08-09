@@ -117,6 +117,15 @@
 		respond "not found" 404
 	}
 
+	# The service-to-service surface is never proxied — that is the point of
+	# mounting it at the root instead of under /api. Denying it explicitly is
+	# not redundant with "no rule forwards it": without this it lands in the
+	# SPA fallback below and answers 200 with index.html, which reads like a
+	# working endpoint to anyone probing and hides the boundary from tests.
+	handle /internal/* {
+		respond "not found" 404
+	}
+
 	# Backend liveness for DEPLOY.md and the autodeploy script. auth-service
 	# stands in for the whole backend: it has the widest infra dependency
 	# (Postgres + Redis + RabbitMQ), so if it answers, the platform is up.
