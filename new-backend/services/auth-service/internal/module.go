@@ -28,9 +28,8 @@ import (
 
 // Module is the wiring root for the auth module.
 type Module struct {
-	cfg         *config.Config
-	pool        *pgxpool.Pool
-	redisClient *platformRedis.ClientWrapper
+	cfg  *config.Config
+	pool *pgxpool.Pool
 
 	authRepo       *repository.AuthRepository
 	sessionRepo    *repository.SessionRepository
@@ -71,7 +70,6 @@ func New(
 	return &Module{
 		cfg:            cfg,
 		pool:           pool,
-		redisClient:    redisClient,
 		authRepo:       authRepo,
 		sessionRepo:    sessionRepo,
 		eventRepo:      eventRepo,
@@ -123,16 +121,15 @@ func (m *Module) RegisterRoutes(rg *gin.RouterGroup) {
 	}
 }
 
-// Bootstrap runs auth's startup-time work: register the JWT middleware's
-// blacklist checker, seed the initial admin user, start the cleanup
-// scheduler, and begin consuming staff/student events from RabbitMQ.
+// Bootstrap runs auth's startup-time work: seed the initial admin user,
+// start the cleanup scheduler, and begin consuming staff/student events
+// from RabbitMQ. The JWT blacklist checker is registered by shared/bootstrap
+// instead — every service needs it, not just this one.
 //
 // Cross-module event consumption stays on RabbitMQ for now; once staff
 // events settle fully in-process, the RabbitMQ hop can become an
 // in-process subscriber.
 func (m *Module) Bootstrap(ctx context.Context) error {
-	platformMiddleware.SetBlacklistChecker(m.redisClient)
-
 	if err := m.authService.SeedAdmin(ctx); err != nil {
 		logger.Error("admin seed failed", zap.Error(err))
 		// Non-fatal: admin may already exist.
