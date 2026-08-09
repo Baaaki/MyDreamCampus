@@ -5,11 +5,11 @@ package grades
 import (
 	"context"
 
-	"github.com/baaaki/mydreamcampus/monolith/internal/eventbus"
 	"github.com/baaaki/mydreamcampus/monolith/internal/modules/grades/handler"
 	"github.com/baaaki/mydreamcampus/monolith/internal/modules/grades/repository"
 	"github.com/baaaki/mydreamcampus/monolith/internal/modules/grades/service"
 	"github.com/baaaki/mydreamcampus/monolith/internal/modules/grades/worker"
+	"github.com/baaaki/mydreamcampus/shared/eventbus"
 	"github.com/baaaki/mydreamcampus/shared/platform/audit"
 	platformMiddleware "github.com/baaaki/mydreamcampus/shared/platform/middleware"
 	"github.com/baaaki/mydreamcampus/shared/platform/rabbitmq"

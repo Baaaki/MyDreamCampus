@@ -5,12 +5,12 @@ import (
 
 	"time"
 
-	"github.com/baaaki/mydreamcampus/monolith/config"
-	"github.com/baaaki/mydreamcampus/monolith/internal/eventbus"
 	"github.com/baaaki/mydreamcampus/monolith/internal/modules/meal/handler"
 	"github.com/baaaki/mydreamcampus/monolith/internal/modules/meal/repository"
 	"github.com/baaaki/mydreamcampus/monolith/internal/modules/meal/service"
 	"github.com/baaaki/mydreamcampus/monolith/internal/modules/meal/worker"
+	"github.com/baaaki/mydreamcampus/shared/config"
+	"github.com/baaaki/mydreamcampus/shared/eventbus"
 	"github.com/baaaki/mydreamcampus/shared/platform/audit"
 	platformMiddleware "github.com/baaaki/mydreamcampus/shared/platform/middleware"
 	"github.com/baaaki/mydreamcampus/shared/platform/rabbitmq"

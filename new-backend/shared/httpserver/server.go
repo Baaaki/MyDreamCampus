@@ -1,4 +1,4 @@
-package http
+package httpserver
 
 import (
 	"context"
@@ -8,7 +8,7 @@ import (
 	"path/filepath"
 	"time"
 
-	"github.com/baaaki/mydreamcampus/monolith/config"
+	"github.com/baaaki/mydreamcampus/shared/config"
 	platformHandler "github.com/baaaki/mydreamcampus/shared/platform/handler"
 	"github.com/baaaki/mydreamcampus/shared/platform/logger"
 	platformMiddleware "github.com/baaaki/mydreamcampus/shared/platform/middleware"

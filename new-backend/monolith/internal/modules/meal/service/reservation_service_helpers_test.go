@@ -7,9 +7,9 @@ import (
 	"testing"
 	"time"
 
-	"github.com/baaaki/mydreamcampus/monolith/config"
 	"github.com/baaaki/mydreamcampus/monolith/internal/modules/meal/db"
 	serviceErrors "github.com/baaaki/mydreamcampus/monolith/internal/modules/meal/errors"
+	"github.com/baaaki/mydreamcampus/shared/config"
 	"github.com/baaaki/mydreamcampus/shared/platform/clock"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"

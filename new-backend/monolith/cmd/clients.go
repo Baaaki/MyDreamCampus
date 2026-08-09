@@ -3,7 +3,7 @@ package main
 import (
 	"time"
 
-	"github.com/baaaki/mydreamcampus/monolith/config"
+	"github.com/baaaki/mydreamcampus/shared/config"
 	"github.com/baaaki/mydreamcampus/shared/client"
 )
 

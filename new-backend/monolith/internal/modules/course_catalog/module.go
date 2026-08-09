@@ -9,12 +9,12 @@ package coursecatalog
 import (
 	"context"
 
-	"github.com/baaaki/mydreamcampus/monolith/config"
-	"github.com/baaaki/mydreamcampus/monolith/internal/eventbus"
 	"github.com/baaaki/mydreamcampus/monolith/internal/modules/course_catalog/handler"
 	"github.com/baaaki/mydreamcampus/monolith/internal/modules/course_catalog/repository"
 	"github.com/baaaki/mydreamcampus/monolith/internal/modules/course_catalog/service"
 	"github.com/baaaki/mydreamcampus/monolith/internal/modules/course_catalog/worker"
+	"github.com/baaaki/mydreamcampus/shared/config"
+	"github.com/baaaki/mydreamcampus/shared/eventbus"
 	"github.com/baaaki/mydreamcampus/shared/platform/audit"
 	platformHandler "github.com/baaaki/mydreamcampus/shared/platform/handler"
 	platformMiddleware "github.com/baaaki/mydreamcampus/shared/platform/middleware"

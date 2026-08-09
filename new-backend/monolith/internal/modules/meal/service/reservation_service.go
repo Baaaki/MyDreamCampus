@@ -11,11 +11,11 @@ import (
 	"strings"
 	"time"
 
-	"github.com/baaaki/mydreamcampus/monolith/config"
 	"github.com/baaaki/mydreamcampus/monolith/internal/modules/meal/db"
 	"github.com/baaaki/mydreamcampus/monolith/internal/modules/meal/dto"
 	serviceErrors "github.com/baaaki/mydreamcampus/monolith/internal/modules/meal/errors"
 	"github.com/baaaki/mydreamcampus/monolith/internal/modules/meal/repository"
+	"github.com/baaaki/mydreamcampus/shared/config"
 	"github.com/baaaki/mydreamcampus/shared/platform/clock"
 	sharedErrors "github.com/baaaki/mydreamcampus/shared/platform/errors"
 	"github.com/baaaki/mydreamcampus/shared/platform/utils"

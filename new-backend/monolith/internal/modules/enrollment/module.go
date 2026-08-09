@@ -11,11 +11,11 @@ package enrollment
 import (
 	"context"
 
-	"github.com/baaaki/mydreamcampus/monolith/internal/eventbus"
 	"github.com/baaaki/mydreamcampus/monolith/internal/modules/enrollment/handler"
 	"github.com/baaaki/mydreamcampus/monolith/internal/modules/enrollment/repository"
 	"github.com/baaaki/mydreamcampus/monolith/internal/modules/enrollment/service"
 	"github.com/baaaki/mydreamcampus/monolith/internal/modules/enrollment/worker"
+	"github.com/baaaki/mydreamcampus/shared/eventbus"
 	platformMiddleware "github.com/baaaki/mydreamcampus/shared/platform/middleware"
 	"github.com/baaaki/mydreamcampus/shared/platform/rabbitmq"
 	platformRepo "github.com/baaaki/mydreamcampus/shared/platform/repository"

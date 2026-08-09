@@ -8,9 +8,9 @@ import (
 	"syscall"
 	"time"
 
-	"github.com/baaaki/mydreamcampus/monolith/config"
-	"github.com/baaaki/mydreamcampus/monolith/internal/eventbus"
-	monolithHTTP "github.com/baaaki/mydreamcampus/monolith/internal/http"
+	"github.com/baaaki/mydreamcampus/shared/config"
+	"github.com/baaaki/mydreamcampus/shared/eventbus"
+	"github.com/baaaki/mydreamcampus/shared/httpserver"
 	"github.com/baaaki/mydreamcampus/monolith/internal/modules/attendance"
 	attendanceService "github.com/baaaki/mydreamcampus/monolith/internal/modules/attendance/service"
 	attendanceWorker "github.com/baaaki/mydreamcampus/monolith/internal/modules/attendance/worker"
@@ -297,7 +297,7 @@ func main() {
 	go eventbus.NewOutboxWorker("meal", "meal.events", mealModule.OutboxStore(),
 		publisher, outboxInterval, batchSize).Start(ctx)
 
-	server := monolithHTTP.NewServer(cfg)
+	server := httpserver.NewServer(cfg)
 	server.RegisterHealthCheck("database", pool.Ping)
 	server.RegisterHealthCheck("rabbitmq", rabbitConn.Ping)
 	server.RegisterHealthCheck("redis", redisClient.Ping)

@@ -6,11 +6,11 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/baaaki/mydreamcampus/monolith/config"
 	"github.com/baaaki/mydreamcampus/monolith/internal/modules/auth/db"
 	"github.com/baaaki/mydreamcampus/monolith/internal/modules/auth/dto"
 	serviceErrors "github.com/baaaki/mydreamcampus/monolith/internal/modules/auth/errors"
 	"github.com/baaaki/mydreamcampus/monolith/internal/modules/auth/repository"
+	"github.com/baaaki/mydreamcampus/shared/config"
 	"github.com/baaaki/mydreamcampus/shared/events"
 	"github.com/baaaki/mydreamcampus/shared/platform/clock"
 	sharedErrors "github.com/baaaki/mydreamcampus/shared/platform/errors"

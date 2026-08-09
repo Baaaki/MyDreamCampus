@@ -2,7 +2,7 @@
 // handlers behind a single Module struct that main.go consumes.
 //
 // The module owns the auth schema (users, sessions, processed_events).
-// It implements monolithHTTP.Module so it can be registered onto the
+// It implements httpserver.Module so it can be registered onto the
 // shared Gin router under /api/auth, and exposes Bootstrap for the
 // startup-time work that has to run after dependency injection
 // (admin seed, cleanup scheduler, event consumer).
@@ -11,12 +11,12 @@ package auth
 import (
 	"context"
 
-	"github.com/baaaki/mydreamcampus/monolith/config"
-	"github.com/baaaki/mydreamcampus/monolith/internal/eventbus"
 	"github.com/baaaki/mydreamcampus/monolith/internal/modules/auth/handler"
 	"github.com/baaaki/mydreamcampus/monolith/internal/modules/auth/repository"
 	"github.com/baaaki/mydreamcampus/monolith/internal/modules/auth/service"
 	"github.com/baaaki/mydreamcampus/monolith/internal/modules/auth/worker"
+	"github.com/baaaki/mydreamcampus/shared/config"
+	"github.com/baaaki/mydreamcampus/shared/eventbus"
 	"github.com/baaaki/mydreamcampus/shared/platform/logger"
 	platformMiddleware "github.com/baaaki/mydreamcampus/shared/platform/middleware"
 	"github.com/baaaki/mydreamcampus/shared/platform/rabbitmq"
@@ -83,13 +83,13 @@ func New(
 	}
 }
 
-// Name implements monolithHTTP.Module — used as the URL prefix segment.
+// Name implements httpserver.Module — used as the URL prefix segment.
 func (m *Module) Name() string { return "auth" }
 
 // OutboxStore exposes the eventbus.OutboxStore for the per-module outbox worker
 func (m *Module) OutboxStore() eventbus.OutboxStore { return m.outboxStore }
 
-// RegisterRoutes implements monolithHTTP.Module. Routes are mounted under
+// RegisterRoutes implements httpserver.Module. Routes are mounted under
 // /api/auth by the server. Auth-specific middleware (JWTAuth, CSRF,
 // per-endpoint rate limits) is wired at the route-group level here.
 func (m *Module) RegisterRoutes(rg *gin.RouterGroup) {

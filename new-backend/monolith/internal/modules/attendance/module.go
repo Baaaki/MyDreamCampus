@@ -5,12 +5,12 @@ package attendance
 import (
 	"context"
 
-	"github.com/baaaki/mydreamcampus/monolith/config"
-	"github.com/baaaki/mydreamcampus/monolith/internal/eventbus"
 	"github.com/baaaki/mydreamcampus/monolith/internal/modules/attendance/handler"
 	"github.com/baaaki/mydreamcampus/monolith/internal/modules/attendance/repository"
 	"github.com/baaaki/mydreamcampus/monolith/internal/modules/attendance/service"
 	"github.com/baaaki/mydreamcampus/monolith/internal/modules/attendance/worker"
+	"github.com/baaaki/mydreamcampus/shared/config"
+	"github.com/baaaki/mydreamcampus/shared/eventbus"
 	platformMiddleware "github.com/baaaki/mydreamcampus/shared/platform/middleware"
 	"github.com/baaaki/mydreamcampus/shared/platform/rabbitmq"
 	platformRepo "github.com/baaaki/mydreamcampus/shared/platform/repository"

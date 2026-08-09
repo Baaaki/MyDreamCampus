@@ -7,11 +7,11 @@
 package staff
 
 import (
-	"github.com/baaaki/mydreamcampus/monolith/config"
-	"github.com/baaaki/mydreamcampus/monolith/internal/eventbus"
 	"github.com/baaaki/mydreamcampus/monolith/internal/modules/staff/handler"
 	"github.com/baaaki/mydreamcampus/monolith/internal/modules/staff/repository"
 	"github.com/baaaki/mydreamcampus/monolith/internal/modules/staff/service"
+	"github.com/baaaki/mydreamcampus/shared/config"
+	"github.com/baaaki/mydreamcampus/shared/eventbus"
 	platformHandler "github.com/baaaki/mydreamcampus/shared/platform/handler"
 	platformMiddleware "github.com/baaaki/mydreamcampus/shared/platform/middleware"
 	"github.com/gin-gonic/gin"
@@ -117,7 +117,7 @@ func (m *Module) RegisterRoutes(rg *gin.RouterGroup) {
 	}
 }
 
-// RegisterPublicRoutes implements monolithHTTP.PublicRoutesProvider.
+// RegisterPublicRoutes implements httpserver.PublicRoutesProvider.
 // Anonymous teacher browsing lives outside /api so the front-end can keep
 // hitting /public/teachers without an auth token.
 func (m *Module) RegisterPublicRoutes(r *gin.Engine) {

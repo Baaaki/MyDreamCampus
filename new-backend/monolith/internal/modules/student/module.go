@@ -10,12 +10,12 @@ package student
 import (
 	"context"
 
-	"github.com/baaaki/mydreamcampus/monolith/config"
-	"github.com/baaaki/mydreamcampus/monolith/internal/eventbus"
 	"github.com/baaaki/mydreamcampus/monolith/internal/modules/student/handler"
 	"github.com/baaaki/mydreamcampus/monolith/internal/modules/student/repository"
 	"github.com/baaaki/mydreamcampus/monolith/internal/modules/student/service"
 	"github.com/baaaki/mydreamcampus/monolith/internal/modules/student/worker"
+	"github.com/baaaki/mydreamcampus/shared/config"
+	"github.com/baaaki/mydreamcampus/shared/eventbus"
 	platformMiddleware "github.com/baaaki/mydreamcampus/shared/platform/middleware"
 	"github.com/baaaki/mydreamcampus/shared/platform/rabbitmq"
 	"github.com/gin-gonic/gin"

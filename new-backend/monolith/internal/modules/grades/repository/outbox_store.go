@@ -3,8 +3,8 @@ package repository
 import (
 	"context"
 
-	"github.com/baaaki/mydreamcampus/monolith/internal/eventbus"
 	"github.com/baaaki/mydreamcampus/monolith/internal/modules/grades/db"
+	"github.com/baaaki/mydreamcampus/shared/eventbus"
 	"github.com/baaaki/mydreamcampus/shared/platform/utils"
 	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5/pgtype"
