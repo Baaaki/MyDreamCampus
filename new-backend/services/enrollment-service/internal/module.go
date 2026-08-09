@@ -1,7 +1,7 @@
-// Package enrollment wires the enrollment module's dependencies and
-// exposes the platform-level Module + lifecycle hooks main.go uses.
+// Package enrollment wires the enrollment service's dependencies and
+// exposes the platform-level Module + lifecycle hooks cmd/main.go uses.
 //
-// Owns the enrollment schema (students_cache, semester_courses_cache,
+// Owns the enrollment database (students_cache, semester_courses_cache,
 // course_sessions_cache, student_passed_prerequisites, enrollment_programs,
 // enrollment_program_courses, enrollment_rejection_logs, outbox_events,
 // processed_events, academic_periods). academic_periods is a projection of
@@ -11,10 +11,10 @@ package enrollment
 import (
 	"context"
 
-	"github.com/baaaki/mydreamcampus/monolith/internal/modules/enrollment/handler"
-	"github.com/baaaki/mydreamcampus/monolith/internal/modules/enrollment/repository"
-	"github.com/baaaki/mydreamcampus/monolith/internal/modules/enrollment/service"
-	"github.com/baaaki/mydreamcampus/monolith/internal/modules/enrollment/worker"
+	"github.com/baaaki/mydreamcampus/enrollment/internal/handler"
+	"github.com/baaaki/mydreamcampus/enrollment/internal/repository"
+	"github.com/baaaki/mydreamcampus/enrollment/internal/service"
+	"github.com/baaaki/mydreamcampus/enrollment/internal/worker"
 	"github.com/baaaki/mydreamcampus/shared/eventbus"
 	platformMiddleware "github.com/baaaki/mydreamcampus/shared/platform/middleware"
 	"github.com/baaaki/mydreamcampus/shared/platform/rabbitmq"
@@ -32,6 +32,7 @@ type Module struct {
 	passedPrereqRepo    *repository.PassedPrerequisitesRepository
 	periodRepo          *platformRepo.SimplePeriodRepository
 	outboxStore         *repository.OutboxStore
+	retentionStore      *repository.RetentionStore
 
 	enrollmentService *service.EnrollmentService
 
@@ -63,6 +64,7 @@ func New(
 		passedPrereqRepo:    passedPrereqRepo,
 		periodRepo:          periodRepo,
 		outboxStore:         repository.NewOutboxStore(outboxRepo),
+		retentionStore:      repository.NewRetentionStore(pool),
 		enrollmentService:   enrollmentSvc,
 		enrollmentHandler:   handler.NewEnrollmentHandler(enrollmentSvc),
 		eventConsumer:       worker.NewEventConsumer(rabbitmq.NewConsumer(rabbitConn), passedPrereqRepo),
@@ -73,11 +75,14 @@ func New(
 // Name is the URL slug under /api. Frontend already calls /api/enrollment.
 func (m *Module) Name() string { return "enrollment" }
 
-// OutboxStore for the per-module outbox worker.
+// OutboxStore for the outbox worker.
 func (m *Module) OutboxStore() eventbus.OutboxStore { return m.outboxStore }
 
+// RetentionStore exposes this schema's event tables to the retention worker.
+func (m *Module) RetentionStore() eventbus.RetentionStore { return m.retentionStore }
+
 // Bootstrap starts the RabbitMQ consumers feeding the passed-prerequisite and
-// academic-period projections. Queue bindings are pre-declared in main.go so
+// academic-period projections. Queue bindings are declared in cmd/main.go so
 // events published before this point are not lost.
 func (m *Module) Bootstrap(ctx context.Context) error {
 	if err := m.eventConsumer.Start(ctx); err != nil {
@@ -97,7 +102,9 @@ func (m *Module) RegisterRoutes(rg *gin.RouterGroup) {
 		student.Use(platformMiddleware.RequireStudent())
 		{
 			student.GET("/available-courses", m.enrollmentHandler.GetAvailableCourses)
-			student.POST("/programs", m.enrollmentHandler.CreateEnrollmentProgram)
+			// Submitting a program consumes course quota, so a retry must
+			// not book a second seat.
+			student.POST("/programs", platformMiddleware.Idempotency(), m.enrollmentHandler.CreateEnrollmentProgram)
 			student.DELETE("/programs", m.enrollmentHandler.CancelMyEnrollment)
 			student.GET("/my-enrollments", m.enrollmentHandler.GetMyEnrollments)
 			student.GET("/latest-rejection", m.enrollmentHandler.GetLatestRejection)
@@ -109,8 +116,9 @@ func (m *Module) RegisterRoutes(rg *gin.RouterGroup) {
 		advisor.Use(platformMiddleware.RequireRole("teacher", "admin"))
 		{
 			advisor.GET("/pending-programs", m.enrollmentHandler.GetPendingProgramsByAdvisor)
-			advisor.POST("/programs/:program_id/approve", m.enrollmentHandler.ApproveEnrollmentProgram)
-			advisor.POST("/programs/:program_id/reject", m.enrollmentHandler.RejectEnrollmentProgram)
+			// A double approve or reject would emit the decision event twice.
+			advisor.POST("/programs/:program_id/approve", platformMiddleware.Idempotency(), m.enrollmentHandler.ApproveEnrollmentProgram)
+			advisor.POST("/programs/:program_id/reject", platformMiddleware.Idempotency(), m.enrollmentHandler.RejectEnrollmentProgram)
 		}
 	}
 }

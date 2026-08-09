@@ -4,7 +4,7 @@ import (
 	"context"
 	"time"
 
-	"github.com/baaaki/mydreamcampus/monolith/internal/modules/enrollment/db"
+	"github.com/baaaki/mydreamcampus/enrollment/internal/db"
 	"github.com/baaaki/mydreamcampus/shared/eventbus"
 	"github.com/baaaki/mydreamcampus/shared/platform/utils"
 	"github.com/jackc/pgx/v5/pgxpool"

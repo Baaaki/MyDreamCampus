@@ -8,7 +8,7 @@ import (
 	"net/url"
 	"testing"
 
-	enrollmentErrors "github.com/baaaki/mydreamcampus/monolith/internal/modules/enrollment/errors"
+	enrollmentErrors "github.com/baaaki/mydreamcampus/enrollment/internal/errors"
 	"github.com/baaaki/mydreamcampus/shared/client"
 	"github.com/baaaki/mydreamcampus/shared/contracts"
 	"github.com/baaaki/mydreamcampus/shared/platform/logger"

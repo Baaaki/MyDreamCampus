@@ -1,7 +1,7 @@
 package service
 
 import (
-	serviceErrors "github.com/baaaki/mydreamcampus/monolith/internal/modules/enrollment/errors"
+	serviceErrors "github.com/baaaki/mydreamcampus/enrollment/internal/errors"
 	"github.com/baaaki/mydreamcampus/shared/contracts"
 	"github.com/google/uuid"
 )

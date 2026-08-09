@@ -7,7 +7,7 @@ import (
 	"net/http/httptest"
 	"testing"
 
-	"github.com/baaaki/mydreamcampus/monolith/internal/modules/enrollment/dto"
+	"github.com/baaaki/mydreamcampus/enrollment/internal/dto"
 	"github.com/gin-gonic/gin"
 	"github.com/google/uuid"
 	"github.com/stretchr/testify/assert"

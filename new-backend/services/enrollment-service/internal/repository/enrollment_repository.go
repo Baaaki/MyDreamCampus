@@ -7,7 +7,7 @@ import (
 	"fmt"
 	"hash/crc64"
 
-	"github.com/baaaki/mydreamcampus/monolith/internal/modules/enrollment/db"
+	"github.com/baaaki/mydreamcampus/enrollment/internal/db"
 	"github.com/baaaki/mydreamcampus/shared/events"
 	sharedErrors "github.com/baaaki/mydreamcampus/shared/platform/errors"
 	"github.com/baaaki/mydreamcampus/shared/platform/logger"

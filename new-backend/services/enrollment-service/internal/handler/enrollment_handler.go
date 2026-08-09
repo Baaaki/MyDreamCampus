@@ -5,9 +5,9 @@ import (
 	"net/http"
 	"time"
 
-	"github.com/baaaki/mydreamcampus/monolith/internal/modules/enrollment/dto"
-	serviceErrors "github.com/baaaki/mydreamcampus/monolith/internal/modules/enrollment/errors"
-	"github.com/baaaki/mydreamcampus/monolith/internal/modules/enrollment/service"
+	"github.com/baaaki/mydreamcampus/enrollment/internal/dto"
+	serviceErrors "github.com/baaaki/mydreamcampus/enrollment/internal/errors"
+	"github.com/baaaki/mydreamcampus/enrollment/internal/service"
 	sharedErrors "github.com/baaaki/mydreamcampus/shared/platform/errors"
 	"github.com/baaaki/mydreamcampus/shared/platform/logger"
 	"github.com/gin-gonic/gin"

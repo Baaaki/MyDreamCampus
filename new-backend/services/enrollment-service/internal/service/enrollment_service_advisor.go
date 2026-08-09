@@ -4,9 +4,9 @@ import (
 	"context"
 	"encoding/json"
 
-	"github.com/baaaki/mydreamcampus/monolith/internal/modules/enrollment/db"
-	"github.com/baaaki/mydreamcampus/monolith/internal/modules/enrollment/dto"
-	serviceErrors "github.com/baaaki/mydreamcampus/monolith/internal/modules/enrollment/errors"
+	"github.com/baaaki/mydreamcampus/enrollment/internal/db"
+	"github.com/baaaki/mydreamcampus/enrollment/internal/dto"
+	serviceErrors "github.com/baaaki/mydreamcampus/enrollment/internal/errors"
 	sharedErrors "github.com/baaaki/mydreamcampus/shared/platform/errors"
 	"github.com/baaaki/mydreamcampus/shared/platform/logger"
 	"github.com/baaaki/mydreamcampus/shared/platform/utils"

@@ -4,7 +4,7 @@ import (
 	"context"
 	"encoding/json"
 
-	"github.com/baaaki/mydreamcampus/monolith/internal/modules/enrollment/dto"
+	"github.com/baaaki/mydreamcampus/enrollment/internal/dto"
 	"github.com/baaaki/mydreamcampus/shared/contracts"
 	sharedErrors "github.com/baaaki/mydreamcampus/shared/platform/errors"
 	"github.com/baaaki/mydreamcampus/shared/platform/logger"

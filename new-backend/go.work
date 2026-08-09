@@ -6,6 +6,7 @@ use (
 	./monolith
 	./services/auth-service
 	./services/catalog-service
+	./services/enrollment-service
 	./services/notification
 	./services/payment-service
 	./services/staff-service
