@@ -1,0 +1,880 @@
+{
+  "rabbit_version": "3.13.0",
+  "rabbitmq_version": "3.13.0",
+  "vhosts": [
+    {
+      "name": "/"
+    }
+  ],
+  "exchanges": [
+    {
+      "name": "auth.events",
+      "vhost": "/",
+      "type": "topic",
+      "durable": true,
+      "auto_delete": false,
+      "internal": false,
+      "arguments": {}
+    },
+    {
+      "name": "staff.events",
+      "vhost": "/",
+      "type": "topic",
+      "durable": true,
+      "auto_delete": false,
+      "internal": false,
+      "arguments": {}
+    },
+    {
+      "name": "student.events",
+      "vhost": "/",
+      "type": "topic",
+      "durable": true,
+      "auto_delete": false,
+      "internal": false,
+      "arguments": {}
+    },
+    {
+      "name": "course_catalog.events",
+      "vhost": "/",
+      "type": "topic",
+      "durable": true,
+      "auto_delete": false,
+      "internal": false,
+      "arguments": {}
+    },
+    {
+      "name": "enrollment.events",
+      "vhost": "/",
+      "type": "topic",
+      "durable": true,
+      "auto_delete": false,
+      "internal": false,
+      "arguments": {}
+    },
+    {
+      "name": "attendance.events",
+      "vhost": "/",
+      "type": "topic",
+      "durable": true,
+      "auto_delete": false,
+      "internal": false,
+      "arguments": {}
+    },
+    {
+      "name": "grades.events",
+      "vhost": "/",
+      "type": "topic",
+      "durable": true,
+      "auto_delete": false,
+      "internal": false,
+      "arguments": {}
+    },
+    {
+      "name": "meal.events",
+      "vhost": "/",
+      "type": "topic",
+      "durable": true,
+      "auto_delete": false,
+      "internal": false,
+      "arguments": {}
+    },
+    {
+      "name": "payment.events",
+      "vhost": "/",
+      "type": "topic",
+      "durable": true,
+      "auto_delete": false,
+      "internal": false,
+      "arguments": {}
+    },
+    {
+      "name": "attendance.period_events.dlq.exchange",
+      "vhost": "/",
+      "type": "fanout",
+      "durable": true,
+      "auto_delete": false,
+      "internal": false,
+      "arguments": {}
+    },
+    {
+      "name": "attendance.sync_events.dlq.exchange",
+      "vhost": "/",
+      "type": "fanout",
+      "durable": true,
+      "auto_delete": false,
+      "internal": false,
+      "arguments": {}
+    },
+    {
+      "name": "auth_events_queue.dlq.exchange",
+      "vhost": "/",
+      "type": "fanout",
+      "durable": true,
+      "auto_delete": false,
+      "internal": false,
+      "arguments": {}
+    },
+    {
+      "name": "catalog.audit_events.dlq.exchange",
+      "vhost": "/",
+      "type": "fanout",
+      "durable": true,
+      "auto_delete": false,
+      "internal": false,
+      "arguments": {}
+    },
+    {
+      "name": "enrollment.period_events.dlq.exchange",
+      "vhost": "/",
+      "type": "fanout",
+      "durable": true,
+      "auto_delete": false,
+      "internal": false,
+      "arguments": {}
+    },
+    {
+      "name": "enrollment.sync_events.dlq.exchange",
+      "vhost": "/",
+      "type": "fanout",
+      "durable": true,
+      "auto_delete": false,
+      "internal": false,
+      "arguments": {}
+    },
+    {
+      "name": "grades.finalize_requested.dlq.exchange",
+      "vhost": "/",
+      "type": "fanout",
+      "durable": true,
+      "auto_delete": false,
+      "internal": false,
+      "arguments": {}
+    },
+    {
+      "name": "grades.period_events.dlq.exchange",
+      "vhost": "/",
+      "type": "fanout",
+      "durable": true,
+      "auto_delete": false,
+      "internal": false,
+      "arguments": {}
+    },
+    {
+      "name": "grades.sync_events.dlq.exchange",
+      "vhost": "/",
+      "type": "fanout",
+      "durable": true,
+      "auto_delete": false,
+      "internal": false,
+      "arguments": {}
+    },
+    {
+      "name": "meal.payment_completed_queue.dlq.exchange",
+      "vhost": "/",
+      "type": "fanout",
+      "durable": true,
+      "auto_delete": false,
+      "internal": false,
+      "arguments": {}
+    },
+    {
+      "name": "meal.payment_failed_queue.dlq.exchange",
+      "vhost": "/",
+      "type": "fanout",
+      "durable": true,
+      "auto_delete": false,
+      "internal": false,
+      "arguments": {}
+    },
+    {
+      "name": "meal.student_created_queue.dlq.exchange",
+      "vhost": "/",
+      "type": "fanout",
+      "durable": true,
+      "auto_delete": false,
+      "internal": false,
+      "arguments": {}
+    },
+    {
+      "name": "meal.student_deactivated_queue.dlq.exchange",
+      "vhost": "/",
+      "type": "fanout",
+      "durable": true,
+      "auto_delete": false,
+      "internal": false,
+      "arguments": {}
+    },
+    {
+      "name": "meal.student_updated_queue.dlq.exchange",
+      "vhost": "/",
+      "type": "fanout",
+      "durable": true,
+      "auto_delete": false,
+      "internal": false,
+      "arguments": {}
+    },
+    {
+      "name": "notification_events_queue.dlq.exchange",
+      "vhost": "/",
+      "type": "fanout",
+      "durable": true,
+      "auto_delete": false,
+      "internal": false,
+      "arguments": {}
+    },
+    {
+      "name": "student.staff_events.dlq.exchange",
+      "vhost": "/",
+      "type": "fanout",
+      "durable": true,
+      "auto_delete": false,
+      "internal": false,
+      "arguments": {}
+    }
+  ],
+  "queues": [
+    {
+      "name": "attendance.period_events",
+      "vhost": "/",
+      "durable": true,
+      "auto_delete": false,
+      "arguments": {
+        "x-dead-letter-exchange": "attendance.period_events.dlq.exchange"
+      }
+    },
+    {
+      "name": "attendance.period_events.dlq",
+      "vhost": "/",
+      "durable": true,
+      "auto_delete": false,
+      "arguments": {}
+    },
+    {
+      "name": "attendance.sync_events",
+      "vhost": "/",
+      "durable": true,
+      "auto_delete": false,
+      "arguments": {
+        "x-dead-letter-exchange": "attendance.sync_events.dlq.exchange"
+      }
+    },
+    {
+      "name": "attendance.sync_events.dlq",
+      "vhost": "/",
+      "durable": true,
+      "auto_delete": false,
+      "arguments": {}
+    },
+    {
+      "name": "auth_events_queue",
+      "vhost": "/",
+      "durable": true,
+      "auto_delete": false,
+      "arguments": {
+        "x-dead-letter-exchange": "auth_events_queue.dlq.exchange"
+      }
+    },
+    {
+      "name": "auth_events_queue.dlq",
+      "vhost": "/",
+      "durable": true,
+      "auto_delete": false,
+      "arguments": {}
+    },
+    {
+      "name": "catalog.audit_events",
+      "vhost": "/",
+      "durable": true,
+      "auto_delete": false,
+      "arguments": {
+        "x-dead-letter-exchange": "catalog.audit_events.dlq.exchange"
+      }
+    },
+    {
+      "name": "catalog.audit_events.dlq",
+      "vhost": "/",
+      "durable": true,
+      "auto_delete": false,
+      "arguments": {}
+    },
+    {
+      "name": "enrollment.period_events",
+      "vhost": "/",
+      "durable": true,
+      "auto_delete": false,
+      "arguments": {
+        "x-dead-letter-exchange": "enrollment.period_events.dlq.exchange"
+      }
+    },
+    {
+      "name": "enrollment.period_events.dlq",
+      "vhost": "/",
+      "durable": true,
+      "auto_delete": false,
+      "arguments": {}
+    },
+    {
+      "name": "enrollment.sync_events",
+      "vhost": "/",
+      "durable": true,
+      "auto_delete": false,
+      "arguments": {
+        "x-dead-letter-exchange": "enrollment.sync_events.dlq.exchange"
+      }
+    },
+    {
+      "name": "enrollment.sync_events.dlq",
+      "vhost": "/",
+      "durable": true,
+      "auto_delete": false,
+      "arguments": {}
+    },
+    {
+      "name": "grades.finalize_requested",
+      "vhost": "/",
+      "durable": true,
+      "auto_delete": false,
+      "arguments": {
+        "x-dead-letter-exchange": "grades.finalize_requested.dlq.exchange"
+      }
+    },
+    {
+      "name": "grades.finalize_requested.dlq",
+      "vhost": "/",
+      "durable": true,
+      "auto_delete": false,
+      "arguments": {}
+    },
+    {
+      "name": "grades.period_events",
+      "vhost": "/",
+      "durable": true,
+      "auto_delete": false,
+      "arguments": {
+        "x-dead-letter-exchange": "grades.period_events.dlq.exchange"
+      }
+    },
+    {
+      "name": "grades.period_events.dlq",
+      "vhost": "/",
+      "durable": true,
+      "auto_delete": false,
+      "arguments": {}
+    },
+    {
+      "name": "grades.sync_events",
+      "vhost": "/",
+      "durable": true,
+      "auto_delete": false,
+      "arguments": {
+        "x-dead-letter-exchange": "grades.sync_events.dlq.exchange"
+      }
+    },
+    {
+      "name": "grades.sync_events.dlq",
+      "vhost": "/",
+      "durable": true,
+      "auto_delete": false,
+      "arguments": {}
+    },
+    {
+      "name": "meal.payment_completed_queue",
+      "vhost": "/",
+      "durable": true,
+      "auto_delete": false,
+      "arguments": {
+        "x-dead-letter-exchange": "meal.payment_completed_queue.dlq.exchange"
+      }
+    },
+    {
+      "name": "meal.payment_completed_queue.dlq",
+      "vhost": "/",
+      "durable": true,
+      "auto_delete": false,
+      "arguments": {}
+    },
+    {
+      "name": "meal.payment_failed_queue",
+      "vhost": "/",
+      "durable": true,
+      "auto_delete": false,
+      "arguments": {
+        "x-dead-letter-exchange": "meal.payment_failed_queue.dlq.exchange"
+      }
+    },
+    {
+      "name": "meal.payment_failed_queue.dlq",
+      "vhost": "/",
+      "durable": true,
+      "auto_delete": false,
+      "arguments": {}
+    },
+    {
+      "name": "meal.student_created_queue",
+      "vhost": "/",
+      "durable": true,
+      "auto_delete": false,
+      "arguments": {
+        "x-dead-letter-exchange": "meal.student_created_queue.dlq.exchange"
+      }
+    },
+    {
+      "name": "meal.student_created_queue.dlq",
+      "vhost": "/",
+      "durable": true,
+      "auto_delete": false,
+      "arguments": {}
+    },
+    {
+      "name": "meal.student_deactivated_queue",
+      "vhost": "/",
+      "durable": true,
+      "auto_delete": false,
+      "arguments": {
+        "x-dead-letter-exchange": "meal.student_deactivated_queue.dlq.exchange"
+      }
+    },
+    {
+      "name": "meal.student_deactivated_queue.dlq",
+      "vhost": "/",
+      "durable": true,
+      "auto_delete": false,
+      "arguments": {}
+    },
+    {
+      "name": "meal.student_updated_queue",
+      "vhost": "/",
+      "durable": true,
+      "auto_delete": false,
+      "arguments": {
+        "x-dead-letter-exchange": "meal.student_updated_queue.dlq.exchange"
+      }
+    },
+    {
+      "name": "meal.student_updated_queue.dlq",
+      "vhost": "/",
+      "durable": true,
+      "auto_delete": false,
+      "arguments": {}
+    },
+    {
+      "name": "notification_events_queue",
+      "vhost": "/",
+      "durable": true,
+      "auto_delete": false,
+      "arguments": {
+        "x-dead-letter-exchange": "notification_events_queue.dlq.exchange"
+      }
+    },
+    {
+      "name": "notification_events_queue.dlq",
+      "vhost": "/",
+      "durable": true,
+      "auto_delete": false,
+      "arguments": {}
+    },
+    {
+      "name": "student.staff_events",
+      "vhost": "/",
+      "durable": true,
+      "auto_delete": false,
+      "arguments": {
+        "x-dead-letter-exchange": "student.staff_events.dlq.exchange"
+      }
+    },
+    {
+      "name": "student.staff_events.dlq",
+      "vhost": "/",
+      "durable": true,
+      "auto_delete": false,
+      "arguments": {}
+    }
+  ],
+  "bindings": [
+    {
+      "source": "attendance.period_events.dlq.exchange",
+      "vhost": "/",
+      "destination": "attendance.period_events.dlq",
+      "destination_type": "queue",
+      "routing_key": "",
+      "arguments": {}
+    },
+    {
+      "source": "attendance.sync_events.dlq.exchange",
+      "vhost": "/",
+      "destination": "attendance.sync_events.dlq",
+      "destination_type": "queue",
+      "routing_key": "",
+      "arguments": {}
+    },
+    {
+      "source": "auth_events_queue.dlq.exchange",
+      "vhost": "/",
+      "destination": "auth_events_queue.dlq",
+      "destination_type": "queue",
+      "routing_key": "",
+      "arguments": {}
+    },
+    {
+      "source": "catalog.audit_events.dlq.exchange",
+      "vhost": "/",
+      "destination": "catalog.audit_events.dlq",
+      "destination_type": "queue",
+      "routing_key": "",
+      "arguments": {}
+    },
+    {
+      "source": "enrollment.period_events.dlq.exchange",
+      "vhost": "/",
+      "destination": "enrollment.period_events.dlq",
+      "destination_type": "queue",
+      "routing_key": "",
+      "arguments": {}
+    },
+    {
+      "source": "enrollment.sync_events.dlq.exchange",
+      "vhost": "/",
+      "destination": "enrollment.sync_events.dlq",
+      "destination_type": "queue",
+      "routing_key": "",
+      "arguments": {}
+    },
+    {
+      "source": "grades.finalize_requested.dlq.exchange",
+      "vhost": "/",
+      "destination": "grades.finalize_requested.dlq",
+      "destination_type": "queue",
+      "routing_key": "",
+      "arguments": {}
+    },
+    {
+      "source": "grades.period_events.dlq.exchange",
+      "vhost": "/",
+      "destination": "grades.period_events.dlq",
+      "destination_type": "queue",
+      "routing_key": "",
+      "arguments": {}
+    },
+    {
+      "source": "grades.sync_events.dlq.exchange",
+      "vhost": "/",
+      "destination": "grades.sync_events.dlq",
+      "destination_type": "queue",
+      "routing_key": "",
+      "arguments": {}
+    },
+    {
+      "source": "meal.payment_completed_queue.dlq.exchange",
+      "vhost": "/",
+      "destination": "meal.payment_completed_queue.dlq",
+      "destination_type": "queue",
+      "routing_key": "",
+      "arguments": {}
+    },
+    {
+      "source": "meal.payment_failed_queue.dlq.exchange",
+      "vhost": "/",
+      "destination": "meal.payment_failed_queue.dlq",
+      "destination_type": "queue",
+      "routing_key": "",
+      "arguments": {}
+    },
+    {
+      "source": "meal.student_created_queue.dlq.exchange",
+      "vhost": "/",
+      "destination": "meal.student_created_queue.dlq",
+      "destination_type": "queue",
+      "routing_key": "",
+      "arguments": {}
+    },
+    {
+      "source": "meal.student_deactivated_queue.dlq.exchange",
+      "vhost": "/",
+      "destination": "meal.student_deactivated_queue.dlq",
+      "destination_type": "queue",
+      "routing_key": "",
+      "arguments": {}
+    },
+    {
+      "source": "meal.student_updated_queue.dlq.exchange",
+      "vhost": "/",
+      "destination": "meal.student_updated_queue.dlq",
+      "destination_type": "queue",
+      "routing_key": "",
+      "arguments": {}
+    },
+    {
+      "source": "notification_events_queue.dlq.exchange",
+      "vhost": "/",
+      "destination": "notification_events_queue.dlq",
+      "destination_type": "queue",
+      "routing_key": "",
+      "arguments": {}
+    },
+    {
+      "source": "student.staff_events.dlq.exchange",
+      "vhost": "/",
+      "destination": "student.staff_events.dlq",
+      "destination_type": "queue",
+      "routing_key": "",
+      "arguments": {}
+    },
+    {
+      "source": "staff.events",
+      "vhost": "/",
+      "destination": "auth_events_queue",
+      "destination_type": "queue",
+      "routing_key": "staff.created",
+      "arguments": {}
+    },
+    {
+      "source": "staff.events",
+      "vhost": "/",
+      "destination": "auth_events_queue",
+      "destination_type": "queue",
+      "routing_key": "staff.updated",
+      "arguments": {}
+    },
+    {
+      "source": "staff.events",
+      "vhost": "/",
+      "destination": "auth_events_queue",
+      "destination_type": "queue",
+      "routing_key": "staff.deactivated",
+      "arguments": {}
+    },
+    {
+      "source": "student.events",
+      "vhost": "/",
+      "destination": "auth_events_queue",
+      "destination_type": "queue",
+      "routing_key": "student.created",
+      "arguments": {}
+    },
+    {
+      "source": "student.events",
+      "vhost": "/",
+      "destination": "auth_events_queue",
+      "destination_type": "queue",
+      "routing_key": "student.updated",
+      "arguments": {}
+    },
+    {
+      "source": "student.events",
+      "vhost": "/",
+      "destination": "auth_events_queue",
+      "destination_type": "queue",
+      "routing_key": "student.deactivated",
+      "arguments": {}
+    },
+    {
+      "source": "staff.events",
+      "vhost": "/",
+      "destination": "student.staff_events",
+      "destination_type": "queue",
+      "routing_key": "staff.deactivated",
+      "arguments": {}
+    },
+    {
+      "source": "grades.events",
+      "vhost": "/",
+      "destination": "catalog.audit_events",
+      "destination_type": "queue",
+      "routing_key": "audit.entry.created",
+      "arguments": {}
+    },
+    {
+      "source": "meal.events",
+      "vhost": "/",
+      "destination": "catalog.audit_events",
+      "destination_type": "queue",
+      "routing_key": "audit.entry.created",
+      "arguments": {}
+    },
+    {
+      "source": "grades.events",
+      "vhost": "/",
+      "destination": "enrollment.sync_events",
+      "destination_type": "queue",
+      "routing_key": "grade.student.prerequisite.passed",
+      "arguments": {}
+    },
+    {
+      "source": "course_catalog.events",
+      "vhost": "/",
+      "destination": "enrollment.period_events",
+      "destination_type": "queue",
+      "routing_key": "course_catalog.period.enrollment.*",
+      "arguments": {}
+    },
+    {
+      "source": "student.events",
+      "vhost": "/",
+      "destination": "attendance.sync_events",
+      "destination_type": "queue",
+      "routing_key": "student.created",
+      "arguments": {}
+    },
+    {
+      "source": "student.events",
+      "vhost": "/",
+      "destination": "attendance.sync_events",
+      "destination_type": "queue",
+      "routing_key": "student.updated",
+      "arguments": {}
+    },
+    {
+      "source": "student.events",
+      "vhost": "/",
+      "destination": "attendance.sync_events",
+      "destination_type": "queue",
+      "routing_key": "student.deactivated",
+      "arguments": {}
+    },
+    {
+      "source": "course_catalog.events",
+      "vhost": "/",
+      "destination": "attendance.sync_events",
+      "destination_type": "queue",
+      "routing_key": "course.semester.created",
+      "arguments": {}
+    },
+    {
+      "source": "enrollment.events",
+      "vhost": "/",
+      "destination": "attendance.sync_events",
+      "destination_type": "queue",
+      "routing_key": "enrollment.program.approved",
+      "arguments": {}
+    },
+    {
+      "source": "course_catalog.events",
+      "vhost": "/",
+      "destination": "attendance.period_events",
+      "destination_type": "queue",
+      "routing_key": "course_catalog.period.attendance.*",
+      "arguments": {}
+    },
+    {
+      "source": "student.events",
+      "vhost": "/",
+      "destination": "grades.sync_events",
+      "destination_type": "queue",
+      "routing_key": "student.created",
+      "arguments": {}
+    },
+    {
+      "source": "student.events",
+      "vhost": "/",
+      "destination": "grades.sync_events",
+      "destination_type": "queue",
+      "routing_key": "student.updated",
+      "arguments": {}
+    },
+    {
+      "source": "student.events",
+      "vhost": "/",
+      "destination": "grades.sync_events",
+      "destination_type": "queue",
+      "routing_key": "student.deactivated",
+      "arguments": {}
+    },
+    {
+      "source": "course_catalog.events",
+      "vhost": "/",
+      "destination": "grades.sync_events",
+      "destination_type": "queue",
+      "routing_key": "course.semester.created",
+      "arguments": {}
+    },
+    {
+      "source": "enrollment.events",
+      "vhost": "/",
+      "destination": "grades.sync_events",
+      "destination_type": "queue",
+      "routing_key": "enrollment.program.approved",
+      "arguments": {}
+    },
+    {
+      "source": "attendance.events",
+      "vhost": "/",
+      "destination": "grades.sync_events",
+      "destination_type": "queue",
+      "routing_key": "attendance.semester.failed",
+      "arguments": {}
+    },
+    {
+      "source": "grades.events",
+      "vhost": "/",
+      "destination": "grades.finalize_requested",
+      "destination_type": "queue",
+      "routing_key": "grade.finalize.requested",
+      "arguments": {}
+    },
+    {
+      "source": "course_catalog.events",
+      "vhost": "/",
+      "destination": "grades.period_events",
+      "destination_type": "queue",
+      "routing_key": "course_catalog.period.grading.*",
+      "arguments": {}
+    },
+    {
+      "source": "student.events",
+      "vhost": "/",
+      "destination": "meal.student_created_queue",
+      "destination_type": "queue",
+      "routing_key": "student.created",
+      "arguments": {}
+    },
+    {
+      "source": "student.events",
+      "vhost": "/",
+      "destination": "meal.student_updated_queue",
+      "destination_type": "queue",
+      "routing_key": "student.updated",
+      "arguments": {}
+    },
+    {
+      "source": "student.events",
+      "vhost": "/",
+      "destination": "meal.student_deactivated_queue",
+      "destination_type": "queue",
+      "routing_key": "student.deactivated",
+      "arguments": {}
+    },
+    {
+      "source": "payment.events",
+      "vhost": "/",
+      "destination": "meal.payment_completed_queue",
+      "destination_type": "queue",
+      "routing_key": "payment.completed",
+      "arguments": {}
+    },
+    {
+      "source": "payment.events",
+      "vhost": "/",
+      "destination": "meal.payment_failed_queue",
+      "destination_type": "queue",
+      "routing_key": "payment.failed",
+      "arguments": {}
+    },
+    {
+      "source": "auth.events",
+      "vhost": "/",
+      "destination": "notification_events_queue",
+      "destination_type": "queue",
+      "routing_key": "user.registered",
+      "arguments": {}
+    },
+    {
+      "source": "auth.events",
+      "vhost": "/",
+      "destination": "notification_events_queue",
+      "destination_type": "queue",
+      "routing_key": "user.password_reset_requested",
+      "arguments": {}
+    }
+  ]
+}

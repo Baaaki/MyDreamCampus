@@ -66,6 +66,11 @@ services:
     volumes:
       - rabbitmq-data:/var/lib/rabbitmq
       - ./rabbitmq/rabbitmq.conf:/etc/rabbitmq/rabbitmq.conf:ro
+      # Loaded at boot (management.load_definitions): every queue and binding
+      # exists before any service connects, so a message published while its
+      # consumer has never run still lands in the queue instead of being
+      # discarded by the topic exchange.
+      - ./rabbitmq/definitions.json:/etc/rabbitmq/definitions.json:ro
     healthcheck:
       test: ["CMD", "rabbitmq-diagnostics", "-q", "ping"]
       interval: 10s
