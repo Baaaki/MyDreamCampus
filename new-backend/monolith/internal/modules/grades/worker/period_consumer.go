@@ -50,9 +50,7 @@ func NewPeriodConsumer(
 func (w *PeriodConsumer) Start(ctx context.Context) error {
 	log := logger.WithContextAndFields(ctx, zap.String("worker", "GradesPeriodConsumer"))
 
-	if err := w.consumer.Consume(QueuePeriodEvents, func(body []byte) error {
-		return w.handleMessage(ctx, body)
-	}); err != nil {
+	if err := w.consumer.ConsumeEnvelope(ctx, QueuePeriodEvents, w.handleMessage); err != nil {
 		log.Error("failed to start consuming", zap.Error(err))
 		return err
 	}

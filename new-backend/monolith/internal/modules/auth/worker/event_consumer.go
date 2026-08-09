@@ -39,8 +39,9 @@ func (w *EventConsumer) Start(ctx context.Context) error {
 		return fmt.Errorf("failed to declare queue: %w", err)
 	}
 
-	// Create message handler
-	handler := func(body []byte) error {
+	// Create message handler. ctx comes from ConsumeEnvelope and already
+	// carries the correlation id of the request that produced the event.
+	handler := func(ctx context.Context, body []byte) error {
 		// Parse base event to get routing key
 		var baseEvent dto.BaseEvent
 		if err := json.Unmarshal(body, &baseEvent); err != nil {
@@ -71,7 +72,7 @@ func (w *EventConsumer) Start(ctx context.Context) error {
 	}
 
 	// Start consuming
-	err = w.consumer.Consume(events.QueueAuthStaffEvents, handler)
+	err = w.consumer.ConsumeEnvelope(ctx, events.QueueAuthStaffEvents, handler)
 	if err != nil {
 		return fmt.Errorf("failed to start consumer: %w", err)
 	}

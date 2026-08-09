@@ -40,7 +40,7 @@ func (c *EventConsumer) Start(ctx context.Context) error {
 	if err != nil {
 		return fmt.Errorf("failed to bind queue meal.student_created_queue: %w", err)
 	}
-	err = c.consumer.Consume("meal.student_created_queue", func(body []byte) error { return c.studentConsumer.HandleStudentCreated(ctx, body) })
+	err = c.consumer.ConsumeEnvelope(ctx, "meal.student_created_queue", c.studentConsumer.HandleStudentCreated)
 	if err != nil {
 		return fmt.Errorf("failed to consume meal.student_created_queue: %w", err)
 	}
@@ -53,7 +53,7 @@ func (c *EventConsumer) Start(ctx context.Context) error {
 	if err != nil {
 		return fmt.Errorf("failed to bind queue meal.student_updated_queue: %w", err)
 	}
-	err = c.consumer.Consume("meal.student_updated_queue", func(body []byte) error { return c.studentConsumer.HandleStudentUpdated(ctx, body) })
+	err = c.consumer.ConsumeEnvelope(ctx, "meal.student_updated_queue", c.studentConsumer.HandleStudentUpdated)
 	if err != nil {
 		return fmt.Errorf("failed to consume meal.student_updated_queue: %w", err)
 	}
@@ -66,7 +66,7 @@ func (c *EventConsumer) Start(ctx context.Context) error {
 	if err != nil {
 		return fmt.Errorf("failed to bind queue meal.student_deactivated_queue: %w", err)
 	}
-	err = c.consumer.Consume("meal.student_deactivated_queue", func(body []byte) error { return c.studentConsumer.HandleStudentDeactivated(ctx, body) })
+	err = c.consumer.ConsumeEnvelope(ctx, "meal.student_deactivated_queue", c.studentConsumer.HandleStudentDeactivated)
 	if err != nil {
 		return fmt.Errorf("failed to consume meal.student_deactivated_queue: %w", err)
 	}
@@ -80,7 +80,7 @@ func (c *EventConsumer) Start(ctx context.Context) error {
 	if err != nil {
 		return fmt.Errorf("failed to bind queue meal.payment_completed_queue: %w", err)
 	}
-	err = c.consumer.Consume("meal.payment_completed_queue", func(body []byte) error { return c.paymentConsumer.HandlePaymentCompleted(ctx, body) })
+	err = c.consumer.ConsumeEnvelope(ctx, "meal.payment_completed_queue", c.paymentConsumer.HandlePaymentCompleted)
 	if err != nil {
 		return fmt.Errorf("failed to consume meal.payment_completed_queue: %w", err)
 	}
@@ -93,7 +93,7 @@ func (c *EventConsumer) Start(ctx context.Context) error {
 	if err != nil {
 		return fmt.Errorf("failed to bind queue meal.payment_failed_queue: %w", err)
 	}
-	err = c.consumer.Consume("meal.payment_failed_queue", func(body []byte) error { return c.paymentConsumer.HandlePaymentFailed(ctx, body) })
+	err = c.consumer.ConsumeEnvelope(ctx, "meal.payment_failed_queue", c.paymentConsumer.HandlePaymentFailed)
 	if err != nil {
 		return fmt.Errorf("failed to consume meal.payment_failed_queue: %w", err)
 	}

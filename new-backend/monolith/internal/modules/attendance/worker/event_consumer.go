@@ -45,9 +45,7 @@ func (w *EventConsumer) Start(ctx context.Context) error {
 	// in-flight event processing is canceled on graceful shutdown.
 	// Queue is declared and bound in main.go (DeclareDownstreamBindings);
 	// the name is a queue, distinct from the "attendance.events" exchange.
-	if err := w.consumer.Consume(QueueSyncEvents, func(body []byte) error {
-		return w.handleMessage(ctx, body)
-	}); err != nil {
+	if err := w.consumer.ConsumeEnvelope(ctx, QueueSyncEvents, w.handleMessage); err != nil {
 		log.Error("failed to start consuming", zap.Error(err))
 		return err
 	}

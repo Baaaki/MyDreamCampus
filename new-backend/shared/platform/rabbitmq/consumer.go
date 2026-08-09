@@ -1,6 +1,7 @@
 package rabbitmq
 
 import (
+	"context"
 	"encoding/json"
 	"fmt"
 
@@ -25,17 +26,12 @@ func NewConsumer(conn *Connection) *Consumer {
 	}
 }
 
-// DeclareQueue declares a durable queue
+// DeclareQueue declares a durable queue together with its dead-letter
+// exchange and queue. The two are declared as a unit: a queue whose
+// x-dead-letter-exchange points at a missing exchange drops rejected
+// messages instead of parking them for inspection.
 func (c *Consumer) DeclareQueue(queueName string) error {
-	_, err := c.conn.Channel().QueueDeclare(
-		queueName, // name
-		true,      // durable
-		false,     // delete when unused
-		false,     // exclusive
-		false,     // no-wait
-		nil,       // arguments
-	)
-	return err
+	return SetupDLQ(c.conn.Channel(), queueName)
 }
 
 // BindQueue binds a queue to an exchange with routing key
@@ -165,6 +161,39 @@ func (c *Consumer) ConsumeWithDLQ(queueName string, handler MessageHandler, maxR
 	}()
 
 	return nil
+}
+
+// EnvelopeHandler processes one event body with a context that already
+// carries the originating request's ID.
+type EnvelopeHandler func(ctx context.Context, body []byte) error
+
+// correlated is the sliver of the outbox envelope this layer reads. The rest
+// of the envelope stays the handler's business.
+type correlated struct {
+	CorrelationID string `json:"correlation_id"`
+}
+
+// MaxDeliveryAttempts is how often a failing message is retried before it is
+// parked in the queue's DLQ. Kept as one constant rather than a per-consumer
+// knob: the number that matters is "not infinite", and a message that failed
+// three times is not going to succeed on the fourth.
+const MaxDeliveryAttempts = 3
+
+// ConsumeEnvelope is the entry point every module consumer uses. On top of
+// ConsumeWithDLQ it pulls correlation_id out of the envelope and puts it in
+// the handler's context, so the consumer's log lines join the chain of the
+// HTTP request that produced the event. Solving it here rather than in each
+// consumer is what keeps the chain unbroken across nine services.
+func (c *Consumer) ConsumeEnvelope(ctx context.Context, queueName string, handler EnvelopeHandler) error {
+	return c.ConsumeWithDLQ(queueName, func(body []byte) error {
+		var env correlated
+		// A body that does not parse as an envelope is still the handler's
+		// call — it owns the drop-or-retry decision for malformed messages.
+		_ = json.Unmarshal(body, &env)
+		// WithRequestIDValue mints an ID when correlation_id is empty, which
+		// is the case for worker- and scheduler-driven events.
+		return handler(logger.WithRequestIDValue(ctx, env.CorrelationID), body)
+	}, MaxDeliveryAttempts)
 }
 
 // getRetryCount extracts retry count from message headers

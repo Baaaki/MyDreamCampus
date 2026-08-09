@@ -38,9 +38,7 @@ func NewFinalizeConsumer(
 func (w *FinalizeConsumer) Start(ctx context.Context) error {
 	log := logger.WithContextAndFields(ctx, zap.String("worker", "FinalizeConsumer"))
 
-	if err := w.consumer.Consume(QueueFinalizeRequested, func(body []byte) error {
-		return w.handleFinalizeRequested(ctx, body)
-	}); err != nil {
+	if err := w.consumer.ConsumeEnvelope(ctx, QueueFinalizeRequested, w.handleFinalizeRequested); err != nil {
 		log.Error("failed to start consuming", zap.Error(err))
 		return err
 	}

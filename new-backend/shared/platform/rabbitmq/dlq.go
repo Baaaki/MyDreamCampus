@@ -9,8 +9,8 @@ import (
 
 // SetupDLQ sets up Dead Letter Queue for a given queue
 func SetupDLQ(channel *amqp.Channel, queueName string) error {
-	dlqName := queueName + ".dlq"
-	dlqExchangeName := queueName + ".dlq.exchange"
+	dlqName := DLQName(queueName)
+	dlqExchangeName := DLQExchangeName(queueName)
 
 	// 1. Declare DLQ exchange
 	if err := channel.ExchangeDeclare(
@@ -49,19 +49,13 @@ func SetupDLQ(channel *amqp.Channel, queueName string) error {
 	}
 
 	// 4. Declare main queue with DLQ configuration
-	args := amqp.Table{
-		"x-dead-letter-exchange": dlqExchangeName,
-		// Optional: message TTL (time to live)
-		// "x-message-ttl": 86400000, // 24 hours in milliseconds
-	}
-
 	if _, err := channel.QueueDeclare(
 		queueName,
 		true,  // durable
 		false, // delete when unused
 		false, // exclusive
 		false, // no-wait
-		args,  // arguments with DLQ config
+		WorkQueueArgs(queueName),
 	); err != nil {
 		return fmt.Errorf("failed to declare queue with DLQ: %w", err)
 	}
@@ -71,8 +65,8 @@ func SetupDLQ(channel *amqp.Channel, queueName string) error {
 
 // SetupDLQWithTTL sets up DLQ with message TTL
 func SetupDLQWithTTL(channel *amqp.Channel, queueName string, ttlMs int) error {
-	dlqName := queueName + ".dlq"
-	dlqExchangeName := queueName + ".dlq.exchange"
+	dlqName := DLQName(queueName)
+	dlqExchangeName := DLQExchangeName(queueName)
 
 	// Declare DLQ exchange
 	if err := channel.ExchangeDeclare(
@@ -111,10 +105,8 @@ func SetupDLQWithTTL(channel *amqp.Channel, queueName string, ttlMs int) error {
 	}
 
 	// Declare main queue with DLQ and TTL
-	args := amqp.Table{
-		"x-dead-letter-exchange": dlqExchangeName,
-		"x-message-ttl":          utils.ClampToInt32(ttlMs), // Message TTL in milliseconds
-	}
+	args := WorkQueueArgs(queueName)
+	args["x-message-ttl"] = utils.ClampToInt32(ttlMs) // Message TTL in milliseconds
 
 	if _, err := channel.QueueDeclare(
 		queueName,

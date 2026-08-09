@@ -68,16 +68,12 @@ type PaymentService struct {
 }
 
 func NewPaymentService(publisher *rabbitmq.Publisher, logger *zap.Logger) *PaymentService {
-	// Ensure the exchanges and queues are declared. Failures are non-fatal:
-	// publish retries re-declare, and the mock payment flow must not block boot.
+	// Only the exchange, which payment owns. The meal.payment_* queues used to
+	// be declared here too — a publisher defining its consumer's queues. Meal
+	// declares them itself; payment must not know who listens.
+	// Non-fatal: publish re-declares, and the mock flow must not block boot.
 	if err := publisher.DeclareExchange("payment.events"); err != nil {
 		logger.Warn("failed to declare payment exchange", zap.Error(err))
-	}
-	if err := publisher.DeclareAndBindQueue("meal.payment_completed_queue", "payment.events", "payment.completed"); err != nil {
-		logger.Warn("failed to declare payment_completed queue", zap.Error(err))
-	}
-	if err := publisher.DeclareAndBindQueue("meal.payment_failed_queue", "payment.events", "payment.failed"); err != nil {
-		logger.Warn("failed to declare payment_failed queue", zap.Error(err))
 	}
 
 	return &PaymentService{

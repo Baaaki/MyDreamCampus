@@ -37,9 +37,7 @@ func (c *EventConsumer) Start(ctx context.Context) error {
 	log.Info("starting event consumer")
 
 	// Consume staff events using shared events constants
-	err := c.consumer.Consume(events.QueueStudentStaffEvents, func(msg []byte) error {
-		return c.handleMessage(ctx, msg)
-	})
+	err := c.consumer.ConsumeEnvelope(ctx, events.QueueStudentStaffEvents, c.handleMessage)
 	if err != nil {
 		return fmt.Errorf("failed to start consuming: %w", err)
 	}

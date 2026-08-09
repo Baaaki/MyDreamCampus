@@ -83,15 +83,8 @@ func (p *Publisher) Publish(ctx context.Context, exchangeName, routingKey string
 func (p *Publisher) DeclareAndBindQueue(queueName, exchangeName, routingKey string) error {
 	ch := p.conn.Channel()
 
-	_, err := ch.QueueDeclare(
-		queueName,
-		true,  // durable
-		false, // delete when unused
-		false, // exclusive
-		false, // no-wait
-		nil,
-	)
-	if err != nil {
+	// Declares the queue and its dead-letter side in one go — see SetupDLQ.
+	if err := SetupDLQ(ch, queueName); err != nil {
 		return fmt.Errorf("failed to declare queue %s: %w", queueName, err)
 	}
 
