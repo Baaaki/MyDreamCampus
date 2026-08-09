@@ -102,6 +102,43 @@ func TestHTTPCourseCatalogClient_GetAvailableCourses_SendsFilters(t *testing.T) 
 	assert.Equal(t, "2025-2026-Fall", gotQuery.Get("semester"))
 	assert.Equal(t, "Bilgisayar", gotQuery.Get("department"))
 	assert.Equal(t, "1", gotQuery.Get("class_level"))
+	// catalog binds limit with max=100 and answers 400 above it.
+	assert.Equal(t, "100", gotQuery.Get("limit"))
+}
+
+func TestHTTPCourseCatalogClient_GetAvailableCourses_WalksEveryPage(t *testing.T) {
+	var gotPages []string
+	c := NewHTTPCourseCatalogClient(newTestBase(t, func(w http.ResponseWriter, r *http.Request) {
+		page := r.URL.Query().Get("page")
+		gotPages = append(gotPages, page)
+
+		// One full page, then a short one that ends the walk.
+		items := make([]contracts.SemesterCourseListItem, catalogPageSize)
+		if page == "2" {
+			items = []contracts.SemesterCourseListItem{{CourseCode: "BLM999"}}
+		}
+		_ = json.NewEncoder(w).Encode(semesterCourseList{Data: items})
+	}))
+
+	courses, err := c.GetAvailableCourses(context.Background(), "Bilgisayar", 1, "2025-2026-Fall")
+	require.NoError(t, err)
+
+	assert.Equal(t, []string{"1", "2"}, gotPages)
+	require.Len(t, courses, catalogPageSize+1)
+	assert.Equal(t, "BLM999", courses[catalogPageSize].CourseCode)
+}
+
+func TestHTTPCourseCatalogClient_GetAvailableCourses_EndlessPagingErrors(t *testing.T) {
+	c := NewHTTPCourseCatalogClient(newTestBase(t, func(w http.ResponseWriter, _ *http.Request) {
+		// Never shrinks, so the walk must stop with an error rather than
+		// hand back a silently truncated list.
+		_ = json.NewEncoder(w).Encode(semesterCourseList{
+			Data: make([]contracts.SemesterCourseListItem, catalogPageSize),
+		})
+	}))
+
+	_, err := c.GetAvailableCourses(context.Background(), "Bilgisayar", 1, "2025-2026-Fall")
+	assert.ErrorContains(t, err, "more than")
 }
 
 func TestHTTPCourseCatalogClient_GetCoursesByIDs_FetchesEach(t *testing.T) {

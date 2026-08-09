@@ -13,8 +13,18 @@ import (
 	"github.com/google/uuid"
 )
 
-// listPageSize matches the in-process adapter's "give me everything" limit.
-const listPageSize = 1000
+// catalogPageSize is the largest `limit` catalog's query binding accepts
+// (max=100); asking for more is a 400, not a bigger page. The in-process
+// adapter passed one "give me everything" limit straight to the service and
+// never met that ceiling, so the HTTP client pages to return the same full
+// list rather than silently stopping at the first hundred.
+const catalogPageSize = 100
+
+// maxCatalogPages bounds the walk. Unreachable in practice — it is 5000
+// courses for a single department and class level — so hitting it means the
+// provider is not shrinking its pages, and truncating there without a word
+// is the very failure this paging exists to avoid.
+const maxCatalogPages = 50
 
 // adviseeList and semesterCourseList are the slices of the providers' paged
 // responses this client reads. Declared locally so enrollment does not depend
@@ -70,19 +80,31 @@ func NewHTTPCourseCatalogClient(base *client.Base) *HTTPCourseCatalogClient {
 }
 
 func (c *HTTPCourseCatalogClient) GetAvailableCourses(ctx context.Context, department string, classLevel int16, semester string) ([]contracts.SemesterCourseListItem, error) {
-	query := url.Values{
-		"semester":    {semester},
-		"department":  {department},
-		"class_level": {strconv.Itoa(int(classLevel))},
-		"page":        {"1"},
-		"limit":       {strconv.Itoa(listPageSize)},
+	var all []contracts.SemesterCourseListItem
+
+	for page := 1; page <= maxCatalogPages; page++ {
+		query := url.Values{
+			"semester":    {semester},
+			"department":  {department},
+			"class_level": {strconv.Itoa(int(classLevel))},
+			"page":        {strconv.Itoa(page)},
+			"limit":       {strconv.Itoa(catalogPageSize)},
+		}
+
+		var resp semesterCourseList
+		if err := c.base.Get(ctx, "/internal/semester-courses?"+query.Encode(), &resp); err != nil {
+			return nil, err
+		}
+		all = append(all, resp.Data...)
+
+		// A short page is the last page.
+		if len(resp.Data) < catalogPageSize {
+			return all, nil
+		}
 	}
 
-	var resp semesterCourseList
-	if err := c.base.Get(ctx, "/internal/semester-courses?"+query.Encode(), &resp); err != nil {
-		return nil, err
-	}
-	return resp.Data, nil
+	return nil, fmt.Errorf("catalog available courses: more than %d pages for %s/%d",
+		maxCatalogPages, department, classLevel)
 }
 
 func (c *HTTPCourseCatalogClient) GetCoursesByIDs(ctx context.Context, semester string, ids []uuid.UUID) ([]contracts.SemesterCourseResponse, error) {
