@@ -1,14 +1,14 @@
-// Package attendance wires the attendance module's dependencies
-// and exposes the platform-level Module + lifecycle hooks main.go uses.
+// Package attendance wires the attendance service's dependencies and
+// exposes the platform-level Module + lifecycle hooks cmd/main.go uses.
 package attendance
 
 import (
 	"context"
 
-	"github.com/baaaki/mydreamcampus/monolith/internal/modules/attendance/handler"
-	"github.com/baaaki/mydreamcampus/monolith/internal/modules/attendance/repository"
-	"github.com/baaaki/mydreamcampus/monolith/internal/modules/attendance/service"
-	"github.com/baaaki/mydreamcampus/monolith/internal/modules/attendance/worker"
+	"github.com/baaaki/mydreamcampus/attendance/internal/handler"
+	"github.com/baaaki/mydreamcampus/attendance/internal/repository"
+	"github.com/baaaki/mydreamcampus/attendance/internal/service"
+	"github.com/baaaki/mydreamcampus/attendance/internal/worker"
 	"github.com/baaaki/mydreamcampus/shared/config"
 	"github.com/baaaki/mydreamcampus/shared/eventbus"
 	platformMiddleware "github.com/baaaki/mydreamcampus/shared/platform/middleware"
@@ -29,6 +29,7 @@ type Module struct {
 	outboxRepo     *repository.OutboxRepository
 	eventRepo      *repository.EventRepository
 	outboxStore    *repository.OutboxStore
+	retentionStore *repository.RetentionStore
 
 	qrService      *service.QRService
 	redisService   *service.RedisService
@@ -74,6 +75,7 @@ func New(
 		outboxRepo:        outboxRepo,
 		eventRepo:         eventRepo,
 		outboxStore:       repository.NewOutboxStore(outboxRepo),
+		retentionStore:    repository.NewRetentionStore(pool),
 		qrService:         qrService,
 		redisService:      redisService,
 		semesterClient:    semesterClient,
@@ -89,9 +91,8 @@ func New(
 // Bootstrap starts the attendance background workers: the RabbitMQ event
 // consumer (student/course/enrollment cache sync), the academic-period
 // projection consumer, the Redis buffer flusher (QR scans → DB) and the
-// session expiry handler. Queue bindings are pre-declared in main.go
-// (eventbus.DeclareDownstreamBindings) so events published before these
-// consumers attach are not lost.
+// session expiry handler. Queue bindings are declared in cmd/main.go so
+// events published before these consumers attach are not lost.
 func (m *Module) Bootstrap(ctx context.Context) error {
 	if err := m.eventConsumer.Start(ctx); err != nil {
 		return err
@@ -110,7 +111,8 @@ func (m *Module) Name() string { return "attendance" }
 
 func (m *Module) OutboxStore() eventbus.OutboxStore { return m.outboxStore }
 
-func (m *Module) AttendanceService() *service.AttendanceService { return m.attendanceService }
+// RetentionStore exposes this schema's event tables to the retention worker.
+func (m *Module) RetentionStore() eventbus.RetentionStore { return m.retentionStore }
 
 func (m *Module) RegisterRoutes(rg *gin.RouterGroup) {
 	protected := rg.Group("")
@@ -123,7 +125,10 @@ func (m *Module) RegisterRoutes(rg *gin.RouterGroup) {
 		protected.GET("/sessions/:session_id", platformMiddleware.RequireRole("teacher", "admin"), m.attendanceHandler.GetSessionDetails)
 		protected.GET("/sessions/:session_id/records", platformMiddleware.RequireRole("teacher", "admin"), m.attendanceHandler.GetSessionRecords)
 		protected.GET("/sessions/:session_id/students", platformMiddleware.RequireRole("teacher", "admin"), m.attendanceHandler.GetSessionStudents)
-		protected.POST("/sessions/:session_id/manual", platformMiddleware.RequireRole("teacher", "admin"), m.attendanceHandler.CreateManualAttendance)
+		// Manual marking has no QR dedup behind it, so a retry would write a
+		// second record for the same student. QR scanning is left out: Redis
+		// SADD already makes it atomic.
+		protected.POST("/sessions/:session_id/manual", platformMiddleware.RequireRole("teacher", "admin"), platformMiddleware.Idempotency(), m.attendanceHandler.CreateManualAttendance)
 		protected.POST("/sessions/:session_id/close", platformMiddleware.RequireRole("teacher", "admin"), m.attendanceHandler.CloseSession)
 		protected.GET("/sessions/:session_id/qr", platformMiddleware.RequireRole("teacher", "admin"), m.attendanceHandler.GetQRCode)
 

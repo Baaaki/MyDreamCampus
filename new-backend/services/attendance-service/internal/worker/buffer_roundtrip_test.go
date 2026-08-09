@@ -5,7 +5,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/baaaki/mydreamcampus/monolith/internal/modules/attendance/db"
+	"github.com/baaaki/mydreamcampus/attendance/internal/db"
 	"github.com/baaaki/mydreamcampus/shared/platform/utils"
 	"github.com/google/uuid"
 )

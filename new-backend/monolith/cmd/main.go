@@ -8,9 +8,6 @@ import (
 	"syscall"
 	"time"
 
-	"github.com/baaaki/mydreamcampus/monolith/internal/modules/attendance"
-	attendanceService "github.com/baaaki/mydreamcampus/monolith/internal/modules/attendance/service"
-	attendanceWorker "github.com/baaaki/mydreamcampus/monolith/internal/modules/attendance/worker"
 	"github.com/baaaki/mydreamcampus/monolith/internal/modules/grades"
 	gradesService "github.com/baaaki/mydreamcampus/monolith/internal/modules/grades/service"
 	gradesWorker "github.com/baaaki/mydreamcampus/monolith/internal/modules/grades/worker"
@@ -119,12 +116,6 @@ func main() {
 	// its consumers as it migrates. Auth + student still consume staff
 	// events from RabbitMQ until those modules switch to in-process pubsub.
 	downstreamBindings := []eventbus.DownstreamBinding{
-		// attendance — local student/course/enrollment cache sync.
-		{Queue: "attendance.sync_events", Exchange: "student.events", RoutingKey: "student.created"},
-		{Queue: "attendance.sync_events", Exchange: "student.events", RoutingKey: "student.updated"},
-		{Queue: "attendance.sync_events", Exchange: "student.events", RoutingKey: "student.deactivated"},
-		{Queue: "attendance.sync_events", Exchange: "course_catalog.events", RoutingKey: "course.semester.created"},
-		{Queue: "attendance.sync_events", Exchange: "enrollment.events", RoutingKey: "enrollment.program.approved"},
 		// grades — cache sync, registrations and attendance failures.
 		{Queue: "grades.sync_events", Exchange: "student.events", RoutingKey: "student.created"},
 		{Queue: "grades.sync_events", Exchange: "student.events", RoutingKey: "student.updated"},
@@ -140,7 +131,6 @@ func main() {
 		// catalog owns audit_log; grades and meal publish their entries
 		// instead of writing across the schema boundary.
 		{Queue: gradesWorker.QueuePeriodEvents, Exchange: "course_catalog.events", RoutingKey: events.PeriodEventRoutingPattern(platformRepo.PeriodTypeGrading)},
-		{Queue: attendanceWorker.QueuePeriodEvents, Exchange: "course_catalog.events", RoutingKey: events.PeriodEventRoutingPattern(platformRepo.PeriodTypeAttendance)},
 	}
 	if err := eventbus.DeclareDownstreamBindings(publisher, downstreamBindings); err != nil {
 		logger.Fatal("failed to declare downstream bindings", zap.Error(err))
@@ -153,21 +143,13 @@ func main() {
 	transports := newInternalTransports(cfg)
 	// Catalog already runs as its own service, so every semester client is
 	// HTTP-only.
-	attendanceSemesterClient := attendanceService.NewHTTPSemesterClient(transports.catalog)
 	gradesSemesterClient := gradesService.NewHTTPSemesterClient(transports.catalog)
 
 	// Each module reads academic_periods from its own schema. Catalog stays the
 	// source of truth and pushes changes as events; nobody reads across a
 	// schema boundary, which is what makes the split into separate databases
 	// possible.
-	attendancePeriodRepo := platformRepo.NewSimplePeriodRepository(pool, "attendance")
 	gradesPeriodRepo := platformRepo.NewSimplePeriodRepository(pool, "grades")
-
-	attendanceModule := attendance.New(cfg, pool, redisClient.Client(), rabbitConn,
-		attendanceSemesterClient, attendancePeriodRepo)
-	if err := attendanceModule.Bootstrap(ctx); err != nil {
-		logger.Fatal("failed to bootstrap attendance module", zap.Error(err))
-	}
 
 	gradesModule := grades.New(pool, rabbitConn, gradesPeriodRepo, gradesSemesterClient)
 	if err := gradesModule.Bootstrap(ctx); err != nil {
@@ -185,8 +167,6 @@ func main() {
 	// module's outbox table inside the business transaction, then relayed here.
 	outboxInterval := time.Duration(cfg.Outbox.IntervalSeconds) * time.Second
 	batchSize := utils.ClampToInt32(cfg.Outbox.BatchSize)
-	go eventbus.NewOutboxWorker("attendance", "attendance.events", attendanceModule.OutboxStore(),
-		publisher, outboxInterval, batchSize).Start(ctx)
 	go eventbus.NewOutboxWorker("grades", "grades.events", gradesModule.OutboxStore(),
 		publisher, outboxInterval, batchSize).Start(ctx)
 	go eventbus.NewOutboxWorker("meal", "meal.events", mealModule.OutboxStore(),
@@ -197,7 +177,7 @@ func main() {
 	server.RegisterHealthCheck("rabbitmq", rabbitConn.Ping)
 	server.RegisterHealthCheck("redis", redisClient.Ping)
 
-	server.RegisterModules(attendanceModule, gradesModule, mealModule)
+	server.RegisterModules(gradesModule, mealModule)
 	server.Run()
 
 	quit := make(chan os.Signal, 1)

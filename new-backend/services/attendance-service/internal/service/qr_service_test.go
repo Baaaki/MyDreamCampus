@@ -4,7 +4,7 @@ import (
 	"encoding/hex"
 	"testing"
 
-	"github.com/baaaki/mydreamcampus/monolith/internal/modules/attendance/dto"
+	"github.com/baaaki/mydreamcampus/attendance/internal/dto"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )

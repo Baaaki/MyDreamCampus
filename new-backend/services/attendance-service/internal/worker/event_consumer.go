@@ -4,9 +4,9 @@ import (
 	"context"
 	"encoding/json"
 
-	"github.com/baaaki/mydreamcampus/monolith/internal/modules/attendance/db"
-	"github.com/baaaki/mydreamcampus/monolith/internal/modules/attendance/dto"
-	"github.com/baaaki/mydreamcampus/monolith/internal/modules/attendance/repository"
+	"github.com/baaaki/mydreamcampus/attendance/internal/db"
+	"github.com/baaaki/mydreamcampus/attendance/internal/dto"
+	"github.com/baaaki/mydreamcampus/attendance/internal/repository"
 	"github.com/baaaki/mydreamcampus/shared/platform/logger"
 	"github.com/baaaki/mydreamcampus/shared/platform/rabbitmq"
 	"github.com/baaaki/mydreamcampus/shared/platform/utils"

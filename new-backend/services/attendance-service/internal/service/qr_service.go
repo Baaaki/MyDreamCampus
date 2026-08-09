@@ -6,7 +6,7 @@ import (
 	"crypto/sha256"
 	"encoding/hex"
 
-	"github.com/baaaki/mydreamcampus/monolith/internal/modules/attendance/dto"
+	"github.com/baaaki/mydreamcampus/attendance/internal/dto"
 )
 
 type QRService struct{}

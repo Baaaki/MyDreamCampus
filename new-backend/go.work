@@ -4,6 +4,7 @@ toolchain go1.26.4
 
 use (
 	./monolith
+	./services/attendance-service
 	./services/auth-service
 	./services/catalog-service
 	./services/enrollment-service

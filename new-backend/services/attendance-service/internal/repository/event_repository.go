@@ -3,7 +3,7 @@ package repository
 import (
 	"context"
 
-	"github.com/baaaki/mydreamcampus/monolith/internal/modules/attendance/db"
+	"github.com/baaaki/mydreamcampus/attendance/internal/db"
 	"github.com/baaaki/mydreamcampus/shared/platform/utils"
 	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5/pgxpool"

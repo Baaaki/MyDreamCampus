@@ -4,8 +4,8 @@ import (
 	"context"
 	"time"
 
-	"github.com/baaaki/mydreamcampus/monolith/internal/modules/attendance/repository"
-	"github.com/baaaki/mydreamcampus/monolith/internal/modules/attendance/service"
+	"github.com/baaaki/mydreamcampus/attendance/internal/repository"
+	"github.com/baaaki/mydreamcampus/attendance/internal/service"
 	"github.com/baaaki/mydreamcampus/shared/platform/logger"
 	"github.com/baaaki/mydreamcampus/shared/platform/utils"
 	"go.uber.org/zap"

@@ -5,7 +5,7 @@ import (
 	"encoding/json"
 	"time"
 
-	"github.com/baaaki/mydreamcampus/monolith/internal/modules/attendance/dto"
+	"github.com/baaaki/mydreamcampus/attendance/internal/dto"
 	"github.com/baaaki/mydreamcampus/shared/events"
 	"github.com/baaaki/mydreamcampus/shared/platform/logger"
 	"github.com/baaaki/mydreamcampus/shared/platform/rabbitmq"

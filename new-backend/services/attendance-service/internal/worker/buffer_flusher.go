@@ -6,9 +6,9 @@ import (
 	"strings"
 	"time"
 
-	"github.com/baaaki/mydreamcampus/monolith/internal/modules/attendance/db"
-	"github.com/baaaki/mydreamcampus/monolith/internal/modules/attendance/repository"
-	"github.com/baaaki/mydreamcampus/monolith/internal/modules/attendance/service"
+	"github.com/baaaki/mydreamcampus/attendance/internal/db"
+	"github.com/baaaki/mydreamcampus/attendance/internal/repository"
+	"github.com/baaaki/mydreamcampus/attendance/internal/service"
 	"github.com/baaaki/mydreamcampus/shared/platform/logger"
 	"go.uber.org/zap"
 )

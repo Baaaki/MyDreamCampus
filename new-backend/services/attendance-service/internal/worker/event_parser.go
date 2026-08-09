@@ -4,7 +4,7 @@ import (
 	"encoding/json"
 	"fmt"
 
-	"github.com/baaaki/mydreamcampus/monolith/internal/modules/attendance/dto"
+	"github.com/baaaki/mydreamcampus/attendance/internal/dto"
 )
 
 // unwrapEventData unmarshals an outbox-shaped message into the caller's
