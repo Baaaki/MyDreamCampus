@@ -10,14 +10,14 @@ package student
 import (
 	"context"
 
-	"github.com/baaaki/mydreamcampus/monolith/internal/modules/student/handler"
-	"github.com/baaaki/mydreamcampus/monolith/internal/modules/student/repository"
-	"github.com/baaaki/mydreamcampus/monolith/internal/modules/student/service"
-	"github.com/baaaki/mydreamcampus/monolith/internal/modules/student/worker"
 	"github.com/baaaki/mydreamcampus/shared/config"
 	"github.com/baaaki/mydreamcampus/shared/eventbus"
 	platformMiddleware "github.com/baaaki/mydreamcampus/shared/platform/middleware"
 	"github.com/baaaki/mydreamcampus/shared/platform/rabbitmq"
+	"github.com/baaaki/mydreamcampus/student/internal/handler"
+	"github.com/baaaki/mydreamcampus/student/internal/repository"
+	"github.com/baaaki/mydreamcampus/student/internal/service"
+	"github.com/baaaki/mydreamcampus/student/internal/worker"
 	"github.com/gin-gonic/gin"
 	"github.com/jackc/pgx/v5/pgxpool"
 )
@@ -32,6 +32,7 @@ type Module struct {
 	importRepo          *repository.ImportRepository
 	importJobsRepo      *repository.ImportJobsRepository
 	outboxStore         *repository.OutboxStore
+	retentionStore      *repository.RetentionStore
 
 	studentService *service.StudentService
 	importService  *service.ImportService
@@ -70,6 +71,7 @@ func New(
 		importRepo:          importRepo,
 		importJobsRepo:      importJobsRepo,
 		outboxStore:         repository.NewOutboxStore(outboxRepo),
+		retentionStore:      repository.NewRetentionStore(pool),
 		studentService:      studentSvc,
 		importService:       importSvc,
 		staffClient:         staffClient,
@@ -89,6 +91,9 @@ func (m *Module) StudentService() *service.StudentService { return m.studentServ
 // OutboxStore for the per-module outbox worker.
 func (m *Module) OutboxStore() eventbus.OutboxStore { return m.outboxStore }
 
+// RetentionStore exposes this schema's event tables to the retention worker.
+func (m *Module) RetentionStore() eventbus.RetentionStore { return m.retentionStore }
+
 // Bootstrap starts the staff-events consumer. Once staff is in the same
 // process this can move to in-process pubsub — keeping
 // RabbitMQ for now mirrors the legacy contract and lets us migrate
@@ -97,19 +102,10 @@ func (m *Module) Bootstrap(ctx context.Context) error {
 	return m.consumer.Start(ctx)
 }
 
-// RegisterRoutes mounts /api/student/*. All routes are JWT-protected;
-// admin-only ones get an extra RequireAdmin(). The /internal sub-tree is
-// the exception — enrollment reaches it with the shared secret.
+// RegisterRoutes mounts /api/students/*. All routes are JWT-protected;
+// admin-only ones get an extra RequireAdmin(). Enrollment's reads live on
+// the root /internal tree — see RegisterPublicRoutes.
 func (m *Module) RegisterRoutes(rg *gin.RouterGroup) {
-	// Mounted before rg.Use(JWTAuth()) so service-to-service reads do not
-	// inherit the user auth chain. Phase 4 moves this group out of /api.
-	internal := rg.Group("/internal")
-	internal.Use(platformMiddleware.RequireInternalSecret(m.cfg.Server.InternalSecret))
-	{
-		internal.GET("/students/:id", m.studentHandler.GetStudentByID)
-		internal.GET("/students", m.studentHandler.ListStudentsByAdvisor)
-	}
-
 	rg.Use(platformMiddleware.JWTAuth())
 	rg.Use(platformMiddleware.CSRFProtection())
 	rg.Use(platformMiddleware.UserRateLimit())
@@ -127,7 +123,8 @@ func (m *Module) RegisterRoutes(rg *gin.RouterGroup) {
 		admin := rg.Group("")
 		admin.Use(platformMiddleware.RequireAdmin())
 		{
-			admin.POST("", m.studentHandler.CreateStudent)
+			// A retried create must not produce a second student record.
+			admin.POST("", platformMiddleware.Idempotency(), m.studentHandler.CreateStudent)
 			admin.PUT("/:id", m.studentHandler.UpdateStudent)
 			admin.DELETE("/:id", m.studentHandler.DeleteStudent)
 			admin.GET("/orphaned", m.studentHandler.ListOrphanedStudents)
@@ -136,5 +133,18 @@ func (m *Module) RegisterRoutes(rg *gin.RouterGroup) {
 			admin.GET("/bulk-import/:job_id", m.studentHandler.GetImportJobStatus)
 			admin.GET("/bulk-import", m.studentHandler.ListImportJobs)
 		}
+	}
+}
+
+// RegisterPublicRoutes mounts the internal reads enrollment performs. They
+// sit at the root rather than under /api because Caddy only proxies /api,
+// which puts them out of reach from outside the compose network. The secret
+// check stays behind that as the second line of defence.
+func (m *Module) RegisterPublicRoutes(r *gin.Engine) {
+	internal := r.Group("/internal")
+	internal.Use(platformMiddleware.RequireInternalSecret(m.cfg.Server.InternalSecret))
+	{
+		internal.GET("/students/:id", m.studentHandler.GetStudentByID)
+		internal.GET("/students", m.studentHandler.ListStudentsByAdvisor)
 	}
 }

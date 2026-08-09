@@ -3,9 +3,9 @@ package repository
 import (
 	"context"
 
-	"github.com/baaaki/mydreamcampus/monolith/internal/modules/student/db"
 	"github.com/baaaki/mydreamcampus/shared/eventbus"
 	"github.com/baaaki/mydreamcampus/shared/platform/utils"
+	"github.com/baaaki/mydreamcampus/student/internal/db"
 	"github.com/google/uuid"
 )
 

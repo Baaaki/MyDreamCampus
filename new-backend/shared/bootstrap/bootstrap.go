@@ -177,6 +177,10 @@ func (r *Runtime) initRedis(opts Options) {
 	})
 	logger.Info("Redis connection established")
 
+	// Keys are namespaced per service, so a client that reuses one key across
+	// two services cannot be served the wrong service's stored response.
+	platformMiddleware.SetIdempotencyStore(client, opts.Service)
+
 	if !r.Cfg.RateLimit.Enabled {
 		return
 	}

@@ -6,7 +6,6 @@ import (
 
 	catalogDTO "github.com/baaaki/mydreamcampus/monolith/internal/modules/course_catalog/dto"
 	catalogService "github.com/baaaki/mydreamcampus/monolith/internal/modules/course_catalog/service"
-	studentService "github.com/baaaki/mydreamcampus/monolith/internal/modules/student/service"
 	"github.com/baaaki/mydreamcampus/shared/contracts"
 	"github.com/google/uuid"
 )
@@ -21,27 +20,6 @@ type StudentClient interface {
 type CourseCatalogClient interface {
 	GetAvailableCourses(ctx context.Context, department string, classLevel int16, semester string) ([]contracts.SemesterCourseListItem, error)
 	GetCoursesByIDs(ctx context.Context, semester string, ids []uuid.UUID) ([]contracts.SemesterCourseResponse, error)
-}
-
-// InProcessStudentClient implements StudentClient by directly calling the Student module's public service
-type InProcessStudentClient struct {
-	svc *studentService.StudentService
-}
-
-func NewInProcessStudentClient(svc *studentService.StudentService) *InProcessStudentClient {
-	return &InProcessStudentClient{svc: svc}
-}
-
-func (c *InProcessStudentClient) GetStudentByID(ctx context.Context, id uuid.UUID) (contracts.StudentResponse, error) {
-	return c.svc.GetStudentByID(ctx, id.String())
-}
-
-func (c *InProcessStudentClient) GetStudentsByAdvisorID(ctx context.Context, advisorID uuid.UUID) ([]contracts.StudentResponse, error) {
-	resp, err := c.svc.ListStudentsByAdvisor(ctx, advisorID)
-	if err != nil {
-		return nil, err
-	}
-	return resp.Students, nil
 }
 
 // InProcessCourseCatalogClient implements CourseCatalogClient by directly calling the Course Catalog module's public service
@@ -82,5 +60,4 @@ func (c *InProcessCourseCatalogClient) GetCoursesByIDs(ctx context.Context, seme
 
 // Compile-time assertions — the in-process and HTTP clients must stay
 // interchangeable.
-var _ StudentClient = (*InProcessStudentClient)(nil)
 var _ CourseCatalogClient = (*InProcessCourseCatalogClient)(nil)

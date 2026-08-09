@@ -8,5 +8,6 @@ use (
 	./services/notification
 	./services/payment-service
 	./services/staff-service
+	./services/student-service
 	./shared
 )

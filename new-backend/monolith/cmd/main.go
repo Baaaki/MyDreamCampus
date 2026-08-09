@@ -22,8 +22,6 @@ import (
 	gradesWorker "github.com/baaaki/mydreamcampus/monolith/internal/modules/grades/worker"
 	"github.com/baaaki/mydreamcampus/monolith/internal/modules/meal"
 	mealService "github.com/baaaki/mydreamcampus/monolith/internal/modules/meal/service"
-	"github.com/baaaki/mydreamcampus/monolith/internal/modules/student"
-	studentService "github.com/baaaki/mydreamcampus/monolith/internal/modules/student/service"
 	"github.com/baaaki/mydreamcampus/shared/config"
 	"github.com/baaaki/mydreamcampus/shared/eventbus"
 	"github.com/baaaki/mydreamcampus/shared/events"
@@ -127,8 +125,6 @@ func main() {
 	// its consumers as it migrates. Auth + student still consume staff
 	// events from RabbitMQ until those modules switch to in-process pubsub.
 	downstreamBindings := []eventbus.DownstreamBinding{
-		// student — drops advisor assignment when the staff member is removed.
-		{Queue: "student.staff_events", Exchange: "staff.events", RoutingKey: "staff.deactivated"},
 		// attendance — local student/course/enrollment cache sync.
 		{Queue: "attendance.sync_events", Exchange: "student.events", RoutingKey: "student.created"},
 		{Queue: "attendance.sync_events", Exchange: "student.events", RoutingKey: "student.updated"},
@@ -172,26 +168,21 @@ func main() {
 
 	// The cross-module clients are chosen here, once. Everything downstream
 	// sees an interface and cannot tell which implementation it got.
+	// Student already runs as its own service, so enrollment's student client
+	// is HTTP-only.
+	enrollmentStudentClient := enrollmentService.NewHTTPStudentClient(transports.student)
 	var (
-		enrollmentStudentClient  enrollmentService.StudentClient
 		enrollmentCourseClient   enrollmentService.CourseCatalogClient
 		attendanceSemesterClient attendanceService.SemesterClient
 		gradesSemesterClient     gradesService.SemesterClient
 	)
-	// Staff already runs as its own service, so its clients are HTTP-only —
+	// Staff already runs as its own service, so its client is HTTP-only —
 	// there is no in-process staff module left to fall back to.
 	catalogStaffClient := catalogService.NewHTTPStaffClient(transports.staff)
-	studentStaffClient := studentService.NewHTTPStaffClient(transports.staff)
 	if httpMode {
-		enrollmentStudentClient = enrollmentService.NewHTTPStudentClient(transports.student)
 		enrollmentCourseClient = enrollmentService.NewHTTPCourseCatalogClient(transports.catalog)
 		attendanceSemesterClient = attendanceService.NewHTTPSemesterClient(transports.catalog)
 		gradesSemesterClient = gradesService.NewHTTPSemesterClient(transports.catalog)
-	}
-
-	studentModule := student.New(cfg, pool, rabbitConn, studentStaffClient)
-	if err := studentModule.Bootstrap(ctx); err != nil {
-		logger.Fatal("failed to bootstrap student module", zap.Error(err))
 	}
 
 	catalogModule := coursecatalog.New(cfg, pool, rabbitConn,
@@ -211,9 +202,7 @@ func main() {
 	gradesPeriodRepo := platformRepo.NewSimplePeriodRepository(pool, "grades")
 
 	enrollmentModule := enrollment.New(pool, rabbitConn,
-		orInProcess(enrollmentStudentClient, func() enrollmentService.StudentClient {
-			return enrollmentService.NewInProcessStudentClient(studentModule.StudentService())
-		}),
+		enrollmentStudentClient,
 		orInProcess(enrollmentCourseClient, func() enrollmentService.CourseCatalogClient {
 			return enrollmentService.NewInProcessCourseCatalogClient(catalogModule.SemesterService())
 		}),
@@ -250,8 +239,6 @@ func main() {
 	// module's outbox table inside the business transaction, then relayed here.
 	outboxInterval := time.Duration(cfg.Outbox.IntervalSeconds) * time.Second
 	batchSize := utils.ClampToInt32(cfg.Outbox.BatchSize)
-	go eventbus.NewOutboxWorker("student", "student.events", studentModule.OutboxStore(),
-		publisher, outboxInterval, batchSize).Start(ctx)
 	go eventbus.NewOutboxWorker("course_catalog", "course_catalog.events", catalogModule.OutboxStore(),
 		publisher, outboxInterval, batchSize).Start(ctx)
 	go eventbus.NewOutboxWorker("enrollment", "enrollment.events", enrollmentModule.OutboxStore(),
@@ -268,7 +255,7 @@ func main() {
 	server.RegisterHealthCheck("rabbitmq", rabbitConn.Ping)
 	server.RegisterHealthCheck("redis", redisClient.Ping)
 
-	server.RegisterModules(studentModule, catalogModule, enrollmentModule, attendanceModule, gradesModule, mealModule)
+	server.RegisterModules(catalogModule, enrollmentModule, attendanceModule, gradesModule, mealModule)
 	server.Run()
 
 	quit := make(chan os.Signal, 1)

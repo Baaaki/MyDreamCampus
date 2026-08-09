@@ -3,12 +3,12 @@ package service
 import (
 	"context"
 
-	"github.com/baaaki/mydreamcampus/monolith/internal/modules/student/db"
-	"github.com/baaaki/mydreamcampus/monolith/internal/modules/student/dto"
-	serviceErrors "github.com/baaaki/mydreamcampus/monolith/internal/modules/student/errors"
 	sharedErrors "github.com/baaaki/mydreamcampus/shared/platform/errors"
 	"github.com/baaaki/mydreamcampus/shared/platform/logger"
 	"github.com/baaaki/mydreamcampus/shared/platform/utils"
+	"github.com/baaaki/mydreamcampus/student/internal/db"
+	"github.com/baaaki/mydreamcampus/student/internal/dto"
+	serviceErrors "github.com/baaaki/mydreamcampus/student/internal/errors"
 	"github.com/google/uuid"
 	"go.uber.org/zap"
 )

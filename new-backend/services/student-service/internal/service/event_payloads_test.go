@@ -5,8 +5,8 @@ import (
 	"testing"
 	"time"
 
-	"github.com/baaaki/mydreamcampus/monolith/internal/modules/student/db"
-	"github.com/baaaki/mydreamcampus/monolith/internal/modules/student/dto"
+	"github.com/baaaki/mydreamcampus/student/internal/db"
+	"github.com/baaaki/mydreamcampus/student/internal/dto"
 	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5/pgtype"
 	"github.com/stretchr/testify/assert"
