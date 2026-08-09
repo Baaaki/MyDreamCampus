@@ -3,8 +3,8 @@ package payment
 import (
 	"context"
 
-	"github.com/baaaki/mydreamcampus/monolith/internal/modules/payment/handler"
-	"github.com/baaaki/mydreamcampus/monolith/internal/modules/payment/service"
+	"github.com/baaaki/mydreamcampus/payment/internal/handler"
+	"github.com/baaaki/mydreamcampus/payment/internal/service"
 	"github.com/baaaki/mydreamcampus/shared/config"
 	platformMiddleware "github.com/baaaki/mydreamcampus/shared/platform/middleware"
 	"github.com/baaaki/mydreamcampus/shared/platform/rabbitmq"
@@ -41,14 +41,15 @@ func (m *Module) Bootstrap(ctx context.Context) error {
 	return nil
 }
 
-// RegisterRoutes mounts only the /internal sub-tree — payment has no
-// user-facing endpoints; meal is its single caller.
-func (m *Module) RegisterRoutes(router *gin.RouterGroup) {
-	internal := router.Group("/internal")
+// RegisterRoutes mounts nothing under /api — payment has no user-facing
+// endpoints. Meal, its single caller, reaches it through RegisterPublicRoutes.
+func (m *Module) RegisterRoutes(*gin.RouterGroup) {}
+
+// RegisterPublicRoutes mounts the /internal sub-tree at the root, outside the
+// /api prefix Caddy proxies, so payment is reachable only from inside the
+// compose network. The secret check stays as the second line of defence.
+func (m *Module) RegisterPublicRoutes(r *gin.Engine) {
+	internal := r.Group("/internal")
 	internal.Use(platformMiddleware.RequireInternalSecret(m.cfg.Server.InternalSecret))
 	m.paymentHandler.RegisterInternalRoutes(internal)
-}
-
-func (m *Module) PaymentService() *service.PaymentService {
-	return m.paymentService
 }

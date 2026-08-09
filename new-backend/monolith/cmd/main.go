@@ -23,7 +23,6 @@ import (
 	gradesWorker "github.com/baaaki/mydreamcampus/monolith/internal/modules/grades/worker"
 	"github.com/baaaki/mydreamcampus/monolith/internal/modules/meal"
 	mealService "github.com/baaaki/mydreamcampus/monolith/internal/modules/meal/service"
-	"github.com/baaaki/mydreamcampus/monolith/internal/modules/payment"
 	"github.com/baaaki/mydreamcampus/monolith/internal/modules/student"
 	studentService "github.com/baaaki/mydreamcampus/monolith/internal/modules/student/service"
 	"github.com/baaaki/mydreamcampus/shared/config"
@@ -191,7 +190,6 @@ func main() {
 		enrollmentCourseClient   enrollmentService.CourseCatalogClient
 		attendanceSemesterClient attendanceService.SemesterClient
 		gradesSemesterClient     gradesService.SemesterClient
-		mealPaymentClient        mealService.PaymentClient
 	)
 	// Staff already runs as its own service, so its clients are HTTP-only —
 	// there is no in-process staff module left to fall back to.
@@ -202,7 +200,6 @@ func main() {
 		enrollmentCourseClient = enrollmentService.NewHTTPCourseCatalogClient(transports.catalog)
 		attendanceSemesterClient = attendanceService.NewHTTPSemesterClient(transports.catalog)
 		gradesSemesterClient = gradesService.NewHTTPSemesterClient(transports.catalog)
-		mealPaymentClient = mealService.NewHTTPPaymentClient(transports.payment)
 	}
 
 	studentModule := student.New(cfg, pool, rabbitConn, studentStaffClient)
@@ -255,15 +252,9 @@ func main() {
 		logger.Fatal("failed to bootstrap grades module", zap.Error(err))
 	}
 
-	paymentModule := payment.New(cfg, logger.Log, rabbitConn)
-	if err := paymentModule.Bootstrap(ctx); err != nil {
-		logger.Fatal("failed to bootstrap payment module", zap.Error(err))
-	}
-
+	// Payment already runs as its own service; meal reaches it over HTTP only.
 	mealModule := meal.New(pool, redisClient.Client(), cfg, logger.Log, rabbitConn,
-		orInProcess(mealPaymentClient, func() mealService.PaymentClient {
-			return mealService.NewPaymentAdapter(paymentModule.PaymentService())
-		}))
+		mealService.NewHTTPPaymentClient(transports.payment))
 	if err := mealModule.Bootstrap(ctx); err != nil {
 		logger.Fatal("failed to bootstrap meal module", zap.Error(err))
 	}
@@ -292,7 +283,7 @@ func main() {
 	server.RegisterHealthCheck("rabbitmq", rabbitConn.Ping)
 	server.RegisterHealthCheck("redis", redisClient.Ping)
 
-	server.RegisterModules(authModule, studentModule, catalogModule, enrollmentModule, attendanceModule, gradesModule, paymentModule, mealModule)
+	server.RegisterModules(authModule, studentModule, catalogModule, enrollmentModule, attendanceModule, gradesModule, mealModule)
 	server.Run()
 
 	quit := make(chan os.Signal, 1)

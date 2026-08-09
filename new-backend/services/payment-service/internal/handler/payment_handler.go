@@ -5,8 +5,8 @@ import (
 	"net/http"
 	"time"
 
-	"github.com/baaaki/mydreamcampus/monolith/internal/modules/payment/dto"
-	"github.com/baaaki/mydreamcampus/monolith/internal/modules/payment/service"
+	"github.com/baaaki/mydreamcampus/payment/internal/dto"
+	"github.com/baaaki/mydreamcampus/payment/internal/service"
 	sharedErrors "github.com/baaaki/mydreamcampus/shared/platform/errors"
 	"github.com/baaaki/mydreamcampus/shared/platform/logger"
 	"github.com/gin-gonic/gin"
