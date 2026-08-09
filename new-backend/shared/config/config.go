@@ -202,6 +202,16 @@ func Load() (*Config, error) {
 			StaticDir: viper.GetString("FRONTEND_STATIC_DIR"),
 			Enabled:   viper.GetBool("FRONTEND_STATIC_ENABLED"),
 		},
+		// Every other section is read here explicitly, so a section left out
+		// silently stays at its zero value however good its SetDefault is.
+		// This one was: meal priced reservations at 0 TRY and gave QR codes a
+		// 0-second validity window.
+		Reservation: ReservationConfig{
+			TimeoutMinutes:          viper.GetInt("RESERVATION_TIMEOUT_MINUTES"),
+			MealPriceTRY:            viper.GetFloat64("MEAL_PRICE_TRY"),
+			CancelCutoffHours:       viper.GetInt("RESERVATION_CANCEL_CUTOFF_HOURS"),
+			QRValidityWindowSeconds: viper.GetInt("QR_VALIDITY_WINDOW_SECONDS"),
+		},
 		InternalClient: InternalClientConfig{
 			ServiceURLs: map[string]string{
 				"staff":   viper.GetString("STAFF_SERVICE_URL"),
