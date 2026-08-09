@@ -11,7 +11,6 @@ import (
 	"github.com/baaaki/mydreamcampus/monolith/internal/modules/attendance"
 	attendanceService "github.com/baaaki/mydreamcampus/monolith/internal/modules/attendance/service"
 	attendanceWorker "github.com/baaaki/mydreamcampus/monolith/internal/modules/attendance/worker"
-	"github.com/baaaki/mydreamcampus/monolith/internal/modules/auth"
 	coursecatalog "github.com/baaaki/mydreamcampus/monolith/internal/modules/course_catalog"
 	catalogService "github.com/baaaki/mydreamcampus/monolith/internal/modules/course_catalog/service"
 	catalogWorker "github.com/baaaki/mydreamcampus/monolith/internal/modules/course_catalog/worker"
@@ -128,13 +127,6 @@ func main() {
 	// its consumers as it migrates. Auth + student still consume staff
 	// events from RabbitMQ until those modules switch to in-process pubsub.
 	downstreamBindings := []eventbus.DownstreamBinding{
-		// auth — keeps user records in sync with staff/student lifecycle.
-		{Queue: "auth_events_queue", Exchange: "staff.events", RoutingKey: "staff.created"},
-		{Queue: "auth_events_queue", Exchange: "staff.events", RoutingKey: "staff.updated"},
-		{Queue: "auth_events_queue", Exchange: "staff.events", RoutingKey: "staff.deactivated"},
-		{Queue: "auth_events_queue", Exchange: "student.events", RoutingKey: "student.created"},
-		{Queue: "auth_events_queue", Exchange: "student.events", RoutingKey: "student.updated"},
-		{Queue: "auth_events_queue", Exchange: "student.events", RoutingKey: "student.deactivated"},
 		// student — drops advisor assignment when the staff member is removed.
 		{Queue: "student.staff_events", Exchange: "staff.events", RoutingKey: "staff.deactivated"},
 		// attendance — local student/course/enrollment cache sync.
@@ -171,11 +163,6 @@ func main() {
 
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
-
-	authModule := auth.New(cfg, pool, redisClient, rabbitConn)
-	if err := authModule.Bootstrap(ctx); err != nil {
-		logger.Fatal("failed to bootstrap auth module", zap.Error(err))
-	}
 
 	// One transport per target service. The closed-day fan-out to meal has
 	// always gone over HTTP, so its client is built in both modes.
@@ -263,8 +250,6 @@ func main() {
 	// module's outbox table inside the business transaction, then relayed here.
 	outboxInterval := time.Duration(cfg.Outbox.IntervalSeconds) * time.Second
 	batchSize := utils.ClampToInt32(cfg.Outbox.BatchSize)
-	go eventbus.NewOutboxWorker("auth", "auth.events", authModule.OutboxStore(),
-		publisher, outboxInterval, batchSize).Start(ctx)
 	go eventbus.NewOutboxWorker("student", "student.events", studentModule.OutboxStore(),
 		publisher, outboxInterval, batchSize).Start(ctx)
 	go eventbus.NewOutboxWorker("course_catalog", "course_catalog.events", catalogModule.OutboxStore(),
@@ -283,7 +268,7 @@ func main() {
 	server.RegisterHealthCheck("rabbitmq", rabbitConn.Ping)
 	server.RegisterHealthCheck("redis", redisClient.Ping)
 
-	server.RegisterModules(authModule, studentModule, catalogModule, enrollmentModule, attendanceModule, gradesModule, mealModule)
+	server.RegisterModules(studentModule, catalogModule, enrollmentModule, attendanceModule, gradesModule, mealModule)
 	server.Run()
 
 	quit := make(chan os.Signal, 1)

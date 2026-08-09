@@ -5,8 +5,8 @@ import (
 	"encoding/json"
 	"fmt"
 
-	"github.com/baaaki/mydreamcampus/monolith/internal/modules/auth/dto"
-	"github.com/baaaki/mydreamcampus/monolith/internal/modules/auth/service"
+	"github.com/baaaki/mydreamcampus/auth/internal/dto"
+	"github.com/baaaki/mydreamcampus/auth/internal/service"
 	"github.com/baaaki/mydreamcampus/shared/events"
 	"github.com/baaaki/mydreamcampus/shared/platform/logger"
 	"github.com/baaaki/mydreamcampus/shared/platform/rabbitmq"

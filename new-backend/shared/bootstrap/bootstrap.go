@@ -42,9 +42,9 @@ type Options struct {
 	// without Redis would mean serving logins with neither. Everywhere else
 	// Redis backs fail-open rate limiting and is not worth a boot failure.
 	RedisFatal bool
-	// EndpointRateLimits are the per-endpoint buckets (login, refresh,
-	// password). Only auth serves those routes.
-	EndpointRateLimits map[string]platformMiddleware.EndpointLimit
+	// LoginRateLimits adds the per-endpoint buckets for login, refresh and
+	// password. Only auth serves those routes; the values come from config.
+	LoginRateLimits bool
 }
 
 // Runtime is the wired infrastructure handed back to a service's main.
@@ -187,7 +187,7 @@ func (r *Runtime) initRedis(opts Options) {
 		IPWindow:       time.Duration(r.Cfg.RateLimit.IPWindowSecs) * time.Second,
 		UserLimit:      r.Cfg.RateLimit.UserLimit,
 		UserWindow:     time.Duration(r.Cfg.RateLimit.UserWindowSecs) * time.Second,
-		EndpointLimits: opts.EndpointRateLimits,
+		EndpointLimits: r.endpointLimits(opts),
 	}
 	platformMiddleware.SetRateLimiter(platformMiddleware.NewRateLimiter(client, rl))
 	logger.Info("rate limiter configured",
@@ -205,6 +205,21 @@ func (r *Runtime) InternalClient(target string) *client.Base {
 		logger.Fatal("internal client not configured", zap.Error(err))
 	}
 	return base
+}
+
+// endpointLimits builds the brute-force buckets. FailClosed is mandatory on
+// all three: when Redis is unreachable a 503 beats letting an attacker try
+// passwords without a limit.
+func (r *Runtime) endpointLimits(opts Options) map[string]platformMiddleware.EndpointLimit {
+	if !opts.LoginRateLimits {
+		return nil
+	}
+	rl := r.Cfg.RateLimit
+	return map[string]platformMiddleware.EndpointLimit{
+		"login":    {Limit: rl.LoginLimit, Window: time.Duration(rl.LoginWindowSecs) * time.Second, FailClosed: true},
+		"refresh":  {Limit: rl.RefreshLimit, Window: time.Duration(rl.RefreshWindowSecs) * time.Second, FailClosed: true},
+		"password": {Limit: rl.PasswordLimit, Window: time.Duration(rl.PasswordWindowSecs) * time.Second, FailClosed: true},
+	}
 }
 
 // DeclareQueues pre-declares the queues this service consumes, together with

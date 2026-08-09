@@ -5,9 +5,9 @@ import (
 	"net/http"
 	"time"
 
-	"github.com/baaaki/mydreamcampus/monolith/internal/modules/auth/dto"
-	authErrors "github.com/baaaki/mydreamcampus/monolith/internal/modules/auth/errors"
-	"github.com/baaaki/mydreamcampus/monolith/internal/modules/auth/service"
+	"github.com/baaaki/mydreamcampus/auth/internal/dto"
+	authErrors "github.com/baaaki/mydreamcampus/auth/internal/errors"
+	"github.com/baaaki/mydreamcampus/auth/internal/service"
 	"github.com/baaaki/mydreamcampus/shared/config"
 	"github.com/baaaki/mydreamcampus/shared/platform/audit"
 	sharedErrors "github.com/baaaki/mydreamcampus/shared/platform/errors"

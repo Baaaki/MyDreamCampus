@@ -4,7 +4,7 @@ import (
 	"context"
 	"fmt"
 
-	"github.com/baaaki/mydreamcampus/monolith/internal/modules/auth/db"
+	"github.com/baaaki/mydreamcampus/auth/internal/db"
 	sharedErrors "github.com/baaaki/mydreamcampus/shared/platform/errors"
 	"github.com/jackc/pgx/v5/pgxpool"
 )

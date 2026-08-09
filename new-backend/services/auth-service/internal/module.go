@@ -11,10 +11,10 @@ package auth
 import (
 	"context"
 
-	"github.com/baaaki/mydreamcampus/monolith/internal/modules/auth/handler"
-	"github.com/baaaki/mydreamcampus/monolith/internal/modules/auth/repository"
-	"github.com/baaaki/mydreamcampus/monolith/internal/modules/auth/service"
-	"github.com/baaaki/mydreamcampus/monolith/internal/modules/auth/worker"
+	"github.com/baaaki/mydreamcampus/auth/internal/handler"
+	"github.com/baaaki/mydreamcampus/auth/internal/repository"
+	"github.com/baaaki/mydreamcampus/auth/internal/service"
+	"github.com/baaaki/mydreamcampus/auth/internal/worker"
 	"github.com/baaaki/mydreamcampus/shared/config"
 	"github.com/baaaki/mydreamcampus/shared/eventbus"
 	"github.com/baaaki/mydreamcampus/shared/platform/logger"
@@ -32,11 +32,12 @@ type Module struct {
 	pool        *pgxpool.Pool
 	redisClient *platformRedis.ClientWrapper
 
-	authRepo    *repository.AuthRepository
-	sessionRepo *repository.SessionRepository
-	eventRepo   *repository.EventRepository
-	outboxRepo  *repository.OutboxRepository
-	outboxStore *repository.OutboxStore
+	authRepo       *repository.AuthRepository
+	sessionRepo    *repository.SessionRepository
+	eventRepo      *repository.EventRepository
+	outboxRepo     *repository.OutboxRepository
+	outboxStore    *repository.OutboxStore
+	retentionStore *repository.RetentionStore
 
 	authService  *service.AuthService
 	eventService *service.EventService
@@ -68,26 +69,30 @@ func New(
 	eventConsumer := worker.NewEventConsumer(consumer, eventService)
 
 	return &Module{
-		cfg:          cfg,
-		pool:         pool,
-		redisClient:  redisClient,
-		authRepo:     authRepo,
-		sessionRepo:  sessionRepo,
-		eventRepo:    eventRepo,
-		outboxRepo:   outboxRepo,
-		outboxStore:  repository.NewOutboxStore(outboxRepo),
-		authService:  authService,
-		eventService: eventService,
-		handler:      authHandler,
-		consumer:     eventConsumer,
+		cfg:            cfg,
+		pool:           pool,
+		redisClient:    redisClient,
+		authRepo:       authRepo,
+		sessionRepo:    sessionRepo,
+		eventRepo:      eventRepo,
+		outboxRepo:     outboxRepo,
+		outboxStore:    repository.NewOutboxStore(outboxRepo),
+		retentionStore: repository.NewRetentionStore(pool),
+		authService:    authService,
+		eventService:   eventService,
+		handler:        authHandler,
+		consumer:       eventConsumer,
 	}
 }
 
 // Name implements httpserver.Module — used as the URL prefix segment.
 func (m *Module) Name() string { return "auth" }
 
-// OutboxStore exposes the eventbus.OutboxStore for the per-module outbox worker
+// OutboxStore exposes the eventbus.OutboxStore for the outbox worker.
 func (m *Module) OutboxStore() eventbus.OutboxStore { return m.outboxStore }
+
+// RetentionStore exposes this schema's event tables to the retention worker.
+func (m *Module) RetentionStore() eventbus.RetentionStore { return m.retentionStore }
 
 // RegisterRoutes implements httpserver.Module. Routes are mounted under
 // /api/auth by the server. Auth-specific middleware (JWTAuth, CSRF,

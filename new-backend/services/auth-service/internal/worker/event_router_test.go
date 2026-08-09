@@ -4,7 +4,7 @@ import (
 	"encoding/json"
 	"testing"
 
-	"github.com/baaaki/mydreamcampus/monolith/internal/modules/auth/dto"
+	"github.com/baaaki/mydreamcampus/auth/internal/dto"
 	"github.com/baaaki/mydreamcampus/shared/events"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"

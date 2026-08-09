@@ -5,8 +5,8 @@ import (
 	"errors"
 	"fmt"
 
-	"github.com/baaaki/mydreamcampus/monolith/internal/modules/auth/db"
-	serviceErrors "github.com/baaaki/mydreamcampus/monolith/internal/modules/auth/errors"
+	"github.com/baaaki/mydreamcampus/auth/internal/db"
+	serviceErrors "github.com/baaaki/mydreamcampus/auth/internal/errors"
 	sharedErrors "github.com/baaaki/mydreamcampus/shared/platform/errors"
 	"github.com/baaaki/mydreamcampus/shared/platform/utils"
 	"github.com/google/uuid"

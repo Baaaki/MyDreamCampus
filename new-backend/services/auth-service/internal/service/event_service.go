@@ -9,9 +9,9 @@ import (
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgconn"
 
-	"github.com/baaaki/mydreamcampus/monolith/internal/modules/auth/db"
-	"github.com/baaaki/mydreamcampus/monolith/internal/modules/auth/dto"
-	"github.com/baaaki/mydreamcampus/monolith/internal/modules/auth/repository"
+	"github.com/baaaki/mydreamcampus/auth/internal/db"
+	"github.com/baaaki/mydreamcampus/auth/internal/dto"
+	"github.com/baaaki/mydreamcampus/auth/internal/repository"
 	"github.com/baaaki/mydreamcampus/shared/events"
 	sharedErrors "github.com/baaaki/mydreamcampus/shared/platform/errors"
 	"github.com/baaaki/mydreamcampus/shared/platform/logger"
