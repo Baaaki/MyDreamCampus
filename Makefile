@@ -149,15 +149,23 @@ deploy-down:
 # containers to ship a one-line change in one service.
 # ─────────────────────────────────────────────
 
+# Compose names the ten Go services `<name>-service`, but the container is
+# `mydreamcampus-meal` and `make run-meal` already takes the short name, so
+# `make deploy-meal` is what everyone types — and it failed with a bare
+# "no such service: meal". Resolve the short form here; anything else (caddy,
+# postgres, rabbitmq) passes through untouched.
+GO_SERVICES := auth staff student catalog enrollment attendance grades meal payment notification
+compose_service = $(if $(filter $1,$(GO_SERVICES)),$1-service,$1)
+
 # Rebuild and restart one service, leaving the other 15 running.
 deploy-%: check-env
-	$(SUDO) docker compose $(COMPOSE) up -d --no-deps --build $*
+	$(SUDO) docker compose $(COMPOSE) up -d --no-deps --build $(call compose_service,$*)
 
 logs-%:
-	$(SUDO) docker compose $(COMPOSE) logs -f $*
+	$(SUDO) docker compose $(COMPOSE) logs -f $(call compose_service,$*)
 
 restart-%:
-	$(SUDO) docker compose $(COMPOSE) restart $*
+	$(SUDO) docker compose $(COMPOSE) restart $(call compose_service,$*)
 
 # ─────────────────────────────────────────────
 # Backup — nine databases, one Postgres container, so one dump covers them all.
