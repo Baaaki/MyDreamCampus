@@ -4,13 +4,13 @@ import (
 	"context"
 	"encoding/json"
 
-	"github.com/baaaki/mydreamcampus/monolith/internal/modules/staff/db"
-	"github.com/baaaki/mydreamcampus/monolith/internal/modules/staff/dto"
-	serviceErrors "github.com/baaaki/mydreamcampus/monolith/internal/modules/staff/errors"
-	"github.com/baaaki/mydreamcampus/monolith/internal/modules/staff/repository"
 	sharedErrors "github.com/baaaki/mydreamcampus/shared/platform/errors"
 	"github.com/baaaki/mydreamcampus/shared/platform/logger"
 	"github.com/baaaki/mydreamcampus/shared/platform/utils"
+	"github.com/baaaki/mydreamcampus/staff/internal/db"
+	"github.com/baaaki/mydreamcampus/staff/internal/dto"
+	serviceErrors "github.com/baaaki/mydreamcampus/staff/internal/errors"
+	"github.com/baaaki/mydreamcampus/staff/internal/repository"
 	"github.com/google/uuid"
 	"go.uber.org/zap"
 )

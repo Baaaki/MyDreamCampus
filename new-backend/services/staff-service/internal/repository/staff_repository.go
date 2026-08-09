@@ -6,11 +6,11 @@ import (
 	"errors"
 	"fmt"
 
-	"github.com/baaaki/mydreamcampus/monolith/internal/modules/staff/db"
-	serviceErrors "github.com/baaaki/mydreamcampus/monolith/internal/modules/staff/errors"
 	"github.com/baaaki/mydreamcampus/shared/events"
 	sharedErrors "github.com/baaaki/mydreamcampus/shared/platform/errors"
 	"github.com/baaaki/mydreamcampus/shared/platform/utils"
+	"github.com/baaaki/mydreamcampus/staff/internal/db"
+	serviceErrors "github.com/baaaki/mydreamcampus/staff/internal/errors"
 	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgconn"

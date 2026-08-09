@@ -32,17 +32,20 @@ type PublicRoutesProvider interface {
 	RegisterPublicRoutes(r *gin.Engine)
 }
 
-// Server bundles a Gin router around the monolith config plus dependency
-// health checks. main.go constructs it once, registers modules, then calls
-// Run/Shutdown.
+// Server bundles a Gin router around the service config plus dependency
+// health checks. main.go constructs it once, registers its module, then
+// calls Run/Shutdown.
 type Server struct {
 	cfg          *config.Config
+	service      string
 	router       *gin.Engine
 	httpServer   *http.Server
 	healthChecks map[string]platformHandler.HealthCheck
 }
 
-func NewServer(cfg *config.Config) *Server {
+// NewServer builds the router with the middleware chain every service runs.
+// service names the binary in /health and /ready output.
+func NewServer(cfg *config.Config, service string) *Server {
 	if cfg.Server.Environment == "production" {
 		gin.SetMode(gin.ReleaseMode)
 	}
@@ -58,6 +61,7 @@ func NewServer(cfg *config.Config) *Server {
 
 	return &Server{
 		cfg:          cfg,
+		service:      service,
 		router:       r,
 		healthChecks: make(map[string]platformHandler.HealthCheck),
 	}
@@ -88,8 +92,8 @@ func (s *Server) RegisterModules(modules ...Module) {
 		logger.Info("module registered", zap.String("module", m.Name()))
 	}
 
-	s.router.GET("/health", platformHandler.LivenessHandler("monolith"))
-	s.router.GET("/ready", platformHandler.ReadinessHandler("monolith", s.healthChecks))
+	s.router.GET("/health", platformHandler.LivenessHandler(s.service))
+	s.router.GET("/ready", platformHandler.ReadinessHandler(s.service, s.healthChecks))
 
 	s.installFrontendFallback()
 }

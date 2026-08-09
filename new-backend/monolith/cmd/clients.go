@@ -3,8 +3,8 @@ package main
 import (
 	"time"
 
-	"github.com/baaaki/mydreamcampus/shared/config"
 	"github.com/baaaki/mydreamcampus/shared/client"
+	"github.com/baaaki/mydreamcampus/shared/config"
 )
 
 // internalTransports holds one shared/client.Base per target service. The

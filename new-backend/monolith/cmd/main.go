@@ -8,9 +8,6 @@ import (
 	"syscall"
 	"time"
 
-	"github.com/baaaki/mydreamcampus/shared/config"
-	"github.com/baaaki/mydreamcampus/shared/eventbus"
-	"github.com/baaaki/mydreamcampus/shared/httpserver"
 	"github.com/baaaki/mydreamcampus/monolith/internal/modules/attendance"
 	attendanceService "github.com/baaaki/mydreamcampus/monolith/internal/modules/attendance/service"
 	attendanceWorker "github.com/baaaki/mydreamcampus/monolith/internal/modules/attendance/worker"
@@ -27,10 +24,12 @@ import (
 	"github.com/baaaki/mydreamcampus/monolith/internal/modules/meal"
 	mealService "github.com/baaaki/mydreamcampus/monolith/internal/modules/meal/service"
 	"github.com/baaaki/mydreamcampus/monolith/internal/modules/payment"
-	"github.com/baaaki/mydreamcampus/monolith/internal/modules/staff"
 	"github.com/baaaki/mydreamcampus/monolith/internal/modules/student"
 	studentService "github.com/baaaki/mydreamcampus/monolith/internal/modules/student/service"
+	"github.com/baaaki/mydreamcampus/shared/config"
+	"github.com/baaaki/mydreamcampus/shared/eventbus"
 	"github.com/baaaki/mydreamcampus/shared/events"
+	"github.com/baaaki/mydreamcampus/shared/httpserver"
 	"github.com/baaaki/mydreamcampus/shared/platform/audit"
 	"github.com/baaaki/mydreamcampus/shared/platform/database"
 	"github.com/baaaki/mydreamcampus/shared/platform/logger"
@@ -185,22 +184,20 @@ func main() {
 	httpMode := cfg.InternalClient.Mode == config.InternalClientModeHTTP
 	logger.Info("internal client mode", zap.String("mode", cfg.InternalClient.Mode))
 
-	staffModule := staff.New(cfg, pool)
-
 	// The cross-module clients are chosen here, once. Everything downstream
 	// sees an interface and cannot tell which implementation it got.
 	var (
-		catalogStaffClient       catalogService.StaffClient
-		studentStaffClient       studentService.StaffServiceInterface
 		enrollmentStudentClient  enrollmentService.StudentClient
 		enrollmentCourseClient   enrollmentService.CourseCatalogClient
 		attendanceSemesterClient attendanceService.SemesterClient
 		gradesSemesterClient     gradesService.SemesterClient
 		mealPaymentClient        mealService.PaymentClient
 	)
+	// Staff already runs as its own service, so its clients are HTTP-only —
+	// there is no in-process staff module left to fall back to.
+	catalogStaffClient := catalogService.NewHTTPStaffClient(transports.staff)
+	studentStaffClient := studentService.NewHTTPStaffClient(transports.staff)
 	if httpMode {
-		catalogStaffClient = catalogService.NewHTTPStaffClient(transports.staff)
-		studentStaffClient = studentService.NewHTTPStaffClient(transports.staff)
 		enrollmentStudentClient = enrollmentService.NewHTTPStudentClient(transports.student)
 		enrollmentCourseClient = enrollmentService.NewHTTPCourseCatalogClient(transports.catalog)
 		attendanceSemesterClient = attendanceService.NewHTTPSemesterClient(transports.catalog)
@@ -208,18 +205,13 @@ func main() {
 		mealPaymentClient = mealService.NewHTTPPaymentClient(transports.payment)
 	}
 
-	studentModule := student.New(cfg, pool, rabbitConn, orInProcess(studentStaffClient,
-		func() studentService.StaffServiceInterface {
-			return studentService.NewInProcessStaffClient(staffModule.StaffService())
-		}))
+	studentModule := student.New(cfg, pool, rabbitConn, studentStaffClient)
 	if err := studentModule.Bootstrap(ctx); err != nil {
 		logger.Fatal("failed to bootstrap student module", zap.Error(err))
 	}
 
 	catalogModule := coursecatalog.New(cfg, pool, rabbitConn,
-		orInProcess(catalogStaffClient, func() catalogService.StaffClient {
-			return catalogService.NewInProcessStaffClient(staffModule.StaffService())
-		}),
+		catalogStaffClient,
 		catalogService.NewHTTPMealClient(transports.meal),
 	)
 	if err := catalogModule.Bootstrap(ctx); err != nil {
@@ -282,8 +274,6 @@ func main() {
 	batchSize := utils.ClampToInt32(cfg.Outbox.BatchSize)
 	go eventbus.NewOutboxWorker("auth", "auth.events", authModule.OutboxStore(),
 		publisher, outboxInterval, batchSize).Start(ctx)
-	go eventbus.NewOutboxWorker("staff", "staff.events", staffModule.OutboxStore(),
-		publisher, outboxInterval, batchSize).Start(ctx)
 	go eventbus.NewOutboxWorker("student", "student.events", studentModule.OutboxStore(),
 		publisher, outboxInterval, batchSize).Start(ctx)
 	go eventbus.NewOutboxWorker("course_catalog", "course_catalog.events", catalogModule.OutboxStore(),
@@ -297,12 +287,12 @@ func main() {
 	go eventbus.NewOutboxWorker("meal", "meal.events", mealModule.OutboxStore(),
 		publisher, outboxInterval, batchSize).Start(ctx)
 
-	server := httpserver.NewServer(cfg)
+	server := httpserver.NewServer(cfg, "monolith")
 	server.RegisterHealthCheck("database", pool.Ping)
 	server.RegisterHealthCheck("rabbitmq", rabbitConn.Ping)
 	server.RegisterHealthCheck("redis", redisClient.Ping)
 
-	server.RegisterModules(authModule, staffModule, studentModule, catalogModule, enrollmentModule, attendanceModule, gradesModule, paymentModule, mealModule)
+	server.RegisterModules(authModule, studentModule, catalogModule, enrollmentModule, attendanceModule, gradesModule, paymentModule, mealModule)
 	server.Run()
 
 	quit := make(chan os.Signal, 1)

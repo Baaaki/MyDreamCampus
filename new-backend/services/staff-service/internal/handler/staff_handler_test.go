@@ -7,7 +7,7 @@ import (
 	"net/http/httptest"
 	"testing"
 
-	"github.com/baaaki/mydreamcampus/monolith/internal/modules/staff/dto"
+	"github.com/baaaki/mydreamcampus/staff/internal/dto"
 	"github.com/gin-gonic/gin"
 	"github.com/stretchr/testify/assert"
 )

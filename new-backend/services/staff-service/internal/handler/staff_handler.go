@@ -5,10 +5,10 @@ import (
 	"net/http"
 	"time"
 
-	"github.com/baaaki/mydreamcampus/monolith/internal/modules/staff/dto"
-	"github.com/baaaki/mydreamcampus/monolith/internal/modules/staff/service"
 	sharedErrors "github.com/baaaki/mydreamcampus/shared/platform/errors"
 	"github.com/baaaki/mydreamcampus/shared/platform/logger"
+	"github.com/baaaki/mydreamcampus/staff/internal/dto"
+	"github.com/baaaki/mydreamcampus/staff/internal/service"
 	"github.com/gin-gonic/gin"
 	"go.uber.org/zap"
 )

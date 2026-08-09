@@ -1,7 +1,7 @@
 package service
 
 import (
-	"github.com/baaaki/mydreamcampus/monolith/internal/modules/staff/dto"
+	"github.com/baaaki/mydreamcampus/staff/internal/dto"
 )
 
 // Wire-contract payload builders for staff outbox events. The downstream

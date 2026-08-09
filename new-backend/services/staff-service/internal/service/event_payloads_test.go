@@ -4,7 +4,7 @@ import (
 	"encoding/json"
 	"testing"
 
-	"github.com/baaaki/mydreamcampus/monolith/internal/modules/staff/dto"
+	"github.com/baaaki/mydreamcampus/staff/internal/dto"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
