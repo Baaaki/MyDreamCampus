@@ -11,14 +11,19 @@ import (
 	"github.com/jackc/pgx/v5/pgtype"
 )
 
-const cleanupOldProcessedEvents = `-- name: CleanupOldProcessedEvents :exec
+const deleteOldProcessedEvents = `-- name: DeleteOldProcessedEvents :execrows
 DELETE FROM auth.processed_events
-WHERE processed_at < NOW() - $1::interval
+WHERE processed_at < $1
 `
 
-func (q *Queries) CleanupOldProcessedEvents(ctx context.Context, dollar_1 pgtype.Interval) error {
-	_, err := q.db.Exec(ctx, cleanupOldProcessedEvents, dollar_1)
-	return err
+// Retention: the dedup ledger only has to outlive redelivery, not the row it
+// guarded. Retention window comes from the caller, not the query.
+func (q *Queries) DeleteOldProcessedEvents(ctx context.Context, processedAt pgtype.Timestamp) (int64, error) {
+	result, err := q.db.Exec(ctx, deleteOldProcessedEvents, processedAt)
+	if err != nil {
+		return 0, err
+	}
+	return result.RowsAffected(), nil
 }
 
 const isEventProcessed = `-- name: IsEventProcessed :one

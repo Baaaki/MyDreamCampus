@@ -7,3 +7,9 @@ ON CONFLICT (event_id) DO NOTHING;
 SELECT COUNT(*) as count
 FROM attendance.processed_events
 WHERE event_id = $1;
+
+-- name: DeleteOldProcessedEvents :execrows
+-- Retention: the dedup ledger only has to outlive redelivery, not the row it
+-- guarded. Retention window comes from the caller, not the query.
+DELETE FROM attendance.processed_events
+WHERE processed_at < $1;

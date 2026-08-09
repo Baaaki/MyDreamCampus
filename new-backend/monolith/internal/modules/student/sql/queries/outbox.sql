@@ -31,3 +31,9 @@ LIMIT $1;
 UPDATE student.outbox_events
 SET status = 'pending', error_message = NULL
 WHERE id = $1;
+
+-- name: DeleteProcessedOutboxEvents :execrows
+-- Retention: relayed rows are kept only long enough to answer "which events
+-- did this request produce"; without this the table grows forever.
+DELETE FROM student.outbox_events
+WHERE status = 'processed' AND processed_at < $1;

@@ -37,3 +37,9 @@ SET status = 'pending',
     retry_count = 0,
     error_message = NULL
 WHERE id = $1 AND status = 'failed';
+
+-- name: DeleteProcessedOutboxEvents :execrows
+-- Retention: relayed rows are kept only long enough to answer "which events
+-- did this request produce"; without this the table grows forever.
+DELETE FROM attendance.outbox_events
+WHERE status = 'processed' AND processed_at < $1;

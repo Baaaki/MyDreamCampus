@@ -6,7 +6,6 @@ import (
 
 	"github.com/baaaki/mydreamcampus/monolith/internal/modules/auth/db"
 	sharedErrors "github.com/baaaki/mydreamcampus/shared/platform/errors"
-	"github.com/jackc/pgx/v5/pgtype"
 	"github.com/jackc/pgx/v5/pgxpool"
 )
 
@@ -39,21 +38,6 @@ func (r *EventRepository) MarkEventProcessed(ctx context.Context, eventID, event
 	})
 	if err != nil {
 		return fmt.Errorf("%w: failed to mark event processed: %v", sharedErrors.ErrQueryFailed, err)
-	}
-	return nil
-}
-
-// CleanupOldProcessedEvents removes old processed events
-func (r *EventRepository) CleanupOldProcessedEvents(ctx context.Context, olderThan string) error {
-	// Convert string to pgtype.Interval
-	interval := pgtype.Interval{}
-	// Simple approach: use days
-	// "30 days" -> interval
-	// For now, we'll use a simple string pass-through and let PostgreSQL parse it
-	// Alternative: use raw SQL query
-	err := r.queries.CleanupOldProcessedEvents(ctx, interval)
-	if err != nil {
-		return fmt.Errorf("%w: failed to cleanup old processed events: %v", sharedErrors.ErrQueryFailed, err)
 	}
 	return nil
 }

@@ -715,16 +715,9 @@ func (s *AuthService) StartCleanupScheduler(ctx context.Context) {
 				} else {
 					logger.Info("expired sessions cleaned up")
 				}
-
-				// Cleanup old processed events (30 days)
-				err = s.eventRepo.CleanupOldProcessedEvents(ctx, "30 days")
-				if err != nil {
-					logger.Error("failed to cleanup old processed events",
-						zap.Error(err),
-					)
-				} else {
-					logger.Info("old processed events cleaned up")
-				}
+				// processed_events is pruned by the shared
+				// eventbus.RetentionWorker, so every service gets the same
+				// window from one place instead of auth alone.
 			case <-ctx.Done():
 				ticker.Stop()
 				return

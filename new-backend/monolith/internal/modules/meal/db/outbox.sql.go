@@ -54,6 +54,21 @@ func (q *Queries) CreateOutboxEvent(ctx context.Context, arg CreateOutboxEventPa
 	return i, err
 }
 
+const deletePublishedOutboxEvents = `-- name: DeletePublishedOutboxEvents :execrows
+DELETE FROM meal.outbox_events
+WHERE status = 'published' AND published_at < $1
+`
+
+// Retention: relayed rows are kept only long enough to answer "which events
+// did this request produce"; without this the table grows forever.
+func (q *Queries) DeletePublishedOutboxEvents(ctx context.Context, publishedAt pgtype.Timestamptz) (int64, error) {
+	result, err := q.db.Exec(ctx, deletePublishedOutboxEvents, publishedAt)
+	if err != nil {
+		return 0, err
+	}
+	return result.RowsAffected(), nil
+}
+
 const getFailedOutboxEvents = `-- name: GetFailedOutboxEvents :many
 SELECT id, aggregate_id, aggregate_type, event_type, payload, status, retry_count, max_retries, next_retry_at, last_error, created_at, published_at, correlation_id
 FROM meal.outbox_events

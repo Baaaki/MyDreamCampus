@@ -6,6 +6,8 @@ INSERT INTO auth.processed_events (event_id, event_type)
 VALUES ($1, $2)
 ON CONFLICT (event_id) DO NOTHING;
 
--- name: CleanupOldProcessedEvents :exec
+-- name: DeleteOldProcessedEvents :execrows
+-- Retention: the dedup ledger only has to outlive redelivery, not the row it
+-- guarded. Retention window comes from the caller, not the query.
 DELETE FROM auth.processed_events
-WHERE processed_at < NOW() - $1::interval;
+WHERE processed_at < $1;

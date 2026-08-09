@@ -29,6 +29,21 @@ func (q *Queries) CreateProcessedEvent(ctx context.Context, arg CreateProcessedE
 	return i, err
 }
 
+const deleteOldProcessedEvents = `-- name: DeleteOldProcessedEvents :execrows
+DELETE FROM enrollment.processed_events
+WHERE processed_at < $1
+`
+
+// Retention: the dedup ledger only has to outlive redelivery, not the row it
+// guarded. Retention window comes from the caller, not the query.
+func (q *Queries) DeleteOldProcessedEvents(ctx context.Context, processedAt pgtype.Timestamp) (int64, error) {
+	result, err := q.db.Exec(ctx, deleteOldProcessedEvents, processedAt)
+	if err != nil {
+		return 0, err
+	}
+	return result.RowsAffected(), nil
+}
+
 const isEventProcessed = `-- name: IsEventProcessed :one
 SELECT EXISTS(
     SELECT 1 FROM enrollment.processed_events WHERE event_id = $1

@@ -30,3 +30,9 @@ UPDATE grades.outbox_events
 SET status = 'pending',
     retry_count = retry_count + 1
 WHERE id = $1 AND retry_count < max_retries;
+
+-- name: DeleteProcessedOutboxEvents :execrows
+-- Retention: relayed rows are kept only long enough to answer "which events
+-- did this request produce"; without this the table grows forever.
+DELETE FROM grades.outbox_events
+WHERE status = 'processed' AND processed_at < $1;

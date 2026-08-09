@@ -40,12 +40,3 @@ func (r *ProcessedEventsRepository) IsEventProcessed(ctx context.Context, eventI
 	}
 	return exists, nil
 }
-
-// CleanupOldProcessedEvents removes old processed events
-func (r *ProcessedEventsRepository) CleanupOldProcessedEvents(ctx context.Context) error {
-	err := r.queries.CleanupOldProcessedEvents(ctx)
-	if err != nil {
-		return fmt.Errorf("%w: failed to cleanup old processed events: %v", sharedErrors.ErrQueryFailed, err)
-	}
-	return nil
-}

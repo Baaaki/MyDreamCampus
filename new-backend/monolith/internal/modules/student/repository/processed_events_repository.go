@@ -41,12 +41,3 @@ func (r *ProcessedEventsRepository) MarkEventProcessed(ctx context.Context, even
 	}
 	return nil
 }
-
-// DeleteOldProcessedEvents deletes processed events older than 30 days
-func (r *ProcessedEventsRepository) DeleteOldProcessedEvents(ctx context.Context) error {
-	err := r.queries.DeleteOldProcessedEvents(ctx)
-	if err != nil {
-		return fmt.Errorf("%w: failed to delete old processed events: %v", sharedErrors.ErrQueryFailed, err)
-	}
-	return nil
-}

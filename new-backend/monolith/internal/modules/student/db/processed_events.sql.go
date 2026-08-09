@@ -7,6 +7,8 @@ package db
 
 import (
 	"context"
+
+	"github.com/jackc/pgx/v5/pgtype"
 )
 
 const createProcessedEvent = `-- name: CreateProcessedEvent :exec
@@ -25,13 +27,19 @@ func (q *Queries) CreateProcessedEvent(ctx context.Context, arg CreateProcessedE
 	return err
 }
 
-const deleteOldProcessedEvents = `-- name: DeleteOldProcessedEvents :exec
-DELETE FROM student.processed_events WHERE processed_at < NOW() - INTERVAL '30 days'
+const deleteOldProcessedEvents = `-- name: DeleteOldProcessedEvents :execrows
+DELETE FROM student.processed_events
+WHERE processed_at < $1
 `
 
-func (q *Queries) DeleteOldProcessedEvents(ctx context.Context) error {
-	_, err := q.db.Exec(ctx, deleteOldProcessedEvents)
-	return err
+// Retention: the dedup ledger only has to outlive redelivery, not the row it
+// guarded. Retention window comes from the caller, not the query.
+func (q *Queries) DeleteOldProcessedEvents(ctx context.Context, processedAt pgtype.Timestamp) (int64, error) {
+	result, err := q.db.Exec(ctx, deleteOldProcessedEvents, processedAt)
+	if err != nil {
+		return 0, err
+	}
+	return result.RowsAffected(), nil
 }
 
 const isEventProcessed = `-- name: IsEventProcessed :one

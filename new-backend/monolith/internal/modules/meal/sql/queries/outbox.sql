@@ -38,3 +38,9 @@ LIMIT $1;
 UPDATE meal.outbox_events
 SET status = 'pending', next_retry_at = NOW(), retry_count = 0
 WHERE id = $1;
+
+-- name: DeletePublishedOutboxEvents :execrows
+-- Retention: relayed rows are kept only long enough to answer "which events
+-- did this request produce"; without this the table grows forever.
+DELETE FROM meal.outbox_events
+WHERE status = 'published' AND published_at < $1;

@@ -62,6 +62,21 @@ func (q *Queries) CreateOutboxEvent(ctx context.Context, arg CreateOutboxEventPa
 	return i, err
 }
 
+const deleteProcessedOutboxEvents = `-- name: DeleteProcessedOutboxEvents :execrows
+DELETE FROM staff.outbox_events
+WHERE status = 'processed' AND processed_at < $1
+`
+
+// Retention: relayed rows are kept only long enough to answer "which events
+// did this request produce"; without this the table grows forever.
+func (q *Queries) DeleteProcessedOutboxEvents(ctx context.Context, processedAt pgtype.Timestamp) (int64, error) {
+	result, err := q.db.Exec(ctx, deleteProcessedOutboxEvents, processedAt)
+	if err != nil {
+		return 0, err
+	}
+	return result.RowsAffected(), nil
+}
+
 const getFailedOutboxEvents = `-- name: GetFailedOutboxEvents :many
 SELECT id, event_type, routing_key, payload, status, retry_count, max_retries, created_at, processed_at, error_message, correlation_id
 FROM staff.outbox_events
