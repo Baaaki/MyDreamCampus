@@ -9,11 +9,11 @@ ENV GOWORK=off CGO_ENABLED=0
 WORKDIR /src
 
 COPY new-backend/shared/ ./shared/
-COPY new-backend/services/notification/go.mod new-backend/services/notification/go.sum ./services/notification/
-WORKDIR /src/services/notification
+COPY new-backend/services/notification-service/go.mod new-backend/services/notification-service/go.sum ./services/notification-service/
+WORKDIR /src/services/notification-service
 RUN go mod download
 
-COPY new-backend/services/notification/ ./
+COPY new-backend/services/notification-service/ ./
 RUN go build -trimpath -ldflags="-s -w" -o /out/notification ./cmd/main.go
 
 FROM gcr.io/distroless/static-debian12:nonroot
@@ -21,7 +21,7 @@ WORKDIR /app
 COPY --from=build /out/notification /app/notification
 # Email templates are loaded with a CWD-relative glob (internal/templates/*.html),
 # so they must sit next to the binary under /app.
-COPY --from=build /src/services/notification/internal/templates /app/internal/templates
+COPY --from=build /src/services/notification-service/internal/templates /app/internal/templates
 EXPOSE 9090
 USER nonroot:nonroot
 ENTRYPOINT ["/app/notification"]

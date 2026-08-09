@@ -3,30 +3,26 @@ package consumer
 import (
 	"fmt"
 
+	sharedRabbit "github.com/baaaki/mydreamcampus/shared/platform/rabbitmq"
 	amqp "github.com/rabbitmq/amqp091-go"
 )
 
 const (
-	ExchangeAuth   = "auth.events"
+	ExchangeAuth            = "auth.events"
 	QueueNotificationEvents = "notification_events_queue"
 )
 
 func SetupTopology(ch *amqp.Channel) error {
-	// Declare queue
-	_, err := ch.QueueDeclare(
-		QueueNotificationEvents,
-		true,  // durable
-		false, // delete when unused
-		false, // exclusive
-		false, // no-wait
-		nil,   // arguments
-	)
-	if err != nil {
+	// Declare queue with its dead-letter side. It has to go through the
+	// shared helper: RabbitMQ rejects a re-declare whose arguments differ
+	// from the existing queue, so this declaration, the one in
+	// definitions.json and the ones in the Go services must match exactly.
+	if err := sharedRabbit.SetupDLQ(ch, QueueNotificationEvents); err != nil {
 		return fmt.Errorf("failed to declare queue: %w", err)
 	}
 
 	// Declare exchange if not already created by publisher
-	err = ch.ExchangeDeclare(
+	err := ch.ExchangeDeclare(
 		ExchangeAuth,
 		"topic",
 		true,  // durable

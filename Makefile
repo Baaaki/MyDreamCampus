@@ -40,13 +40,13 @@ help:
 	@echo "  make down         Stop infrastructure (monolith runs in foreground)"
 	@echo ""
 	@echo "  make infra        Start only infrastructure (Postgres x2, RabbitMQ, Redis, MailHog)"
-	@echo "  make backend      Run the monolith (requires infra)"
+	@echo "  make backend      Run every service (requires infra) — see DEPLOY.md"
 	@echo "  make notification Run the notification service (requires infra)"
 	@echo "  make frontend     Install deps and run Vite dev server"
 	@echo "  make mobile       Install deps and run Expo dev server"
 	@echo ""
 	@echo "  make test            Run ALL test suites (backend + frontend + mobile)"
-	@echo "  make test-backend    Run Go tests across monolith + shared + notification (with -race)"
+	@echo "  make test-backend    Run Go tests across shared + every service (with -race)"
 	@echo "  make test-frontend   Run Vitest unit tests in frontend/"
 	@echo "  make test-mobile     Run Jest unit tests in mobile/"
 	@echo "  make test-coverage   Backend tests with coverage report"
@@ -68,11 +68,17 @@ infra:
 infra-down:
 	$(SUDO) docker compose $(COMPOSE) down
 
+# The single backend process is gone — nine services replace it. Running them
+# all by hand is not a workflow; phase 6 wires them into compose and this
+# target becomes `docker compose up`.
 backend:
-	cd new-backend/monolith && go run ./cmd
+	@echo "The monolith is gone. Run a single service with:"
+	@echo "  cd new-backend/services/<name>-service && make run"
+	@echo "Or wait for the compose targets (phase 6)."
+	@exit 1
 
 notification:
-	cd new-backend/services/notification && go run ./cmd
+	cd new-backend/services/notification-service && go run ./cmd
 
 frontend:
 	@cd frontend && bun install && bun dev
@@ -167,8 +173,12 @@ test: test-backend test-frontend test-mobile
 	@echo "✓ All test suites passed"
 
 test-backend:
-	@echo "→ monolith + shared + notification"
-	@cd new-backend && go test -race -count=1 ./monolith/... ./shared/... ./services/notification/...
+	@echo "→ shared + every service"
+	@cd new-backend/shared && go test -race -count=1 ./...
+	@for svc in new-backend/services/*/; do \
+		echo "→ $$svc"; \
+		(cd $$svc && go test -race -count=1 ./...) || exit 1; \
+	done
 
 test-frontend:
 	@echo "→ frontend (vitest)"
@@ -179,6 +189,6 @@ test-mobile:
 	@cd mobile && npm test -- --ci
 
 test-coverage:
-	@echo "→ backend (coverage)"
-	@cd new-backend && go test -race -count=1 -coverprofile=coverage.out ./monolith/... ./shared/... \
+	@echo "→ backend (coverage, shared only — per-service profiles cannot be merged by go tool cover)"
+	@cd new-backend/shared && go test -race -count=1 -coverprofile=coverage.out ./... \
 		&& go tool cover -func=coverage.out | tail -1

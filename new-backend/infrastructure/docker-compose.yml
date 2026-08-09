@@ -157,7 +157,7 @@ services:
   notification:
     build:
       context: ../..
-      dockerfile: new-backend/services/notification/Dockerfile
+      dockerfile: new-backend/services/notification-service/Dockerfile
     image: mydreamcampus-notification:latest
     container_name: mydreamcampus-notification
     restart: unless-stopped

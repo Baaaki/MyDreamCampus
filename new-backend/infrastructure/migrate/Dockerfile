@@ -13,18 +13,21 @@ FROM alpine:3.20
 RUN apk add --no-cache postgresql-client
 COPY --from=build /go/bin/goose /usr/local/bin/goose
 
-# Monolith modules (one migration dir + one version table each).
-COPY new-backend/monolith/internal/modules/auth/sql/migrations           /migrations/modules/auth
-COPY new-backend/monolith/internal/modules/staff/sql/migrations          /migrations/modules/staff
-COPY new-backend/monolith/internal/modules/student/sql/migrations        /migrations/modules/student
-COPY new-backend/monolith/internal/modules/course_catalog/sql/migrations /migrations/modules/course_catalog
-COPY new-backend/monolith/internal/modules/enrollment/sql/migrations     /migrations/modules/enrollment
-COPY new-backend/monolith/internal/modules/attendance/sql/migrations     /migrations/modules/attendance
-COPY new-backend/monolith/internal/modules/grades/sql/migrations         /migrations/modules/grades
-COPY new-backend/monolith/internal/modules/meal/sql/migrations           /migrations/modules/meal
+# One migration dir + one goose version table per service. The
+# /migrations/modules/<name> destinations are unchanged on purpose:
+# entrypoint.sh maps them to databases by that name, and catalog's dir is
+# still called course_catalog because its goose table is.
+COPY new-backend/services/auth-service/internal/sql/migrations       /migrations/modules/auth
+COPY new-backend/services/staff-service/internal/sql/migrations      /migrations/modules/staff
+COPY new-backend/services/student-service/internal/sql/migrations    /migrations/modules/student
+COPY new-backend/services/catalog-service/internal/sql/migrations    /migrations/modules/course_catalog
+COPY new-backend/services/enrollment-service/internal/sql/migrations /migrations/modules/enrollment
+COPY new-backend/services/attendance-service/internal/sql/migrations /migrations/modules/attendance
+COPY new-backend/services/grades-service/internal/sql/migrations     /migrations/modules/grades
+COPY new-backend/services/meal-service/internal/sql/migrations       /migrations/modules/meal
 
 # Notification service (separate database).
-COPY new-backend/services/notification/sql/migrations                    /migrations/notification
+COPY new-backend/services/notification-service/sql/migrations        /migrations/notification
 
 COPY new-backend/infrastructure/migrate/entrypoint.sh /entrypoint.sh
 RUN chmod +x /entrypoint.sh

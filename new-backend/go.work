@@ -12,7 +12,7 @@ use (
 	./services/enrollment-service
 	./services/grades-service
 	./services/meal-service
-	./services/notification
+	./services/notification-service
 	./services/payment-service
 	./services/staff-service
 	./services/student-service
