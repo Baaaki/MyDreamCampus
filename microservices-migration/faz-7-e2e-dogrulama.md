@@ -15,6 +15,36 @@ Burada bulunan her hata, **ilgili fazın dosyasına geri dönülüp** düzeltili
 
 ---
 
+## Statik Ön Denetim (2026-08-10) — stack ayakta değilken yapılan kısım
+
+Aşağıdaki bölümler **koddan** doğrulandı; çalışma zamanı teyidi hâlâ gerekli.
+
+| Bölüm | Statik bulgu |
+|---|---|
+| G | `make test` yeşil: backend tümü `ok`, frontend 56/56, mobile 62/62 |
+| C | 8 servisin hepsinde `rt.StartOutbox` var (payment doğrudan publish eder, notification tüketicidir) |
+| D2 | 7 halkanın hepsi bağlı: Caddy ID basıyor → `RequestLogger` gelen ID'yi koruyor → `client.Base` `X-Request-ID` taşıyor → outbox satırı `correlation_id` yazıyor → envelope taşıyor → consumer ctx'e geri koyuyor |
+| D3 | `client.send` 4xx'i nil hata döndürüyor, yalnız 5xx breaker'a sayılıyor → **404 breaker'ı açmaz** (5. test statik olarak geçiyor) |
+| E1 | `/internal` grubu olan 5 servisin hepsi `RequireInternalSecret` arkasında; Caddy `/internal/*`'ı 404'lüyor |
+| E2 | `init-databases.sh` her DB'de `REVOKE CONNECT FROM PUBLIC` + tek role `GRANT CONNECT` yapıyor |
+| E5 | `sharedRateLimitBucket = "public"` — kova servis adına göre bölünmüyor |
+| B | `rabbitmq/definitions.json` binding'leri, servislerin `DeclareQueues` çağrılarıyla birebir örtüşüyor (notification dahil) |
+
+**Bulunan tek regresyon (düzeltildi):** `SetBlacklistChecker` sadece
+auth-service'te çağrılıyordu; `blacklistChecker` nil olan diğer 9 serviste
+JWTAuth revocation bloğunun tamamı atlanıyordu — logout yalnız auth için
+işliyordu. Monolith'te tek process olduğu için görünmüyordu, **Faz 4** bölünmesi
+kırmış. Çağrı `shared/bootstrap`'a taşındı → `7289872`.
+
+**Statik olarak doğrulanamayan, çalışma zamanı isteyen:** A (13 adım),
+B'nin SQL sayımları, D (servis durdurma), D3'ün 1-4. testleri, E'nin 3/4/5.
+maddeleri, F.
+
+**§C komut düzeltmesi:** kolon adı 7 serviste `processed_at`, **yalnız meal'de**
+`published_at` (meal'deki `processed_at` inbox tablosuna ait, outbox'a değil).
+
+---
+
 ## A — Golden Path (kullanıcı akışı)
 
 Tarayıcıda sırayla, her adımda **hem sonuç hem network sekmesi** kontrol
