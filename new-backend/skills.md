@@ -1,23 +1,24 @@
-# Backend — Go Moduler Monolith (AI Talimati)
+# Backend — Go Mikroservisler (AI Talimati)
 
-Tek binary monolith (`new-backend/monolith`) + ayri notification servisi. 9 modul: auth, staff, student, course_catalog, enrollment, attendance, grades, meal, payment. `new-backend/**` icinde calisirken bu dosya zorunlu okumadir.
+10 ayri binary (`new-backend/services/`): auth, staff, student, catalog, enrollment, attendance, grades, meal, payment + notification. `new-backend/**` icinde calisirken bu dosya zorunlu okumadir.
 
-> **Onemli:** Bu artik mikroservis DEGIL. Eski mikroservis kodu `v0-microservices` git tag'inde arsivli — main'de legacy kod yok.
+> **Not:** Bu dosya Faz 4 sonrasi kismen guncellendi; tam yeniden yazim Faz 8'de. Celiskide `microservices-migration/00-BASLANGIC.md` gecerlidir.
 
 ---
 
 ## 1. Sert Kurallar (asla ihlal etme)
 
-- **Calisma dizini**: Tum make komutlari `new-backend/monolith/` icinden. Ciplak `goose`/`sqlc generate` YAPMA — Makefile env cozumluyor.
-- **DB**: Tek PostgreSQL, modul basina ayri schema (tablo adi `auth_users` gibi prefix'li) + ayri goose version tablosu (`goose_db_version_<module>`).
-- **Query**: sqlc + pgx/v5 — raw SQL string YAPMA, GORM YAPMA. `internal/modules/*/db/` generated — elle DUZENLEME.
+- **Calisma dizini**: Make komutlari servisin kendi kokunden (`services/<x>-service/`). Ciplak `goose`/`sqlc generate` YAPMA — Makefile DB_URL ve goose version tablosunu cozumluyor.
+- **DB**: Tek PostgreSQL konteyneri, servis basina ayri DB + ayri DB kullanicisi. Schema adlari korunuyor (`catalog` DB'sinde `course_catalog` schema'si) + ayri goose version tablosu (`goose_db_version_<module>`).
+- **Query**: sqlc + pgx/v5 — raw SQL string YAPMA, GORM YAPMA. `services/*/internal/db/` generated — elle DUZENLEME.
 - **Migration**: goose. Uygulanmis migration'i degistirme, yeni dosya ekle. Calistirma (`migrate-up`) kullanici onayi ister.
 - **Event publish**: Outbox pattern zorunlu — service transaction icinde outbox tablosuna yaz, publisher'i dogrudan cagirma.
-- **Moduller arasi cagri**: Sync okuma/dogrulama icin **internal REST**
+- **Servisler arasi cagri**: Sync okuma/dogrulama icin **internal REST**
   (`shared/client`, `X-Internal-Secret`). In-process client adapter'lari
-  mikroservis migrasyonunda kaldiriliyor — bkz.
-  `microservices-migration/00-BASLANGIC.md`. Side-effect/notify icin
-  RabbitMQ event (degismedi).
+  kaldirildi. Side-effect/notify icin RabbitMQ event (degismedi).
+- **Yeni kuyruk**: hem tuketen servisin `cmd/main.go` `DeclareQueues` listesine
+  hem `infrastructure/rabbitmq/definitions.json`'a ekle. Sadece birine eklemek,
+  tuketici hic ayaga kalkmadiysa mesajin sessizce kaybolmasi demek.
 - **sqlc rename**: Her modulun `sqlc.yaml`'inda schema prefix'i Go adindan dusuren `rename:` blogu var (`auth_user` → `User`). Yeni tablo eklerken rename satirini da ekle.
 - **Yeni modul / yeni event semasi**: once kullaniciya sor (CLAUDE.md §6).
 
@@ -27,55 +28,59 @@ Tek binary monolith (`new-backend/monolith`) + ayri notification servisi. 9 modu
 
 ```
 new-backend/
-  go.work                    # monolith + services/notification + shared
-  monolith/
-    cmd/main.go              # tum modul wiring + outbox worker'lar + downstream binding'ler
-    internal/http/server.go  # Module interface: Name() + RegisterRoutes(rg)
-    internal/eventbus/       # OutboxWorker, exchange topolojisi, DownstreamBinding
-    internal/modules/<m>/    # module.go + dto/ repository/ service/ handler/ errors/ worker/
-                             #   db/ (generated)  sql/{migrations,queries}/  sqlc.yaml
-  services/notification/     # AYRI binary — RabbitMQ consumer (consumer/delivery/templates), kendi sqlc+goose
-  shared/events/             # event envelope tipleri
-  shared/platform/           # ortak: errors, middleware, logger, database, redis, rabbitmq, handler
-                             #   AYRI Go modulu — servisler de import edebilsin diye internal/ altinda degil
-  infrastructure/            # docker-compose.yml, seed, Caddy
+  go.work                    # shared + 10 servis
+  services/<x>-service/      # her biri AYRI Go modulu
+    cmd/main.go              # bootstrap.Init -> DeclareQueues -> module -> StartOutbox/StartRetention -> Run
+    go.mod  Dockerfile  Makefile  sqlc.yaml
+    internal/                # module.go + dto/ repository/ service/ handler/ errors/ worker/
+                             #   db/ (generated)  sql/{migrations,queries}/
+  shared/                    # AYRI Go modulu, hepsi bunu import eder
+    bootstrap/               # ortak acilis sirasi (config, logger, DB, Redis, Rabbit, HTTP)
+    httpserver/              # Module interface: Name() + RegisterRoutes(rg)
+    eventbus/                # OutboxWorker, RetentionWorker, exchange topolojisi
+    client/                  # internal REST transport + circuit breaker
+    contracts/               # servis sinirini gecen tipler
+    events/  platform/       # envelope sabitleri; errors, middleware, logger, db, redis, rabbitmq
+  infrastructure/            # docker-compose.yml, rabbitmq/definitions.json, seed, Caddy
 ```
 
-Kanonik ornekler: **auth** (tam katman seti + consumer), **staff** (outbox dahil en sade modul).
+Kanonik ornekler: **auth** (tam katman seti + consumer), **staff** (outbox dahil en sade servis).
 
 ---
 
-## 3. Make Komutlari (`new-backend/monolith/` icinden)
+## 3. Make Komutlari (`new-backend/services/<x>-service/` icinden)
 
 ```bash
-make build | run | test | test-cov | lint | tidy
-make sqlc-<module>            # tek modul icin generate (ornek: make sqlc-auth)
-make sqlc-all
-make migrate-up-<module>      # KULLANICI ONAYI ile calistir
-make migrate-down-<module> | migrate-status-<module> | migrate-up-all
-make migrate-create-<module> name=create_x_table
+make build | run | test
+make sqlc                     # bu servis icin generate
+make migrate-up               # KULLANICI ONAYI ile calistir
+make migrate-down | migrate-status
 ```
 
-`DB_URL` `.env`'den gelir. Modul listesi Makefile `MODULES` degiskeninde.
+`DB_URL` servisin Makefile'inda; parola `SERVICE_DB_PASSWORD` env'inden gelir.
+Goose version tablosu **modul adiyla** kalir (`goose_db_version_course_catalog`),
+DB adiyla degil — Faz 1'de uygulanan migration gecmisiyle uyumlu olsun diye.
 
 ---
 
 ## 4. Yeni Endpoint Workflow (sira zorunlu)
 
-1. Migration (gerekiyorsa): `make migrate-create-<m> name=...` — tablo adi schema-prefix'li
-2. Query: `internal/modules/<m>/sql/queries/*.sql` → `make sqlc-<m>` (+ sqlc.yaml rename)
-3. Repository → Service → DTO → Handler → modul `errors/` sabiti
-4. Route: modulun `module.go` → `RegisterRoutes` (middleware zinciri orada kurulur)
+1. Migration (gerekiyorsa): `internal/sql/migrations/` altina yeni goose dosyasi — tablo adi schema-prefix'li
+2. Query: `internal/sql/queries/*.sql` → `make sqlc` (+ sqlc.yaml rename)
+3. Repository → Service → DTO → Handler → servis `errors/` sabiti
+4. Route: servisin `internal/module.go` → `RegisterRoutes` (middleware zinciri orada kurulur).
+   `/internal/*` route'lari `RegisterPublicRoutes`'a, kok altina — Caddy sadece `/api`'yi proxy'liyor.
+   Para/kota etkileyen POST'lara `platformMiddleware.Idempotency()` ekle.
 5. `make test` + `go build ./...` hatasiz → atomic commit
 
 ---
 
-## 5. Yeni Modul Kaydi (once kullaniciya sor)
+## 5. Yeni Servis Kaydi (once kullaniciya sor)
 
-1. `internal/modules/<m>/module.go`: `Name()` + `RegisterRoutes(rg)` implement et (`internal/http/server.go` Module interface). Opsiyonel: `Bootstrap(ctx)`, `PublicRoutesProvider`.
-2. `cmd/main.go`: `New(...)` → `Bootstrap` → `RegisterModules(...)` zincirine ekle.
-3. Event publish ediyorsa: `eventbus.NewOutboxWorker("<m>", "<m>.events", module.OutboxStore(), ...)` goroutine'i main.go'ya.
-4. Makefile `MODULES` listesine ekle.
+1. `internal/module.go`: `Name()` + `RegisterRoutes(rg)` implement et (`shared/httpserver` Module interface). Opsiyonel: `Bootstrap(ctx)`, `PublicRoutesProvider`.
+2. `cmd/main.go`: `bootstrap.Init(...)` → `DeclareQueues` → `New(...)` → `Bootstrap` → `rt.Run(module)`.
+3. Event publish ediyorsa: `rt.StartOutbox("<x>.events", module.OutboxStore())` + `rt.StartRetention(module.RetentionStore())`.
+4. `go.work`'e, `infrastructure/` compose'a ve `infrastructure/migrate/Dockerfile`'a ekle.
 
 ---
 
@@ -83,7 +88,7 @@ make migrate-create-<module> name=create_x_table
 
 - **Publish**: Service, is transaction'i ICINDE outbox tablosuna yazar (`staff/repository/outbox_repository.go` + `outbox_store.go` pattern'i). OutboxWorker arka planda RabbitMQ'ya basar.
 - **Exchange adi**: `<module>.events` — **routing key**: `<entity>.<action>` (ornek: `staff.created`, `grade.finalize.requested`).
-- **Consume**: Modul `worker/` altinda EventConsumer; queue binding'i `cmd/main.go` `downstreamBindings` listesine eklenir (consumer offline'ken mesaj kaybolmasin diye pre-declared).
+- **Consume**: Servisin `internal/worker/` altinda EventConsumer; `consumer.ConsumeEnvelope(ctx, queue, handler)` kullan — DLQ butcesini ve correlation id'yi o sariyor. Queue binding'i servisin `cmd/main.go` `DeclareQueues` listesine + `definitions.json`'a eklenir.
 - **Idempotency**: `processed_events` tablosu — ayni event iki kere islenmez.
 - Event payload degisikligi = geriye uyumsuzluk → kullaniciya sor. Consumer'lar: notification servisi + diger modullerin worker'lari.
 
@@ -108,8 +113,8 @@ make migrate-create-<module> name=create_x_table
 
 ## 9. Test
 
-- Test dosyalari modul paketlerinin YANINDA (`service/`, `handler/`, `dto/`, `worker/`) — ayri test agaci yok.
-- Isimlendirme: `TestXxx_Scenario_ExpectedResult`. Calistirma: `make test`.
+- Test dosyalari paketlerin YANINDA (`service/`, `handler/`, `dto/`, `worker/`) — ayri test agaci yok.
+- Isimlendirme: `TestXxx_Scenario_ExpectedResult`. Calistirma: servis kokunde `make test`, hepsi icin kok dizinde `make test-backend`.
 - Basarisiz testi `t.Skip()` ile atlama — fix et veya rapor et, commit atma.
 
 ---
@@ -118,7 +123,7 @@ make migrate-create-<module> name=create_x_table
 
 | Durum | YAP | YAPMA |
 |---|---|---|
-| sqlc generate hata | Query SQL'i duzelt, tekrar `make sqlc-<m>` | `db/` dosyalarini elle duzenleme |
-| Migration hata | Kullaniciya goster, `migrate-down-<m>` oner | Tablo `DROP`, goose tablosu `DELETE` |
+| sqlc generate hata | Query SQL'i duzelt, tekrar `make sqlc` | `internal/db/` dosyalarini elle duzenleme |
+| Migration hata | Kullaniciya goster, `make migrate-down` oner | Tablo `DROP`, goose tablosu `DELETE` |
 | RabbitMQ/Redis baglantisi yok (dev) | Kullaniciya compose komutunu goster (sudo gerekir) | Publish/blacklist adimini bypass etme |
 | Legacy kodda (v0-microservices tag) bug fark ettin | Not et, `new-backend`'e dokunan kismi bildir | Tag icindeki kodu duzeltmeye calisma |

@@ -1,6 +1,6 @@
 # MyDreamCampus — AI Asistanı Talimatları
 
-Universite yonetim sistemi. Full-stack monorepo: Go moduler monolith (`new-backend/`) + React+Vite web + React Native (Expo) mobil. Eski mikroservis kodu main'den cikarildi — `v0-microservices` git tag'inde arsivli.
+Universite yonetim sistemi. Full-stack monorepo: Go mikroservisler (`new-backend/services/`) + React+Vite web + React Native (Expo) mobil. Eski mikroservis kodu main'den cikarildi — `v0-microservices` git tag'inde arsivli.
 
 > Bu dosya **AI'a** talimattir. Kullanici dokumanlari icin bkz. `README.md`.
 
@@ -40,7 +40,6 @@ Gorev baslamadan **mutlaka oku**:
 
 | Eger suraya dokunacaksan… | Once oku |
 |---|---|
-| `new-backend/monolith/**` | `new-backend/skills.md` |
 | `new-backend/services/**`, `new-backend/shared/**` | `new-backend/skills.md` |
 | `frontend/src/**` | `frontend/skills.md` |
 | `mobile/app/**`, `mobile/services/**`, `mobile/hooks/**` | `mobile/skills.md` |
@@ -68,7 +67,7 @@ Birden fazla katmanda degisiklik varsa **hepsini** oku.
 |---|---|---|---|
 | `frontend/` | `bun add`, `bun run`, `bun tsc`, `bunx --bun <x>` | `npm`, `npx`, `yarn` | `bun.lock` source-of-truth; `package-lock.json` yok, npm bagimliliklari farkli cozuyor |
 | `mobile/` | `npm install`, `npm run`, `npx expo`, `npx jest` | `bun` (eskiden vardi, kaldirildi) | Expo prebuild scriptleri npm assumption ile yazilmis, `package-lock.json` source |
-| `new-backend/monolith/` | `go mod`, `make sqlc-<module>`, `make migrate-up-<module>` (Makefile bu dizinde) | dogrudan `goose`, `sqlc generate` | Makefile `.env` ve modul basina `sqlc.yaml` cozumlemesi yapiyor; ciplak komut config bulamaz |
+| `new-backend/services/<x>-service/` | `go mod`, `make sqlc`, `make migrate-up` (Makefile servis kokunde) | dogrudan `goose`, `sqlc generate` | Makefile DB_URL ve goose version tablosunu cozumluyor; ciplak komut yanlis tabloya yazar |
 
 ---
 
@@ -237,7 +236,7 @@ Bu kararlar verilmis — yeniden sorma:
 |---|---|
 | Mimari | **Moduler monolith** (`new-backend/monolith`) — tek binary, 9 modul. Notification tek ayri servis (RabbitMQ consumer). |
 | Moduller arasi iletisim | **Sync okuma/validasyon:** internal REST + `X-Internal-Secret` (`shared/client`, hedef servis basina circuit breaker). **Side-effect/notify:** RabbitMQ event + outbox. Client -> backend HTTP, Caddy uzerinden. JWT dogrulamasi `platform/middleware.JWTAuth` ile her serviste. |
-| Database | PostgreSQL 18+. **Servis basina ayri DB + ayri DB kullanicisi**, hepsi tek Postgres konteynerinde. Schema adlari korunuyor — `catalog` DB'sinin icinde `course_catalog` schema'si. Modul basina ayri goose version tablosu. (Monolith Faz 4'e kadar hala eski `mydreamcampus` DB'sini okuyor.) |
+| Database | PostgreSQL 18+. **Servis basina ayri DB + ayri DB kullanicisi**, hepsi tek Postgres konteynerinde. Schema adlari korunuyor — `catalog` DB'sinin icinde `course_catalog` schema'si. Modul basina ayri goose version tablosu. |
 | ORM/Query | sqlc + pgx/v5 (raw SQL yok, GORM yok) |
 | Migration | goose |
 | HTTP framework (Go) | Gin v1.11 |
@@ -285,9 +284,9 @@ Bu yollardaki dosyalari **manuel duzenleme**. Kaynak dosyayi guncelle ve generat
 
 | Yol | Kaynak | Regenerate |
 |---|---|---|
-| `new-backend/monolith/internal/modules/*/db/*.go` | `internal/modules/*/sql/queries/*.sql` | `make sqlc-<module>` |
+| `new-backend/services/*/internal/db/*.go` | `services/*/internal/sql/queries/*.sql` | servis kokunde `make sqlc` |
 | `new-backend/**/sql/migrations/*.sql` (uygulanmis) | — | Yeni migration ekle, eskisini degistirme |
-| `new-backend/services/notification/internal/db/*.go` | `sql/queries/*.sql` | servis dizininde `sqlc generate` |
+| `new-backend/services/notification-service/internal/db/*.go` | `sql/queries/*.sql` | servis dizininde `sqlc generate` |
 | `frontend/src/components/ui/*` | shadcn CLI | `bunx --bun shadcn@latest add <c>` |
 | `*.lock`, `*.lockb`, `go.sum`, `bun.lock`, `package-lock.json` | Paket yoneticisi | Komutu calistir, manuel dokunma |
 

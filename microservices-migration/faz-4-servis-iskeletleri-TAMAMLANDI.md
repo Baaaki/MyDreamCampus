@@ -552,3 +552,45 @@ ls services/*/Dockerfile | wc -l    # 10
 1. Bu dosyayı yeniden adlandır: `faz-4-servis-iskeletleri-TAMAMLANDI.md`
 2. `00-BASLANGIC.md` durum tablosunda Faz 4 satırını `[x]` yap
 3. "Sıradaki faz" satırını **5** yap
+
+---
+
+## Uygulama Notları (faz kapanışında eklendi)
+
+Plandan sapılan veya planda olmayan noktalar:
+
+- **`shared/bootstrap/`** eklendi. Plan her `main.go`'nun monolith'ten
+  kopyalanmasını söylüyordu; ortak açılış sırası 9 kez kopyalanmak yerine tek
+  pakette toplandı. Gerekçe: `ServiceName: "public"`, `audit.InitSecurity` ve
+  boş `INTERNAL_SERVICE_SECRET` kontrolü kopyalandıkça düşen türden
+  güvenlik adımları. Servis `main.go`'ları 25-50 satır kaldı.
+- **`Consume` yerine `ConsumeEnvelope`.** DLQ bütçesi ve correlation-id
+  aktarımı ([6]) tek sarmalayıcıda birleştirildi; her consumer'a ayrı ayrı
+  yazılmadı. `MaxDeliveryAttempts = 3` sabit — servis başına ayar yok.
+- **Kuyruk argümanları tek kaynaktan** (`rabbitmq.WorkQueueArgs`). RabbitMQ
+  farklı argümanla yeniden declare'i reddedip kanalı kapattığı için
+  publisher, consumer ve `definitions.json` birebir aynı tabloyu vermeli.
+  Bu, **mevcut RabbitMQ volume'unun sıfırlanmasını gerektirir** — eski
+  kuyruklar `x-dead-letter-exchange` argümanı olmadan yaratıldı. Faz 6'da
+  volume zaten siliniyor.
+- **attendance ve meal'de Redis fatal.** `01-REFERANS-MIMARI.md` §6 sadece
+  auth'u fatal sayıyor. İkisi Redis'i rate limit değil **veri deposu** olarak
+  kullanıyor (QR tampon / QR dedup); nil client ilk taramada panic olurdu.
+- **`config.Validate()`'ten `DB_URL` zorunluluğu kaldırıldı** (A3'ün ikinci
+  seçeneği): payment'ın şeması yok, kontrolü `bootstrap` yapıyor.
+- **`shared/contracts` alias'la bağlandı.** Sağlayıcı modüllerin `dto`
+  paketleri taşınan tipleri `type X = contracts.X` ile yeniden ihraç ediyor,
+  böylece modül içi 60+ referans ve testler dokunulmadan kaldı.
+- **Retention worker sqlc üzerinden.** Ham SQL yasağı (Kod Yazım Kuralları)
+  gereği 8 modüle `DeleteProcessedOutboxEvents`, 5 modüle
+  `DeleteOldProcessedEvents` query'si eklenip `make sqlc-<m>` çalıştırıldı.
+  auth'un `StartCleanupScheduler`'ı yalnızca session temizliğini sürdürüyor.
+- **`monolith/` go.work'ten çıkarıldı**, silinmedi (F bölümü). `cmd/` içi
+  boşaldı; `test/` ve `go.mod` duruyor.
+
+### Bu fazda doğrulanamayanlar
+
+C bölümü adım 10 (`go run ./cmd` + `curl /health`) çalıştırılmadı: Postgres,
+RabbitMQ ve Redis `sudo docker` gerektiriyor (CLAUDE.md §5). Derleme, testler
+ve sınır sızıntısı kontrolleri geçti; ayağa kalkma doğrulaması Faz 6/7'de
+compose ile yapılacak.
