@@ -1,7 +1,7 @@
-# MyDreamCampus modular monolith — full stack.
-# Infra (postgres x2, rabbitmq, redis, mailhog) + app (migrate, monolith,
-# notification worker, caddy edge). Caddy on :80 is the single entrypoint;
-# everything else is reachable only over the compose network.
+# MyDreamCampus microservices — full stack.
+# Infra (postgres, rabbitmq, redis, mailhog) + app (migrate, nine business
+# services, notification worker, seed, caddy edge). Caddy on :80 is the single
+# entrypoint; everything else is reachable only over the compose network.
 #
 # This file publishes exactly ONE host port (caddy's :80) so it can be handed
 # to a PaaS that fronts it with its own edge proxy — Openship replaces that
@@ -12,11 +12,66 @@
 
 name: mydreamcampus
 
+# ── Shared service fragments ────────────────────────────────────────────────
+# Nine services differ only in port, database and a couple of URLs. Spelling
+# the common half out nine times is how one of them silently drifts — a new
+# variable added to eight services and forgotten on the ninth fails at runtime,
+# not at parse time.
+
+# Unbounded json-file logs from 16 containers fill a home server's disk. 30 MB
+# per container, ~480 MB total.
+x-logging: &logging
+  driver: json-file
+  options:
+    max-size: "10m"
+    max-file: "3"
+
+# Every service waits on infra and on the migrations landing. Sync dependencies
+# (catalog -> staff) are deliberately NOT here: chaining service startup means
+# one slow boot holds the whole stack, and a service must answer with an error
+# while its peer is still coming up, not refuse to start.
+x-service-deps: &service-deps
+  postgres:
+    condition: service_healthy
+  redis:
+    condition: service_healthy
+  rabbitmq:
+    condition: service_healthy
+  migrate:
+    condition: service_completed_successfully
+
+# Identical in all nine. ADMIN_* is not auth-only: config.Validate rejects the
+# default admin password in production for every service. Redis likewise — the
+# rate limiter is in the global middleware chain everywhere.
+x-service-env: &service-env
+  ENVIRONMENT: production
+  RABBITMQ_URL: amqp://${RABBITMQ_USER:-rabbitmq}:${RABBITMQ_PASSWORD:?RABBITMQ_PASSWORD is required — see .env.example}@rabbitmq:5672/
+  REDIS_ADDR: redis:6379
+  REDIS_PASSWORD: ${REDIS_PASSWORD:?set REDIS_PASSWORD in .env}
+  JWT_SECRET: ${JWT_SECRET:?set JWT_SECRET in .env}
+  INTERNAL_SERVICE_SECRET: ${INTERNAL_SERVICE_SECRET:?set INTERNAL_SERVICE_SECRET in .env}
+  ADMIN_EMAIL: ${ADMIN_EMAIL:-admin@university.edu.tr}
+  ADMIN_INITIAL_PASSWORD: ${ADMIN_INITIAL_PASSWORD:?set ADMIN_INITIAL_PASSWORD in .env}
+  # SPA is served by caddy, not by a service. Same origin -> CORS matches the
+  # public URL the browser uses.
+  CORS_ALLOWED_ORIGINS: ${PUBLIC_ORIGIN:?set PUBLIC_ORIGIN in .env}
+  # Timeout budget, outermost to innermost: caddy 30s (default) > service HTTP
+  # server 20s > internal client 10s. An inner timeout that outlives its caller
+  # only turns one slow hop into two.
+  REQUEST_TIMEOUT_SECONDS: ${REQUEST_TIMEOUT_SECONDS:-20}
+
+x-service: &service
+  restart: unless-stopped
+  logging: *logging
+  depends_on: *service-deps
+
 services:
   postgres:
     image: postgres:18
     container_name: mydreamcampus-postgres
     restart: unless-stopped
+    mem_limit: 768m
+    logging: *logging
     environment:
       POSTGRES_USER: ${POSTGRES_USER:-postgres}
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?POSTGRES_PASSWORD is required — see .env.example}
@@ -38,28 +93,12 @@ services:
       timeout: 3s
       retries: 10
 
-  notification-postgres:
-    image: postgres:18
-    container_name: mydreamcampus-notification-postgres
-    restart: unless-stopped
-    environment:
-      POSTGRES_USER: ${POSTGRES_USER:-postgres}
-      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?POSTGRES_PASSWORD is required — see .env.example}
-      POSTGRES_DB: notification
-      PGDATA: /var/lib/postgresql/data/pgdata
-    volumes:
-      - notification-postgres-data:/var/lib/postgresql
-      - ./postgres/init-notification-db.sql:/docker-entrypoint-initdb.d/00-init.sql:ro
-    healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U postgres -d notification"]
-      interval: 5s
-      timeout: 3s
-      retries: 10
-
   rabbitmq:
     image: rabbitmq:3-management
     container_name: mydreamcampus-rabbitmq
     restart: unless-stopped
+    mem_limit: 384m
+    logging: *logging
     environment:
       RABBITMQ_DEFAULT_USER: ${RABBITMQ_USER:-rabbitmq}
       RABBITMQ_DEFAULT_PASS: ${RABBITMQ_PASSWORD:?RABBITMQ_PASSWORD is required — see .env.example}
@@ -81,6 +120,8 @@ services:
     image: redis:7-alpine
     container_name: mydreamcampus-redis
     restart: unless-stopped
+    mem_limit: 128m
+    logging: *logging
     command: ["redis-server", "/usr/local/etc/redis/redis.conf", "--requirepass", "${REDIS_PASSWORD:?REDIS_PASSWORD is required — see .env.example}"]
     volumes:
       - redis-data:/data
@@ -97,12 +138,15 @@ services:
     image: mailhog/mailhog
     container_name: mydreamcampus-mailhog
     restart: unless-stopped
+    mem_limit: 64m
+    logging: *logging
     expose:
       - "1025"  # SMTP
       - "8025"  # Web UI
 
-  # One-shot: applies every module's goose migrations, then exits. The monolith
-  # and notification wait for this to finish successfully before starting.
+  # One-shot: applies every service's goose migrations to that service's own
+  # database, as that service's own role, then exits. Every service waits for
+  # it to finish successfully before starting.
   migrate:
     build:
       context: ../..
@@ -110,81 +154,197 @@ services:
     image: mydreamcampus-migrate:latest
     container_name: mydreamcampus-migrate
     restart: "no"
+    mem_limit: 128m
+    logging: *logging
     environment:
-      # Legacy targets: the single monolith database and the standalone
-      # notification one. Both go away once the services move off them.
-      DB_URL: postgres://${POSTGRES_USER:-postgres}:${POSTGRES_PASSWORD:?POSTGRES_PASSWORD is required — see .env.example}@postgres:5432/mydreamcampus?sslmode=disable
-      NOTIF_DB_URL: postgres://${POSTGRES_USER:-postgres}:${POSTGRES_PASSWORD:?POSTGRES_PASSWORD is required — see .env.example}@notification-postgres:5432/notification?sslmode=disable
-      # Per-service databases: migrate builds one DSN per service from these.
+      # DB_URL and NOTIF_DB_URL are deliberately unset: they drove the legacy
+      # half of entrypoint.sh (the single `mydreamcampus` database and the
+      # standalone notification one), and both targets are gone.
       PG_HOST: postgres
       SERVICE_DB_PASSWORD: ${SERVICE_DB_PASSWORD:?SERVICE_DB_PASSWORD is required — see .env.example}
     depends_on:
       postgres:
         condition: service_healthy
-      notification-postgres:
-        condition: service_healthy
 
-  monolith:
+  # ── Business services ─────────────────────────────────────────────────────
+  # No healthcheck on any of them: the images are distroless/static, with no
+  # shell, wget or curl, so every `test:` would fail forever and leave the
+  # container permanently `unhealthy`. Nothing gates on their health anyway —
+  # depends_on above points at infra only. If one is ever needed, add a
+  # `-health` flag to the binary and use CMD, not CMD-SHELL.
+
+  auth-service:
+    <<: *service
     build:
       context: ../..
-      dockerfile: new-backend/monolith/Dockerfile
-    image: mydreamcampus-monolith:latest
-    container_name: mydreamcampus-monolith
-    restart: unless-stopped
+      dockerfile: new-backend/services/auth-service/Dockerfile
+    image: mydreamcampus-auth:latest
+    container_name: mydreamcampus-auth
+    mem_limit: 192m
     environment:
-      ENVIRONMENT: production
-      PORT: "8080"
-      DB_URL: postgres://${POSTGRES_USER:-postgres}:${POSTGRES_PASSWORD:?POSTGRES_PASSWORD is required — see .env.example}@postgres:5432/mydreamcampus?sslmode=disable
-      RABBITMQ_URL: amqp://${RABBITMQ_USER:-rabbitmq}:${RABBITMQ_PASSWORD:?RABBITMQ_PASSWORD is required — see .env.example}@rabbitmq:5672/
-      REDIS_ADDR: redis:6379
-      REDIS_PASSWORD: ${REDIS_PASSWORD:?set REDIS_PASSWORD in .env}
-      JWT_SECRET: ${JWT_SECRET:?set JWT_SECRET in .env}
-      INTERNAL_SERVICE_SECRET: ${INTERNAL_SERVICE_SECRET:?set INTERNAL_SERVICE_SECRET in .env}
-      QR_SECRET: ${QR_SECRET:?set QR_SECRET in .env}
-      ADMIN_EMAIL: ${ADMIN_EMAIL:-admin@university.edu.tr}
-      ADMIN_INITIAL_PASSWORD: ${ADMIN_INITIAL_PASSWORD:?set ADMIN_INITIAL_PASSWORD in .env}
-      # SPA is served by caddy, not the monolith. Same origin -> CORS matches
-      # the public URL the browser uses.
-      FRONTEND_STATIC_ENABLED: "false"
-      CORS_ALLOWED_ORIGINS: ${PUBLIC_ORIGIN:?set PUBLIC_ORIGIN in .env}
+      <<: *service-env
+      PORT: "8081"
+      DB_URL: postgres://auth_svc:${SERVICE_DB_PASSWORD:?}@postgres:5432/auth?sslmode=disable
     expose:
-      - "8080"
+      - "8081"
+
+  staff-service:
+    <<: *service
+    build:
+      context: ../..
+      dockerfile: new-backend/services/staff-service/Dockerfile
+    image: mydreamcampus-staff:latest
+    container_name: mydreamcampus-staff
+    mem_limit: 128m
+    environment:
+      <<: *service-env
+      PORT: "8082"
+      DB_URL: postgres://staff_svc:${SERVICE_DB_PASSWORD:?}@postgres:5432/staff?sslmode=disable
+    expose:
+      - "8082"
+
+  student-service:
+    <<: *service
+    build:
+      context: ../..
+      dockerfile: new-backend/services/student-service/Dockerfile
+    image: mydreamcampus-student:latest
+    container_name: mydreamcampus-student
+    mem_limit: 128m
+    environment:
+      <<: *service-env
+      PORT: "8083"
+      DB_URL: postgres://student_svc:${SERVICE_DB_PASSWORD:?}@postgres:5432/student?sslmode=disable
+      STAFF_SERVICE_URL: http://staff-service:8082
+    expose:
+      - "8083"
+
+  catalog-service:
+    <<: *service
+    build:
+      context: ../..
+      dockerfile: new-backend/services/catalog-service/Dockerfile
+    image: mydreamcampus-catalog:latest
+    container_name: mydreamcampus-catalog
+    mem_limit: 128m
+    environment:
+      <<: *service-env
+      PORT: "8084"
+      DB_URL: postgres://catalog_svc:${SERVICE_DB_PASSWORD:?}@postgres:5432/catalog?sslmode=disable
+      STAFF_SERVICE_URL: http://staff-service:8082
+      MEAL_SERVICE_URL: http://meal-service:8088
+    expose:
+      - "8084"
+
+  enrollment-service:
+    <<: *service
+    build:
+      context: ../..
+      dockerfile: new-backend/services/enrollment-service/Dockerfile
+    image: mydreamcampus-enrollment:latest
+    container_name: mydreamcampus-enrollment
+    mem_limit: 128m
+    environment:
+      <<: *service-env
+      PORT: "8085"
+      DB_URL: postgres://enrollment_svc:${SERVICE_DB_PASSWORD:?}@postgres:5432/enrollment?sslmode=disable
+      STUDENT_SERVICE_URL: http://student-service:8083
+      CATALOG_SERVICE_URL: http://catalog-service:8084
+    expose:
+      - "8085"
+
+  attendance-service:
+    <<: *service
+    build:
+      context: ../..
+      dockerfile: new-backend/services/attendance-service/Dockerfile
+    image: mydreamcampus-attendance:latest
+    container_name: mydreamcampus-attendance
+    mem_limit: 192m
+    environment:
+      <<: *service-env
+      PORT: "8086"
+      DB_URL: postgres://attendance_svc:${SERVICE_DB_PASSWORD:?}@postgres:5432/attendance?sslmode=disable
+      CATALOG_SERVICE_URL: http://catalog-service:8084
+      QR_SECRET: ${QR_SECRET:?set QR_SECRET in .env}
+    expose:
+      - "8086"
+
+  grades-service:
+    <<: *service
+    build:
+      context: ../..
+      dockerfile: new-backend/services/grades-service/Dockerfile
+    image: mydreamcampus-grades:latest
+    container_name: mydreamcampus-grades
+    mem_limit: 128m
+    environment:
+      <<: *service-env
+      PORT: "8087"
+      DB_URL: postgres://grades_svc:${SERVICE_DB_PASSWORD:?}@postgres:5432/grades?sslmode=disable
+      CATALOG_SERVICE_URL: http://catalog-service:8084
+    expose:
+      - "8087"
+
+  meal-service:
+    <<: *service
+    build:
+      context: ../..
+      dockerfile: new-backend/services/meal-service/Dockerfile
+    image: mydreamcampus-meal:latest
+    container_name: mydreamcampus-meal
+    mem_limit: 192m
+    environment:
+      <<: *service-env
+      PORT: "8088"
+      DB_URL: postgres://meal_svc:${SERVICE_DB_PASSWORD:?}@postgres:5432/meal?sslmode=disable
+      PAYMENT_SERVICE_URL: http://payment-service:8089
+      QR_SECRET: ${QR_SECRET:?set QR_SECRET in .env}
+    expose:
+      - "8088"
+
+  # Stateless mock: no database, so no migrate/postgres dependency either.
+  payment-service:
+    <<: *service
+    build:
+      context: ../..
+      dockerfile: new-backend/services/payment-service/Dockerfile
+    image: mydreamcampus-payment:latest
+    container_name: mydreamcampus-payment
+    mem_limit: 128m
+    environment:
+      <<: *service-env
+      PORT: "8089"
+    expose:
+      - "8089"
     depends_on:
-      postgres:
-        condition: service_healthy
       redis:
         condition: service_healthy
       rabbitmq:
         condition: service_healthy
-      migrate:
-        condition: service_completed_successfully
 
   notification:
+    <<: *service
     build:
       context: ../..
       dockerfile: new-backend/services/notification-service/Dockerfile
     image: mydreamcampus-notification:latest
     container_name: mydreamcampus-notification
-    restart: unless-stopped
+    mem_limit: 128m
     environment:
-      NOTIF_DATABASE_URL: postgres://${POSTGRES_USER:-postgres}:${POSTGRES_PASSWORD:?POSTGRES_PASSWORD is required — see .env.example}@notification-postgres:5432/notification?sslmode=disable
+      # Its own NOTIF_-prefixed config, and its own role on the shared Postgres
+      # — the separate notification-postgres container is gone.
+      NOTIF_DATABASE_URL: postgres://notification_svc:${SERVICE_DB_PASSWORD:?}@postgres:5432/notification?sslmode=disable
       NOTIF_RABBITMQ_URL: amqp://${RABBITMQ_USER:-rabbitmq}:${RABBITMQ_PASSWORD:?RABBITMQ_PASSWORD is required — see .env.example}@rabbitmq:5672/
       NOTIF_SMTP_HOST: mailhog
       NOTIF_SMTP_PORT: "1025"
       NOTIF_APP_URL: ${PUBLIC_ORIGIN:?set PUBLIC_ORIGIN in .env}
     expose:
       - "9090"
-    depends_on:
-      notification-postgres:
-        condition: service_healthy
-      rabbitmq:
-        condition: service_healthy
-      migrate:
-        condition: service_completed_successfully
 
-  # One-shot: seeds demo teachers/courses/students via the admin API once the
-  # monolith is up. Idempotent (skips if demo data exists). SEED_DEMO=false in
-  # .env disables it.
+  # One-shot: seeds demo teachers/courses/students through the real admin API
+  # once the stack is up. Idempotent (skips if demo data exists). SEED_DEMO=false
+  # in .env disables it.
   seed:
     build:
       context: ../..
@@ -192,18 +352,29 @@ services:
     image: mydreamcampus-seed:latest
     container_name: mydreamcampus-seed
     restart: "no"
+    mem_limit: 64m
+    logging: *logging
     environment:
-      API_URL: http://monolith:8080
+      # Through the gateway, not a single service: the seed drives staff,
+      # catalog and student endpoints, which now live in three containers.
+      API_URL: http://caddy:80
       SEED_DEMO: ${SEED_DEMO:-true}
       ADMIN_EMAIL: ${ADMIN_EMAIL:-admin@university.edu.tr}
       ADMIN_INITIAL_PASSWORD: ${ADMIN_INITIAL_PASSWORD:?set ADMIN_INITIAL_PASSWORD in .env}
-      DB_URL: postgres://${POSTGRES_USER:-postgres}:${POSTGRES_PASSWORD:?POSTGRES_PASSWORD is required — see .env.example}@postgres:5432/mydreamcampus?sslmode=disable
+      # One DSN per database the relational seed writes to. A single DB_URL
+      # cannot work any more: the eight schemas it fills are eight databases.
+      PG_HOST: postgres
+      SERVICE_DB_PASSWORD: ${SERVICE_DB_PASSWORD:?SERVICE_DB_PASSWORD is required — see .env.example}
     depends_on:
-      monolith:
+      caddy:
         condition: service_started
 
-  # Public edge: serves the SPA and reverse-proxies /api to the monolith.
-  # Fetches a real Let's Encrypt cert for SITE_ADDRESS automatically.
+  # Public edge: serves the SPA and reverse-proxies each /api prefix to its own
+  # service. Fetches a real Let's Encrypt cert for SITE_ADDRESS automatically.
+  #
+  # No depends_on: Caddy serving the SPA does not need a backend, and gating it
+  # on nine services would trade a working page + API errors for a blank screen
+  # whenever one service is slow to boot.
   caddy:
     build:
       context: ../..
@@ -211,6 +382,8 @@ services:
     image: mydreamcampus-caddy:latest
     container_name: mydreamcampus-caddy
     restart: unless-stopped
+    mem_limit: 128m
+    logging: *logging
     environment:
       SITE_ADDRESS: ${PUBLIC_HOST:-localhost}
     # Host-side port is overridable because rootless Docker cannot bind below
@@ -226,12 +399,9 @@ services:
     volumes:
       - caddy-data:/data
       - caddy-config:/config
-    depends_on:
-      - monolith
 
 volumes:
   postgres-data:
-  notification-postgres-data:
   rabbitmq-data:
   redis-data:
   caddy-data:

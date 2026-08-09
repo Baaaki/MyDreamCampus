@@ -79,8 +79,8 @@ Birden fazla katmanda degisiklik varsa **hepsini** oku.
 ```bash
 # Bunu sen calistirma — kullaniciya goster:
 sudo docker compose -f new-backend/infrastructure/docker-compose.yml up -d
-sudo docker exec mydreamcampus-postgres psql -U postgres -d mydreamcampus -c "SELECT email FROM auth_users;"
-sudo docker logs -f mydreamcampus-monolith
+sudo docker exec mydreamcampus-postgres psql -U auth_svc -d auth -c "SELECT email FROM auth.users;"
+sudo docker logs -f mydreamcampus-auth
 ```
 
 ---
@@ -256,15 +256,15 @@ Bu kararlar verilmis — yeniden sorma:
 
 | Bilesen | Port | Aciklama |
 |---|---|---|
-| Monolith backend | 8080 | 9 modul tek process icinde. |
-| PostgreSQL (monolith) | 5432 | Tek instance, modul basina ayri schema. |
-| PostgreSQL (notification) | 5433 | Notification servisinin ayri DB'si. |
+| Is servisleri | 8081-8089 | auth, staff, student, catalog, enrollment, attendance, grades, meal, payment — sirasiyla. Host'a publish EDILMEZ. |
+| Notification | 9090 | RabbitMQ consumer, HTTP route'u yok. Publish edilmez. |
+| PostgreSQL | 5432 | Tek instance, servis basina ayri DB + ayri rol. |
 | RabbitMQ | 5672/15672 | Event mesajlasmasi + management UI. |
 | Redis | 6379 | Token blacklist + rate limit. |
 | MailHog | 1025/8025 | Dev SMTP (notification e-postalari). |
 | Caddy | 80/443 | Tek public giris: `/api/<prefix>` path-prefix ile ilgili servise, `/health` -> auth-service, geri kalani SPA. |
 
-Infra portlari `127.0.0.1`'e bind'li — disaridan sadece Caddy erisilir. Frontend dev: `3000` (Vite proxy `/api` -> 8080).
+Infra portlari `127.0.0.1`'e bind'li — disaridan sadece Caddy erisilir. Is servisleri host'a hic publish edilmez. Frontend dev: `3000` (Vite proxy `/api` -> Caddy; port `DEV_API_TARGET` ile degistirilir).
 
 **Compose dosyasi ikiye bolundu** — port publish etme yeri onemli:
 

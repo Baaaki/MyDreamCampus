@@ -93,11 +93,11 @@ için görünmez. Bu dosyalara **dokunma**.
 | 3 | `faz-3-http-client-katmani-TAMAMLANDI.md` | `shared/client/` internal REST client'ları | [x] |
 | 4 | `faz-4-servis-iskeletleri-TAMAMLANDI.md` | 9 × `cmd/main.go` + `go.mod` + `Dockerfile` + `go.work` | [x] |
 | 5 | `faz-5-caddy-gateway-TAMAMLANDI.md` | Caddyfile path-prefix routing | [x] |
-| 6 | `faz-6-docker-compose.md` | 16 konteynerli compose + kaynak limitleri | [ ] |
+| 6 | `faz-6-docker-compose-TAMAMLANDI.md` | 16 konteynerli compose + kaynak limitleri | [x] |
 | 7 | `faz-7-e2e-dogrulama.md` | Uçtan uca golden path testi | [ ] |
 | 8 | `faz-8-temizlik.md` | `monolith/` kaldırma + doküman güncelleme | [ ] |
 
-**Sıradaki faz: 6**
+**Sıradaki faz: 7**
 
 ---
 

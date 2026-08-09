@@ -1,6 +1,7 @@
-.PHONY: help dev up down stop infra infra-down backend notification frontend mobile clean \
+.PHONY: help dev up down stop infra infra-down frontend mobile clean \
 	test test-backend test-frontend test-mobile test-coverage \
 	deploy deploy-down deploy-logs deploy-ps deploy-update check-env \
+	backup restore \
 	autodeploy-install autodeploy-status autodeploy-logs autodeploy-now autodeploy-off
 
 INFRA        := new-backend/infrastructure
@@ -10,7 +11,15 @@ COMPOSE_FILE := $(INFRA)/docker-compose.yml
 # without fighting for :443; the standalone overlay adds the infra loopback
 # ports and caddy's :443 back. Every target here runs the stack WITHOUT such a
 # platform, so both files are always loaded.
+#
+# A Prometheus/Grafana/Loki stack is out of scope for now, but it slots in as a
+# third overlay without rethinking this variable:
+#   $(if $(OBSERVABILITY),-f $(INFRA)/docker-compose.observability.yml)
+# turns `make deploy OBSERVABILITY=1` on once that file exists.
 COMPOSE := -f $(COMPOSE_FILE) -f $(INFRA)/docker-compose.standalone.yml
+
+# The four containers a locally-run service needs, plus the one-shot migrator.
+INFRA_SERVICES := postgres redis rabbitmq mailhog migrate
 
 # Empty when the docker socket is already reachable (root, or user in the
 # `docker` group) so the server never prompts for a password; falls back to
@@ -24,9 +33,18 @@ help:
 	@echo "SERVER (tek komut — frontend + backend + infra, hepsi container'da):"
 	@echo "  make deploy        Build + start the whole stack (SPA served by caddy on :80)"
 	@echo "  make deploy-update git pull + rebuild changed services + restart"
-	@echo "  make deploy-logs   Follow monolith + caddy logs"
+	@echo "  make deploy-logs   Follow caddy + auth + catalog logs"
 	@echo "  make deploy-ps     Show container status"
 	@echo "  make deploy-down   Stop everything (volumes/data kept)"
+	@echo ""
+	@echo "TEK SERVIS (digerlerine dokunmadan):"
+	@echo "  make deploy-grades   Rebuild + restart one service (any compose service name)"
+	@echo "  make logs-grades     Follow one service's log"
+	@echo "  make restart-grades  Restart one service"
+	@echo ""
+	@echo "YEDEK:"
+	@echo "  make backup            pg_dumpall of all databases -> $(DB_BACKUP_DIR)"
+	@echo "  make restore FILE=...  YIKICI — overwrites the databases from a dump"
 	@echo ""
 	@echo "OTOMATIK DEPLOY (sunucu origin/main'i yoklar, degisince kendini gunceller):"
 	@echo "  make autodeploy-install  Enable the systemd user timer (2 min poll)"
@@ -36,12 +54,11 @@ help:
 	@echo "  make autodeploy-off      Disable it"
 	@echo ""
 	@echo "LOCAL DEV (hot reload, ayri terminaller):"
-	@echo "  make up           Bring up infrastructure + monolith backend"
-	@echo "  make down         Stop infrastructure (monolith runs in foreground)"
+	@echo "  make up           Start infrastructure, then run a service by hand"
+	@echo "  make down         Stop everything"
 	@echo ""
-	@echo "  make infra        Start only infrastructure (Postgres x2, RabbitMQ, Redis, MailHog)"
-	@echo "  make backend      Run every service (requires infra) — see DEPLOY.md"
-	@echo "  make notification Run the notification service (requires infra)"
+	@echo "  make infra        Start only infrastructure (Postgres, RabbitMQ, Redis, MailHog, migrate)"
+	@echo "  make run-grades   Run one service on the host (requires infra)"
 	@echo "  make frontend     Install deps and run Vite dev server"
 	@echo "  make mobile       Install deps and run Expo dev server"
 	@echo ""
@@ -55,30 +72,27 @@ help:
 	@echo ""
 	@echo "  Docker erisimi: $(if $(SUDO),sudo ile (sifre sorar) — 'sudo usermod -aG docker $$USER' + yeniden giris ile kalicilastir,dogrudan (sudo gerekmiyor))"
 
-# Full stack: infra + backend
-up: infra backend
+up: infra
+	@echo ""
+	@echo "Infra hazir. Servisi elle calistir:  make run-grades"
+	@echo "Hepsini container'da isteyen:        make deploy"
 
 down: infra-down
 
 dev: up
 
+# Only the infra containers: running ten services on the host is not a
+# workflow, `make deploy` is. This exists so a single service can be run with
+# `go run` against real Postgres/RabbitMQ/Redis.
 infra:
-	$(SUDO) docker compose $(COMPOSE) up -d
+	$(SUDO) docker compose $(COMPOSE) up -d $(INFRA_SERVICES)
 
 infra-down:
 	$(SUDO) docker compose $(COMPOSE) down
 
-# The single backend process is gone — nine services replace it. Running them
-# all by hand is not a workflow; phase 6 wires them into compose and this
-# target becomes `docker compose up`.
-backend:
-	@echo "The monolith is gone. Run a single service with:"
-	@echo "  cd new-backend/services/<name>-service && make run"
-	@echo "Or wait for the compose targets (phase 6)."
-	@exit 1
-
-notification:
-	cd new-backend/services/notification-service && go run ./cmd
+# One service on the host, e.g. `make run-grades` or `make run-notification`.
+run-%:
+	cd new-backend/services/$*-service && go run ./cmd
 
 frontend:
 	@cd frontend && bun install && bun dev
@@ -117,13 +131,46 @@ deploy-update: check-env
 	$(SUDO) docker compose $(COMPOSE) up -d --build
 
 deploy-logs:
-	$(SUDO) docker compose $(COMPOSE) logs -f monolith caddy
+	$(SUDO) docker compose $(COMPOSE) logs -f caddy auth-service catalog-service
 
 deploy-ps:
 	$(SUDO) docker compose $(COMPOSE) ps
 
 deploy-down:
 	$(SUDO) docker compose $(COMPOSE) down
+
+# ─────────────────────────────────────────────
+# Single-service targets — the operational point of splitting the monolith.
+# Without them everyone reaches for `make deploy` and restarts all 16
+# containers to ship a one-line change in one service.
+# ─────────────────────────────────────────────
+
+# Rebuild and restart one service, leaving the other 15 running.
+deploy-%: check-env
+	$(SUDO) docker compose $(COMPOSE) up -d --no-deps --build $*
+
+logs-%:
+	$(SUDO) docker compose $(COMPOSE) logs -f $*
+
+restart-%:
+	$(SUDO) docker compose $(COMPOSE) restart $*
+
+# ─────────────────────────────────────────────
+# Backup — nine databases, one Postgres container, so one dump covers them all.
+# ─────────────────────────────────────────────
+
+DB_BACKUP_DIR ?= $(HOME)/mydreamcampus-backups
+
+backup:
+	@mkdir -p $(DB_BACKUP_DIR)
+	$(SUDO) docker exec mydreamcampus-postgres pg_dumpall -U postgres \
+		| gzip > $(DB_BACKUP_DIR)/all-$$(date +%F-%H%M).sql.gz
+	@ls -lh $(DB_BACKUP_DIR) | tail -5
+
+# DESTRUCTIVE — overwrites the current databases with the dump's contents.
+restore:
+	@test -n "$(FILE)" || { echo "kullanim: make restore FILE=/yol/yedek.sql.gz"; exit 1; }
+	gunzip -c $(FILE) | $(SUDO) docker exec -i mydreamcampus-postgres psql -U postgres
 
 # ─────────────────────────────────────────────
 # Auto-deploy — a systemd user timer polls origin and redeploys on new commits.

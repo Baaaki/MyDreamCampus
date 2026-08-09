@@ -1,12 +1,19 @@
 # Deploy Rehberi
 
+> **GÜNCEL DEĞİL — mikroservis migrasyonu Faz 6.** Monolith konteyneri
+> kaldırıldı, yerine dokuz servis konteyneri geldi. `make deploy` /
+> `make deploy-down` / `.env` akışı aynen çalışıyor; ama bu dosyada `monolith`
+> geçen her yer (konteyner adı, `docker compose restart monolith`,
+> `notification-postgres`, servis listeleri) artık yanlış. Güncel konteyner ve
+> port listesi: [CLAUDE.md](CLAUDE.md) §13. Bu dosya Faz 8'de yeniden yazılıyor.
+
 Proje tek bir makinede `docker compose` ile **tek komutta** ayağa kalkar:
-Caddy (SPA + `/api` proxy) → monolith → Postgres/Redis/RabbitMQ.
+Caddy (SPA + `/api` proxy) → dokuz servis → Postgres/Redis/RabbitMQ.
 
 > **Ayrı bir "frontend sunucusu" yok.** SPA `bun run build` ile statik dosyalara
 > derlenip Caddy imajının içine kopyalanıyor ([frontend/Dockerfile](frontend/Dockerfile)).
-> Caddy 80/443'ü dinler: `/api/*` → monolith:8080, geri kalan her şey SPA.
-> Tarayıcı tek origin görür — CORS yok, ayrı port yok.
+> Caddy 80/443'ü dinler: `/api/<prefix>` path-prefix ile ilgili servise, geri
+> kalan her şey SPA. Tarayıcı tek origin görür — CORS yok, ayrı port yok.
 
 Üç senaryo var:
 
