@@ -40,8 +40,18 @@ kırmış. Çağrı `shared/bootstrap`'a taşındı → `7289872`.
 B'nin SQL sayımları, D (servis durdurma), D3'ün 1-4. testleri, E'nin 3/4/5.
 maddeleri, F.
 
-**§C komut düzeltmesi:** kolon adı 7 serviste `processed_at`, **yalnız meal'de**
-`published_at` (meal'deki `processed_at` inbox tablosuna ait, outbox'a değil).
+**Çalışma zamanında koşulan bölümler (2026-08-10):** B, C, E1, E2, F geçti —
+period projeksiyonu üç serviste de dolu, `students_view` üçünde de 8, auth
+projeksiyonu 8 öğrenci + 3 öğretmen ile tutuyor, sekiz outbox da 0 bekleyen,
+16 DLQ'nun hepsi boş, dört internal path de 404, üç DB izolasyon denemesi de
+reddedildi, toplam bellek 382 MiB (beklenen ~760'ın yarısı), `/api/catalog/courses`
+4.5 ms.
+
+**§B ve §C komutları hatalıydı, düzeltildi:** `audit_log` kolonları
+`service`/`action`/`timestamp` (`service_name`/`created_at` diye bir kolon yok);
+outbox şeması DB adıyla aynı **tek istisna catalog → `course_catalog`**; kolon
+adı yedi serviste `processed_at`, yalnız meal'de `published_at` (meal'deki
+`processed_at` inbox tablosuna ait).
 
 ---
 
@@ -98,7 +108,7 @@ sudo docker exec mydreamcampus-postgres psql -U postgres -d auth \
 
 # Audit event'i catalog'a ulaştı mı (Faz 3)
 sudo docker exec mydreamcampus-postgres psql -U postgres -d catalog \
-  -c "SELECT service_name, action, created_at FROM course_catalog.audit_log ORDER BY created_at DESC LIMIT 5;"
+  -c "SELECT service, action, timestamp FROM course_catalog.audit_log ORDER BY timestamp DESC LIMIT 5;"
 ```
 
 Boş kalan varsa: RabbitMQ management UI'da (`localhost:15672`) o kuyruğun
@@ -112,15 +122,19 @@ eksik.
 Her serviste outbox'ın boşaldığını doğrula — birikiyorsa publisher kopuk:
 
 ```bash
-for db in auth staff student catalog enrollment attendance grades meal; do
+# Şema adı DB adıyla aynı, tek istisna catalog → course_catalog.
+# Kolon adı yedi serviste processed_at, yalnız meal'de published_at.
+for pair in auth:auth staff:staff student:student catalog:course_catalog \
+            enrollment:enrollment attendance:attendance grades:grades; do
+  db=${pair%%:*}; schema=${pair##*:}
   echo -n "$db: "
   sudo docker exec mydreamcampus-postgres psql -U postgres -d $db -tA \
-    -c "SELECT count(*) FROM $db.outbox_events WHERE published_at IS NULL;" 2>/dev/null
+    -c "SELECT count(*) FROM $schema.outbox_events WHERE processed_at IS NULL;"
 done
+echo -n "meal: "
+sudo docker exec mydreamcampus-postgres psql -U postgres -d meal -tA \
+  -c "SELECT count(*) FROM meal.outbox_events WHERE published_at IS NULL;"
 ```
-
-Not: kolon adı şemaya göre `published_at` / `processed_at` olabilir — önce
-`\d <schema>.outbox_events` ile bak.
 
 Birkaç saniyede sıfıra inmeli. Kalıcı olarak artıyorsa o servisin
 `OutboxWorker`'ı başlatılmamıştır (Faz 4, adım 4).
