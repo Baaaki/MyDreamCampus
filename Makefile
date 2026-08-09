@@ -123,12 +123,16 @@ check-env:
 		echo "  openssl rand -base64 48"; \
 		exit 1; } || true
 
+# --remove-orphans: containers whose service left the compose file (the
+# monolith, notification-postgres) keep running and keep holding their host
+# ports, so the next `up` fails on a port that looks free. Only on the two
+# whole-stack targets — a single-service target must never sweep.
 deploy: check-env
-	$(SUDO) docker compose $(COMPOSE) up -d --build
+	$(SUDO) docker compose $(COMPOSE) up -d --build --remove-orphans
 
 deploy-update: check-env
 	git pull
-	$(SUDO) docker compose $(COMPOSE) up -d --build
+	$(SUDO) docker compose $(COMPOSE) up -d --build --remove-orphans
 
 deploy-logs:
 	$(SUDO) docker compose $(COMPOSE) logs -f caddy auth-service catalog-service
