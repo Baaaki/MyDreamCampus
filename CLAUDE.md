@@ -248,7 +248,7 @@ Bu kararlar verilmis — yeniden sorma:
 | State (web+mobile) | TanStack Query (server state), Context (UI state) |
 | Logging | Zap (backend), console (frontend, debug icin) |
 | Outbox pattern | Tum event publish'lerde zorunlu |
-| Edge / reverse proxy | Caddy (80/443) — `/api/*` -> monolith:8080, geri kalani SPA static (Traefik KALDIRILDI) |
+| Edge / reverse proxy | Caddy (80/443) — `/api/<prefix>` path-prefix routing ile servis basina upstream, geri kalani SPA static (Traefik KALDIRILDI) |
 
 ---
 
@@ -262,7 +262,7 @@ Bu kararlar verilmis — yeniden sorma:
 | RabbitMQ | 5672/15672 | Event mesajlasmasi + management UI. |
 | Redis | 6379 | Token blacklist + rate limit. |
 | MailHog | 1025/8025 | Dev SMTP (notification e-postalari). |
-| Caddy | 80/443 | Tek public giris: `/api/*` -> monolith, geri kalani SPA. |
+| Caddy | 80/443 | Tek public giris: `/api/<prefix>` path-prefix ile ilgili servise, `/health` -> auth-service, geri kalani SPA. |
 
 Infra portlari `127.0.0.1`'e bind'li — disaridan sadece Caddy erisilir. Frontend dev: `3000` (Vite proxy `/api` -> 8080).
 

@@ -51,9 +51,24 @@ Frontend ve mobil **hiç değişmiyor** — route prefix'leri servis sınırlar�
 	# değerlerinden geliyor, frontend'in api-client.ts'indeki prefixUrl'lerle
 	# birebir aynı — SPA tarafında değişiklik gerekmiyor.
 	#
-	# Her prefix İKİ matcher ile yazılıyor: ky "/api/students" (path yok,
+	# Her prefix İKİ path ile yazılıyor: ky "/api/students" (path yok,
 	# sadece query) isteği de atıyor ve o istek "/api/students/*" ile
-	# EŞLEŞMEZ. Tek matcher yazarsan liste endpointleri 404 olur.
+	# EŞLEŞMEZ. Tek path yazarsan liste endpointleri 404 olur.
+	#
+	# DÜZELTME (uygulama sırasında bulundu): `handle` **tek** matcher
+	# argümanı alır — aşağıdaki `handle /api/auth /api/auth/*` yazımı
+	# `caddy validate`'ten geçmez ("wrong argument count"). İki path bir
+	# named matcher içinde OR'lanmalı:
+	#
+	#   @auth path /api/auth /api/auth/*
+	#   handle @auth {
+	#       reverse_proxy auth-service:8081 {
+	#           lb_try_duration 5s
+	#           lb_try_interval 250ms
+	#       }
+	#   }
+	#
+	# Dosyanın uygulanmış hali için `frontend/Caddyfile`'a bak.
 	# Her reverse_proxy bloğuna kısa yeniden deneme eklenir
 	# (04-PROD-HAZIRLIK.md §4). Tek servisi yeniden başlatmak mikroservisin
 	# asıl kazancı; retry olmadan bu kazanç kullanıcıya 502 olarak yansır.

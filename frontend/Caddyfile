@@ -4,12 +4,127 @@
 {$SITE_ADDRESS:localhost} {
 	encode gzip zstd
 
-	# API and the monolith's own /health go to the backend.
-	handle /api/* {
-		reverse_proxy monolith:8080
+	# First link of the request-tracing chain. Minting the id here keeps Caddy's
+	# access log and every downstream service log on the same id; leaving it to
+	# the services makes the edge hop invisible. A client-supplied id (mobile
+	# debug builds) is never overwritten.
+	@no_request_id not header X-Request-ID *
+	request_header @no_request_id X-Request-ID {http.request.uuid}
+
+	# One reverse_proxy per service. The prefixes come from each module's
+	# Name(), which is what the SPA already calls — no frontend change.
+	#
+	# Each prefix needs a named matcher listing TWO paths: ky also issues
+	# "/api/students" (no trailing path, query only) and that request does NOT
+	# match "/api/students/*". `handle` takes a single matcher argument, so the
+	# two paths have to be OR'd inside a named matcher rather than written side
+	# by side.
+	#
+	# lb_try_* keeps a single-service restart from surfacing as a 502: Caddy
+	# retries for a few seconds, and a service that boots in ~5s never drops
+	# the request.
+	@auth path /api/auth /api/auth/*
+	handle @auth {
+		reverse_proxy auth-service:8081 {
+			lb_try_duration 5s
+			lb_try_interval 250ms
+		}
 	}
+
+	@staff path /api/staff /api/staff/*
+	handle @staff {
+		reverse_proxy staff-service:8082 {
+			lb_try_duration 5s
+			lb_try_interval 250ms
+		}
+	}
+
+	@admin_staff path /api/admin-staff /api/admin-staff/*
+	handle @admin_staff {
+		reverse_proxy staff-service:8082 {
+			lb_try_duration 5s
+			lb_try_interval 250ms
+		}
+	}
+
+	@students path /api/students /api/students/*
+	handle @students {
+		reverse_proxy student-service:8083 {
+			lb_try_duration 5s
+			lb_try_interval 250ms
+		}
+	}
+
+	@catalog path /api/catalog /api/catalog/*
+	handle @catalog {
+		reverse_proxy catalog-service:8084 {
+			lb_try_duration 5s
+			lb_try_interval 250ms
+		}
+	}
+
+	@semesters path /api/semesters /api/semesters/*
+	handle @semesters {
+		reverse_proxy catalog-service:8084 {
+			lb_try_duration 5s
+			lb_try_interval 250ms
+		}
+	}
+
+	@enrollment path /api/enrollment /api/enrollment/*
+	handle @enrollment {
+		reverse_proxy enrollment-service:8085 {
+			lb_try_duration 5s
+			lb_try_interval 250ms
+		}
+	}
+
+	@attendance path /api/attendance /api/attendance/*
+	handle @attendance {
+		reverse_proxy attendance-service:8086 {
+			lb_try_duration 5s
+			lb_try_interval 250ms
+		}
+	}
+
+	@grades path /api/grades /api/grades/*
+	handle @grades {
+		reverse_proxy grades-service:8087 {
+			lb_try_duration 5s
+			lb_try_interval 250ms
+		}
+	}
+
+	@meals path /api/meals /api/meals/*
+	handle @meals {
+		reverse_proxy meal-service:8088 {
+			lb_try_duration 5s
+			lb_try_interval 250ms
+		}
+	}
+
+	@payments path /api/payments /api/payments/*
+	handle @payments {
+		reverse_proxy payment-service:8089 {
+			lb_try_duration 5s
+			lb_try_interval 250ms
+		}
+	}
+
+	# An /api path that matched no service must not fall through to the SPA:
+	# a typo'd prefix has to 404, not return index.html with a 200.
+	handle /api/* {
+		respond "not found" 404
+	}
+
+	# Backend liveness for DEPLOY.md and the autodeploy script. auth-service
+	# stands in for the whole backend: it has the widest infra dependency
+	# (Postgres + Redis + RabbitMQ), so if it answers, the platform is up.
 	handle /health {
-		reverse_proxy monolith:8080
+		reverse_proxy auth-service:8081 {
+			lb_try_duration 5s
+			lb_try_interval 250ms
+		}
 	}
 
 	# Everything else is the SPA; unknown paths fall back to index.html so
