@@ -4,7 +4,7 @@ import (
 	"context"
 	"fmt"
 
-	"github.com/baaaki/mydreamcampus/monolith/internal/modules/grades/db"
+	"github.com/baaaki/mydreamcampus/grades/internal/db"
 	sharedErrors "github.com/baaaki/mydreamcampus/shared/platform/errors"
 	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5"

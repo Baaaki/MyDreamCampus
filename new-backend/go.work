@@ -8,6 +8,7 @@ use (
 	./services/auth-service
 	./services/catalog-service
 	./services/enrollment-service
+	./services/grades-service
 	./services/notification
 	./services/payment-service
 	./services/staff-service

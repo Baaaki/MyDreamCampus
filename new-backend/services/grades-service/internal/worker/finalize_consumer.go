@@ -4,9 +4,9 @@ import (
 	"context"
 	"encoding/json"
 
-	"github.com/baaaki/mydreamcampus/monolith/internal/modules/grades/dto"
-	"github.com/baaaki/mydreamcampus/monolith/internal/modules/grades/repository"
-	"github.com/baaaki/mydreamcampus/monolith/internal/modules/grades/service"
+	"github.com/baaaki/mydreamcampus/grades/internal/dto"
+	"github.com/baaaki/mydreamcampus/grades/internal/repository"
+	"github.com/baaaki/mydreamcampus/grades/internal/service"
 	"github.com/baaaki/mydreamcampus/shared/platform/logger"
 	"github.com/baaaki/mydreamcampus/shared/platform/rabbitmq"
 	"go.uber.org/zap"

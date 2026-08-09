@@ -7,9 +7,9 @@ import (
 	"strconv"
 	"strings"
 
-	"github.com/baaaki/mydreamcampus/monolith/internal/modules/grades/dto"
-	"github.com/baaaki/mydreamcampus/monolith/internal/modules/grades/errors"
-	"github.com/baaaki/mydreamcampus/monolith/internal/modules/grades/repository"
+	"github.com/baaaki/mydreamcampus/grades/internal/dto"
+	"github.com/baaaki/mydreamcampus/grades/internal/errors"
+	"github.com/baaaki/mydreamcampus/grades/internal/repository"
 	"github.com/baaaki/mydreamcampus/shared/platform/logger"
 	"github.com/baaaki/mydreamcampus/shared/platform/utils"
 	"github.com/google/uuid"

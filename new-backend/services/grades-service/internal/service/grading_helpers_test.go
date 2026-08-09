@@ -4,7 +4,7 @@ import (
 	"math"
 	"testing"
 
-	"github.com/baaaki/mydreamcampus/monolith/internal/modules/grades/db"
+	"github.com/baaaki/mydreamcampus/grades/internal/db"
 	"github.com/stretchr/testify/assert"
 )
 

@@ -4,7 +4,7 @@ import (
 	"math"
 	"slices"
 
-	"github.com/baaaki/mydreamcampus/monolith/internal/modules/grades/db"
+	"github.com/baaaki/mydreamcampus/grades/internal/db"
 )
 
 // Grading type decision based on class mean

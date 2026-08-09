@@ -6,7 +6,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/baaaki/mydreamcampus/monolith/internal/modules/grades/dto"
+	"github.com/baaaki/mydreamcampus/grades/internal/dto"
 	"github.com/baaaki/mydreamcampus/shared/platform/clock"
 	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5/pgtype"

@@ -3,7 +3,7 @@ package repository
 import (
 	"context"
 
-	"github.com/baaaki/mydreamcampus/monolith/internal/modules/grades/db"
+	"github.com/baaaki/mydreamcampus/grades/internal/db"
 	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgxpool"

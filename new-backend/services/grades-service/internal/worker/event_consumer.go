@@ -5,9 +5,9 @@ import (
 	"encoding/json"
 	"errors"
 
-	"github.com/baaaki/mydreamcampus/monolith/internal/modules/grades/db"
-	"github.com/baaaki/mydreamcampus/monolith/internal/modules/grades/dto"
-	"github.com/baaaki/mydreamcampus/monolith/internal/modules/grades/repository"
+	"github.com/baaaki/mydreamcampus/grades/internal/db"
+	"github.com/baaaki/mydreamcampus/grades/internal/dto"
+	"github.com/baaaki/mydreamcampus/grades/internal/repository"
 	"github.com/baaaki/mydreamcampus/shared/platform/logger"
 	"github.com/baaaki/mydreamcampus/shared/platform/rabbitmq"
 	"github.com/baaaki/mydreamcampus/shared/platform/utils"

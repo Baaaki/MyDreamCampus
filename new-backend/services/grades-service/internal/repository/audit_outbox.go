@@ -4,7 +4,7 @@ import (
 	"context"
 	"fmt"
 
-	"github.com/baaaki/mydreamcampus/monolith/internal/modules/grades/db"
+	"github.com/baaaki/mydreamcampus/grades/internal/db"
 	"github.com/baaaki/mydreamcampus/shared/platform/audit"
 	"github.com/baaaki/mydreamcampus/shared/platform/utils"
 )
