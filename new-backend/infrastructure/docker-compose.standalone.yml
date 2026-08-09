@@ -9,26 +9,31 @@
 # UIs), so this overlay adds them back. Every infra port binds to 127.0.0.1 —
 # only the host reaches them; Caddy stays the single externally reachable door.
 #
+# Every host-side port is overridable: these are conveniences, and a machine
+# that already runs some other Postgres or Redis should not be forced to choose
+# between them. Nothing inside the stack is affected — services reach each
+# other over the compose network on the container port, never the host one.
+#
 # Loaded automatically by every `make` target. By hand:
 #   docker compose -f docker-compose.yml -f docker-compose.standalone.yml up -d
 services:
   postgres:
     ports:
-      - "127.0.0.1:5432:5432"
+      - "127.0.0.1:${POSTGRES_HOST_PORT:-5432}:5432"
 
   rabbitmq:
     ports:
-      - "127.0.0.1:5672:5672"
-      - "127.0.0.1:15672:15672"
+      - "127.0.0.1:${RABBITMQ_HOST_PORT:-5672}:5672"
+      - "127.0.0.1:${RABBITMQ_UI_HOST_PORT:-15672}:15672"
 
   redis:
     ports:
-      - "127.0.0.1:6379:6379"
+      - "127.0.0.1:${REDIS_HOST_PORT:-6379}:6379"
 
   mailhog:
     ports:
-      - "127.0.0.1:1025:1025"  # SMTP
-      - "127.0.0.1:8025:8025"  # Web UI
+      - "127.0.0.1:${MAILHOG_SMTP_HOST_PORT:-1025}:1025"  # SMTP
+      - "127.0.0.1:${MAILHOG_UI_HOST_PORT:-8025}:8025"    # Web UI
 
   caddy:
     # Caddy is the outermost edge here, so it terminates TLS itself: a real
