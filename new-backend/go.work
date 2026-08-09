@@ -5,6 +5,7 @@ toolchain go1.26.4
 use (
 	./monolith
 	./services/auth-service
+	./services/catalog-service
 	./services/notification
 	./services/payment-service
 	./services/staff-service

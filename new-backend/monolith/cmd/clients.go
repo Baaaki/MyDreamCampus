@@ -18,17 +18,6 @@ type internalTransports struct {
 	meal    *client.Base
 }
 
-// orInProcess returns the HTTP client when one was built, otherwise the
-// in-process adapter. The adapter is built lazily because it needs a module
-// handle that only exists in this mode.
-func orInProcess[T comparable](httpClient T, inProcess func() T) T {
-	var zero T
-	if httpClient != zero {
-		return httpClient
-	}
-	return inProcess()
-}
-
 // loopbackPrefixes maps a target to the route prefix it answers on inside
 // the monolith. Once the services are split, each gets its own host and the
 // prefix disappears — the paths the clients use are already the final ones.

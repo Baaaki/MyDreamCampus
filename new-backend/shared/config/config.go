@@ -34,17 +34,11 @@ type ServerConfig struct {
 	InternalSecret string `mapstructure:"INTERNAL_SERVICE_SECRET"`
 }
 
-// InternalClientConfig governs how modules reach each other.
-//
-// inprocess = modules call each other directly (monolith default)
-// http      = modules call each other over internal REST; the monolith calls
-//
-//	itself. Lets the client layer be exercised with real traffic
-//	before the services are actually split.
+// InternalClientConfig governs how services reach each other: internal REST
+// with a shared secret, one entry per target.
 type InternalClientConfig struct {
-	Mode string `mapstructure:"INTERNAL_CLIENT_MODE"`
 	// ServiceURLs is keyed by target name (staff, student, catalog,
-	// payment, meal). Empty entries fall back to this process.
+	// payment, meal).
 	ServiceURLs    map[string]string
 	TimeoutSeconds int `mapstructure:"INTERNAL_CLIENT_TIMEOUT_SECONDS"`
 	Breaker        CircuitBreakerConfig
@@ -56,13 +50,6 @@ type CircuitBreakerConfig struct {
 	TimeoutSeconds      int `mapstructure:"CIRCUIT_BREAKER_TIMEOUT_SECONDS"`
 	ConsecutiveFailures int `mapstructure:"CIRCUIT_BREAKER_CONSECUTIVE_FAILURES"`
 }
-
-// InternalClientModeInProcess and InternalClientModeHTTP are the accepted
-// values of INTERNAL_CLIENT_MODE.
-const (
-	InternalClientModeInProcess = "inprocess"
-	InternalClientModeHTTP      = "http"
-)
 
 type DatabaseConfig struct {
 	URL string `mapstructure:"DB_URL"`
@@ -216,10 +203,6 @@ func Load() (*Config, error) {
 			Enabled:   viper.GetBool("FRONTEND_STATIC_ENABLED"),
 		},
 		InternalClient: InternalClientConfig{
-			Mode: viper.GetString("INTERNAL_CLIENT_MODE"),
-			// Empty means "this process": in http mode the monolith calls
-			// itself through its own port. Phase 4 fills these with the
-			// per-service container addresses.
 			ServiceURLs: map[string]string{
 				"staff":   viper.GetString("STAFF_SERVICE_URL"),
 				"student": viper.GetString("STUDENT_SERVICE_URL"),
@@ -287,7 +270,6 @@ func setDefaults() {
 	viper.SetDefault("FRONTEND_STATIC_DIR", "./frontend_dist")
 	viper.SetDefault("FRONTEND_STATIC_ENABLED", false)
 
-	viper.SetDefault("INTERNAL_CLIENT_MODE", InternalClientModeInProcess)
 	viper.SetDefault("INTERNAL_CLIENT_TIMEOUT_SECONDS", 10)
 	// Five consecutive failures before tripping: one blip must not open the
 	// breaker. 30s open window covers a container restart (~5-10s).
@@ -347,10 +329,6 @@ func (c *Config) Validate() error {
 	}
 	if c.Outbox.BatchSize <= 0 {
 		return fmt.Errorf("OUTBOX_BATCH_SIZE must be positive")
-	}
-	if c.InternalClient.Mode != InternalClientModeInProcess && c.InternalClient.Mode != InternalClientModeHTTP {
-		return fmt.Errorf("INTERNAL_CLIENT_MODE must be %q or %q (got %q)",
-			InternalClientModeInProcess, InternalClientModeHTTP, c.InternalClient.Mode)
 	}
 	return nil
 }
