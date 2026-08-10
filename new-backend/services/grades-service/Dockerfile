@@ -18,7 +18,10 @@ WORKDIR /src/services/grades-service
 RUN --mount=type=cache,target=/go/pkg/mod \
     go mod download
 
-COPY new-backend/shared/ ./shared/
+# Absolute destination: WORKDIR is the service dir by now, so a relative
+# ./shared/ would land inside it and leave the replace target (../../shared)
+# holding nothing but the go.mod copied above.
+COPY new-backend/shared/ /src/shared/
 COPY new-backend/services/grades-service/ ./
 # Without these mounts a whole-stack build is thirteen cold compiles of one
 # dependency tree — gin, pgx, zap and the rest, once per service, in parallel.
