@@ -39,13 +39,32 @@ jobs:
             infra:
               - 'new-backend/infrastructure/**'
 
-  backend-lint:
+  # One job per Go module. A failure names its own service in the job title,
+  # which a single looping job cannot do — with ten services, "backend-test
+  # failed" is not an answer. fail-fast is off so one broken service does not
+  # hide the state of the other nine.
+  backend:
     needs: changes
     if: needs.changes.outputs.backend == 'true'
     runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        module:
+          - shared
+          - services/auth-service
+          - services/staff-service
+          - services/student-service
+          - services/catalog-service
+          - services/enrollment-service
+          - services/attendance-service
+          - services/grades-service
+          - services/meal-service
+          - services/payment-service
+          - services/notification-service
     defaults:
       run:
-        working-directory: new-backend
+        working-directory: new-backend/${{ matrix.module }}
     steps:
       - uses: actions/checkout@v4
 
@@ -54,11 +73,8 @@ jobs:
           go-version: ${{ env.GO_VERSION }}
           cache-dependency-path: new-backend/**/go.sum
 
-      - name: Run go vet
-        run: |
-          (cd shared && go vet ./...)
-          (cd services/notification && go vet ./...)
-          (cd monolith && go vet ./...)
+      - name: go vet
+        run: go vet ./...
 
       - name: Install golangci-lint
         uses: golangci/golangci-lint-action@v6
@@ -67,167 +83,162 @@ jobs:
           install-only: true
 
       - name: Lint
-        run: |
-          (cd shared && golangci-lint run --timeout=5m ./...)
-          (cd services/notification && golangci-lint run --timeout=5m ./...)
-          (cd monolith && golangci-lint run --timeout=5m ./...)
+        run: golangci-lint run --timeout=5m ./...
 
-  backend-build:
-    needs: changes
-    if: needs.changes.outputs.backend == 'true'
-    runs-on: ubuntu-latest
-    defaults:
-      run:
-        working-directory: new-backend
-    steps:
-      - uses: actions/checkout@v4
-
-      - uses: actions/setup-go@v5
-        with:
-          go-version: ${{ env.GO_VERSION }}
-          cache-dependency-path: new-backend/**/go.sum
-
-      - name: Build components
-        run: |
-          (cd shared && go build ./...)
-          (cd services/notification && go build -o /dev/null ./cmd/...)
-          (cd monolith && make build)
-
-  backend-test:
-    needs: changes
-    if: needs.changes.outputs.backend == 'true'
-    runs-on: ubuntu-latest
-    defaults:
-      run:
-        working-directory: new-backend
-    steps:
-      - uses: actions/checkout@v4
-
-      - uses: actions/setup-go@v5
-        with:
-          go-version: ${{ env.GO_VERSION }}
-          cache-dependency-path: new-backend/**/go.sum
+      - name: Build
+        run: go build ./...
 
       - name: Test
-        run: |
-          (cd shared && go test -race -count=1 ./...)
-          (cd services/notification && go test -race -count=1 ./...)
-          (cd monolith && make test)
+        run: go test -race -count=1 ./...
 
-  backend-integration:
+      - name: Check go.mod tidiness
+        run: |
+          go mod tidy
+          if ! git diff --exit-code go.mod go.sum; then
+            echo "::error::new-backend/${{ matrix.module }}/go.mod is not tidy. Run 'go mod tidy' locally."
+            exit 1
+          fi
+
+  # End-to-end smoke test against the real stack: compose builds and starts all
+  # 16 containers, the seed writes through the actual admin API, and the golden
+  # path is replayed through Caddy. It is the only job that proves the SPLIT
+  # works — per-module tests pass just as happily when a service cannot reach
+  # its peer or an event never arrives.
+  backend-e2e:
     needs: changes
     if: needs.changes.outputs.backend == 'true'
     runs-on: ubuntu-latest
-    timeout-minutes: 25
+    timeout-minutes: 30
     defaults:
       run:
-        working-directory: new-backend
-
-    services:
-      postgres:
-        image: postgres:18-alpine
-        env:
-          POSTGRES_USER: postgres
-          POSTGRES_PASSWORD: postgres
-          POSTGRES_DB: mydreamcampus
-        ports: ["5432:5432"]
-        options: >-
-          --health-cmd "pg_isready -U postgres"
-          --health-interval 5s
-          --health-timeout 5s
-          --health-retries 20
-
-      redis:
-        image: redis:8-alpine
-        ports: ["6379:6379"]
-        options: >-
-          --health-cmd "redis-cli ping"
-          --health-interval 5s
-          --health-timeout 5s
-          --health-retries 20
-
-      rabbitmq:
-        image: rabbitmq:4.2-management-alpine
-        env:
-          RABBITMQ_DEFAULT_USER: rabbitmq
-          RABBITMQ_DEFAULT_PASS: rabbitmq
-        ports: ["5672:5672"]
-        options: >-
-          --health-cmd "rabbitmq-diagnostics -q ping"
-          --health-interval 10s
-          --health-timeout 10s
-          --health-retries 20
-
-    env:
-      INTEGRATION_TESTS: "true"
-      RABBITMQ_URL: "amqp://rabbitmq:rabbitmq@localhost:5672/"
-      REDIS_ADDR: "localhost:6379"
-      REDIS_PASSWORD: ""
-      JWT_SECRET: "ci-test-secret-not-for-production"
-      INTERNAL_SERVICE_SECRET: "ci-test-internal-secret"
-      ENVIRONMENT: "test"
-      DB_URL: "postgresql://postgres:postgres@localhost:5432/mydreamcampus?sslmode=disable"
-
+        working-directory: new-backend/infrastructure
     steps:
       - uses: actions/checkout@v4
 
-      - uses: actions/setup-go@v5
-        with:
-          go-version: ${{ env.GO_VERSION }}
-          cache-dependency-path: new-backend/**/go.sum
-
-      - name: Install goose for migrations
-        run: go install github.com/pressly/goose/v3/cmd/goose@latest
-
-      - name: Apply migrations for monolith
+      - name: Write .env
+        # http:// on PUBLIC_HOST keeps Caddy's automatic HTTPS off — with a
+        # bare hostname every :80 request answers 308 to a certificate that
+        # cannot be issued for a runner.
         run: |
-          cd monolith
-          make migrate-up-all
+          cat > .env <<'EOF'
+          POSTGRES_USER=postgres
+          POSTGRES_PASSWORD=ci-postgres-password
+          SERVICE_DB_PASSWORD=ci0service0db0password
+          REDIS_PASSWORD=ci-redis-password
+          RABBITMQ_USER=rabbitmq
+          RABBITMQ_PASSWORD=ci-rabbitmq-password
+          JWT_SECRET=ci-jwt-secret-at-least-32-bytes-long-x
+          INTERNAL_SERVICE_SECRET=ci-internal-secret-at-least-32-bytes-x
+          QR_SECRET=ci-qr-secret-at-least-32-bytes-long-xxxx
+          ADMIN_EMAIL=admin@university.edu.tr
+          ADMIN_INITIAL_PASSWORD=ci-admin-password
+          SEED_DEMO=true
+          PUBLIC_HOST=http://localhost
+          PUBLIC_ORIGIN=http://localhost
+          EOF
 
-      - name: Build monolith and notification
-        run: |
-          mkdir -p tmp/bin
-          (cd monolith && make build && cp bin/monolith ../tmp/bin/)
-          (cd services/notification && go build -o ../../tmp/bin/notification ./cmd/...)
+      - name: Start the stack
+        run: docker compose -f docker-compose.yml up -d --build
 
-      - name: Start monolith in the background
+      - name: Wait for the edge
         run: |
-          mkdir -p tmp/logs
-          PORT=8080 nohup tmp/bin/monolith > tmp/logs/monolith.log 2>&1 &
-          echo $! > tmp/logs/monolith.pid
-          echo "started monolith on :8080"
-
-      - name: Wait for monolith health check
-        run: |
-          for i in $(seq 1 60); do
-            if curl -sf "http://localhost:8080/health" > /dev/null; then
-              echo "monolith healthy after ${i}s"
-              break
-            fi
-            if [ "$i" -eq 60 ]; then
-              echo "::error::monolith did not become healthy in 60s"
-              exit 1
+          for i in $(seq 1 90); do
+            if curl -sf http://localhost/health > /dev/null; then
+              echo "edge healthy after ${i}s"
+              exit 0
             fi
             sleep 1
           done
+          echo "::error::caddy /health did not answer within 90s"
+          exit 1
 
-      - name: Dump service logs on failure
+      - name: Wait for the seed to finish
+        # The seed is the first real exercise of the chain: it logs in as admin
+        # and creates teachers, courses and students through each service's own
+        # API, so a non-zero exit here already means a broken seam.
+        run: |
+          for i in $(seq 1 180); do
+            state=$(docker inspect -f '{{.State.Status}}' mydreamcampus-seed 2>/dev/null || echo missing)
+            if [ "$state" = "exited" ]; then
+              code=$(docker inspect -f '{{.State.ExitCode}}' mydreamcampus-seed)
+              [ "$code" = "0" ] && { echo "seed completed"; exit 0; }
+              echo "::error::seed exited with code $code"
+              exit 1
+            fi
+            sleep 2
+          done
+          echo "::error::seed did not finish within 360s"
+          exit 1
+
+      - name: Golden path through the edge
+        # Every request goes through Caddy, so each step also asserts that the
+        # path prefix still routes to the service that owns it.
+        run: |
+          set -eu
+          api() { curl -sS -o /tmp/body -w '%{http_code}' "$@"; }
+          expect() {
+            want="$1"; got="$2"; what="$3"
+            if [ "$got" != "$want" ]; then
+              echo "::error::$what — expected $want, got $got: $(head -c 300 /tmp/body)"
+              exit 1
+            fi
+            echo "ok  [$got] $what"
+          }
+
+          code=$(api -X POST http://localhost/api/auth/login \
+            -H 'Content-Type: application/json' \
+            -d '{"email":"admin@university.edu.tr","password":"ci-admin-password"}')
+          expect 200 "$code" "admin login (auth)"
+          TOKEN=$(jq -r '.access_token' /tmp/body)
+          [ -n "$TOKEN" ] && [ "$TOKEN" != "null" ] || { echo "::error::no access_token"; exit 1; }
+
+          code=$(api http://localhost/api/staff -H "Authorization: Bearer $TOKEN")
+          expect 200 "$code" "list staff (staff)"
+
+          code=$(api http://localhost/api/catalog/courses)
+          expect 200 "$code" "list courses (catalog)"
+
+          code=$(api http://localhost/api/students -H "Authorization: Bearer $TOKEN")
+          expect 200 "$code" "list students (student)"
+
+          # A seeded teacher can only log in if staff's creation event reached
+          # auth and its user projection was written — the async half of the
+          # split, which no per-service test can see.
+          code=$(api -X POST http://localhost/api/auth/login \
+            -H 'Content-Type: application/json' \
+            -d '{"email":"ahmet.yilmaz@uni.edu.tr","password":"ahmet.yilmaz@uni.edu.tr"}')
+          expect 200 "$code" "seeded teacher login (staff event -> auth projection)"
+
+          # Course selection: enrollment resolves the student through student
+          # AND the offering list through catalog, both over internal REST.
+          code=$(api -X POST http://localhost/api/auth/login \
+            -H 'Content-Type: application/json' \
+            -d '{"email":"zeynep.sahin@uni.edu.tr","password":"zeynep.sahin@uni.edu.tr"}')
+          expect 200 "$code" "seeded student login (student event -> auth projection)"
+          STUDENT_TOKEN=$(jq -r '.access_token' /tmp/body)
+
+          code=$(api http://localhost/api/enrollment/available-courses \
+            -H "Authorization: Bearer $STUDENT_TOKEN")
+          expect 200 "$code" "available courses (enrollment -> student + catalog)"
+
+          # No token must never be served.
+          code=$(api http://localhost/api/grades)
+          expect 401 "$code" "unauthenticated request is rejected (grades)"
+
+      - name: Collect logs on failure
         if: failure()
-        run: |
-          for f in tmp/logs/*.log; do
-            echo "::group::log $(basename "$f")"
-            tail -n 300 "$f"
-            echo "::endgroup::"
-          done
+        run: docker compose -f docker-compose.yml logs --no-color --tail=400 > compose-logs.txt
 
-      - name: Stop services
+      - name: Upload logs
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: compose-logs
+          path: new-backend/infrastructure/compose-logs.txt
+
+      - name: Tear down
         if: always()
-        run: |
-          for f in tmp/logs/*.pid; do
-            [ -f "$f" ] || continue
-            pid=$(cat "$f")
-            kill "$pid" 2>/dev/null || true
-          done
+        run: docker compose -f docker-compose.yml down -v
 
   backend-security:
     needs: changes
@@ -247,12 +258,15 @@ jobs:
       - name: Install gosec
         run: go install github.com/securego/gosec/v2/cmd/gosec@latest
 
+      # One job rather than a matrix: both tools cost more to install than to
+      # run, and neither says anything a per-service job title would clarify.
       - name: Run gosec
         run: |
           failed=0
           (cd shared && gosec -severity medium -confidence medium ./...) || failed=1
-          (cd services/notification && gosec -severity medium -confidence medium ./...) || failed=1
-          (cd monolith && gosec -severity medium -confidence medium ./...) || failed=1
+          for svc in services/*/; do
+            (cd "$svc" && gosec -severity medium -confidence medium ./...) || failed=1
+          done
           exit $failed
 
       - name: Install govulncheck
@@ -262,34 +276,10 @@ jobs:
         run: |
           failed=0
           (cd shared && govulncheck ./...) || failed=1
-          (cd services/notification && govulncheck ./...) || failed=1
-          (cd monolith && govulncheck ./...) || failed=1
-          exit $failed
-
-  backend-deps:
-    needs: changes
-    if: needs.changes.outputs.backend == 'true'
-    runs-on: ubuntu-latest
-    defaults:
-      run:
-        working-directory: new-backend
-    steps:
-      - uses: actions/checkout@v4
-
-      - uses: actions/setup-go@v5
-        with:
-          go-version: ${{ env.GO_VERSION }}
-          cache-dependency-path: new-backend/**/go.sum
-
-      - name: Check go.mod tidiness
-        run: |
-          for dir in shared services/notification monolith; do
-            (cd "$dir" && go mod tidy)
-            if ! git diff --exit-code "${dir}/go.mod" "${dir}/go.sum"; then
-              echo "::error::${dir}/go.mod is not tidy. Run 'go mod tidy' locally."
-              exit 1
-            fi
+          for svc in services/*/; do
+            (cd "$svc" && govulncheck ./...) || failed=1
           done
+          exit $failed
 
   frontend:
     needs: changes
@@ -350,24 +340,18 @@ jobs:
   ci-passed:
     if: always()
     needs:
-      - backend-lint
-      - backend-build
-      - backend-test
-      - backend-integration
+      - backend
+      - backend-e2e
       - backend-security
-      - backend-deps
       - frontend
       - mobile
     runs-on: ubuntu-latest
     steps:
       - name: Check all jobs
         run: |
-          results=("${{ needs.backend-lint.result }}" \
-                   "${{ needs.backend-build.result }}" \
-                   "${{ needs.backend-test.result }}" \
-                   "${{ needs.backend-integration.result }}" \
+          results=("${{ needs.backend.result }}" \
+                   "${{ needs.backend-e2e.result }}" \
                    "${{ needs.backend-security.result }}" \
-                   "${{ needs.backend-deps.result }}" \
                    "${{ needs.frontend.result }}" \
                    "${{ needs.mobile.result }}")
           for r in "${results[@]}"; do

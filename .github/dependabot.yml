@@ -13,7 +13,7 @@ updates:
 
   # ─────────── Go: shared ───────────
   - package-ecosystem: "gomod"
-    directory: "/backend/shared"
+    directory: "/new-backend/shared"
     schedule:
       interval: "weekly"
     commit-message:
@@ -29,7 +29,7 @@ updates:
 
   # ─────────── Go: services ───────────
   - package-ecosystem: "gomod"
-    directory: "/backend/services/auth-service"
+    directory: "/new-backend/services/auth-service"
     schedule:
       interval: "weekly"
     commit-message:
@@ -40,7 +40,7 @@ updates:
         update-types: ["minor", "patch"]
 
   - package-ecosystem: "gomod"
-    directory: "/backend/services/staff-service"
+    directory: "/new-backend/services/staff-service"
     schedule:
       interval: "weekly"
     commit-message:
@@ -51,7 +51,7 @@ updates:
         update-types: ["minor", "patch"]
 
   - package-ecosystem: "gomod"
-    directory: "/backend/services/student-service"
+    directory: "/new-backend/services/student-service"
     schedule:
       interval: "weekly"
     commit-message:
@@ -62,7 +62,7 @@ updates:
         update-types: ["minor", "patch"]
 
   - package-ecosystem: "gomod"
-    directory: "/backend/services/course-catalog-service"
+    directory: "/new-backend/services/catalog-service"
     schedule:
       interval: "weekly"
     commit-message:
@@ -73,7 +73,7 @@ updates:
         update-types: ["minor", "patch"]
 
   - package-ecosystem: "gomod"
-    directory: "/backend/services/enrollment-service"
+    directory: "/new-backend/services/enrollment-service"
     schedule:
       interval: "weekly"
     commit-message:
@@ -84,7 +84,7 @@ updates:
         update-types: ["minor", "patch"]
 
   - package-ecosystem: "gomod"
-    directory: "/backend/services/attendance-service"
+    directory: "/new-backend/services/attendance-service"
     schedule:
       interval: "weekly"
     commit-message:
@@ -95,7 +95,7 @@ updates:
         update-types: ["minor", "patch"]
 
   - package-ecosystem: "gomod"
-    directory: "/backend/services/grades-service"
+    directory: "/new-backend/services/grades-service"
     schedule:
       interval: "weekly"
     commit-message:
@@ -106,7 +106,7 @@ updates:
         update-types: ["minor", "patch"]
 
   - package-ecosystem: "gomod"
-    directory: "/backend/services/meal-service"
+    directory: "/new-backend/services/meal-service"
     schedule:
       interval: "weekly"
     commit-message:
@@ -117,11 +117,22 @@ updates:
         update-types: ["minor", "patch"]
 
   - package-ecosystem: "gomod"
-    directory: "/backend/services/payment-service"
+    directory: "/new-backend/services/payment-service"
     schedule:
       interval: "weekly"
     commit-message:
       prefix: "chore(payment)"
+    labels: ["dependencies", "backend"]
+    groups:
+      go-minor-patch:
+        update-types: ["minor", "patch"]
+
+  - package-ecosystem: "gomod"
+    directory: "/new-backend/services/notification-service"
+    schedule:
+      interval: "weekly"
+    commit-message:
+      prefix: "chore(notification)"
     labels: ["dependencies", "backend"]
     groups:
       go-minor-patch:

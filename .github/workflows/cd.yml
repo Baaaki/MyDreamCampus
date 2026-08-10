@@ -27,34 +27,39 @@ jobs:
       - uses: dorny/paths-filter@v3
         id: filter
         with:
+          # shared/ is in every filter on purpose: it is compiled INTO each
+          # image, so a change there makes ten images stale at once.
           filters: |
             auth-service:
-              - 'backend/services/auth-service/**'
-              - 'backend/shared/**'
+              - 'new-backend/services/auth-service/**'
+              - 'new-backend/shared/**'
             staff-service:
-              - 'backend/services/staff-service/**'
-              - 'backend/shared/**'
+              - 'new-backend/services/staff-service/**'
+              - 'new-backend/shared/**'
             student-service:
-              - 'backend/services/student-service/**'
-              - 'backend/shared/**'
-            course-catalog-service:
-              - 'backend/services/course-catalog-service/**'
-              - 'backend/shared/**'
+              - 'new-backend/services/student-service/**'
+              - 'new-backend/shared/**'
+            catalog-service:
+              - 'new-backend/services/catalog-service/**'
+              - 'new-backend/shared/**'
             enrollment-service:
-              - 'backend/services/enrollment-service/**'
-              - 'backend/shared/**'
+              - 'new-backend/services/enrollment-service/**'
+              - 'new-backend/shared/**'
             attendance-service:
-              - 'backend/services/attendance-service/**'
-              - 'backend/shared/**'
+              - 'new-backend/services/attendance-service/**'
+              - 'new-backend/shared/**'
             grades-service:
-              - 'backend/services/grades-service/**'
-              - 'backend/shared/**'
+              - 'new-backend/services/grades-service/**'
+              - 'new-backend/shared/**'
             meal-service:
-              - 'backend/services/meal-service/**'
-              - 'backend/shared/**'
+              - 'new-backend/services/meal-service/**'
+              - 'new-backend/shared/**'
             payment-service:
-              - 'backend/services/payment-service/**'
-              - 'backend/shared/**'
+              - 'new-backend/services/payment-service/**'
+              - 'new-backend/shared/**'
+            notification-service:
+              - 'new-backend/services/notification-service/**'
+              - 'new-backend/shared/**'
 
   # ─────────────────────────────────────────────
   # Build & push changed services to GHCR
@@ -101,8 +106,11 @@ jobs:
         id: build
         uses: docker/build-push-action@v6
         with:
-          context: ./backend
-          file: ./backend/services/${{ matrix.service }}/Dockerfile
+          # Repo root, matching compose: every service Dockerfile copies both
+          # its own directory and new-backend/shared, so a context rooted at
+          # the service cannot see its replace target.
+          context: .
+          file: ./new-backend/services/${{ matrix.service }}/Dockerfile
           push: true
           platforms: linux/amd64
           tags: ${{ steps.meta.outputs.tags }}

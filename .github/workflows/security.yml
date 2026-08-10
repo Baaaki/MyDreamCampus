@@ -50,7 +50,7 @@ jobs:
       - name: Set up Go
         uses: actions/setup-go@v5
         with:
-          go-version-file: new-backend/monolith/go.mod
+          go-version-file: new-backend/shared/go.mod
           cache-dependency-path: new-backend/**/go.sum
 
       - name: Install gosec
@@ -59,7 +59,7 @@ jobs:
       - name: Run gosec
         working-directory: new-backend
         run: |
-          for mod in monolith shared services/notification; do
+          for mod in shared services/*/; do
             echo "::group::gosec $mod"
             (cd "$mod" && gosec -quiet -exclude-generated ./...)
             echo "::endgroup::"
@@ -79,7 +79,7 @@ jobs:
       - name: Set up Go
         uses: actions/setup-go@v5
         with:
-          go-version-file: new-backend/monolith/go.mod
+          go-version-file: new-backend/shared/go.mod
           cache-dependency-path: new-backend/**/go.sum
 
       - name: Install govulncheck
@@ -88,7 +88,7 @@ jobs:
       - name: Run govulncheck
         working-directory: new-backend
         run: |
-          for mod in monolith shared services/notification; do
+          for mod in shared services/*/; do
             echo "::group::govulncheck $mod"
             (cd "$mod" && govulncheck ./...)
             echo "::endgroup::"
@@ -133,8 +133,9 @@ jobs:
         working-directory: new-backend
         run: |
           (cd shared && go build ./...)
-          (cd services/notification && go build ./...)
-          (cd monolith && make build)
+          for svc in services/*/; do
+            (cd "$svc" && go build ./...)
+          done
 
       - name: Perform CodeQL Analysis
         uses: github/codeql-action/analyze@v4
