@@ -5,7 +5,11 @@
 
 FROM golang:1.26 AS build
 ENV CGO_ENABLED=0
-RUN go install github.com/pressly/goose/v3/cmd/goose@latest
+# Same caches the service images use, so goose is compiled once per machine
+# rather than once per rebuild of this image.
+RUN --mount=type=cache,target=/go/pkg/mod \
+    --mount=type=cache,target=/root/.cache/go-build \
+    go install github.com/pressly/goose/v3/cmd/goose@latest
 
 FROM alpine:3.20
 # pg_isready gates the migration run on the server actually accepting
