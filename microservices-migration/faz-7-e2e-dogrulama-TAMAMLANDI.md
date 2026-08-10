@@ -15,43 +15,70 @@ Burada bulunan her hata, **ilgili fazın dosyasına geri dönülüp** düzeltili
 
 ---
 
-## Statik Ön Denetim (2026-08-10) — stack ayakta değilken yapılan kısım
+## Sonuç (2026-08-10) — tüm bitiş kriterleri karşılandı
 
-Aşağıdaki bölümler **koddan** doğrulandı; çalışma zamanı teyidi hâlâ gerekli.
+Mimari monolith ile aynı davranışı veriyor. A'nın 13 adımı, B, C, D, E, F ve
+G geçti. Golden path tarayıcı yerine `curl` ile koşuldu; her adım gerçek
+Caddy → servis → event zincirinden geçtiği için kanıt değeri aynı.
 
-| Bölüm | Statik bulgu |
+### Bulunan yedi hata
+
+| # | Hata | Sınıf | Commit |
+|---|---|---|---|
+| 1 | `SetBlacklistChecker` yalnız auth'ta çağrılıyordu; diğer 9 serviste `blacklistChecker` nil olduğu için JWTAuth revocation bloğu tümüyle atlanıyor, logout sadece auth'ta işliyordu | **Faz 4 regresyonu** | `7289872` |
+| 2 | enrollment'ın catalog client'ı `limit=1000` gönderiyor, catalog `max=100` bağlaması 400 dönüyor, enrollment 500'e sarıyor → her ders seçimi düşüyordu | **Faz 3 regresyonu** | `6a4ece8` |
+| 3 | `config.Load` `Reservation` bölümünü hiç okumuyordu: 0 TL rezervasyon, 0 dk zaman aşımı, QR'da `Unix()/0` → istek yolunda panic | Mevcut; bölünme görünür kıldı | `8267ff5` |
+| 4 | Tekil ders sorguları `department`'ı SELECT edip struct'a kopyalamıyordu → enrollment'ın bölüm kontrolü her başvuruyu 422 ile reddediyordu | Mevcut; bölünme görünür kıldı | `bfbb2f7` |
+| 5 | Seed `courses_view`'leri yalnız Güz ile dolduruyordu; Bahar programı onaylanınca FK patlayıp event DLQ'ya düşüyordu | **Faz 6 seed defekti** | `f25dadf` |
+| 6 | `make deploy-meal` "no such service" veriyordu (compose adı `meal-service`) | Faz 6 defekti | `e956e09` |
+| 7 | §B/§C doğrulama sorguları yanlış kolon ve şema adı kullanıyordu | Doküman | `d7305ba` |
+
+1, 2 ve 5 bölünmenin kendi ürünü. 3 ve 4 monolith'ten geliyordu ama in-process
+çağrılar handler bağlamasını atladığı için sessizdi; internal REST'e geçince
+görünür hataya döndüler — bu fazın asıl kazancı bu.
+
+### Düzeltilmeyen, kapsam dışı bırakılanlar
+
+- `isValidSemesterFormat` `YYYY-YYYY-Fall` dayatıyor ama seed de frontend de
+  `2025-2026 Güz` kullanıyor → `POST /api/semesters/:sem/courses` gerçek dönem
+  adlarıyla çağrılamıyor.
+- Aynı endpoint'te pgx, `course_catalog.day_of_week_enum[]` parametresini
+  kodlayamıyor (`NewPostgresPool`'da `LoadType`/`AfterConnect` yok) → 500.
+- Frontend `admin/scores/lock` çağırıyor, backend'de o route yok.
+- auth ve meal consumer'ları başarı yolunda ctx logger'ıyla satır yazmıyor;
+  correlation ctx'te var ama loglarda görünmüyor.
+
+Dördü de monolith commit'lerinden geliyor, migrasyonla ilgisi yok.
+
+### Bölüm bölüm kanıt
+
+| Bölüm | Sonuç |
 |---|---|
-| G | `make test` yeşil: backend tümü `ok`, frontend 56/56, mobile 62/62 |
-| C | 8 servisin hepsinde `rt.StartOutbox` var (payment doğrudan publish eder, notification tüketicidir) |
-| D2 | 7 halkanın hepsi bağlı: Caddy ID basıyor → `RequestLogger` gelen ID'yi koruyor → `client.Base` `X-Request-ID` taşıyor → outbox satırı `correlation_id` yazıyor → envelope taşıyor → consumer ctx'e geri koyuyor |
-| D3 | `client.send` 4xx'i nil hata döndürüyor, yalnız 5xx breaker'a sayılıyor → **404 breaker'ı açmaz** (5. test statik olarak geçiyor) |
-| E1 | `/internal` grubu olan 5 servisin hepsi `RequireInternalSecret` arkasında; Caddy `/internal/*`'ı 404'lüyor |
-| E2 | `init-databases.sh` her DB'de `REVOKE CONNECT FROM PUBLIC` + tek role `GRANT CONNECT` yapıyor |
-| E5 | `sharedRateLimitBucket = "public"` — kova servis adına göre bölünmüyor |
-| B | `rabbitmq/definitions.json` binding'leri, servislerin `DeclareQueues` çağrılarıyla birebir örtüşüyor (notification dahil) |
+| A | 13/13 — aşağıdaki tablo |
+| B | Period projeksiyonu 3 serviste dolu; `students_view` 10/10/10; auth projeksiyonu öğrenci+öğretmen sayısıyla tutuyor; `grade.appeal_processed` 3 sn'de catalog `audit_log`'una düştü |
+| C | Sekiz outbox da 0 bekleyen; 16 DLQ boş |
+| D1 | meal kapalı: `/api/meals` 502, catalog 200, staff 401 |
+| D2 | Tek `X-Request-ID` **beş serviste** (student, enrollment, catalog, grades, attendance). Not: `correlation_id` UUID kolonu — UUID olmayan client id'si event tarafında düşer |
+| D3 | 1-2 idempotency (aynı gövde → aynı id, farklı gövde → 422); 3 breaker 6. istekte 503 + `closed→open` logu, panic yok; 4 half-open 35 sn sonra toparladı; 5 404 breaker'ı açmıyor |
+| D4 | grades restart'ı boyunca 502 yok — `lb_try_duration` çalışıyor |
+| D5 | DLQ mekanizması doğru çalıştı: 3 denemeden sonra park etti, kuyruk tıkanmadı |
+| E1 | Dört internal path de 404 |
+| E2 | `grades_svc→auth`, `meal_svc→grades`, `student_svc→payment` üçü de reddedildi |
+| E3 | Tokensiz 401, aynı token'la meal/attendance/staff/student kabul |
+| E4 | Logout sonrası beş serviste de 401 (catalog `/courses` bilinçli public) |
+| E5 | 120 istek catalog+grades'e dağıtıldı, **başka üç servis de 429** — kova bölünmüyor |
+| F | Toplam 382 MiB (beklenen ~760), `/api/catalog/courses` 4.5 ms |
+| G | backend tümü `ok`, frontend 56/56, mobile 62/62 |
 
-**Bulunan tek regresyon (düzeltildi):** `SetBlacklistChecker` sadece
-auth-service'te çağrılıyordu; `blacklistChecker` nil olan diğer 9 serviste
-JWTAuth revocation bloğunun tamamı atlanıyordu — logout yalnız auth için
-işliyordu. Monolith'te tek process olduğu için görünmüyordu, **Faz 4** bölünmesi
-kırmış. Çağrı `shared/bootstrap`'a taşındı → `7289872`.
+### Bir dahaki koşuş için
 
-**Statik olarak doğrulanamayan, çalışma zamanı isteyen:** A (13 adım),
-B'nin SQL sayımları, D (servis durdurma), D3'ün 1-4. testleri, E'nin 3/4/5.
-maddeleri, F.
-
-**Çalışma zamanında koşulan bölümler (2026-08-10):** B, C, E1, E2, F geçti —
-period projeksiyonu üç serviste de dolu, `students_view` üçünde de 8, auth
-projeksiyonu 8 öğrenci + 3 öğretmen ile tutuyor, sekiz outbox da 0 bekleyen,
-16 DLQ'nun hepsi boş, dört internal path de 404, üç DB izolasyon denemesi de
-reddedildi, toplam bellek 382 MiB (beklenen ~760'ın yarısı), `/api/catalog/courses`
-4.5 ms.
-
-**§B ve §C komutları hatalıydı, düzeltildi:** `audit_log` kolonları
-`service`/`action`/`timestamp` (`service_name`/`created_at` diye bir kolon yok);
-outbox şeması DB adıyla aynı **tek istisna catalog → `course_catalog`**; kolon
-adı yedi serviste `processed_at`, yalnız meal'de `published_at` (meal'deki
-`processed_at` inbox tablosuna ait).
+- §B/§C sorguları düzeltildi: `audit_log` kolonları `service`/`action`/`timestamp`;
+  outbox şeması DB adıyla aynı, **tek istisna catalog → `course_catalog`**; kolon
+  adı yedi serviste `processed_at`, yalnız meal'de `published_at`.
+- Dönem fan-out'u `UpdatePeriod` ile tetiklenmez (o yalnız audit yazar) —
+  `POST /internal/periods/republish` kullan.
+- Catalog'da dönem başına dört `period_type` satırı var; `/admin/periods`
+  yalnız `catalog` tipini gösterir.
 
 ---
 
@@ -62,19 +89,19 @@ edilir:
 
 | # | Adım | Hangi servisleri sınar | Sonuç |
 |---|---|---|---|
-| 1 | Admin login | auth + Redis + JWT | [ ] |
-| 2 | Personel (öğretim üyesi) ekle | staff → event → auth user projection | [ ] |
-| 3 | Öğrenci ekle | student → staff (HTTP, danışman doğrulama) → event → auth | [ ] |
-| 4 | Ders kataloğuna ders ekle | catalog → staff (HTTP, instructor doğrulama) | [ ] |
-| 5 | Dönem oluştur + aktifleştir | catalog → **period event fan-out** | [ ] |
-| 6 | Öğrenci login + ders seçimi | enrollment → student + catalog (HTTP), period kilidi | [ ] |
-| 7 | Danışman onayı | enrollment → event → attendance + grades view sync | [ ] |
-| 8 | Öğretmen yoklama oturumu aç + QR | attendance → catalog (HTTP, SemesterInfo) + Redis | [ ] |
-| 9 | Mobilden QR okut | attendance Redis buffer → BufferFlusher → DB | [ ] |
-| 10 | Not girişi | grades → catalog (HTTP) + audit **event** | [ ] |
-| 11 | Not finalize (bağıl) | grades self-loop event (`grade.finalize.requested`) | [ ] |
-| 12 | Yemek rezervasyonu | meal → payment (HTTP) → `payment.completed` event → confirm | [ ] |
-| 13 | Şifre sıfırlama talebi | auth → event → notification → MailHog | [ ] |
+| 1 | Admin login | auth + Redis + JWT | [x] 200, request-id header'da |
+| 2 | Personel (öğretim üyesi) ekle | staff → event → auth user projection | [x] 201 → öğretmen aynı id ile login olabildi |
+| 3 | Öğrenci ekle | student → staff (HTTP, danışman doğrulama) → event → auth | [x] 201, `advisor_name` HTTP ile çözüldü |
+| 4 | Ders kataloğuna ders ekle | catalog → staff (HTTP, instructor doğrulama) | [x] 201; olmayan instructor → 404 `INSTRUCTOR_NOT_FOUND` |
+| 5 | Dönem oluştur + aktifleştir | catalog → **period event fan-out** | [x] republish → üç projeksiyon da yeniden yazıldı |
+| 6 | Öğrenci login + ders seçimi | enrollment → student + catalog (HTTP), period kilidi | [x] 200, Bahar penceresinde CENG201 listelendi |
+| 7 | Danışman onayı | enrollment → event → attendance + grades view sync | [x] ön koşulsuz 422, sınıf altı 422, uygun öğrenci `approved` |
+| 8 | Öğretmen yoklama oturumu aç + QR | attendance → catalog (HTTP, SemesterInfo) + Redis | [x] 201 |
+| 9 | Mobilden QR okut | attendance Redis buffer → BufferFlusher → DB | [x] 200, kayıt 3 sn'de DB'ye |
+| 10 | Not girişi | grades → catalog (HTTP) + audit **event** | [x] 201; audit `grade.appeal_processed` catalog'a ulaştı |
+| 11 | Not finalize (bağıl) | grades self-loop event (`grade.finalize.requested`) | [x] `is_finalized: true`, ders `completed_courses`'a geçti |
+| 12 | Yemek rezervasyonu | meal → payment (HTTP) → `payment.completed` event → confirm | [x] 200, 15 TL, 2 sn'de `pending`→`confirmed` |
+| 13 | Şifre sıfırlama talebi | auth → event → notification → MailHog | [x] 2 sn'de MailHog'a düştü |
 
 **13. adım özellikle önemli:** notification zaten ayrı servisti, event zinciri
 bozulmadıysa mimarinin async tarafı sağlam demektir.

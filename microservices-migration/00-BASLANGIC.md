@@ -94,10 +94,14 @@ için görünmez. Bu dosyalara **dokunma**.
 | 4 | `faz-4-servis-iskeletleri-TAMAMLANDI.md` | 9 × `cmd/main.go` + `go.mod` + `Dockerfile` + `go.work` | [x] |
 | 5 | `faz-5-caddy-gateway-TAMAMLANDI.md` | Caddyfile path-prefix routing | [x] |
 | 6 | `faz-6-docker-compose-TAMAMLANDI.md` | 16 konteynerli compose + kaynak limitleri | [x] |
-| 7 | `faz-7-e2e-dogrulama.md` | Uçtan uca golden path testi | [ ] |
+| 7 | `faz-7-e2e-dogrulama-TAMAMLANDI.md` | Uçtan uca golden path testi | [x] |
 | 8 | `faz-8-temizlik.md` | `monolith/` kaldırma + doküman güncelleme | [ ] |
 
-**Sıradaki faz: 7**
+**Sıradaki faz: 8**
+
+> Faz 7 yedi hata çıkardı; üçü bölünmenin kendi regresyonu, ikisi monolith'ten
+> gelip in-process çağrılar handler bağlamasını atladığı için gizli kalmış
+> hatalardı. Dördü Faz 8'e kapsam dışı bırakıldı — listesi faz dosyasında.
 
 ---
 
