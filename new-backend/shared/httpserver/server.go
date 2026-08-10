@@ -4,8 +4,6 @@ import (
 	"context"
 	"fmt"
 	"net/http"
-	"os"
-	"path/filepath"
 	"time"
 
 	"github.com/baaaki/mydreamcampus/shared/config"
@@ -79,8 +77,8 @@ func (s *Server) RegisterHealthCheck(name string, check platformHandler.HealthCh
 }
 
 // RegisterModules mounts each module under /api/<name> and finalises the
-// /health, /ready, and SPA fallback routes. Call exactly once after all
-// modules and health checks are registered.
+// /health and /ready routes. Call exactly once after all modules and health
+// checks are registered.
 func (s *Server) RegisterModules(modules ...Module) {
 	api := s.router.Group("/api")
 	for _, m := range modules {
@@ -94,41 +92,6 @@ func (s *Server) RegisterModules(modules ...Module) {
 
 	s.router.GET("/health", platformHandler.LivenessHandler(s.service))
 	s.router.GET("/ready", platformHandler.ReadinessHandler(s.service, s.healthChecks))
-
-	s.installFrontendFallback()
-}
-
-// installFrontendFallback wires SPA static serving for production. In dev
-// the Vite proxy hits /api/* directly so this is left disabled — see
-// FRONTEND_STATIC_ENABLED in config.
-func (s *Server) installFrontendFallback() {
-	if !s.cfg.Frontend.Enabled {
-		return
-	}
-
-	dir := s.cfg.Frontend.StaticDir
-	if dir == "" {
-		logger.Warn("frontend serving enabled but FRONTEND_STATIC_DIR is empty")
-		return
-	}
-
-	assets := filepath.Join(dir, "assets")
-	if _, err := os.Stat(assets); err == nil {
-		s.router.Static("/assets", assets)
-	}
-	if _, err := os.Stat(filepath.Join(dir, "favicon.ico")); err == nil {
-		s.router.StaticFile("/favicon.ico", filepath.Join(dir, "favicon.ico"))
-	}
-
-	indexFile := filepath.Join(dir, "index.html")
-	s.router.NoRoute(func(c *gin.Context) {
-		// Do not swallow API 404s — only fall back to SPA for non-/api paths.
-		if len(c.Request.URL.Path) >= 4 && c.Request.URL.Path[:4] == "/api" {
-			c.JSON(http.StatusNotFound, gin.H{"error": "Not found"})
-			return
-		}
-		c.File(indexFile)
-	})
 }
 
 // Run starts ListenAndServe in a goroutine; the call returns immediately.

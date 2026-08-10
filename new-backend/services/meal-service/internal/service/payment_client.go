@@ -7,7 +7,7 @@ import (
 )
 
 // PaymentClient defines the interface for interacting with the payment service.
-// In the modular monolith, this will be implemented by an in-process adapter or the actual payment service.
+// Implemented by the internal REST client in shared/client.
 type PaymentClient interface {
 	InitiatePayment(ctx context.Context, req dto.InitiatePaymentRequest) (*dto.InitiatePaymentResponse, error)
 	RequestRefund(ctx context.Context, req dto.RefundRequest) (*dto.RefundResponse, error)

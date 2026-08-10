@@ -17,7 +17,7 @@ func RequestLogger() gin.HandlerFunc {
 		start := time.Now()
 
 		// Reuse upstream X-Request-ID when present so a single trace
-		// ID survives across Caddy → monolith → downstream calls.
+		// ID survives across Caddy → service → downstream service calls.
 		incoming := c.GetHeader("X-Request-ID")
 		ctx := logger.WithRequestIDValue(c.Request.Context(), incoming)
 		c.Request = c.Request.WithContext(ctx)

@@ -251,7 +251,7 @@ func TestGradeStudentPrerequisitePassedEvent_ConsumedWrappedShape(t *testing.T) 
 }
 
 func TestGradeStudentPrerequisitePassedEvent_FlatPayloadDecodesToZero(t *testing.T) {
-	// Regression guard: the pre-monolith DTO declared these fields FLAT and
+	// Regression guard: an earlier version of this DTO declared the fields FLAT and
 	// silently zeroed against the wrapped producer shape. Pin the failure mode
 	// so a "simplification" back to flat is caught.
 	flat := `{

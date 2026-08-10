@@ -179,9 +179,8 @@ func (r *Runtime) initRedis(opts Options) {
 
 	// Every service, not just auth. JWTAuth skips the whole revocation block
 	// when this global is nil, so a service that never sets it accepts tokens
-	// that logout already revoked. In the monolith auth's Bootstrap set it for
-	// the one process everyone shared; ten processes each have to set their
-	// own, and the failure is silent — the token simply keeps working.
+	// that logout already revoked. Ten processes each have to set their own,
+	// and the failure is silent — the token simply keeps working.
 	platformMiddleware.SetBlacklistChecker(client)
 
 	// Keys are namespaced per service, so a client that reuses one key across

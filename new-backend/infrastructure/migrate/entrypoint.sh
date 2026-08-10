@@ -1,15 +1,7 @@
 #!/bin/sh
-# Apply goose migrations. Two targets:
-#
-#   1. Legacy — the single `mydreamcampus` database ($DB_URL) and the separate
-#      notification database ($NOTIF_DB_URL). Runs only while those vars are
-#      set; the monolith still boots against them until phase 4 of the
-#      microservices migration. Dropping the vars turns this half off.
-#   2. Per-service — one database per service, each migrated by its OWN role
-#      (auth_svc, staff_svc, ...) so the tables end up owned by that role.
-#
-# Module order matches the monolith Makefile (migrate-up-all). Each module keeps
-# its own goose version table, in both halves.
+# Apply goose migrations: one database per service, each migrated by that
+# service's OWN role (auth_svc, staff_svc, ...) so the tables end up owned by
+# it. Every service keeps its own goose version table.
 set -e
 
 : "${PG_HOST:=postgres}"
@@ -41,26 +33,6 @@ wait_for_db() {
 svc_url() {
 	echo "postgres://${1}_svc:${SERVICE_DB_PASSWORD}@${PG_HOST}:5432/${1}?sslmode=disable"
 }
-
-# ── Legacy: monolith + standalone notification ───────────────────────────────
-
-if [ -n "$DB_URL" ]; then
-	wait_for_db "monolith database" "$DB_URL"
-	for module in auth staff student course_catalog enrollment attendance grades meal payment; do
-		dir="/migrations/modules/$module"
-		[ -d "$dir" ] || continue
-		echo ">> goose up (monolith) — $module"
-		goose -dir "$dir" -table "goose_db_version_$module" postgres "$DB_URL" up
-	done
-fi
-
-if [ -n "$NOTIF_DB_URL" ]; then
-	wait_for_db "legacy notification database" "$NOTIF_DB_URL"
-	echo ">> goose up (legacy notification)"
-	goose -dir /migrations/notification -table goose_db_version_notification postgres "$NOTIF_DB_URL" up
-fi
-
-# ── Per-service databases ────────────────────────────────────────────────────
 
 wait_for_db "postgres server" "$(svc_url auth)"
 

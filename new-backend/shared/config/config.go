@@ -7,8 +7,8 @@ import (
 	"github.com/spf13/viper"
 )
 
-// Config holds the entire monolith configuration. Modules read from a
-// shared instance; there is no per-module config struct.
+// Config holds one service's configuration. Every service loads the same
+// struct from its own environment; there is no per-service config type.
 type Config struct {
 	Server         ServerConfig
 	Database       DatabaseConfig
@@ -22,7 +22,6 @@ type Config struct {
 	MealTime       MealTimeConfig
 	RateLimit      RateLimitConfig
 	Timeout        TimeoutConfig
-	Frontend       FrontendConfig
 	InternalClient InternalClientConfig
 }
 
@@ -104,13 +103,6 @@ type TimeoutConfig struct {
 	AccountLockDurationMinutes    int `mapstructure:"ACCOUNT_LOCK_DURATION_MINUTES"`
 	CleanupSchedulerIntervalHours int `mapstructure:"CLEANUP_SCHEDULER_INTERVAL_HOURS"`
 	ProcessedEventsRetentionDays  int `mapstructure:"PROCESSED_EVENTS_RETENTION_DAYS"`
-}
-
-// FrontendConfig points at the static SPA build (production) and lets the
-// dev workflow keep using Vite's proxy without touching code.
-type FrontendConfig struct {
-	StaticDir string `mapstructure:"FRONTEND_STATIC_DIR"`
-	Enabled   bool   `mapstructure:"FRONTEND_STATIC_ENABLED"`
 }
 
 type QRConfig struct {
@@ -198,10 +190,6 @@ func Load() (*Config, error) {
 			CleanupSchedulerIntervalHours: viper.GetInt("CLEANUP_SCHEDULER_INTERVAL_HOURS"),
 			ProcessedEventsRetentionDays:  viper.GetInt("PROCESSED_EVENTS_RETENTION_DAYS"),
 		},
-		Frontend: FrontendConfig{
-			StaticDir: viper.GetString("FRONTEND_STATIC_DIR"),
-			Enabled:   viper.GetBool("FRONTEND_STATIC_ENABLED"),
-		},
 		// Every other section is read here explicitly, so a section left out
 		// silently stays at its zero value however good its SetDefault is.
 		// This one was: meal priced reservations at 0 TRY and gave QR codes a
@@ -240,7 +228,9 @@ func setDefaults() {
 	viper.SetDefault("PORT", "8080")
 	viper.SetDefault("INTERNAL_SERVICE_SECRET", "change-this-internal-secret-in-production")
 
-	viper.SetDefault("DB_URL", "postgres://postgres:postgres@localhost:5432/mydreamcampus?sslmode=disable")
+	// No DB_URL default: every service owns a different database, so any value
+	// here would be wrong for eight of the nine. Services that need a pool
+	// fail loudly in bootstrap when it is unset.
 	viper.SetDefault("RABBITMQ_URL", "amqp://rabbitmq:rabbitmq@localhost:5672/")
 	viper.SetDefault("REDIS_ADDR", "localhost:6379")
 	viper.SetDefault("REDIS_PASSWORD", "changeme_redis_secret")
@@ -276,9 +266,6 @@ func setDefaults() {
 	viper.SetDefault("ACCOUNT_LOCK_DURATION_MINUTES", 30)
 	viper.SetDefault("CLEANUP_SCHEDULER_INTERVAL_HOURS", 1)
 	viper.SetDefault("PROCESSED_EVENTS_RETENTION_DAYS", 30)
-
-	viper.SetDefault("FRONTEND_STATIC_DIR", "./frontend_dist")
-	viper.SetDefault("FRONTEND_STATIC_ENABLED", false)
 
 	viper.SetDefault("INTERNAL_CLIENT_TIMEOUT_SECONDS", 10)
 	// Five consecutive failures before tripping: one blip must not open the

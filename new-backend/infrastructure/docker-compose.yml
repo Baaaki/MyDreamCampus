@@ -75,20 +75,20 @@ services:
     environment:
       POSTGRES_USER: ${POSTGRES_USER:-postgres}
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?POSTGRES_PASSWORD is required — see .env.example}
-      POSTGRES_DB: mydreamcampus
+      # `postgres` is the image's own maintenance database, so the entrypoint
+      # skips creating it. No application data lives here: every service owns a
+      # database of its own, created by init-databases.sh.
+      POSTGRES_DB: postgres
       PGDATA: /var/lib/postgresql/data/pgdata
       # Read by init-databases.sh — the shared password of the per-service
       # roles (auth_svc, staff_svc, ...).
       SERVICE_DB_PASSWORD: ${SERVICE_DB_PASSWORD:?SERVICE_DB_PASSWORD is required — see .env.example}
     volumes:
       - postgres-data:/var/lib/postgresql
-      - ./postgres/init-dbs.sql:/docker-entrypoint-initdb.d/00-init.sql:ro
-      # Numeric prefix: the entrypoint runs initdb.d in lexical order, and the
-      # legacy monolith schemas have to land before the per-service databases.
-      # Both only ever run on an EMPTY volume.
+      # Runs only on an EMPTY volume — an existing one skips it, see the script.
       - ./postgres/init-databases.sh:/docker-entrypoint-initdb.d/01-service-dbs.sh:ro
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U postgres -d mydreamcampus"]
+      test: ["CMD-SHELL", "pg_isready -U postgres -d postgres"]
       interval: 5s
       timeout: 3s
       retries: 10
@@ -169,9 +169,6 @@ services:
     mem_limit: 128m
     logging: *logging
     environment:
-      # DB_URL and NOTIF_DB_URL are deliberately unset: they drove the legacy
-      # half of entrypoint.sh (the single `mydreamcampus` database and the
-      # standalone notification one), and both targets are gone.
       PG_HOST: postgres
       SERVICE_DB_PASSWORD: ${SERVICE_DB_PASSWORD:?SERVICE_DB_PASSWORD is required — see .env.example}
     depends_on:

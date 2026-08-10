@@ -6,9 +6,9 @@ import (
 	"github.com/baaaki/mydreamcampus/shared/platform/rabbitmq"
 )
 
-// ModuleExchanges lists every per-module topic exchange the monolith owns.
-// New modules must add their exchange here so the topology declare loop
-// in main.go covers them; the value is also the publisher target string.
+// ModuleExchanges lists every per-service topic exchange in the stack. A new
+// service must add its exchange here so the topology declare loop in main.go
+// covers it; the value is also the publisher target string.
 var ModuleExchanges = []string{
 	"auth.events",
 	"staff.events",
@@ -33,9 +33,9 @@ func DeclareModuleExchanges(publisher *rabbitmq.Publisher) error {
 	return nil
 }
 
-// DownstreamBinding describes a (queue, exchange, routing_key) triple that
-// the monolith pre-declares so messages aren't lost while the consumer is
-// offline.
+// DownstreamBinding describes a (queue, exchange, routing_key) triple the
+// publishing service pre-declares so messages aren't lost while the consumer
+// is offline.
 type DownstreamBinding struct {
 	Queue      string
 	Exchange   string

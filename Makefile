@@ -109,7 +109,8 @@ clean: infra-down
 # ─────────────────────────────────────────────
 # Deploy targets — one command for the full stack.
 # The SPA is built into the caddy image, so there is no separate frontend
-# process to start: caddy serves /srv and proxies /api to the monolith.
+# process to start: caddy serves /srv and proxies each /api prefix to its
+# own service.
 # ─────────────────────────────────────────────
 
 # Fail early with a readable message instead of compose's raw variable errors.
@@ -123,10 +124,10 @@ check-env:
 		echo "  openssl rand -base64 48"; \
 		exit 1; } || true
 
-# --remove-orphans: containers whose service left the compose file (the
-# monolith, notification-postgres) keep running and keep holding their host
-# ports, so the next `up` fails on a port that looks free. Only on the two
-# whole-stack targets — a single-service target must never sweep.
+# --remove-orphans: a container whose service left the compose file keeps
+# running and keeps holding its host ports, so the next `up` fails on a port
+# that looks free. Only on the two whole-stack targets — a single-service
+# target must never sweep.
 deploy: check-env
 	$(SUDO) docker compose $(COMPOSE) up -d --build --remove-orphans
 
@@ -144,9 +145,9 @@ deploy-down:
 	$(SUDO) docker compose $(COMPOSE) down
 
 # ─────────────────────────────────────────────
-# Single-service targets — the operational point of splitting the monolith.
-# Without them everyone reaches for `make deploy` and restarts all 16
-# containers to ship a one-line change in one service.
+# Single-service targets — the operational point of the split. Without them
+# everyone reaches for `make deploy` and restarts all 16 containers to ship a
+# one-line change in one service.
 # ─────────────────────────────────────────────
 
 # Compose names the ten Go services `<name>-service`, but the container is

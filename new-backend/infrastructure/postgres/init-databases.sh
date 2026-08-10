@@ -3,14 +3,14 @@
 #
 # Runs from the Postgres entrypoint (/docker-entrypoint-initdb.d), which fires
 # ONLY on an empty data volume. An existing volume skips this file entirely —
-# provision it by hand, see microservices-migration/faz-1-veritabani-ayrimi.md.
+# provision it by hand, see the command migrate/entrypoint.sh prints on failure.
 #
 # A .sh and not a .sql because the entrypoint passes environment variables to
 # shell scripts only, and the role passwords come from the environment.
 #
-# Schema names deliberately stay as they are in the monolith — the `auth`
+# Each database carries a schema of the same name as the service — the `auth`
 # database holds an `auth` schema — so every migration .sql and all
-# sqlc-generated code keeps working untouched.
+# sqlc-generated code addresses its tables exactly as it always did.
 set -e
 
 : "${POSTGRES_USER:=postgres}"

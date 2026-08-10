@@ -1,6 +1,6 @@
 # syntax=docker/dockerfile:1
 # Stage 1 builds the SPA; stage 2 is a Caddy image that serves the built
-# assets AND reverse-proxies /api/* to the monolith on the same host, so the
+# assets AND reverse-proxies each /api/<prefix> to its own service, so the
 # browser only ever talks to one origin (no CORS, no absolute API base URL).
 #
 # Build context is the REPO ROOT, not frontend/ — Openship's compose builder
@@ -13,7 +13,7 @@ COPY frontend/package.json frontend/bun.lock ./
 RUN bun install --frozen-lockfile
 COPY frontend/ .
 # Same-origin: empty base URL -> the SPA calls relative /api/... which Caddy
-# routes to the monolith. Real API, not mock.
+# routes to the owning service. Real API, not mock.
 ARG VITE_API_BASE_URL=""
 ARG VITE_USE_MOCK_API="false"
 ENV VITE_API_BASE_URL=$VITE_API_BASE_URL
