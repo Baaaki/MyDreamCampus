@@ -13,7 +13,11 @@ SELECT sc.id, sc.course_code, c.name, sc.credits, sc.semester, c.department,
        sc.instructor_id, sc.instructor_fullname, 14, false
 FROM _semester_courses sc
 JOIN _courses c ON c.course_code = sc.course_code
-WHERE sc.semester = '2025-2026 Güz'
+-- Every semester, not just Güz: approving a Bahar program emits
+-- enrollment.program.approved carrying the Bahar offering's course id, and
+-- enrollments_view has an FK onto this table. Without the Bahar row that
+-- event dead-letters — the very flow the prerequisite demo sets up. The
+-- inserts below all scope themselves to Güz, so nothing else changes.
 ON CONFLICT (id) DO NOTHING;
 
 INSERT INTO attendance.enrollments_view (student_id, course_id, semester)

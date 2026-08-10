@@ -16,7 +16,12 @@ SELECT sc.id, sc.course_code, c.name, sc.credits, sc.semester, c.department,
        sc.instructor_id, sc.instructor_fullname, sc.assessment_schema
 FROM _semester_courses sc
 JOIN _courses c ON c.course_code = sc.course_code
-WHERE sc.semester = '2025-2026 Güz'
+-- Every semester, not just Güz: approving a Bahar program emits
+-- enrollment.program.approved carrying the Bahar offering's course id, and
+-- the registration this consumer writes has an FK onto courses_view. Without
+-- the Bahar row that event dead-letters — which is exactly the flow the
+-- prerequisite demo below is built to exercise. Nothing further down keys off
+-- this view without scoping itself to Güz first.
 ON CONFLICT (id) DO NOTHING;
 
 -- ============================================================
