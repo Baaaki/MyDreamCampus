@@ -1,7 +1,12 @@
 # Mikroservis Migrasyonu — Başlangıç Dosyası
 
-> **AI için:** Oturuma bu dosyayla başla. Sadece bu dosyayı ve sıradaki tek faz
-> dosyasını oku. Diğer faz dosyalarını **açma** — bağımsız yazıldılar.
+> **MİGRASYON TAMAMLANDI (2026-08-10).** Faz dosyaları tarihsel referanstır;
+> aşağıdaki çalışma protokolü artık işletilmiyor.
+>
+> **GÜNCEL MİMARİ: [`01-REFERANS-MIMARI.md`](01-REFERANS-MIMARI.md)** (bu
+> klasörde) — projenin mimari kaynağı odur, faz dosyaları değil. Yanında
+> geçerliliğini koruyan dört doküman daha var: `02-GUVENLIK.md`,
+> `03-IZLENEBILIRLIK.md`, `04-PROD-HAZIRLIK.md`, `05-DAYANIKLILIK.md`.
 
 ---
 
@@ -75,11 +80,10 @@ için görünmez. Bu dosyalara **dokunma**.
 | `04-PROD-HAZIRLIK.md` | İşletme boşlukları: DLQ, retention, yedekleme, timeout bütçesi | 4, 5, 6, 8 |
 | `05-DAYANIKLILIK.md` | Circuit breaker + HTTP idempotency key | 3, 4, 7 |
 
-> **`SYSTEM-DESIGN.md`'yi okuma, kaynak olarak kullanma.** O doküman monolith
-> mimarisini anlatıyor ve şimdiden koddan sapmış (var olmayan Grafana/Loki
-> config'lerini "hazır" gösteriyor, bozuk `/internal/periods` fan-out'unu
-> çalışıyor gibi anlatıyor). Mimari bilgi için `01-REFERANS-MIMARI.md`,
-> davranış için **koda** bak. Dosya Faz 8'de siliniyor.
+> **`SYSTEM-DESIGN.md` Faz 8'de silindi.** Monolith mimarisini anlatıyordu ve
+> silinmeden önce de koddan sapmıştı. Yerine geçen mimari kaydı
+> `01-REFERANS-MIMARI.md`; davranış sorularında **koda** bak. Eski hâli
+> gerekirse: `git show c2b34d9:SYSTEM-DESIGN.md`.
 
 ---
 
@@ -95,13 +99,14 @@ için görünmez. Bu dosyalara **dokunma**.
 | 5 | `faz-5-caddy-gateway-TAMAMLANDI.md` | Caddyfile path-prefix routing | [x] |
 | 6 | `faz-6-docker-compose-TAMAMLANDI.md` | 16 konteynerli compose + kaynak limitleri | [x] |
 | 7 | `faz-7-e2e-dogrulama-TAMAMLANDI.md` | Uçtan uca golden path testi | [x] |
-| 8 | `faz-8-temizlik.md` | `monolith/` kaldırma + doküman güncelleme | [ ] |
+| 8 | `faz-8-temizlik-TAMAMLANDI.md` | `monolith/` kaldırma + doküman güncelleme | [x] |
 
-**Sıradaki faz: 8**
+**Sıradaki faz: YOK — migrasyon tamamlandı.**
 
 > Faz 7 yedi hata çıkardı; üçü bölünmenin kendi regresyonu, ikisi monolith'ten
 > gelip in-process çağrılar handler bağlamasını atladığı için gizli kalmış
-> hatalardı. Dördü Faz 8'e kapsam dışı bırakıldı — listesi faz dosyasında.
+> hatalardı. Dördü kapsam dışı bırakıldı — listesi Faz 7 dosyasında, hiçbiri
+> migrasyon kaynaklı değil.
 
 ---
 

@@ -1,15 +1,12 @@
 # Referans Mimari — Ortak Tablolar
 
-> Bu bir faz dosyası değil, **sözlük**. Faz dosyaları buraya atıf yapar.
-> Baştan sona okuma — ihtiyacın olan tabloyu bul.
+> **Projenin mimari kaynağı bu dosyadır.** Bir **sözlük** olarak yazıldı;
+> baştan sona okuma, ihtiyacın olan tabloyu bul.
 
-> **Kaynak: kod.** Bu dosyadaki tablolar `cmd/main.go`, modül `module.go`
-> dosyaları, `worker/` consumer'ları ve migration `.sql`'lerinden çıkarıldı.
->
-> **`SYSTEM-DESIGN.md`'yi kaynak olarak KULLANMA.** O doküman monolith
-> mimarisini anlatıyor ve bazı yerlerde koddan sapmış durumda (örnek: var
-> olmayan Grafana/Loki config dizinlerini "hazır" gösteriyor). Bir bilgiyi
-> oradan alma — koda bak.
+> **Asıl kaynak koddur.** Buradaki tablolar `cmd/main.go`, servislerin
+> `internal/module.go` dosyaları, `worker/` consumer'ları ve migration
+> `.sql`'lerinden çıkarıldı. Bir davranış sorusunda önce koda bak; bu dosya
+> nereye bakacağını söyler.
 
 ---
 
@@ -50,8 +47,8 @@ grades      ──► catalog     (SemesterInfo)
 meal        ──► payment     (ödeme başlatma / iade)
 ```
 
-`academic_periods` **sync değil** — event ile lokal projeksiyon (Faz 2).
-Audit log **sync değil** — event ile catalog'a yazılır (Faz 3).
+`academic_periods` **sync değil** — event ile lokal projeksiyon.
+Audit log **sync değil** — event ile catalog'a yazılır.
 
 Tüm internal çağrılar `X-Internal-Secret` header'ı taşır; doğrulama
 `shared/platform/middleware/internal.go` içindeki mevcut middleware ile yapılır.
@@ -75,7 +72,7 @@ sadece compose network'ünden erişilir.
 
 ---
 
-## 3. Event Haritası (RabbitMQ — değişmiyor)
+## 3. Event Haritası (RabbitMQ)
 
 **Exchange'ler (topic, durable):** `auth.events`, `staff.events`,
 `student.events`, `course_catalog.events`, `enrollment.events`,
@@ -93,23 +90,13 @@ sadece compose network'ünden erişilir.
 | `meal.payment_failed_queue` | payment.events | `payment.failed` | meal |
 | `meal.student_*_queue` | student.events | `student.*` | meal |
 | `notification_events_queue` | auth.events | `user.registered`, `user.password_reset_requested` | notification |
-
-**Faz 2'de eklenecek yeni kuyruklar:**
-
-| Kuyruk | Kaynak | Routing key | Tüketen |
-|---|---|---|---|
 | `enrollment.period_events` | course_catalog.events | `course_catalog.period.enrollment.*` | enrollment |
 | `grades.period_events` | course_catalog.events | `course_catalog.period.grading.*` | grades |
 | `attendance.period_events` | course_catalog.events | `course_catalog.period.attendance.*` | attendance |
-
-Routing key sonu `created` / `updated` / `deleted`. Filtreleme broker'da
-yapılır — her tüketici sadece kendi dönem tipini alır.
-
-**Faz 3'te eklenecek:**
-
-| Kuyruk | Kaynak | Routing key | Tüketen |
-|---|---|---|---|
 | `catalog.audit_events` | grades.events, meal.events | `audit.entry.created` | catalog |
+
+Dönem kuyruklarında routing key sonu `created` / `updated` / `deleted`.
+Filtreleme broker'da yapılır — her tüketici sadece kendi dönem tipini alır.
 
 **Envelope:** `{event_id, event_type, timestamp, data}` — `event_id`
 idempotency anahtarı, `processed_events` tablosuyla kontrol edilir.
@@ -117,34 +104,25 @@ idempotency anahtarı, `processed_events` tablosuyla kontrol edilir.
 **Kural:** Her publish outbox üzerinden (istisna: payment — DB'si yok).
 Her consumer idempotent.
 
-### 3.1 Kuyruk Declare Sorumluluğu — bugün dağınık, Faz 4'te toplanıyor
+### 3.1 Kuyruk Declare Sorumluluğu
 
-Koda bakıldığında kuyruklar **üç ayrı mekanizmayla** tanımlanıyor:
+1. Kuyruğu **tüketen servis** declare eder — kendi `cmd/main.go`'sundaki
+   `DeclareQueues` listesinde. Publisher asla başkasının kuyruğunu tanımlamaz;
+   aksi halde tüketici hiç ayağa kalkmasa bile kuyruk var olur ve sahipliği
+   koddan okunamaz hale gelir.
+2. Kayıp riskine karşı topoloji ayrıca **`infrastructure/rabbitmq/definitions.json`**
+   ile RabbitMQ boot'unda yüklenir. Böylece bir tüketici hiç başlamamış olsa
+   bile binding vardır ve topic exchange mesajı atmak yerine kuyrukta biriktirir.
+3. Servis içi declare'ler idempotent — tek servis `definitions.json` olmadan
+   da dev ortamında çalışabilir.
 
-| Mekanizma | Nerede | Hangi kuyruklar |
-|---|---|---|
-| Merkezi pre-declare | `cmd/main.go` → `downstreamBindings` | `auth_events_queue`, `student.staff_events`, `attendance.sync_events`, `grades.sync_events`, `grades.finalize_requested`, `enrollment.sync_events` |
-| **Publisher declare ediyor** | `payment/service/payment_service.go:76-79` | `meal.payment_completed_queue`, `meal.payment_failed_queue` |
-| Consumer kendi declare ediyor | `meal/worker/event_consumer.go` | `meal.student_*_queue` (3 adet) + yukarıdaki iki payment kuyruğu (tekrar) |
-| Servis kendi declare ediyor | `services/notification/internal/consumer/setup.go` | `notification_events_queue` |
-
-**İkinci satır yanlış sahiplik:** payment, meal'in kuyruğunu tanımlıyor.
-Servisler ayrılınca payment-service, meal-service'in kuyruğunu declare eder
-hale gelir — meal hiç ayağa kalkmasa bile. Faz 4 bunu düzeltiyor.
-
-**Hedef kural (Faz 4):**
-1. Kuyruğu **tüketen servis** declare eder. Publisher asla başkasının
-   kuyruğunu tanımlamaz.
-2. Kayıp riskine karşı topoloji ayrıca **`definitions.json`** ile RabbitMQ
-   boot'unda yüklenir (bkz. Faz 4). Böylece bir tüketici hiç başlamamış olsa
-   bile binding vardır ve mesaj kuyrukta birikir — monolith'teki
-   "pre-declare" garantisi korunur.
-3. Servis içi declare'ler **kalır** (idempotent). Dev ortamında tek servis
-   `definitions.json` olmadan da çalışabilsin.
+**Bakım notu:** Yeni bir kuyruk **iki yere birden** eklenir (1 ve 2). Sadece
+birine eklemek, tüketici hiç ayağa kalkmadığı senaryoda mesajın sessizce
+kaybolması demektir.
 
 ---
 
-## 4. Konteyner Haritası (hedef)
+## 4. Konteyner Haritası
 
 | Konteyner | Image | Host portu | Tahmini RAM |
 |---|---|---|---|
@@ -169,34 +147,34 @@ portlarını ekler. Yeni host portu **standalone dosyasına** eklenir.
 
 ---
 
-## 5. Repo Yapısı (hedef)
+## 5. Repo Yapısı
 
 ```
 new-backend/
-├── go.work                          ← Faz 4
+├── go.work
 ├── shared/
 │   ├── go.mod                       (modül: .../shared)
 │   ├── events/                      (mevcut)
-│   ├── platform/                    ← Faz 0: monolith/internal/platform/ buradan gelir
+│   ├── platform/                    (tüm servislerin ortak altyapısı)
 │   │   ├── audit/ clock/ database/ dto/ errors/ handler/
 │   │   ├── logger/ middleware/ rabbitmq/ redis/ repository/
 │   │   └── rules/ semester/ utils/
-│   ├── client/                      ← Faz 3
-│   └── httpserver/                  ← Faz 4 (ortak Gin bootstrap)
+│   ├── client/                      (internal REST client'ları)
+│   └── httpserver/                  (ortak Gin bootstrap)
 ├── services/
 │   ├── auth-service/  staff-service/  student-service/
 │   ├── catalog-service/  enrollment-service/  attendance-service/
 │   ├── grades-service/  meal-service/  payment-service/
-│   └── notification-service/        ← mevcut notification/ buraya taşınır
+│   └── notification-service/        (RabbitMQ consumer, HTTP route'u yok)
 └── infrastructure/
     ├── docker-compose.yml
     ├── docker-compose.standalone.yml
-    ├── postgres/init-databases.sh   ← Faz 1
-    ├── migrate/                     ← Faz 1'de güncellenir
+    ├── postgres/init-databases.sh
+    ├── migrate/
     └── seed/
 ```
 
-Her servis içi yapı (monolith'teki modül şablonunun aynısı):
+Her servis içi yapı:
 
 ```
 services/<x>-service/
@@ -245,24 +223,9 @@ Service URL formatı: `http://<servis-adı>:<port>` (compose DNS).
 
 ---
 
-## 7. Blokerler ve Hangi Fazda Çözüldükleri
+## 7. Bilinen Açıklar / Kapsam Dışı
 
-| Bloker | Faz |
-|---|---|
-| `monolith/internal/platform/` — Go `internal/` kısıtı servisler arası paylaşımı engelliyor | 0 |
-| Tek `pgxpool` 9 modüle dağıtılıyor | 1 + 4 |
-| `SimplePeriodRepository` → `course_catalog.academic_periods` cross-service okuma | 2 |
-| 7 adet in-process sync client | 3 |
-| catalog → grades/meal audit yazımı (in-process `DirectAuditLogger`) | 3 |
-| Tek `cmd/main.go`, tek binary | 4 |
-| Caddy tek upstream'e proxy'liyor | 5 |
-| HTTP loopback kalıntısı (`X-Internal-Secret` + `/internal/*`) | 3'te normalleşir |
-
----
-
-## 8. Taşınmayan / Kapsam Dışı
-
-Bu migrasyon **davranış değiştirmez**. Mevcut açıklar taşınır, çözülmez:
+Mimarinin taşıdığı, henüz kapatılmamış açıklar:
 
 - Prerequisite kontrolü bypass (enrollment `grade.student.prerequisite.passed` tüketmiyor)
 - payment mock (gerçek sağlayıcı entegrasyonu yok, outbox kullanmıyor)
@@ -270,5 +233,4 @@ Bu migrasyon **davranış değiştirmez**. Mevcut açıklar taşınır, çözül
 - Notification'daki iskelet handler'lar (`grades.entered`, `student.graduated`)
 - Grafana/Loki/Promtail compose'a ekli değil
 
-Bunlar ayrı iş kalemleri. Migrasyon sırasında "bu arada şunu da düzelteyim"
-yapma — faz sınırlarını kirletir.
+Bunlar ayrı iş kalemleri — hiçbiri mikroservis bölünmesinden kaynaklanmıyor.

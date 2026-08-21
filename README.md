@@ -2,7 +2,7 @@
 
 **MyDreamCampus**, öğrencilerin ders kayıtlarından yoklamalara, not girişlerinden kafeterya işlemlerine kadar tüm üniversite süreçlerini yöneten tam kapsamlı bir platformdur. Hem **Web** hem de **Mobil** uygulama olarak hizmet verir.
 
-Bu proje, hem hızlı geliştirme yapılabilmesi hem de ileride kolayca ölçeklenebilmesi için **Modüler Monolit (Modular Monolith)** mimarisiyle sıfırdan, modern teknolojilerle geliştirilmiştir.
+Sistem, her biri kendi veritabanına ve kendi konteynerine sahip **10 mikroservisten** oluşur; hepsinin önünde tek bir Caddy ağ geçidi durur.
 
 ## Ekran Görüntüleri
 
@@ -12,25 +12,50 @@ Bu proje, hem hızlı geliştirme yapılabilmesi hem de ileride kolayca ölçekl
 |-----|--------|
 | ![Web dashboard](docs/screenshots/web-dashboard.png) | ![Mobile attendance](docs/screenshots/mobile-attendance.png) |
 
-## Mimari ve Vizyon (Neden Bu Altyapı Seçildi?)
+## Mimari
 
-Proje, yönetimi ve dağıtımı zor olan parçalı mikroservis mimarisinden, daha sağlam ve yönetilebilir olan **Modüler Monolit** mimariye geçirilmiştir.
+Sistem 10 servise bölünmüştür — her biri ayrı bir Go modülü, ayrı bir
+konteyner ve **kendi veritabanı**:
 
-**1. İnsan Kaynakları ve Proje Yönetimi İçin Avantajları:**
-- **Hızlı Geliştirme:** Tek bir kod tabanı sayesinde yeni özellikler çok daha hızlı eklenir, ürün pazara daha çabuk çıkar.
-- **Düşük Maliyet:** Sunucu maliyetleri ve bakım eforu minimuma indirilmiştir. Sistem az kaynakla çok iş yapar.
-- **Mobil ve Web Uyumu:** Tüm platformlar aynı güçlü arka ucu (backend) kullanır, böylece veri tutarsızlığı yaşanmaz.
+| Servis | Sorumluluk | Servis | Sorumluluk |
+|---|---|---|---|
+| `auth` | Kimlik doğrulama, oturum, token | `attendance` | Yoklama oturumları, QR okutma |
+| `staff` | Öğretim üyeleri, profiller | `grades` | Not girişi, finalizasyon |
+| `student` | Öğrenci kayıtları, danışman | `meal` | Yemekhane rezervasyonu |
+| `catalog` | Ders kataloğu, dönemler | `payment` | Ödeme (mock) |
+| `enrollment` | Ders seçimi, danışman onayı | `notification` | E-posta ve push bildirim |
 
-**2. Yazılım Uzmanları İçin Teknik Detaylar (Geleceğe Hazır Yapı):**
-- **Mantıksal İzolasyon:** Her modül (Auth, Öğrenci, Notlar) kendi paketi içinde tamamen izoledir (`internal/modules/`). "Spagetti kod" oluşumu engellenmiştir.
-- **Veritabanı İzolasyonu:** Tek bir PostgreSQL veritabanı çalışsa da, her modülün kendi şeması (Schema) vardır. Modüller arası sıkı bağ (Foreign Key) kurulmamıştır.
-- **Mikroservise Geçiş (Future-Proof):** Eğer ileride sistem çok büyürse (örn: Ders Kayıt dönemi yoğunluğu), bu mimari sayesinde istenilen modül birkaç saat içinde koparılıp ayrı bir **Mikroservis** olarak dışarı çıkartılabilir. Modüller arası iletişim halihazırda asenkron olarak **RabbitMQ** (Event-Driven) ile sağlanmaktadır.
+**Servisler birbirini nasıl görür**
 
-> **Eski Mimari (Arşiv):** Bu projenin ilk sürümü 9 ayrı mikroservisten oluşuyordu. O mimarinin tüm kaynak kodu, geçiş öncesi son hâliyle `v0-microservices` git tag'i altında dondurulup arşivlendi; `main` dalını kirletmemesi için buradan çıkarıldı. İncelemek için:
+- **Senkron okuma / doğrulama:** internal REST (`/internal/*`), `X-Internal-Secret`
+  başlığıyla imzalı. Bu yollar ağ geçidinden dışarı açılmaz. Her çağrının
+  hedef servis başına bir **devre kesicisi** (circuit breaker) vardır: bir
+  servis düştüğünde çağıran taraf beklemek yerine anında hata döner.
+- **Yan etki / bildirim:** **RabbitMQ** üzerinden olay (event) — her yayın
+  **outbox** tablosundan geçer, böylece iş kaydı yazılıp olayın kaybolduğu bir
+  ara durum oluşmaz.
+- **Veri izolasyonu:** Bir servis başka bir servisin veritabanına bağlanamaz;
+  bağlanma yetkisi rol seviyesinde verilmemiştir. Başka servisin verisi ya
+  internal REST ile okunur ya da olayla kendi tarafına projekte edilir.
+- **Tek giriş kapısı:** Tarayıcı yalnızca Caddy'yi görür. Caddy hem SPA'yı
+  sunar hem `/api/<önek>` yolunu ilgili servise yönlendirir — aynı origin,
+  CORS yok.
+
+Neden bölündü: yoğunluk dönemsel ve dengesiz (ders kayıt haftası enrollment'ı,
+öğle arası meal'i zorlar), ve tek servisin yeniden başlatılması diğer dokuzunu
+etkilemez. Bedeli, ağ üzerinden yapılan çağrıların hata yüzeyidir — devre
+kesici, idempotency anahtarları ve outbox bunun için var.
+
+**Mimari referans:** [`microservices-migration/01-REFERANS-MIMARI.md`](microservices-migration/01-REFERANS-MIMARI.md)
+(servis / port / veritabanı / route / olay tabloları)
+
+> **Arşiv:** Proje daha önce iki mimari denedi — ilk sürüm 9 ayrı mikroservis,
+> ardından modüler monolit. İkisinin de kaynağı `v0-microservices` git tag'i
+> altında dondurulmuştur. İncelemek için:
 >
 > ```bash
-> git checkout v0-microservices   # eski mikroservis ağacını gez (salt-okunur)
-> git checkout main               # güncel modüler monolite geri dön
+> git checkout v0-microservices   # eski ağacı gez (salt-okunur)
+> git checkout main               # güncel sürüme dön
 > ```
 
 ## Kullanılan Modern Teknolojiler (Tech Stack)
@@ -58,7 +83,7 @@ Sistem, OWASP tavsiyeleri temel alınarak katmanlı savunma (defense in depth) p
 - Security header'ları: **Content-Security-Policy**, **HSTS** (production), X-Frame-Options, nosniff, Referrer-Policy, Permissions-Policy.
 - SQL erişimi **sqlc + pgx** ile tamamen parametrize edilir; string birleştirmeli sorgu yoktur (SQL injection yüzeyi kapalı).
 - 1 MB **request body limiti** ve slowloris'e karşı HTTP read/write timeout'ları.
-- Modüller arası loopback çağrılar **X-Internal-Secret** başlığı ile doğrulanır (constant-time compare).
+- Servisler arası çağrılar **X-Internal-Secret** başlığı ile doğrulanır (constant-time compare); `/internal/*` yolları ağ geçidinden dışarı açılmaz.
 - Yemekhane QR doğrulaması **HMAC-SHA256** imzalı ve kısa geçerlilik pencereli; imzasız/expired QR reddedilir.
 - Güvenlik olayları (başarısız login, hesap kilitleme, yetki ihlali) **audit log**'a yazılır.
 
@@ -69,32 +94,44 @@ Sistem, OWASP tavsiyeleri temel alınarak katmanlı savunma (defense in depth) p
 
 ## Yerel Ortamda Çalıştırma (Geliştiriciler İçin)
 
-Projeyi kendi bilgisayarınızda test etmek oldukça basittir. 
+**Gereksinimler:** Docker, Go 1.26+, Bun (web), Node 20+ (mobil)
 
-**Gereksinimler:** Docker, Go 1.26+ ve Node 20+
+### Tümü container'da (önerilen)
+
+Tek komut 16 konteyneri ayağa kaldırır — altyapı, 10 servis, migration, demo
+veri ve SPA'yı sunan Caddy dahil:
 
 ```bash
-# 1. Altyapıyı ayağa kaldırın (Veritabanı, Redis, RabbitMQ vb.)
+cp new-backend/infrastructure/.env.example new-backend/infrastructure/.env
+# .env içindeki CHANGE_ME değerlerini doldurun: openssl rand -base64 48
+make deploy
+```
+
+Sonrasında `make deploy-ps` durumu, `make deploy-logs` logları gösterir.
+Tek bir servisi diğerlerine dokunmadan güncellemek için `make deploy-grades`.
+
+### Elle çalıştırma (hot reload)
+
+10 servisi elle çalıştırmak bir iş akışı değil; bu yol tek bir servis üzerinde
+çalışırken kullanılır:
+
+```bash
+# 1. Altyapı (Postgres, Redis, RabbitMQ, MailHog + migration)
 #    Repo kökünden çalıştırın: `make` doğru compose dosyalarını birlikte yükler
 #    ve infra portlarını 127.0.0.1'e açar (çıplak `docker compose up` açmaz).
 make infra
 
-# 2. Ana Uygulamayı (Backend) başlatın
-cd new-backend/monolith
-make run
+# 2. Üzerinde çalıştığınız servisi host'ta başlatın
+make run-grades          # veya run-auth, run-catalog, run-notification ...
 
-# 3. Bildirim Servisini (E-posta ve Push) başlatın (Yeni bir terminalde)
-cd ../services/notification
-go run cmd/main.go
-
-# 4. Web Arayüzünü başlatın (Yeni bir terminalde)
-cd ../../../frontend
-npm install
-npm run dev
+# 3. Web arayüzü (yeni terminal)
+cd frontend && bun install && bun dev
 ```
 
 **Erişim Noktaları:**
-- Web Arayüzü: `http://localhost:3000`
+- Web Arayüzü (container'da): `http://localhost` — Vite dev sunucusu: `http://localhost:3000`
 - Giden E-postaları Görme (MailHog): `http://localhost:8025`
-- Backend API: `http://localhost:8080`
 - RabbitMQ Yönetim Paneli: `http://localhost:15672`
+- API: doğrudan servis portu yoktur — hepsi Caddy üzerinden `/<origin>/api/<önek>`
+
+Sunucuya kurulum ve Openship ile dağıtım için: [`DEPLOY.md`](DEPLOY.md).

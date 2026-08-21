@@ -1,14 +1,24 @@
 # Deploy Rehberi
 
-> **GÜNCEL DEĞİL — mikroservis migrasyonu Faz 6.** Monolith konteyneri
-> kaldırıldı, yerine dokuz servis konteyneri geldi. `make deploy` /
-> `make deploy-down` / `.env` akışı aynen çalışıyor; ama bu dosyada `monolith`
-> geçen her yer (konteyner adı, `docker compose restart monolith`,
-> `notification-postgres`, servis listeleri) artık yanlış. Güncel konteyner ve
-> port listesi: [CLAUDE.md](CLAUDE.md) §13. Bu dosya Faz 8'de yeniden yazılıyor.
-
 Proje tek bir makinede `docker compose` ile **tek komutta** ayağa kalkar:
-Caddy (SPA + `/api` proxy) → dokuz servis → Postgres/Redis/RabbitMQ.
+Caddy (SPA + `/api` proxy) → on servis → Postgres/Redis/RabbitMQ.
+
+### Konteyner listesi (16)
+
+| Grup | Konteynerler |
+|---|---|
+| Edge | `mydreamcampus-caddy` (:80, standalone'da :443) |
+| İş servisleri | `mydreamcampus-{auth,staff,student,catalog,enrollment,attendance,grades,meal,payment}` — 8081-8089, host'a publish **edilmez** |
+| Worker | `mydreamcampus-notification` — RabbitMQ tüketicisi, HTTP route'u yok |
+| Altyapı | `mydreamcampus-{postgres,rabbitmq,redis,mailhog}` |
+| Tek seferlik | `mydreamcampus-migrate`, `mydreamcampus-seed` — işi bitince `exited (0)` kalır, bu normaldir |
+
+Postgres tek konteyner ama **servis başına ayrı veritabanı + ayrı rol**
+(`auth` DB'si ↔ `auth_svc`). Ayrı bir notification veritabanı konteyneri yoktur.
+
+**Kaynak beklentisi:** imajlar toplam ~650 MB, çalışırken ölçülen bellek
+~400 MB (compose'daki `mem_limit` toplamı ~2.4 GB tavan). 2 GB RAM'li bir
+makinede swap ile çalışır; 4 GB rahat eder.
 
 > **Ayrı bir "frontend sunucusu" yok.** SPA `bun run build` ile statik dosyalara
 > derlenip Caddy imajının içine kopyalanıyor ([frontend/Dockerfile](frontend/Dockerfile)).
@@ -32,7 +42,6 @@ Caddy (SPA + `/api` proxy) → dokuz servis → Postgres/Redis/RabbitMQ.
 |---|---|
 | `docker-compose.yml` | Temel stack. Host'ta **sadece** Caddy'nin `:80`'ini publish eder. |
 | `docker-compose.standalone.yml` | Caddy'nin `:443`'ünü + infra portlarını (`127.0.0.1:5432`, `6379`, `15672`, `8025`…) ekler. |
-| `docker-compose.override.yml` | Sadece mobil geliştirme: monolith `:8080`'i LAN'a açar. |
 
 **A ve B'de ikisi de gerekir** — `make deploy` temel + standalone'u birlikte yükler,
 elle bir şey yapman gerekmez. **C'de sadece temel dosya** kullanılır: Openship'in
@@ -158,17 +167,25 @@ PUBLIC_ORIGIN=http://192.168.1.50
 make deploy
 ```
 
-Bu komut her şeyi yapar: frontend'i derler, Go binary'lerini derler, infra'yı
-kaldırır, migration'ları uygular, monolith + notification + Caddy'yi başlatır ve
-demo veriyi seed eder. İlk sefer 3-6 dakika (sonrakiler ~30 sn).
+Bu komut her şeyi yapar: frontend'i derler, on servisin binary'lerini derler,
+infra'yı kaldırır, migration'ları uygular, servisleri + Caddy'yi başlatır ve
+demo veriyi seed eder. İlk sefer 5-10 dakika (sonrakiler ~30 sn).
 
 Sunucuda dizin değiştirmene gerek yok; hepsi kökten:
 
 ```bash
 make deploy-ps       # durum
-make deploy-logs     # canlı log (monolith + caddy)
+make deploy-logs     # canlı log (caddy + auth + catalog)
 make deploy-update   # git pull + değişenleri derle + yeniden başlat
 make deploy-down     # durdur (veri korunur)
+```
+
+**Tek servisi güncellemek** — diğer 15 konteynere dokunmadan:
+
+```bash
+make deploy-grades   # o servisi rebuild + restart et
+make logs-grades     # tek servisin logu
+make restart-grades  # sadece yeniden başlat
 ```
 
 ### A5. Firewall (ufw kuruluysa)
@@ -195,23 +212,17 @@ ilk kurulumda ve kod güncellemesinde gerekir.
 
 ### Ek: Mobil (Expo) uygulamayı bağlamak
 
-Telefon Caddy'yi es geçip doğrudan monolith'e gitmek isterse override dosyasıyla
-kaldır (base compose 8080'i dışarı açmaz). Üç dosyanın da verilmesi gerekir —
-`-f` kullandığın anda compose `override.yml`'ı otomatik yüklemez:
+Telefon da tarayıcı gibi **Caddy'ye** bağlanır — servislerin portları host'a
+hiç açılmaz, ve zaten tek bir API adresi yok: on servisin her biri kendi
+`/api/<önek>`'inde yaşıyor, onları tek adres altında birleştiren şey Caddy.
 
-```bash
-docker compose \
-  -f new-backend/infrastructure/docker-compose.yml \
-  -f new-backend/infrastructure/docker-compose.standalone.yml \
-  -f new-backend/infrastructure/docker-compose.override.yml up -d
-```
+`mobile/.env` içinde API adresini `PUBLIC_ORIGIN` ile aynı yap — rootless
+kurulumda `http://192.168.1.50:8080`, port 80 kullanıyorsan
+`http://192.168.1.50`.
 
-Sonra `mobile/.env` içinde API adresini `http://192.168.1.50:8080` yap.
-
-> **Dikkat:** rootless kurulumda Caddy zaten `HTTP_PORT=8080`'de. Override da
-> monolith'i 8080'e bağlamaya çalışır ve compose `port is already allocated`
-> hatası verir. Birini değiştir — en kolayı `.env`'de `HTTP_PORT=8090` yapıp
-> `PUBLIC_ORIGIN`'i de `http://192.168.1.50:8090` olarak güncellemek.
+> `PUBLIC_HOST`'ta `http://` öneki **şart**: şemasız bırakılırsa Caddy otomatik
+> HTTPS'e geçer ve :80'e gelen her isteğe özel IP için alınamayan bir
+> sertifikaya 308 döner. Telefonda bu "ağ hatası" olarak görünür.
 
 ### A8. Cloudflare Tunnel ile internete açmak
 
@@ -391,8 +402,8 @@ Doğru değerler bu yüzden artık şunlar:
 
 | Servis | `build` | `dockerfile` |
 |---|---|---|
-| `monolith` | `.` | `new-backend/monolith/Dockerfile` |
-| `notification` | `.` | `new-backend/services/notification/Dockerfile` |
+| `<x>-service` (dokuz iş servisi) | `.` | `new-backend/services/<x>-service/Dockerfile` |
+| `notification` | `.` | `new-backend/services/notification-service/Dockerfile` |
 | `migrate` | `.` | `new-backend/infrastructure/migrate/Dockerfile` |
 | `seed` | `.` | `new-backend/infrastructure/seed/Dockerfile` |
 | `caddy` | `.` | `frontend/Dockerfile` |
@@ -402,11 +413,11 @@ Her biri için:
 ```bash
 curl -X PATCH https://<openship-host>/api/projects/<projectId>/services/<serviceId> \
   -H 'Authorization: Bearer <token>' -H 'Content-Type: application/json' \
-  -d '{"build": ".", "dockerfile": "new-backend/monolith/Dockerfile"}'
+  -d '{"build": ".", "dockerfile": "new-backend/services/auth-service/Dockerfile"}'
 ```
 
-Kalan 5 servis (`postgres`, `notification-postgres`, `rabbitmq`, `redis`,
-`mailhog`) hazır imaj kullanıyor, `build` alanları yok — dokunma.
+Kalan 4 servis (`postgres`, `rabbitmq`, `redis`, `mailhog`) hazır imaj
+kullanıyor, `build` alanları yok — dokunma.
 
 > **MCP üzerinden gidiyorsan:** `POST /projects/:id/services/sync` ve
 > `GET /projects/:id/services` MCP sunucusunda `service '*' not found` ile patlıyor
@@ -448,8 +459,9 @@ PUBLIC_ORIGIN=https://campus.example.com     # sonda / YOK
 > gelsin 80'de cevap ver". Host doğrulamasını ve TLS'i zaten Openship'in edge'i
 > yapıyor; Caddy'ye sabit hostname yazarsan eşleşmeyen istekler 404 döner.
 >
-> Monolith `ENVIRONMENT=production` ile çalışır ve secret'lar boş/default kalırsa
-> **başlamayı reddeder** — bilinçli bir önlem, sessiz kırık deploy olmaz.
+> On servisin hepsi `ENVIRONMENT=production` ile çalışır ve secret'lar
+> boş/default kalırsa **başlamayı reddeder** — bilinçli bir önlem, sessiz
+> kırık deploy olmaz.
 
 > **Parola rotasyonunda iki tuzak var.**
 >
@@ -465,8 +477,9 @@ PUBLIC_ORIGIN=https://campus.example.com     # sonda / YOK
 
 ### C6. Deploy
 
-Deploy'a bas. Sıra: imajlar build edilir → `migrate` şemayı kurar → `monolith` +
-`notification` başlar → `caddy` SPA'yı servis eder → edge domain'i bağlar.
+Deploy'a bas. Sıra: imajlar build edilir → `migrate` her servisin veritabanını
+kurar → on servis başlar → `seed` demo veriyi yazar → `caddy` SPA'yı servis
+eder → edge domain'i bağlar.
 
 Sonrası **push-to-deploy** — ama Openship'in kendi auto-deploy'u üzerinden değil.
 A bölümündeki `make autodeploy-install` (systemd poll timer) yine de **gereksiz**.
@@ -510,7 +523,7 @@ yalnızca native auto-deploy'da devrede.
   [kendi içinde bekler](new-backend/infrastructure/migrate/entrypoint.sh)
   (`pg_isready`, 120 sn). `restart: "no"` olduğu için orada patlamak kalıcı
   olurdu.
-- `monolith` migration'lardan önce başlarsa DB'ye bağlanamayıp ölür ve
+- Bir servis migration'lardan önce başlarsa DB'ye bağlanamayıp ölür ve
   `restart: unless-stopped` ile geri gelir. İlk deploy'da loglarda birkaç
   restart görmek **normal**; birkaç saniyede oturur.
 
@@ -527,7 +540,7 @@ push et — tek doğruluk kaynağı repo kalsın.
 | `Deploy failed: mkdir: Permission denied` | C0 atlanmış; `/opt/openship/static` sunucuda yok veya SSH kullanıcısının değil |
 | `COPY failed: ... package.json: file does not exist` | Build context yanlış — C3'teki tablo ile `build` alanlarını karşılaştır |
 | `port is already allocated` (80 veya 443) | `caddy` public işaretlenmemiş (C4), ya da yanlışlıkla `docker-compose.standalone.yml` de yüklenmiş — Openship sadece base dosyayı kullanmalı |
-| `monolith` sürekli restart | Loglara bak: genelde boş bırakılmış secret (C5) |
+| Bir servis sürekli restart | `make logs-<servis>`: genelde boş bırakılmış secret (C5) |
 | Login 500 / CORS hatası | `PUBLIC_ORIGIN` tam `https://<domain>` mi, sonda `/` var mı |
 | Sayfa açılıyor ama `/api` 404 | Domain `caddy`'ye değil başka bir servise bağlanmış (C4) |
 
@@ -711,8 +724,8 @@ Doldurulacaklar: `POSTGRES_PASSWORD`, `SERVICE_DB_PASSWORD`, `REDIS_PASSWORD`, `
 `JWT_SECRET`, `INTERNAL_SERVICE_SECRET`, `QR_SECRET`, `ADMIN_INITIAL_PASSWORD`,
 `PUBLIC_HOST`, `PUBLIC_ORIGIN`.
 
-> Monolith `ENVIRONMENT=production` ile çalışır ve secret'lar default kalırsa
-> **başlamayı reddeder** — bu bilinçli bir güvenlik önlemi.
+> On servisin hepsi `ENVIRONMENT=production` ile çalışır ve secret'lar default
+> kalırsa **başlamayı reddeder** — bu bilinçli bir güvenlik önlemi.
 
 ### 4b. (Sadece 2GB droplet'te) swap ekle — build OOM olmasın
 
@@ -735,14 +748,14 @@ make deploy              # ilk sefer 3-6 dk (Go + frontend derlenir)
 > standalone overlay'i yüklemez, Caddy `:443`'ü açmaz ve HTTPS gelmez.
 > `make deploy` doğru dosya setini kendisi veriyor.
 
-Sıra otomatik: infra sağlıklı olunca `migrate` çalışır → bitince `monolith` +
-`notification` başlar → `caddy` TLS sertifikasını çeker.
+Sıra otomatik: infra sağlıklı olunca `migrate` çalışır → bitince on servis
+başlar → `seed` demo veriyi yazar → `caddy` TLS sertifikasını çeker.
 
 Migration loglarını gör:
 
 ```bash
-make deploy-ps                        # hepsi "running", migrate "exited (0)"
-make deploy-logs                      # monolith + caddy, canlı
+make deploy-ps                        # 14 "running", migrate + seed "exited (0)"
+make deploy-logs                      # caddy + auth + catalog, canlı
 ```
 
 ---
@@ -763,7 +776,7 @@ Manuel bir şey yapman gerekmez:
 
 - **Admin** ilk açılışta otomatik oluşur (`.env`'deki `ADMIN_EMAIL` /
   `ADMIN_INITIAL_PASSWORD`).
-- **`seed` servisi** monolith ayağa kalkınca otomatik çalışır; demo öğretmen,
+- **`seed` servisi** auth/staff/student/catalog ayağa kalkınca otomatik çalışır; demo öğretmen,
   ders ve öğrencileri **gerçek admin API üzerinden** oluşturur (event zinciri
   düzgün dolsun diye — ham SQL değil). Tekrar çalıştırmak güvenli (idempotent).
   Kapatmak istersen `.env`'de `SEED_DEMO=false`.
@@ -788,8 +801,11 @@ docker compose logs seed        # ">> seed complete" görmelisin
 > [seed/data/](new-backend/infrastructure/seed/data/) altında — düzenleyip
 > `docker compose up -d --build seed` ile yeniden çalıştırabilirsin.
 
-> Örnek ders kataloğunu genişletmek istersen elle de yükleyebilirsin:
-> `docker compose exec -T postgres psql -U postgres -d mydreamcampus < ../monolith/seed_courses.sql`
+> Ders kataloğunu genişletmek istersen ham SQL yerine
+> [seed/data/courses.json](new-backend/infrastructure/seed/data/courses.json)
+> dosyasını düzenle: seed onu katalog servisinin kendi API'sinden geçirir, ve
+> ders eklemenin tetiklediği olaylar diğer servislerin projeksiyonlarına da
+> düşer. Doğrudan `psql` ile yazılan satır o zincirin dışında kalır.
 
 ---
 
@@ -799,10 +815,14 @@ Hepsi **repo kökünden** çalışır — dizin değiştirmene gerek yok:
 
 ```bash
 make deploy-ps       # durum
-make deploy-logs     # canlı log (monolith + caddy)
+make deploy-logs     # canlı log (caddy + auth + catalog)
 make deploy-update   # git pull + değişenleri derle + yeniden başlat
 make deploy-down     # durdur (veriyi korur — volume'lar kalır)
 make clean           # DİKKAT: veriyi de siler
+
+make deploy-grades   # TEK servisi rebuild + restart (diğer 15'e dokunmaz)
+make logs-grades     # tek servisin logu
+make restart-grades  # sadece yeniden başlat
 ```
 
 Tek bir servise müdahale gerekirse compose'a doğrudan da geçebilirsin. Stack iki
@@ -813,12 +833,15 @@ kendi değişkeni, `:` ile ayrılır) bunu bir kez ayarlamanı sağlar:
 cd ~/mydreamcampus
 export COMPOSE_FILE=new-backend/infrastructure/docker-compose.yml:new-backend/infrastructure/docker-compose.standalone.yml
 
-docker compose restart monolith
+docker compose restart grades-service
 docker compose logs migrate
 docker compose logs seed
 docker compose up -d --build seed
-docker compose exec -T postgres psql -U postgres -d mydreamcampus \
-  < new-backend/monolith/seed_courses.sql
+
+# Servis başına ayrı veritabanı: psql'e HANGİ veritabanı olduğunu söylemen
+# gerekiyor. Süperuser olarak hepsine bağlanabilirsin.
+docker compose exec -T postgres psql -U postgres -d catalog -c '\dt course_catalog.*'
+docker compose exec -T postgres psql -U postgres -c '\l'   # veritabanlarını listele
 ```
 
 Kalıcı olsun istersen `~/.bashrc`'ye ekle.
@@ -833,9 +856,11 @@ Kalıcı olsun istersen `~/.bashrc`'ye ekle.
 | `permission denied ... docker.sock` | Klasik daemon'ın root soketine düşmüşsün. `DOCKER_HOST=unix:///run/user/$(id -u)/docker.sock` ayarlı mı? |
 | SSH kapanınca container'lar ölüyor | `sudo loginctl enable-linger $USER` yapılmamış (adım A1). |
 | `bind: permission denied` (port 80) | Rootless 1024 altına bağlanamaz: `.env`'de `HTTP_PORT=8080` kullan ya da `setcap` uygula (adım A1). |
-| `port is already allocated` | `HTTP_PORT` ile mobil override'ın 8080'i çakışıyor — birini değiştir. |
+| `port is already allocated` | Makinede o portu tutan başka bir şey var. `.env`'de `HTTP_PORT` (veya infra için `POSTGRES_HOST_PORT`, `REDIS_HOST_PORT`…) ile değiştir. |
 | Ev ağındaki telefondan açılmıyor | `PUBLIC_ORIGIN` `localhost` kalmış olabilir — LAN IP + port olmalı. Ayrıca `sudo ufw allow <HTTP_PORT>/tcp`. |
-| `monolith` sürekli restart | `make deploy-logs` → genelde `.env`'de eksik/default secret. Düzelt, `make deploy`. |
+| Bir servis sürekli restart | `make logs-<servis>` → genelde `.env`'de eksik/default secret. Düzelt, `make deploy-<servis>`. |
+| Sadece bir `/api/<önek>` 502 veriyor | O servis ayakta değil: `make deploy-ps`, sonra `make logs-<servis>`. Diğer önekler etkilenmez — bölünmenin beklenen davranışı. |
+| Loglarda `circuit breaker state change ... to: open` | Çağrılan servis düşmüş; onu düzelt. Breaker 30 sn sonra kendini dener, eşiği gevşetme. |
 | Sertifika uyarısı | Caddy henüz cert almadı: `logs caddy`. 80/443 firewall'da açık mı? `PUBLIC_HOST` gerçekten IP'ye çözülüyor mu (`dig 203-0-113-5.sslip.io`)? |
 | `migrate` exit code ≠ 0 | `logs migrate`. DB henüz hazır değilse tekrar: `docker compose up -d migrate`. |
 | Login 500 / CORS | `.env`'de `PUBLIC_ORIGIN` tam `https://<host>` mi (sonda `/` yok)? |

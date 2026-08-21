@@ -3,23 +3,9 @@
 Universite yonetim sistemi. Full-stack monorepo: Go mikroservisler (`new-backend/services/`) + React+Vite web + React Native (Expo) mobil. Eski mikroservis kodu main'den cikarildi — `v0-microservices` git tag'inde arsivli.
 
 > Bu dosya **AI'a** talimattir. Kullanici dokumanlari icin bkz. `README.md`.
-
----
-
-## 0. AKTIF: Mikroservis Migrasyonu
-
-Proje mikroservise cevriliyor. **Backend'e dokunan her gorevden once
-[`microservices-migration/00-BASLANGIC.md`](microservices-migration/00-BASLANGIC.md)
-oku** — kullanici hatirlatmasa da. O dosya nerede kalindigini, siradaki fazi ve
-migrasyon boyunca gecerli kod kurallarini tutar.
-
-- Migrasyon dosyalarindan **sadece** baslangic dosyasini ve siradaki tek fazi ac.
-- `SYSTEM-DESIGN.md` bu migrasyon boyunca **gecersizdir** — monolith mimarisini
-  anlatiyor ve koddan sapmis durumda. Faz 8'de siliniyor.
-- Migrasyon bitince bu bolum kaldirilir (Faz 8, C1).
-
-Bu bolum, asagidaki §12 (Mimari Kararlar) tablosunun monolith satirlarini
-**gecersiz kilar** — hedef mimari icin `microservices-migration/01-REFERANS-MIMARI.md`.
+> Servis/port/DB/route/event tablolari icin bkz.
+> [`microservices-migration/01-REFERANS-MIMARI.md`](microservices-migration/01-REFERANS-MIMARI.md)
+> — projenin mimari kaynagi odur.
 
 ---
 
@@ -215,9 +201,9 @@ Mobile feature:
 ## 11. Subagent Kullanimi
 
 **Ne zaman kullan:**
-- 3+ modulu tarayan arastirma
+- 3+ servisi tarayan arastirma
 - Tum kod tabaninda pattern arama
-- Karsilastirma analizi (modul A vs modul B'deki yaklasim)
+- Karsilastirma analizi (servis A vs servis B'deki yaklasim)
 
 **Ne zaman KULLANMA:**
 - Tek dosya okuma
@@ -234,9 +220,9 @@ Bu kararlar verilmis — yeniden sorma:
 
 | Konu | Karar |
 |---|---|
-| Mimari | **Moduler monolith** (`new-backend/monolith`) — tek binary, 9 modul. Notification tek ayri servis (RabbitMQ consumer). |
-| Moduller arasi iletisim | **Sync okuma/validasyon:** internal REST + `X-Internal-Secret` (`shared/client`, hedef servis basina circuit breaker). **Side-effect/notify:** RabbitMQ event + outbox. Client -> backend HTTP, Caddy uzerinden. JWT dogrulamasi `platform/middleware.JWTAuth` ile her serviste. |
-| Database | PostgreSQL 18+. **Servis basina ayri DB + ayri DB kullanicisi**, hepsi tek Postgres konteynerinde. Schema adlari korunuyor — `catalog` DB'sinin icinde `course_catalog` schema'si. Modul basina ayri goose version tablosu. |
+| Mimari | **Mikroservis** — 10 ayri binary/konteyner (`new-backend/services/`): auth, staff, student, catalog, enrollment, attendance, grades, meal, payment + notification (RabbitMQ consumer, HTTP route'u yok). Ortak kod `shared/` Go modulunde. |
+| Servisler arasi iletisim | **Sync okuma/validasyon:** internal REST + `X-Internal-Secret` (`shared/client`, hedef servis basina circuit breaker). **Side-effect/notify:** RabbitMQ event + outbox. Client -> backend HTTP, Caddy uzerinden. JWT dogrulamasi `platform/middleware.JWTAuth` ile her serviste. |
+| Database | PostgreSQL 18+. **Servis basina ayri DB + ayri DB kullanicisi**, hepsi tek Postgres konteynerinde. Schema adlari korunuyor — `catalog` DB'sinin icinde `course_catalog` schema'si. Servis basina ayri goose version tablosu. |
 | ORM/Query | sqlc + pgx/v5 (raw SQL yok, GORM yok) |
 | Migration | goose |
 | HTTP framework (Go) | Gin v1.11 |
@@ -294,10 +280,15 @@ Bu yollardaki dosyalari **manuel duzenleme**. Kaynak dosyayi guncelle ve generat
 
 ## 15. Detayli Rehberler
 
+- **Mimari kaynak** (servis/port/DB/route/event tablolari, internal endpoint
+  kontratlari, env degiskenleri):
+  [`microservices-migration/01-REFERANS-MIMARI.md`](microservices-migration/01-REFERANS-MIMARI.md)
 - Backend: [`new-backend/skills.md`](new-backend/skills.md)
 - Frontend: [`frontend/skills.md`](frontend/skills.md)
 - Mobile: [`mobile/skills.md`](mobile/skills.md)
-- Moduler monolith migration plani (tarihsel referans, migration tamamlandi): `v0-microservices` tag'i altinda `legacy-codebase/architecture/`
+- Deploy: [`DEPLOY.md`](DEPLOY.md)
+- Tarihsel referans (kod olarak gecerli degil): `v0-microservices` git tag'i —
+  ilk mikroservis surumu + monolith donemi dokumanlari
 
 ## 16. Dis Referanslar
 
