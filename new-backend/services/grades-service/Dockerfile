@@ -1,8 +1,8 @@
 # syntax=docker/dockerfile:1
-# Build context is the REPO ROOT (Openship's compose builder roots its one
-# shared context at the checkout and ignores per-service contexts), so COPY
-# sources carry the new-backend/ prefix while destinations keep the old layout
-# — the module still reaches ../../shared, its go.mod replace target.
+# Build context is the REPO ROOT: this module's go.mod replaces the shared
+# module with ../../shared, which sits outside the service directory and so is
+# unreachable from a per-service context. COPY sources therefore carry the
+# new-backend/ prefix while destinations keep the old layout.
 
 FROM golang:1.26 AS build
 ENV GOWORK=off CGO_ENABLED=0

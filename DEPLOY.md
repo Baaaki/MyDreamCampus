@@ -25,16 +25,19 @@ makinede swap ile çalışır; 4 GB rahat eder.
 > Caddy 80/443'ü dinler: `/api/<prefix>` path-prefix ile ilgili servise, geri
 > kalan her şey SPA. Tarayıcı tek origin görür — CORS yok, ayrı port yok.
 
-Üç senaryo var:
+İki senaryo var:
 
-| | **A. Ev sunucusu (LAN)** | **B. Public VPS** | **C. Openship (PaaS)** |
-|---|---|---|---|
-| Erişim | Ev ağındaki cihazlar | İnternetten herkes | İnternetten herkes |
-| Adres | `http://192.168.1.50:8080` | `https://203-0-113-5.sslip.io` | Openship'in verdiği domain |
-| HTTPS | Yok (özel IP'ye sertifika verilmez) | Let's Encrypt, Caddy alır | Let's Encrypt, **Openship** alır |
-| Docker | Rootless — root yetkisi gerekmez | Root daemon (droplet'te zaten root'sun) | Openship yönetir |
-| Deploy | `make deploy` | `make deploy` | Push → Openship build eder |
-| Kurulum | Aşağıdaki **A** bölümü | **B** bölümü | **C** bölümü |
+| | **A. Ev sunucusu** | **B. Public VPS** |
+|---|---|---|
+| Erişim | Ev ağındaki cihazlar; **A8** ile internete de açılır | İnternetten herkes |
+| Adres | `http://192.168.1.50:8080` (tünelle: `https://<domain>`) | `https://203-0-113-5.sslip.io` |
+| HTTPS | LAN'da yok (özel IP'ye sertifika verilmez); tünelde Cloudflare alır | Let's Encrypt, Caddy alır |
+| Docker | Rootless — root yetkisi gerekmez | Root daemon (droplet'te zaten root'sun) |
+| Deploy | `make deploy` | `make deploy` |
+| Kurulum | Aşağıdaki **A** bölümü | **B** bölümü |
+
+Ev bağlantısı CGNAT arkasındaysa port yönlendirme çalışmaz — o durumda A + A8
+(Cloudflare Tunnel) B'nin yerini tutar ve VPS kirası gerekmez.
 
 ### Compose dosyaları — hangisi ne zaman
 
@@ -43,10 +46,10 @@ makinede swap ile çalışır; 4 GB rahat eder.
 | `docker-compose.yml` | Temel stack. Host'ta **sadece** Caddy'nin `:80`'ini publish eder. |
 | `docker-compose.standalone.yml` | Caddy'nin `:443`'ünü + infra portlarını (`127.0.0.1:5432`, `6379`, `15672`, `8025`…) ekler. |
 
-**A ve B'de ikisi de gerekir** — `make deploy` temel + standalone'u birlikte yükler,
-elle bir şey yapman gerekmez. **C'de sadece temel dosya** kullanılır: Openship'in
-kendi edge proxy'si host'un `:80/:443`'ünü zaten tutuyor, Caddy de onu publish
-etmeye kalkarsa deploy port çakışmasından patlar.
+`make deploy` ikisini birlikte yükler, elle bir şey yapman gerekmez. Stack'in
+önüne bir edge koyarsan (Cloudflare Tunnel) sadece temel dosya da yeter — o
+edge host'un `:80/:443`'ünü tutuyorsa Caddy'nin `:443`'ü publish etmesi port
+çakışması yaratır.
 
 ---
 
@@ -304,252 +307,7 @@ PUBLIC_ORIGIN=https://campus.example.com
 
 ---
 
-## C. Openship (self-hosted PaaS)
-
-[Openship](https://openship.io) repoyu kendisi klonlar, compose servislerini
-build eder, container'ları ayağa kaldırır ve kendi **OpenResty edge**'i ile
-domain + Let's Encrypt sertifikasını yönetir. Bu senaryoda A/B'deki
-`make deploy` ve `.env` dosyası **kullanılmaz** — o işi Openship yapar.
-
-> **Bu bölüm dashboard'dan tamamlanamaz.** Openship'in compose pipeline'ı çalışır
-> durumda, ama `docker-compose` framework'ü dashboard'un seçicisinden kasıtlı
-> olarak çıkarılmış (`Frameworks.tsx` → `EXCLUDED_STACKS`). Projeyi UI'dan
-> açarsan stack tek bir Go/statik uygulama sanılır ve deploy static pipeline'ına
-> düşer. Doğru kapı `openship service sync`. Aşağıdaki adımlar Openship v0.4.5
-> kaynak kodu incelenerek çıkarıldı.
-
-### C0. Sunucuda bir kerelik izin düzeltmesi
-
-```bash
-sudo mkdir -p /opt/openship/static/{releases,.builds}
-sudo chown -R $USER:$USER /opt/openship
-```
-
-> Openship `/opt/openship/static`'i **uzak sunucuda oluşturmuyor** — repoda bu
-> dizini açan ya da sahipliğini veren kod yok, yalnızca docker volume mount'u
-> olarak tanımlı. Deploy'un son adımı (`promoteBuildArtifact` → `mkdir`) SSH
-> kullanıcısı olarak çalıştığı için stok `/opt` (root:root 0755) altında
-> `Permission denied` alır. Compose yoluna geçince bu kod yolu kullanılmaz ama
-> ilk denemede static'e düşersen duvara çarpmamak için önden aç.
-
-### C1. Repodaki hazırlık — zaten yapıldı
-
-Kökteki [openship.json](openship.json):
-
-```json
-{
-  "framework": "docker-compose",
-  "rootDirectory": "new-backend/infrastructure",
-  "env": { "PUBLIC_HOST": ":80", ... }
-}
-```
-
-- **`rootDirectory`** — compose dosyası repo kökünde değil, Openship'in nereye
-  bakacağı buradan gelir. Overlay bu alanı uyguluyor.
-- **`framework`** — **overlay bu alanı uygulamıyor** (`prepare.service.ts`
-  içindeki `applyOpenshipOverlay` listesinde yok). Yalnızca detection'ın seçtiği
-  dizinde bir `openship.json` varsa metadata fold'undan geçer; bizim compose
-  dosyamız kök dışında olduğu için geçmez. Dosyada yine de duruyor çünkü C2'de
-  aynı değeri API'ye vereceğiz.
-- **`env`** — sadece **yeni import**ta okunur; mevcut bir projeye sonradan
-  eklemek DB kaydını değiştirmez.
-
-> Şemanın kökünde `additionalProperties: false` var — tanımsız bir alan
-> (eskiden burada `composePath` yazıyordu) dosyanın tamamını geçersiz kılar ve
-> Openship sessizce auto-detection'a düşer. Alan adlarını
-> [openship.schema.json](https://openship.io/openship.schema.json) ile doğrula.
-
-### C2. Projeyi `services` tipiyle oluştur
-
-```bash
-openship project create --name my-dream-campus \
-  --git-owner <owner> --git-repo <repo> --git-branch main --type services
-```
-
-Proje zaten varsa tipini API'den çevir (CLI'de `update --framework` bayrağı yok):
-
-```bash
-curl -X PATCH https://<openship-host>/api/projects/<projectId> \
-  -H 'Authorization: Bearer <token>' -H 'Content-Type: application/json' \
-  -d '{"framework": "docker-compose"}'
-```
-
-### C3. Compose servislerini senkronla
-
-```bash
-openship service sync new-backend/infrastructure/docker-compose.yml \
-  --project <projectId>
-```
-
-Bu komut **yerelde** `docker compose config --format json` çalıştırıp sonucu
-gönderir; yani `${VAR}` interpolasyonunu Docker Compose çözer, Openship'e somut
-değerler gider. Oluşan `kind="compose"` satırları projeyi compose pipeline'ına
-sokar.
-
-**Sync sonrası build context'lerini düzelt — zorunlu.** `service sync` mutlak
-context'i repo köküne değil **compose dosyasının dizinine** göre relatifleştirir
-(`service.ts` → `relativizeContext`) ve `..` segmentlerini temizlemez, dolayısıyla
-ürettiği değerler checkout dizininin dışını gösterir.
-
-Ayrıca Openship build fazında **servis başına context kurmuyor**: tek bir ortak
-context'i checkout kökünde açıp beşine de veriyor (`Preparing shared build
-context...`). `build` alanı yalnızca Dockerfile'ı bulmaya yarıyor
-(`<build>/<dockerfile>`). Bu yüzden repo, tüm Dockerfile'ları **repo kökü göreli**
-COPY yollarına taşıdı (commit `401397e`) — ayrıntı ve gerekçe:
-[OPENSHIP-PROBLEMS.md kusur 7](OPENSHIP-PROBLEMS.md).
-
-Doğru değerler bu yüzden artık şunlar:
-
-| Servis | `build` | `dockerfile` |
-|---|---|---|
-| `<x>-service` (dokuz iş servisi) | `.` | `new-backend/services/<x>-service/Dockerfile` |
-| `notification` | `.` | `new-backend/services/notification-service/Dockerfile` |
-| `migrate` | `.` | `new-backend/infrastructure/migrate/Dockerfile` |
-| `seed` | `.` | `new-backend/infrastructure/seed/Dockerfile` |
-| `caddy` | `.` | `frontend/Dockerfile` |
-
-Her biri için:
-
-```bash
-curl -X PATCH https://<openship-host>/api/projects/<projectId>/services/<serviceId> \
-  -H 'Authorization: Bearer <token>' -H 'Content-Type: application/json' \
-  -d '{"build": ".", "dockerfile": "new-backend/services/auth-service/Dockerfile"}'
-```
-
-Kalan 4 servis (`postgres`, `rabbitmq`, `redis`, `mailhog`) hazır imaj
-kullanıyor, `build` alanları yok — dokunma.
-
-> **MCP üzerinden gidiyorsan:** `POST /projects/:id/services/sync` ve
-> `GET /projects/:id/services` MCP sunucusunda `service '*' not found` ile patlıyor
-> (kusur 11). Servisler zaten kayıtlıysa sync'e gerek yok — her birini
-> `PATCH .../services/<serviceId>` ile güncelle. Servis ID'lerini
-> `GET /projects/:id/services/containers` verir.
-
-### C4. Sadece `caddy`'yi dışa aç
-
-```bash
-openship service update caddy --expose --exposed-port 80 --domain <label>
-```
-
-`exposed` varsayılanı `false`, diğer servislere dokunmana gerek yok.
-
-> **`caddy`'yi public işaretlemek zorunlu.** Openship yalnızca route ettiği
-> servisin portunu `127.0.0.1:<pinned>:80` olarak yeniden bağlar; işaretlemezsen
-> compose'daki `80:80` olduğu gibi host'a publish edilir ve Openship'in kendi
-> edge'i (host network'te, `:80`/`:443`) ile çakışır.
-
-### C5. Environment variables
-
-Dashboard → **Environment**. Secret'ları doldur — her biri için ayrı
-`openssl rand -base64 48`:
-
-```
-POSTGRES_PASSWORD  SERVICE_DB_PASSWORD  REDIS_PASSWORD  RABBITMQ_PASSWORD
-JWT_SECRET  INTERNAL_SERVICE_SECRET  QR_SECRET  ADMIN_INITIAL_PASSWORD
-```
-
-Bir de domain'e bağlı olan tek değişken:
-
-```
-PUBLIC_ORIGIN=https://campus.example.com     # sonda / YOK
-```
-
-> `PUBLIC_ORIGIN` tarayıcının gördüğü tam URL — CORS ve e-posta linkleri buradan
-> üretiliyor. `PUBLIC_HOST` ise `:80` olarak sabit: "hangi Host header gelirse
-> gelsin 80'de cevap ver". Host doğrulamasını ve TLS'i zaten Openship'in edge'i
-> yapıyor; Caddy'ye sabit hostname yazarsan eşleşmeyen istekler 404 döner.
->
-> On servisin hepsi `ENVIRONMENT=production` ile çalışır ve secret'lar
-> boş/default kalırsa **başlamayı reddeder** — bilinçli bir önlem, sessiz
-> kırık deploy olmaz.
-
-> **Parola rotasyonunda iki tuzak var.**
->
-> 1. `POSTGRES_PASSWORD` ve `RABBITMQ_DEFAULT_PASS` yalnızca **boş data dizininde**
->    uygulanır. Çalışan bir stack'te env'i değiştirmek DB kullanıcısının parolasını
->    değiştirmez; uygulama yeni parolayla bağlanmaya çalışır ve auth hatası alır.
->    Gerçekten rotate etmek istiyorsan volume'u boşalt (ya da yeni bir volume adı ver)
->    — `seed` demo verisini zaten yeniden üretir.
-> 2. `redis` parolası `command:` içindeki `--requirepass`'ten geliyor. API `command`
->    alanını **maskelemiyor ve PATCH'te korumuyor**: yalnızca `REDIS_PASSWORD` env'ini
->    güncellersen redis eski parolayla ayağa kalkar. İkisini birlikte güncelle.
->    Ayrıntı: [OPENSHIP-PROBLEMS.md kusur 12](OPENSHIP-PROBLEMS.md).
-
-### C6. Deploy
-
-Deploy'a bas. Sıra: imajlar build edilir → `migrate` her servisin veritabanını
-kurar → on servis başlar → `seed` demo veriyi yazar → `caddy` SPA'yı servis
-eder → edge domain'i bağlar.
-
-Sonrası **push-to-deploy** — ama Openship'in kendi auto-deploy'u üzerinden değil.
-A bölümündeki `make autodeploy-install` (systemd poll timer) yine de **gereksiz**.
-
-**Openship'in native auto-deploy'u bu kurulumda açılamıyor.** Toggle, repoda bir
-webhook oluşturmayı deniyor; Openship'in GitHub OAuth'u yalnızca
-`read:user` + `user:email` scope'larıyla bağlandığı için GitHub 403 döndürüyor ve
-webhook kurulamadan `autoDeploy` bayrağı da yazılmıyor. Açmak istersen repoya
-`admin:repo_hook` yetkili bir token bağlaman ya da GitHub App'i kurman gerekir —
-karşılığında akıllı servis routing'i ve commit-sha dedup'ı kazanırsın.
-
-Bunun yerine kurulu olan yol:
-
-1. Projede bir **incoming webhook** var (`actionType: deploy`, `authMode: token`).
-   Çağrıldığında deploy branch'inin (`main`) HEAD'ini deploy eder.
-2. [`.github/workflows/deploy.yml`](.github/workflows/deploy.yml) `main`'e push'ta
-   o URL'e `Authorization: Bearer <token>` ile POST atar.
-
-Branch filtresi **workflow'da** duruyor çünkü incoming webhook branch bilmez —
-çağrılan her istek production'ı yeniden build eder. GitHub'a doğrudan webhook
-eklersen (Actions yerine) her branch'e push production'ı build eder.
-
-Gereken iki repo secret'ı — Settings → Secrets and variables → Actions:
-
-| Secret | Değer |
-|---|---|
-| `OPENSHIP_DEPLOY_URL` | `https://<openship-host>/api/proxy/api/webhooks/incoming/<hookId>` |
-| `OPENSHIP_DEPLOY_TOKEN` | Hook oluşturulurken dönen `secret` |
-
-Secret'lar yoksa workflow deploy'u sessizce atlar (warning ile), kırmızıya
-düşmez. Her push tüm servisleri yeniden build eder (~80 sn) — akıllı routing
-yalnızca native auto-deploy'da devrede.
-
-### C7. Bilmen gereken iki davranış farkı
-
-**1. `depends_on` koşulları düşer.** Openship compose'un `depends_on`
-*bağlantısını* okur ama `condition: service_healthy` /
-`service_completed_successfully` kısmını okumaz. Pratikte:
-
-- `migrate` bu yüzden şemayı kurmadan önce DB'nin bağlantı kabul etmesini
-  [kendi içinde bekler](new-backend/infrastructure/migrate/entrypoint.sh)
-  (`pg_isready`, 120 sn). `restart: "no"` olduğu için orada patlamak kalıcı
-  olurdu.
-- Bir servis migration'lardan önce başlarsa DB'ye bağlanamayıp ölür ve
-  `restart: unless-stopped` ile geri gelir. İlk deploy'da loglarda birkaç
-  restart görmek **normal**; birkaç saniyede oturur.
-
-**2. Dashboard düzenlemesi repoyu ezmez.** Openship bir alanı dashboard'dan
-değiştirdiğinde repo dosyası ile ayrıştığını "drift" olarak işaretler ve seni
-seçim yapmaya çağırır. Kalıcı değişiklikler için compose dosyasını düzenleyip
-push et — tek doğruluk kaynağı repo kalsın.
-
-### C8. Sorun giderme
-
-| Belirti | Sebep / çözüm |
-|---|---|
-| Log'da `runtime: static` ve jenerik 6 adımlık Dockerfile | Proje compose olarak tanınmamış — C2/C3 yapılmamış. Dashboard'dan düzeltilemez |
-| `Deploy failed: mkdir: Permission denied` | C0 atlanmış; `/opt/openship/static` sunucuda yok veya SSH kullanıcısının değil |
-| `COPY failed: ... package.json: file does not exist` | Build context yanlış — C3'teki tablo ile `build` alanlarını karşılaştır |
-| `port is already allocated` (80 veya 443) | `caddy` public işaretlenmemiş (C4), ya da yanlışlıkla `docker-compose.standalone.yml` de yüklenmiş — Openship sadece base dosyayı kullanmalı |
-| Bir servis sürekli restart | `make logs-<servis>`: genelde boş bırakılmış secret (C5) |
-| Login 500 / CORS hatası | `PUBLIC_ORIGIN` tam `https://<domain>` mi, sonda `/` var mı |
-| Sayfa açılıyor ama `/api` 404 | Domain `caddy`'ye değil başka bir servise bağlanmış (C4) |
-
----
-
 ## Aynı sunucuda birden fazla proje
-
-> Openship kullanıyorsan (C) bu bölümü atla — çoklu proje ve hostname
-> yönlendirmesi zaten onun işi.
 
 **Ayrı bir reverse proxy kurmana gerek yok.** Tunnel'ın `ingress` bloğu zaten
 hostname → port yönlendirmesi yapıyor. Her projeye farklı bir host portu ver,

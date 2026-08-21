@@ -3,12 +3,10 @@
 # services, notification worker, seed, caddy edge). Caddy on :80 is the single
 # entrypoint; everything else is reachable only over the compose network.
 #
-# This file publishes exactly ONE host port (caddy's :80) so it can be handed
-# to a PaaS that fronts it with its own edge proxy — Openship replaces that
-# binding with a pinned loopback one and leaves every other `ports:` entry
-# alone, so a second published port here would fight its edge for :443.
-# `docker-compose.standalone.yml` adds the rest back for running without a PaaS
-# (LAN / Cloudflare Tunnel / VPS); the Makefile loads both.
+# This file publishes exactly ONE host port (caddy's :80) — the single door an
+# outer edge needs, which is all Cloudflare Tunnel connects to.
+# `docker-compose.standalone.yml` adds caddy's :443 and the infra loopback
+# ports back for running Caddy as the outermost edge; the Makefile loads both.
 
 name: mydreamcampus
 
@@ -414,10 +412,10 @@ services:
     # 1024 without extra capabilities: HTTP_PORT=8080 works unprivileged.
     # Caddy always listens on 80 inside the container.
     #
-    # Only :80 lives here. TLS is the outer edge's job in every managed setup
-    # (Openship's OpenResty, Cloudflare Tunnel), and Caddy terminating it too
-    # would mean two processes contending for host :443. The standalone overlay
-    # publishes :443 for the setups where Caddy IS the outermost edge.
+    # Only :80 lives here. When something fronts the stack (Cloudflare Tunnel)
+    # TLS is that edge's job, and Caddy terminating it too would mean two
+    # processes contending for host :443. The standalone overlay publishes :443
+    # for the setups where Caddy IS the outermost edge.
     ports:
       - "${HTTP_PORT:-80}:80"
     volumes:

@@ -7,10 +7,10 @@
 INFRA        := new-backend/infrastructure
 COMPOSE_FILE := $(INFRA)/docker-compose.yml
 
-# The base file publishes only caddy's :80 so a PaaS (Openship) can front it
-# without fighting for :443; the standalone overlay adds the infra loopback
-# ports and caddy's :443 back. Every target here runs the stack WITHOUT such a
-# platform, so both files are always loaded.
+# The base file publishes only caddy's :80 — the single port an outer edge
+# (Cloudflare Tunnel, a VPS reverse proxy) needs to reach. The standalone
+# overlay adds caddy's :443 and the infra loopback ports back for running
+# without such an edge. Every target here loads both.
 #
 # A Prometheus/Grafana/Loki stack is out of scope for now, but it slots in as a
 # third overlay without rethinking this variable:

@@ -1,10 +1,10 @@
-# Standalone overlay — for running the stack WITHOUT a PaaS in front of it.
+# Standalone overlay — for running the stack with Caddy as the outermost edge.
 #
-# The base compose publishes only caddy's :80, because a managed platform
-# (Openship) owns the host's :80/:443 and pins its own loopback port for the
-# service it routes. Anything else published there would collide with it.
+# The base compose publishes only caddy's :80, the single door an outer edge
+# (Cloudflare Tunnel, a VPS reverse proxy) connects to. Anything else published
+# there would collide with an edge that owns the host's :80/:443.
 #
-# Without such a platform, Caddy is itself the outermost edge and the infra
+# Without such an edge, Caddy is itself the outermost one and the infra
 # ports are a genuine convenience (psql, redis-cli, the RabbitMQ and MailHog
 # UIs), so this overlay adds them back. Every infra port binds to 127.0.0.1 —
 # only the host reaches them; Caddy stays the single externally reachable door.

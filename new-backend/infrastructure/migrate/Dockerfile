@@ -1,7 +1,6 @@
 # syntax=docker/dockerfile:1
 # One-shot migrator: goose CLI + every module's migration files. Build context
-# is the REPO ROOT (Openship's compose builder roots its one shared context at
-# the checkout and ignores per-service contexts) — see .dockerignore.
+# is the REPO ROOT — one shared context serves every image, see .dockerignore.
 
 FROM golang:1.26 AS build
 ENV CGO_ENABLED=0

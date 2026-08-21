@@ -9,9 +9,9 @@ set -e
 
 # Wait for the server to accept connections before goose touches it. Compose's
 # `depends_on: condition: service_healthy` already guarantees this, but that
-# condition is a compose-only concept: a PaaS that reads this file (Openship)
-# keeps the dependency EDGE and drops the condition, so migrate can win the
-# race against an initdb that is still running. With `restart: "no"` a failure
+# condition is a compose-only concept: any runner that reads this file for its
+# dependency EDGES while dropping the conditions lets migrate win the race
+# against an initdb that is still running. With `restart: "no"` a failure
 # here is terminal and the schema never lands, so the gate has to be in-script.
 wait_for_db() {
 	label="$1"

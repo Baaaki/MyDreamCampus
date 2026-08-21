@@ -3,9 +3,9 @@
 # assets AND reverse-proxies each /api/<prefix> to its own service, so the
 # browser only ever talks to one origin (no CORS, no absolute API base URL).
 #
-# Build context is the REPO ROOT, not frontend/ — Openship's compose builder
-# roots its one shared context at the checkout and ignores per-service
-# contexts, so every COPY below is repo-root-relative.
+# Build context is the REPO ROOT, not frontend/ — compose roots one shared
+# context at the checkout for every image (see .dockerignore), so every COPY
+# below is repo-root-relative.
 
 FROM oven/bun:1 AS build
 WORKDIR /app

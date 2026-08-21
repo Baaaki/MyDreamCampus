@@ -134,4 +134,4 @@ cd frontend && bun install && bun dev
 - RabbitMQ Yönetim Paneli: `http://localhost:15672`
 - API: doğrudan servis portu yoktur — hepsi Caddy üzerinden `/<origin>/api/<önek>`
 
-Sunucuya kurulum ve Openship ile dağıtım için: [`DEPLOY.md`](DEPLOY.md).
+Sunucuya kurulum ve dağıtım için: [`DEPLOY.md`](DEPLOY.md).
