@@ -46,7 +46,7 @@ func (c *Consumer) dispatch(ctx context.Context, eventID, eventType string, even
 		// Important notification: Send Email + Push
 		userID := fmt.Sprint(data["user_id"])
 		emailAddr := fmt.Sprint(data["email"])
-		
+
 		var title, message string
 		switch eventType {
 		case "student.enrolled":

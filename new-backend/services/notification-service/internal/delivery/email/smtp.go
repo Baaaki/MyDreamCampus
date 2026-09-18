@@ -25,7 +25,7 @@ func (s *SMTPSender) Send(ctx context.Context, to, subject string, htmlBody []by
 	e.HTML = htmlBody
 
 	addr := fmt.Sprintf("%s:%d", s.cfg.Host, s.cfg.Port)
-	
+
 	// Use plain auth if username is provided
 	var auth smtp.Auth
 	if s.cfg.Username != "" {

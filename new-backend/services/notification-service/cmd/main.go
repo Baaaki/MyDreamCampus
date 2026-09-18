@@ -15,8 +15,9 @@ import (
 	"github.com/baaaki/mydreamcampus/notification/internal/delivery/push"
 	"github.com/baaaki/mydreamcampus/notification/internal/repository"
 	"github.com/baaaki/mydreamcampus/notification/internal/service"
+	platformLogger "github.com/baaaki/mydreamcampus/shared/platform/logger"
+	"github.com/baaaki/mydreamcampus/shared/platform/rabbitmq"
 	"github.com/jackc/pgx/v5/pgxpool"
-	amqp "github.com/rabbitmq/amqp091-go"
 	"go.uber.org/zap"
 )
 
@@ -26,11 +27,14 @@ func main() {
 		panic(fmt.Sprintf("failed to load config: %v", err))
 	}
 
-	logger, err := zap.NewProduction()
-	if err != nil {
+	// The shared RabbitMQ package logs through the shared logger, so it is
+	// the one this service uses too.
+	if err := platformLogger.Init("production"); err != nil {
 		panic(fmt.Sprintf("failed to init logger: %v", err))
 	}
-	defer func() { _ = logger.Sync() }()
+	platformLogger.Log = platformLogger.Log.With(zap.String("service", "notification"))
+	logger := platformLogger.Log
+	defer platformLogger.Sync()
 
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
@@ -42,21 +46,15 @@ func main() {
 	}
 	defer pool.Close()
 
-	// RabbitMQ
-	conn, err := amqp.Dial(cfg.RabbitMQURL)
+	// RabbitMQ — the shared connection reconnects on its own and brings the
+	// consumer back with it; a bare amqp.Dial did neither.
+	conn, err := rabbitmq.NewConnection(cfg.RabbitMQURL)
 	if err != nil {
 		logger.Fatal("failed to connect to RabbitMQ", zap.Error(err))
 	}
 	defer func() { _ = conn.Close() }()
 
-	ch, err := conn.Channel()
-	if err != nil {
-		logger.Fatal("failed to open channel", zap.Error(err))
-	}
-	defer func() { _ = ch.Close() }()
-
-	// Topology setup
-	if err := consumer.SetupTopology(ch); err != nil {
+	if err := consumer.SetupTopology(conn.Channel()); err != nil {
 		logger.Fatal("topology setup failed", zap.Error(err))
 	}
 
@@ -71,9 +69,10 @@ func main() {
 		logger.Fatal("failed to create service", zap.Error(err))
 	}
 
-	// Consumer
-	cons := consumer.New(ch, svc, repo, logger)
-	go cons.Start(ctx)
+	cons := consumer.New(svc, repo, logger)
+	if err := cons.Start(ctx, rabbitmq.NewConsumer(conn)); err != nil {
+		logger.Fatal("failed to start consumer", zap.Error(err))
+	}
 
 	// Health endpoint
 	go func() {
@@ -102,4 +101,5 @@ func main() {
 	<-quit
 
 	logger.Info("shutting down notification service")
+	cancel()
 }

@@ -3,113 +3,78 @@ package consumer
 import (
 	"context"
 	"encoding/json"
+	"errors"
+	"fmt"
 
 	"github.com/baaaki/mydreamcampus/notification/internal/db"
 	"github.com/baaaki/mydreamcampus/notification/internal/repository"
 	"github.com/baaaki/mydreamcampus/notification/internal/service"
+	"github.com/baaaki/mydreamcampus/shared/platform/rabbitmq"
 	"github.com/jackc/pgx/v5/pgtype"
-	amqp "github.com/rabbitmq/amqp091-go"
 	"go.uber.org/zap"
 )
 
 type Consumer struct {
-	ch   *amqp.Channel
 	svc  *service.Service
 	repo *repository.Repository
 	log  *zap.Logger
 }
 
-func New(ch *amqp.Channel, svc *service.Service, repo *repository.Repository, log *zap.Logger) *Consumer {
+func New(svc *service.Service, repo *repository.Repository, log *zap.Logger) *Consumer {
 	return &Consumer{
-		ch:   ch,
 		svc:  svc,
 		repo: repo,
 		log:  log,
 	}
 }
 
-func (c *Consumer) Start(ctx context.Context) {
-	msgs, err := c.ch.Consume(
-		QueueNotificationEvents, // queue
-		"",                      // consumer
-		false,                   // auto-ack
-		false,                   // exclusive
-		false,                   // no-local
-		false,                   // no-wait
-		nil,                     // args
-	)
-	if err != nil {
-		c.log.Fatal("failed to register consumer", zap.Error(err))
+// Start subscribes through the shared consumer, like every other service:
+// a failed message is retried through the queue's retry line and parked in
+// the DLQ after rabbitmq.MaxDeliveryAttempts, and the subscription survives
+// a broker restart. This consumer used to Nack(requeue=true) on every
+// error, so with SMTP down one message cycled forever at full speed.
+func (c *Consumer) Start(ctx context.Context, rc *rabbitmq.Consumer) error {
+	if err := rc.ConsumeEnvelope(ctx, QueueNotificationEvents, c.handleMessage); err != nil {
+		return err
 	}
-
 	c.log.Info("notification consumer started")
-
-	for {
-		select {
-		case <-ctx.Done():
-			c.log.Info("shutting down consumer")
-			return
-		case msg, ok := <-msgs:
-			if !ok {
-				c.log.Info("channel closed, stopping consumer")
-				return
-			}
-			c.handleMessage(ctx, msg)
-		}
-	}
+	return nil
 }
 
-func (c *Consumer) handleMessage(ctx context.Context, msg amqp.Delivery) {
-	// Extract message body and parse event
+// handleMessage returns an error to ask for a retry; nil acknowledges.
+func (c *Consumer) handleMessage(ctx context.Context, body []byte) error {
 	var event map[string]any
-	if err := json.Unmarshal(msg.Body, &event); err != nil {
-		c.log.Error("failed to unmarshal message", zap.Error(err))
-		_ = msg.Reject(false) // Drop unparseable messages
-		return
+	if err := json.Unmarshal(body, &event); err != nil {
+		// Retried a few times, then parked in the DLQ for inspection.
+		return fmt.Errorf("unparseable notification event: %w", err)
 	}
 
 	eventID, _ := event["event_id"].(string)
 	eventType, _ := event["event_type"].(string)
-
 	if eventID == "" || eventType == "" {
-		c.log.Error("missing event_id or event_type")
-		_ = msg.Reject(false)
-		return
+		return errors.New("notification event without event_id or event_type")
 	}
 
-	// Idempotency check
 	processed, err := c.repo.IsEventProcessed(ctx, eventID)
 	if err != nil {
-		c.log.Error("failed to check idempotency", zap.Error(err))
-		_ = msg.Nack(false, true) // Requeue on DB error
-		return
+		return fmt.Errorf("idempotency check: %w", err)
 	}
 	if processed {
 		c.log.Info("event already processed, skipping", zap.String("event_id", eventID))
-		_ = msg.Ack(false)
-		return
+		return nil
 	}
 
-	// Dispatch to handler
 	if err := c.dispatch(ctx, eventID, eventType, event); err != nil {
-		c.log.Error("failed to process event", zap.Error(err), zap.String("event_id", eventID))
-		// For now, simple requeue. In production, we'd use DLQ with x-death header to count retries.
-		_ = msg.Nack(false, true)
-		return
+		return fmt.Errorf("dispatch %s: %w", eventType, err)
 	}
 
-	// Mark as processed
-	err = c.repo.MarkEventProcessed(ctx, db.MarkEventProcessedParams{
+	if err := c.repo.MarkEventProcessed(ctx, db.MarkEventProcessedParams{
 		EventID:   eventID,
 		EventType: eventType,
-	})
-	if err != nil {
-		c.log.Error("failed to mark event processed", zap.Error(err))
-		_ = msg.Nack(false, true) // Requeue
-		return
+	}); err != nil {
+		return fmt.Errorf("mark event processed: %w", err)
 	}
-
-	_ = msg.Ack(false)
+	return nil
 }
 
 func (c *Consumer) logDelivery(ctx context.Context, eventID, eventType, channel, recipient, template string, status string, err error) {
@@ -119,7 +84,7 @@ func (c *Consumer) logDelivery(ctx context.Context, eventID, eventType, channel,
 	} else {
 		errorText = pgtype.Text{Valid: false}
 	}
-	
+
 	_, _ = c.repo.CreateDeliveryLog(ctx, db.CreateDeliveryLogParams{
 		EventID:   eventID,
 		EventType: eventType,
