@@ -255,7 +255,7 @@ func (h *AttendanceHandler) CreateManualAttendance(c *gin.Context) {
 		zap.String("instructor_id", instructorID.String()),
 	)
 
-	resp, err := h.service.CreateManualAttendance(ctx, sessionID, instructorID, req)
+	resp, err := h.service.CreateManualAttendance(ctx, sessionID, instructorID, isAdmin(c), req)
 	if err != nil {
 		handlerLogger.Error("failed to create manual attendance", zap.Error(err))
 		h.handleError(c, err)
@@ -307,7 +307,7 @@ func (h *AttendanceHandler) CloseSession(c *gin.Context) {
 		zap.String("instructor_id", instructorID.String()),
 	)
 
-	resp, err := h.service.CloseSession(ctx, sessionID, instructorID)
+	resp, err := h.service.CloseSession(ctx, sessionID, instructorID, isAdmin(c))
 	if err != nil {
 		handlerLogger.Error("failed to close session", zap.Error(err))
 		h.handleError(c, err)
@@ -470,7 +470,7 @@ func (h *AttendanceHandler) GetSessionDetails(c *gin.Context) {
 		zap.String("session_id", sessionID.String()),
 	)
 
-	resp, err := h.service.GetSessionDetails(ctx, sessionID, instructorID)
+	resp, err := h.service.GetSessionDetails(ctx, sessionID, instructorID, isAdmin(c))
 	if err != nil {
 		handlerLogger.Error("failed to get session details", zap.Error(err))
 		h.handleError(c, err)
@@ -520,7 +520,7 @@ func (h *AttendanceHandler) GetSessionRecords(c *gin.Context) {
 		zap.String("session_id", sessionID.String()),
 	)
 
-	resp, err := h.service.GetSessionRecords(ctx, sessionID, instructorID)
+	resp, err := h.service.GetSessionRecords(ctx, sessionID, instructorID, isAdmin(c))
 	if err != nil {
 		handlerLogger.Error("failed to get session records", zap.Error(err))
 		h.handleError(c, err)
@@ -573,7 +573,7 @@ func (h *AttendanceHandler) GetSessionStudents(c *gin.Context) {
 		zap.String("search", search),
 	)
 
-	resp, err := h.service.GetSessionStudents(ctx, sessionID, instructorID, search)
+	resp, err := h.service.GetSessionStudents(ctx, sessionID, instructorID, isAdmin(c), search)
 	if err != nil {
 		handlerLogger.Error("failed to get session students", zap.Error(err))
 		h.handleError(c, err)
@@ -635,6 +635,10 @@ func (h *AttendanceHandler) AdminListSessions(c *gin.Context) {
 	}
 
 	c.JSON(http.StatusOK, response)
+}
+
+func isAdmin(c *gin.Context) bool {
+	return c.GetString("role") == "admin"
 }
 
 func (h *AttendanceHandler) handleError(c *gin.Context, err error) {

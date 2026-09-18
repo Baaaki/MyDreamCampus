@@ -293,6 +293,13 @@ func (s *AttendanceService) GetQRCode(ctx context.Context, sessionID, instructor
 	}, nil
 }
 
+// canManageSession: the instructor who opened the session, or an admin —
+// the same bypass grades gives admin on course reads. QR display, session
+// creation and finalize stay instructor-only.
+func canManageSession(owner pgtype.UUID, callerID uuid.UUID, isAdmin bool) bool {
+	return isAdmin || utils.PgUUIDToUUID(owner) == callerID
+}
+
 // qrRotation reads the session's rotation interval. Sessions created before
 // it was stored have NULL there and get the default.
 func qrRotation(session db.AttendanceSession) time.Duration {
@@ -303,14 +310,13 @@ func qrRotation(session db.AttendanceSession) time.Duration {
 }
 
 // CreateManualAttendance creates manual attendance record
-func (s *AttendanceService) CreateManualAttendance(ctx context.Context, sessionID, instructorID uuid.UUID, req dto.ManualAttendanceRequest) (dto.ManualAttendanceResponse, error) {
+func (s *AttendanceService) CreateManualAttendance(ctx context.Context, sessionID, instructorID uuid.UUID, isAdmin bool, req dto.ManualAttendanceRequest) (dto.ManualAttendanceResponse, error) {
 	session, err := s.sessionRepo.GetActiveSessionByID(ctx, sessionID)
 	if err != nil {
 		return dto.ManualAttendanceResponse{}, errors.ErrSessionNotFound
 	}
 
-	// Check ownership
-	if utils.PgUUIDToUUID(session.InstructorID) != instructorID {
+	if !canManageSession(session.InstructorID, instructorID, isAdmin) {
 		return dto.ManualAttendanceResponse{}, errors.ErrForbidden
 	}
 
@@ -376,14 +382,13 @@ func (s *AttendanceService) CreateManualAttendance(ctx context.Context, sessionI
 
 // CloseSession closes an attendance session
 // Simplified: no absent record creation needed. Record exists = present, no record = absent.
-func (s *AttendanceService) CloseSession(ctx context.Context, sessionID, instructorID uuid.UUID) (dto.CloseSessionResponse, error) {
+func (s *AttendanceService) CloseSession(ctx context.Context, sessionID, instructorID uuid.UUID, isAdmin bool) (dto.CloseSessionResponse, error) {
 	session, err := s.sessionRepo.GetSessionByID(ctx, sessionID)
 	if err != nil {
 		return dto.CloseSessionResponse{}, errors.ErrSessionNotFound
 	}
 
-	// Check ownership
-	if utils.PgUUIDToUUID(session.InstructorID) != instructorID {
+	if !canManageSession(session.InstructorID, instructorID, isAdmin) {
 		return dto.CloseSessionResponse{}, errors.ErrForbidden
 	}
 
@@ -784,14 +789,13 @@ func (s *AttendanceService) publishFailedAttendanceEvent(ctx context.Context, da
 }
 
 // GetSessionDetails returns session details for instructor
-func (s *AttendanceService) GetSessionDetails(ctx context.Context, sessionID, instructorID uuid.UUID) (dto.GetSessionDetailsResponse, error) {
+func (s *AttendanceService) GetSessionDetails(ctx context.Context, sessionID, instructorID uuid.UUID, isAdmin bool) (dto.GetSessionDetailsResponse, error) {
 	session, err := s.sessionRepo.GetSessionByID(ctx, sessionID)
 	if err != nil {
 		return dto.GetSessionDetailsResponse{}, errors.ErrSessionNotFound
 	}
 
-	// Check ownership
-	if utils.PgUUIDToUUID(session.InstructorID) != instructorID {
+	if !canManageSession(session.InstructorID, instructorID, isAdmin) {
 		return dto.GetSessionDetailsResponse{}, errors.ErrForbidden
 	}
 
@@ -838,14 +842,13 @@ func (s *AttendanceService) GetSessionDetails(ctx context.Context, sessionID, in
 }
 
 // GetSessionRecords returns attendance records for a session
-func (s *AttendanceService) GetSessionRecords(ctx context.Context, sessionID, instructorID uuid.UUID) (dto.GetSessionRecordsResponse, error) {
+func (s *AttendanceService) GetSessionRecords(ctx context.Context, sessionID, instructorID uuid.UUID, isAdmin bool) (dto.GetSessionRecordsResponse, error) {
 	session, err := s.sessionRepo.GetSessionByID(ctx, sessionID)
 	if err != nil {
 		return dto.GetSessionRecordsResponse{}, errors.ErrSessionNotFound
 	}
 
-	// Check ownership
-	if utils.PgUUIDToUUID(session.InstructorID) != instructorID {
+	if !canManageSession(session.InstructorID, instructorID, isAdmin) {
 		return dto.GetSessionRecordsResponse{}, errors.ErrForbidden
 	}
 
@@ -896,14 +899,13 @@ func (s *AttendanceService) GetSessionRecords(ctx context.Context, sessionID, in
 }
 
 // GetSessionStudents returns enrolled students for a session with their marked status
-func (s *AttendanceService) GetSessionStudents(ctx context.Context, sessionID, instructorID uuid.UUID, search string) (dto.GetSessionStudentsResponse, error) {
+func (s *AttendanceService) GetSessionStudents(ctx context.Context, sessionID, instructorID uuid.UUID, isAdmin bool, search string) (dto.GetSessionStudentsResponse, error) {
 	session, err := s.sessionRepo.GetSessionByID(ctx, sessionID)
 	if err != nil {
 		return dto.GetSessionStudentsResponse{}, errors.ErrSessionNotFound
 	}
 
-	// Check ownership
-	if utils.PgUUIDToUUID(session.InstructorID) != instructorID {
+	if !canManageSession(session.InstructorID, instructorID, isAdmin) {
 		return dto.GetSessionStudentsResponse{}, errors.ErrForbidden
 	}
 

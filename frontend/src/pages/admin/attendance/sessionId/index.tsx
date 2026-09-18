@@ -55,7 +55,7 @@ export default function AdminAttendanceSessionPage() {
     queryKey: ['admin-session-records', sessionId],
     queryFn: () =>
       attendanceApiSafe
-        .get(`admin/sessions/${sessionId}/records`)
+        .get(`sessions/${sessionId}/records`)
         .json<SessionRecordsResponse>(),
     enabled: !!sessionId && !useMockData,
   });

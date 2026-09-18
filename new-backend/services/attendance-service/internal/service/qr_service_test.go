@@ -6,6 +6,8 @@ import (
 	"time"
 
 	"github.com/baaaki/mydreamcampus/attendance/internal/dto"
+	"github.com/google/uuid"
+	"github.com/jackc/pgx/v5/pgtype"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -140,4 +142,13 @@ func TestQRService_ValidateQRSignature(t *testing.T) {
 		payload := dto.QRPayload{SessionID: "x", Window: QRWindow(qrNow, DefaultQRRotation), Signature: "not-the-right-length"}
 		assert.False(t, valid(s, payload, "secret", qrNow))
 	})
+}
+
+func TestCanManageSession_OwnerOrAdminOnly(t *testing.T) {
+	owner := uuid.New()
+	pgOwner := pgtype.UUID{Bytes: owner, Valid: true}
+
+	assert.True(t, canManageSession(pgOwner, owner, false), "owner")
+	assert.True(t, canManageSession(pgOwner, uuid.New(), true), "admin on someone else's session")
+	assert.False(t, canManageSession(pgOwner, uuid.New(), false), "another teacher")
 }
