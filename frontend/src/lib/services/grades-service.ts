@@ -11,7 +11,7 @@ import type {
 export const gradesService = {
   async getCourseStatus(courseId: string): Promise<CourseStatusResponse> {
     try {
-      const response = await gradesApi.get(`course/${courseId}/status`).json<CourseStatusResponse>();
+      const response = await gradesApi.get(`courses/${courseId}/status`).json<CourseStatusResponse>();
       return response;
     } catch (error) {
       console.error('Failed to fetch course status:', error);
@@ -21,7 +21,7 @@ export const gradesService = {
 
   async getCourseStudents(courseId: string): Promise<CourseStudentsResponse> {
     try {
-      const response = await gradesApi.get(`course/${courseId}/students`).json<CourseStudentsResponse>();
+      const response = await gradesApi.get(`courses/${courseId}/students`).json<CourseStudentsResponse>();
       return response;
     } catch (error) {
       console.error('Failed to fetch course students:', error);
@@ -31,7 +31,7 @@ export const gradesService = {
 
   async submitScore(courseId: string, data: SubmitScoreRequest): Promise<SubmitScoreResponse> {
     try {
-      const response = await gradesApi.post(`course/${courseId}/scores`, {
+      const response = await gradesApi.post(`courses/${courseId}/scores`, {
         json: data,
       }).json<SubmitScoreResponse>();
       return response;
@@ -43,7 +43,7 @@ export const gradesService = {
 
   async bulkSubmitScores(courseId: string, data: BulkSubmitScoresRequest): Promise<BulkSubmitScoresResponse> {
     try {
-      const response = await gradesApi.post(`course/${courseId}/scores/bulk`, {
+      const response = await gradesApi.post(`courses/${courseId}/scores/bulk`, {
         json: data,
       }).json<BulkSubmitScoresResponse>();
       return response;

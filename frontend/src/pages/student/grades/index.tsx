@@ -160,7 +160,7 @@ export default function StudentGradesPage() {
         setLoading(true);
         const res = USE_MOCK
           ? mockMyGradesResponse
-          : await gradesApi.get('student/my').json<MyGradesResponse>();
+          : await gradesApi.get('my/grades').json<MyGradesResponse>();
         if (!cancelled) {
           // Backend ders listesi boşsa null dönüyor — array'e normalize et
           setData({
