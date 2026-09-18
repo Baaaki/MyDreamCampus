@@ -45,8 +45,8 @@ type SecurityEvent struct {
 
 var securityLogger *zap.Logger
 
-// InitSecurity initializes the security audit logger with structured JSON output
-func InitSecurity(environment string) {
+// securityConfig is the audit logger's zap configuration.
+func securityConfig(environment string) zap.Config {
 	var config zap.Config
 	if environment == "production" {
 		config = zap.NewProductionConfig()
@@ -54,14 +54,25 @@ func InitSecurity(environment string) {
 		config = zap.NewDevelopmentConfig()
 	}
 
+	// NewProductionConfig samples: after 100 identical entries per second it
+	// keeps one in a hundred. Every audit line has the same level and message
+	// (SECURITY_AUDIT), so during a brute-force burst — exactly when the
+	// LOGIN_FAILED trail matters — 99% of it would be dropped. An audit log
+	// is a record, not a diagnostic stream: nothing may be sampled out.
+	config.Sampling = nil
+
 	// Security audit logs always use JSON for structured parsing
 	config.Encoding = "json"
 	config.EncoderConfig.TimeKey = "timestamp"
 	config.EncoderConfig.EncodeTime = zapcore.ISO8601TimeEncoder
 	config.EncoderConfig.MessageKey = "event"
+	return config
+}
 
+// InitSecurity initializes the security audit logger with structured JSON output
+func InitSecurity(environment string) {
 	var err error
-	securityLogger, err = config.Build(zap.AddCallerSkip(1))
+	securityLogger, err = securityConfig(environment).Build(zap.AddCallerSkip(1))
 	if err != nil {
 		panic("failed to initialize security audit logger: " + err.Error())
 	}
