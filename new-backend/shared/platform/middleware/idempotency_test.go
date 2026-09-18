@@ -204,3 +204,65 @@ func TestIdempotency_GetRequest_Ignored(t *testing.T) {
 	assert.Equal(t, http.StatusOK, w.Code)
 	assert.Empty(t, store.records, "reads are idempotent already; no Redis round-trip for them")
 }
+
+// ctxAwareStore fails writes whose context is already cancelled, the way a
+// real Redis client does.
+type ctxAwareStore struct {
+	*fakeIdempotencyStore
+	claimTTL time.Duration
+}
+
+func (s *ctxAwareStore) ClaimIdempotencyKey(ctx context.Context, key, value string, ttl time.Duration) (bool, error) {
+	s.claimTTL = ttl
+	return s.fakeIdempotencyStore.ClaimIdempotencyKey(ctx, key, value, ttl)
+}
+
+func (s *ctxAwareStore) SaveIdempotencyRecord(ctx context.Context, key, value string, ttl time.Duration) error {
+	if err := ctx.Err(); err != nil {
+		return err
+	}
+	return s.fakeIdempotencyStore.SaveIdempotencyRecord(ctx, key, value, ttl)
+}
+
+func TestIdempotency_ClientHangsUp_ResponseStillStored(t *testing.T) {
+	require.NoError(t, logger.Init("test"))
+	gin.SetMode(gin.TestMode)
+	store := &ctxAwareStore{fakeIdempotencyStore: newFakeIdempotencyStore()}
+	SetIdempotencyStore(store, "meal")
+	t.Cleanup(func() { globalIdempotency = nil })
+
+	ctx, hangUp := context.WithCancel(context.Background())
+	r := gin.New()
+	r.POST("/reservations", Idempotency(), func(c *gin.Context) {
+		hangUp() // the client disconnects while the work completes
+		c.JSON(http.StatusCreated, gin.H{"id": "res_1"})
+	})
+
+	req := httptest.NewRequest(http.MethodPost, "/reservations", strings.NewReader(`{"meal":"lunch"}`)).WithContext(ctx)
+	req.Header.Set(IdempotencyHeader, "key-hangup")
+	r.ServeHTTP(httptest.NewRecorder(), req)
+
+	var stored string
+	for _, v := range store.records {
+		stored = v
+	}
+	assert.Contains(t, stored, `"status_code":201`, "the retry must replay the result, not see a stuck in-flight claim")
+	assert.NotContains(t, stored, `"in_flight":true`)
+}
+
+func TestIdempotency_InFlightClaim_ExpiresQuickly(t *testing.T) {
+	require.NoError(t, logger.Init("test"))
+	gin.SetMode(gin.TestMode)
+	store := &ctxAwareStore{fakeIdempotencyStore: newFakeIdempotencyStore()}
+	SetIdempotencyStore(store, "meal")
+	t.Cleanup(func() { globalIdempotency = nil })
+
+	r := gin.New()
+	r.POST("/reservations", Idempotency(), func(c *gin.Context) { c.Status(http.StatusCreated) })
+	req := httptest.NewRequest(http.MethodPost, "/reservations", strings.NewReader(`{}`))
+	req.Header.Set(IdempotencyHeader, "key-ttl")
+	r.ServeHTTP(httptest.NewRecorder(), req)
+
+	assert.Equal(t, inFlightTTL, store.claimTTL,
+		"a claim orphaned by a crash must not block the key for the full replay TTL")
+}

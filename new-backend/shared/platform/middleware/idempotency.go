@@ -23,6 +23,15 @@ const IdempotencyHeader = "Idempotency-Key"
 // covers a mobile client that retries after a long offline stretch.
 const idempotencyTTL = 24 * time.Hour
 
+// inFlightTTL bounds the "still processing" claim. It only has to outlive
+// one request; if the process dies mid-request nothing releases the claim,
+// and with the full day's TTL the key would answer 409 until tomorrow.
+const inFlightTTL = 2 * time.Minute
+
+// idempotencyWriteTimeout bounds the Save/Release that runs after the
+// handler, on a context that no longer follows the client.
+const idempotencyWriteTimeout = 3 * time.Second
+
 // maxIdempotentBodyBytes caps what we buffer to hash and store. Requests
 // above it skip idempotency rather than pull an unbounded body into memory.
 const maxIdempotentBodyBytes = 1 << 20 // 1 MiB
@@ -121,7 +130,7 @@ func Idempotency() gin.HandlerFunc {
 			c.Next()
 			return
 		}
-		claimed, err := cfg.store.ClaimIdempotencyKey(ctx, key, string(claim), idempotencyTTL)
+		claimed, err := cfg.store.ClaimIdempotencyKey(ctx, key, string(claim), inFlightTTL)
 		if err != nil {
 			log.Warn("idempotency claim failed, passing request through", zap.Error(err))
 			c.Next()
@@ -141,12 +150,17 @@ func Idempotency() gin.HandlerFunc {
 
 		c.Next()
 
+		// The work is done whether or not the client stayed to hear about it.
+		// On the request context a client that hung up — the very one that
+		// will retry — would cancel the Save, leaving the claim stuck.
+		writeCtx, cancel := context.WithTimeout(context.WithoutCancel(ctx), idempotencyWriteTimeout)
+		defer cancel()
+
 		status := recorder.Status()
 		// Only successful work is worth replaying. Releasing the key on
-		// failure lets the client retry the same key instead of being told
-		// "in progress" for 24 hours.
+		// failure lets the client retry the same key right away.
 		if status < 200 || status >= 300 {
-			if err := cfg.store.ReleaseIdempotencyKey(ctx, key); err != nil {
+			if err := cfg.store.ReleaseIdempotencyKey(writeCtx, key); err != nil {
 				log.Warn("failed to release idempotency key after error response", zap.Error(err))
 			}
 			return
@@ -161,7 +175,7 @@ func Idempotency() gin.HandlerFunc {
 			log.Warn("idempotent response could not be encoded", zap.Error(err))
 			return
 		}
-		if err := cfg.store.SaveIdempotencyRecord(ctx, key, string(record), idempotencyTTL); err != nil {
+		if err := cfg.store.SaveIdempotencyRecord(writeCtx, key, string(record), idempotencyTTL); err != nil {
 			log.Warn("failed to store idempotent response", zap.Error(err))
 		}
 	}
