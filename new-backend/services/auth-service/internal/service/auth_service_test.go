@@ -88,25 +88,6 @@ func (m *MockEventRepository) MarkEventProcessed(ctx context.Context, eventID st
 	return args.Error(0)
 }
 
-// MockRedisClient mocks Redis client
-type MockRedisClient struct {
-	mock.Mock
-}
-
-func (m *MockRedisClient) SetTokenVersion(ctx context.Context, userID string, version int) error {
-	args := m.Called(ctx, userID, version)
-	return args.Error(0)
-}
-
-func (m *MockRedisClient) GetTokenVersion(ctx context.Context, userID string) (int, error) {
-	args := m.Called(ctx, userID)
-	return args.Int(0), args.Error(1)
-}
-
-func (m *MockRedisClient) Close() error {
-	return nil
-}
-
 // Helper to create pgtype.UUID from uuid.UUID
 func pgUUID(id uuid.UUID) pgtype.UUID {
 	return pgtype.UUID{Bytes: id, Valid: true}
@@ -258,33 +239,6 @@ func TestEventIdempotency(t *testing.T) {
 	})
 
 	eventRepo.AssertExpectations(t)
-}
-
-// TestRedisTokenVersionCache tests Redis token version caching
-func TestRedisTokenVersionCache(t *testing.T) {
-	redisClient := new(MockRedisClient)
-	ctx := context.Background()
-	userID := uuid.New().String()
-	version := 5
-
-	t.Run("Set token version", func(t *testing.T) {
-		redisClient.On("SetTokenVersion", ctx, userID, version).Return(nil).Once()
-
-		err := redisClient.SetTokenVersion(ctx, userID, version)
-
-		assert.NoError(t, err)
-	})
-
-	t.Run("Get token version", func(t *testing.T) {
-		redisClient.On("GetTokenVersion", ctx, userID).Return(version, nil).Once()
-
-		cachedVersion, err := redisClient.GetTokenVersion(ctx, userID)
-
-		assert.NoError(t, err)
-		assert.Equal(t, version, cachedVersion)
-	})
-
-	redisClient.AssertExpectations(t)
 }
 
 // Helper function

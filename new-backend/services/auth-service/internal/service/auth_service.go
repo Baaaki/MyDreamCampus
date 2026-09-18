@@ -136,7 +136,6 @@ func (s *AuthService) Login(ctx context.Context, req dto.LoginRequest, deviceInf
 
 	// Create session
 	expiresAt := clock.Now().Add(time.Duration(s.config.JWT.RefreshTokenExpiry) * time.Hour)
-	refreshTokenTTL := time.Duration(s.config.JWT.RefreshTokenExpiry) * time.Hour
 	deviceInfoPtr := utils.StringToPointer(deviceInfo)
 	ipAddressPtr := utils.StringToPointer(ipAddress)
 	_, err = s.sessionRepo.CreateSession(ctx, db.CreateSessionParams{
@@ -153,16 +152,6 @@ func (s *AuthService) Login(ctx context.Context, req dto.LoginRequest, deviceInf
 		}
 		// Unexpected error - wrap and return, handler will log
 		return dto.LoginResponse{}, "", sharedErrors.Wrap(sharedErrors.ErrInternal, err)
-	}
-
-	// Store refresh token in Redis
-	userIDStr := utils.PgtypeToUUID(user.ID).String()
-	if err := s.redisClient.StoreRefreshToken(ctx, jti, userIDStr, refreshTokenTTL); err != nil {
-		logger.Error("failed to store refresh token in Redis",
-			zap.Error(err),
-			zap.String("user_id", userIDStr),
-		)
-		// Continue even if Redis fails - DB session is the source of truth
 	}
 
 	serviceLogger.Info("login successful in database",
@@ -235,14 +224,6 @@ func (s *AuthService) Logout(ctx context.Context, refreshToken string, accessTok
 		}
 	}
 
-	// Delete refresh token from Redis
-	if err := s.redisClient.DeleteRefreshToken(ctx, jti); err != nil {
-		logger.Error("failed to delete refresh token from Redis",
-			zap.Error(err),
-			zap.String("jti", jti),
-		)
-	}
-
 	// Blacklist the access token if provided
 	if accessToken != "" {
 		if err := s.blacklistAccessToken(ctx, accessToken); err != nil {
@@ -293,6 +274,20 @@ func (s *AuthService) blacklistAccessToken(ctx context.Context, tokenString stri
 	return s.redisClient.BlacklistAccessToken(ctx, jti, remainingTTL)
 }
 
+// revokeOutstandingAccessTokens raises the minimum token version JWTAuth
+// accepts for the user. Access tokens are never looked up, so this — not the
+// token_version column — is what makes an already-issued one fail. Failure
+// is logged, not returned: the DB side (version bump, sessions) has already
+// committed and still revokes every refresh token.
+func (s *AuthService) revokeOutstandingAccessTokens(ctx context.Context, userID string, newVersion int) {
+	if err := s.redisClient.BlacklistAllUserTokens(ctx, userID, newVersion); err != nil {
+		logger.Error("failed to revoke outstanding access tokens",
+			zap.Error(err),
+			zap.String("user_id", userID),
+		)
+	}
+}
+
 // LogoutAll invalidates all sessions for a user and blacklists all tokens
 func (s *AuthService) LogoutAll(ctx context.Context, userID uuid.UUID, accessToken string) error {
 	// Increment token version (invalidates all tokens)
@@ -313,27 +308,8 @@ func (s *AuthService) LogoutAll(ctx context.Context, userID uuid.UUID, accessTok
 		return sharedErrors.Wrap(sharedErrors.ErrInternal, err)
 	}
 
-	// Update Redis - set minimum token version (any token with lower version is invalid)
 	userIDStr := userID.String()
-	if err := s.redisClient.SetTokenVersion(ctx, userIDStr, int(newVersion)); err != nil {
-		logger.Error("failed to update token version in Redis",
-			zap.Error(err),
-		)
-	}
-
-	// Also store min token version for quick blacklist check
-	if err := s.redisClient.BlacklistAllUserTokens(ctx, userIDStr, int(newVersion)); err != nil {
-		logger.Error("failed to blacklist all user tokens in Redis",
-			zap.Error(err),
-		)
-	}
-
-	// Delete all refresh tokens from Redis for this user
-	if err := s.redisClient.DeleteAllUserRefreshTokens(ctx, userIDStr); err != nil {
-		logger.Error("failed to delete all refresh tokens from Redis",
-			zap.Error(err),
-		)
-	}
+	s.revokeOutstandingAccessTokens(ctx, userIDStr, int(newVersion))
 
 	// Blacklist the current access token
 	if accessToken != "" {
@@ -511,15 +487,13 @@ func (s *AuthService) ChangePassword(ctx context.Context, userID uuid.UUID, req 
 		return dto.ChangePasswordResponse{}, "", sharedErrors.Wrap(sharedErrors.ErrInternal, err)
 	}
 
-	// Update Redis cache
-	err = s.redisClient.SetTokenVersion(ctx, userID.String(), int(utils.DerefInt32(user.TokenVersion, 0)))
-	if err != nil {
-		logger.Error("failed to update token version in Redis",
-			zap.Error(err),
-		)
-	}
+	// Deleting the sessions below kills every refresh token, but the access
+	// tokens already handed out stay valid until they expire. Whoever took
+	// the old password may be holding one, so they are cut off here too.
+	s.revokeOutstandingAccessTokens(ctx, userID.String(), int(utils.DerefInt32(user.TokenVersion, 0)))
 
-	// Delete all sessions except current one
+	// Every session goes, the caller's included; the caller gets a fresh one
+	// below together with tokens carrying the new version.
 	err = s.sessionRepo.DeleteAllUserSessions(ctx, userID)
 	if err != nil {
 		logger.Error("failed to delete sessions",
