@@ -6,6 +6,7 @@ import (
 	"github.com/baaaki/mydreamcampus/shared/eventbus"
 	"github.com/baaaki/mydreamcampus/shared/events"
 	"github.com/baaaki/mydreamcampus/shared/platform/logger"
+	"github.com/baaaki/mydreamcampus/shared/platform/utils"
 	"go.uber.org/zap"
 )
 
@@ -31,6 +32,9 @@ func main() {
 		{Queue: events.QueueAuthStaffEvents, Exchange: "student.events", RoutingKey: "student.updated"},
 		{Queue: events.QueueAuthStaffEvents, Exchange: "student.events", RoutingKey: "student.deactivated"},
 	})
+
+	// Before the first login can arrive — see utils.WarmDummyPassword.
+	utils.WarmDummyPassword()
 
 	module := auth.New(rt.Cfg, rt.Pool, rt.Redis, rt.Rabbit)
 	if err := module.Bootstrap(rt.Ctx); err != nil {

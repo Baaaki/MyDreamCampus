@@ -7,6 +7,7 @@ import (
 	"errors"
 	"fmt"
 	"strings"
+	"sync"
 
 	"golang.org/x/crypto/argon2"
 )
@@ -37,13 +38,15 @@ var DefaultParams = &Argon2Params{
 // ErrWeakPassword is returned when a password fails policy checks.
 var ErrWeakPassword = errors.New("password does not meet policy: min 8 chars, at least one uppercase, one lowercase, one digit")
 
-// dummyHash is a real Argon2id hash of an unguessable random string,
-// computed once at startup. Use it via VerifyDummyPassword to keep
-// login response time uniform when the user does not exist, defeating
-// email enumeration via timing side-channel.
-var dummyHash string
-
-func init() {
+// dummyHash is a real Argon2id hash of an unguessable random string. Use it
+// via VerifyDummyPassword to keep login response time uniform when the user
+// does not exist, defeating email enumeration via timing side-channel.
+//
+// Computed on first use rather than in init(): init ran a 64 MB Argon2id
+// hash in every binary that imports utils — all ten services — and in every
+// test process, although only auth ever needs it. Auth calls
+// WarmDummyPassword at startup so no login pays for the first computation.
+var dummyHash = sync.OnceValue(func() string {
 	// 32 random bytes is unguessable; the value never matches any real
 	// password and the resulting hash exercises the full Argon2id work
 	// factor that VerifyPassword would otherwise skip on a malformed hash.
@@ -55,7 +58,13 @@ func init() {
 	if err != nil {
 		panic("failed to compute dummy password hash: " + err.Error())
 	}
-	dummyHash = h
+	return h
+})
+
+// WarmDummyPassword computes the dummy hash ahead of the first login, whose
+// response would otherwise be one Argon2id round slower — a timing signal.
+func WarmDummyPassword() {
+	dummyHash()
 }
 
 // VerifyDummyPassword runs the full Argon2id verification against a
@@ -63,7 +72,7 @@ func init() {
 // "user not found" branch of a login flow so the response time is
 // indistinguishable from the password-mismatch branch.
 func VerifyDummyPassword(password string) bool {
-	return VerifyPassword(dummyHash, password)
+	return VerifyPassword(dummyHash(), password)
 }
 
 // ValidatePasswordPolicy enforces the password policy used across the system.
