@@ -2,8 +2,11 @@ package service
 
 import (
 	"context"
+	"crypto/sha256"
+	"encoding/hex"
 	"encoding/json"
 	"fmt"
+	"strings"
 	"time"
 
 	"github.com/baaaki/mydreamcampus/auth/internal/db"
@@ -23,13 +26,32 @@ import (
 	"go.uber.org/zap"
 )
 
+// authCache is the slice of Redis the auth service uses — an interface so
+// the lockout and revocation paths can be tested without a Redis server.
+type authCache interface {
+	BlacklistAccessToken(ctx context.Context, jti string, remainingTTL time.Duration) error
+	BlacklistAllUserTokens(ctx context.Context, userID string, tokenVersion int) error
+	LoginFailureCount(ctx context.Context, key string) (int64, error)
+	RecordLoginFailure(ctx context.Context, key string, window time.Duration) (int64, error)
+	ClearLoginFailures(ctx context.Context, key string) error
+	StoreResetToken(ctx context.Context, token, email string, expiry time.Duration) error
+	GetResetToken(ctx context.Context, token string) (string, error)
+	DeleteResetToken(ctx context.Context, token string) error
+}
+
+var _ authCache = (*redis.ClientWrapper)(nil)
+
 type AuthService struct {
 	authRepo    *repository.AuthRepository
 	sessionRepo *repository.SessionRepository
 	eventRepo   *repository.EventRepository
-	redisClient *redis.ClientWrapper
+	redisClient authCache
 	config      *config.Config
 }
+
+// maxLoginFailures is how many wrong passwords one address may try against
+// one account before it is locked out for ACCOUNT_LOCK_DURATION_MINUTES.
+const maxLoginFailures = 5
 
 func NewAuthService(
 	authRepo *repository.AuthRepository,
@@ -56,6 +78,18 @@ func (s *AuthService) Login(ctx context.Context, req dto.LoginRequest, deviceInf
 		zap.String("email", req.Email),
 	)
 
+	// The lockout is keyed on the account AND the client address. Keyed on
+	// the account alone, anyone who knows an e-mail — the admin's included —
+	// could lock its owner out with five bad guesses.
+	lockKey := loginFailureKey(req.Email, ipAddress)
+	if s.loginLockedOut(ctx, lockKey, serviceLogger) {
+		// Same work, same answer as a wrong password: a distinct lockout
+		// response would reveal that the address exists and was targeted.
+		utils.VerifyDummyPassword(req.Password)
+		serviceLogger.Warn("login attempt while locked out", zap.String("ip", ipAddress))
+		return dto.LoginResponse{}, "", serviceErrors.ErrAccountLocked
+	}
+
 	// Get user by email
 	user, err := s.authRepo.GetUserByEmail(ctx, req.Email)
 	if err != nil {
@@ -65,6 +99,9 @@ func (s *AuthService) Login(ctx context.Context, req dto.LoginRequest, deviceInf
 			// precomputed dummy hash so response time matches the
 			// password-mismatch branch and email enumeration is closed.
 			utils.VerifyDummyPassword(req.Password)
+			// Counted like a wrong password, so unknown addresses lock out
+			// exactly like real ones.
+			s.recordLoginFailure(ctx, lockKey, serviceLogger)
 			serviceLogger.Warn("login attempt for non-existent user")
 			return dto.LoginResponse{}, "", serviceErrors.ErrInvalidCredentials
 		}
@@ -81,44 +118,21 @@ func (s *AuthService) Login(ctx context.Context, req dto.LoginRequest, deviceInf
 	// in the system; only the audit trail records the real reason.
 	if !utils.DerefBool(user.IsActive, false) {
 		utils.VerifyDummyPassword(req.Password)
+		s.recordLoginFailure(ctx, lockKey, serviceLogger)
 		serviceLogger.Warn("login attempt for deactivated account")
 		return dto.LoginResponse{}, "", serviceErrors.ErrInvalidCredentials
 	}
 
-	// Check if account is locked
-	if user.LockedUntil.Valid && user.LockedUntil.Time.After(clock.Now()) {
-		serviceLogger.Warn("login attempt for locked account",
-			zap.Time("locked_until", user.LockedUntil.Time),
-		)
-		return dto.LoginResponse{}, "", serviceErrors.ErrAccountLocked
-	}
-
 	// Verify password
 	if !utils.VerifyPassword(user.PasswordHash, req.Password) {
-		// Increment failed attempts
-		_ = s.authRepo.IncrementFailedLoginAttempts(ctx, utils.PgtypeToUUID(user.ID))
-
-		// Lock account if too many failures (5+ attempts)
-		if utils.DerefInt32(user.FailedLoginAttempts, 0)+1 >= 5 {
-			lockUntil := clock.Now().Add(30 * time.Minute)
-			_ = s.authRepo.LockAccount(ctx, db.LockAccountParams{
-				ID: user.ID,
-				LockedUntil: pgtype.Timestamp{
-					Time:  lockUntil,
-					Valid: true,
-				},
-			})
-			serviceLogger.Warn("account locked due to too many failed attempts",
-				zap.Int("failed_attempts", 5),
-			)
-		}
-
+		s.recordLoginFailure(ctx, lockKey, serviceLogger)
 		serviceLogger.Warn("invalid password")
 		return dto.LoginResponse{}, "", serviceErrors.ErrInvalidCredentials
 	}
 
-	// Reset failed login attempts on successful login
-	_ = s.authRepo.ResetFailedLoginAttempts(ctx, utils.PgtypeToUUID(user.ID))
+	if err := s.redisClient.ClearLoginFailures(ctx, lockKey); err != nil {
+		serviceLogger.Warn("failed to clear login failures", zap.Error(err))
+	}
 
 	// Generate tokens
 	accessToken, err := s.generateAccessToken(user)
@@ -272,6 +286,46 @@ func (s *AuthService) blacklistAccessToken(ctx context.Context, tokenString stri
 
 	// Add to blacklist
 	return s.redisClient.BlacklistAccessToken(ctx, jti, remainingTTL)
+}
+
+// loginFailureKey scopes the failure counter to one account from one
+// address. The e-mail is hashed so Redis never holds it in clear text.
+func loginFailureKey(email, ip string) string {
+	sum := sha256.Sum256([]byte(strings.ToLower(strings.TrimSpace(email))))
+	return "login_fail:" + hex.EncodeToString(sum[:]) + ":" + ip
+}
+
+// loginLockedOut fails open: when Redis cannot answer, the fail-closed login
+// rate limit still bounds how fast passwords can be tried.
+func (s *AuthService) loginLockedOut(ctx context.Context, key string, log *zap.Logger) bool {
+	failures, err := s.redisClient.LoginFailureCount(ctx, key)
+	if err != nil {
+		log.Error("login failure count unavailable", zap.Error(err))
+		return false
+	}
+	return failures >= maxLoginFailures
+}
+
+func (s *AuthService) recordLoginFailure(ctx context.Context, key string, log *zap.Logger) {
+	failures, err := s.redisClient.RecordLoginFailure(ctx, key, s.lockDuration())
+	if err != nil {
+		log.Error("failed to record login failure", zap.Error(err))
+		return
+	}
+	if failures == maxLoginFailures {
+		log.Warn("login locked out after repeated failures",
+			zap.Int64("failures", failures),
+			zap.Duration("lock_duration", s.lockDuration()),
+		)
+	}
+}
+
+func (s *AuthService) lockDuration() time.Duration {
+	minutes := s.config.Timeout.AccountLockDurationMinutes
+	if minutes <= 0 {
+		minutes = 30
+	}
+	return time.Duration(minutes) * time.Minute
 }
 
 // revokeOutstandingAccessTokens raises the minimum token version JWTAuth

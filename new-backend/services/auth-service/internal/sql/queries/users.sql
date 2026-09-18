@@ -42,25 +42,6 @@ SET token_version = token_version + 1,
 WHERE id = $1
 RETURNING token_version;
 
--- name: IncrementFailedLoginAttempts :exec
-UPDATE auth.users
-SET failed_login_attempts = failed_login_attempts + 1,
-    updated_at = NOW()
-WHERE id = $1;
-
--- name: ResetFailedLoginAttempts :exec
-UPDATE auth.users
-SET failed_login_attempts = 0,
-    locked_until = NULL,
-    updated_at = NOW()
-WHERE id = $1;
-
--- name: LockAccount :exec
-UPDATE auth.users
-SET locked_until = $2,
-    updated_at = NOW()
-WHERE id = $1;
-
 -- name: DeactivateUser :exec
 UPDATE auth.users
 SET is_active = false,

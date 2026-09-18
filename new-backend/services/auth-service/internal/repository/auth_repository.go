@@ -120,33 +120,6 @@ func (r *AuthRepository) IncrementTokenVersion(ctx context.Context, userID uuid.
 	return *version, nil
 }
 
-// IncrementFailedLoginAttempts increments failed login attempts
-func (r *AuthRepository) IncrementFailedLoginAttempts(ctx context.Context, userID uuid.UUID) error {
-	err := r.queries.IncrementFailedLoginAttempts(ctx, utils.UUIDToPgtype(userID))
-	if err != nil {
-		return fmt.Errorf("%w: failed to increment failed login attempts: %v", sharedErrors.ErrQueryFailed, err)
-	}
-	return nil
-}
-
-// ResetFailedLoginAttempts resets failed login attempts to 0
-func (r *AuthRepository) ResetFailedLoginAttempts(ctx context.Context, userID uuid.UUID) error {
-	err := r.queries.ResetFailedLoginAttempts(ctx, utils.UUIDToPgtype(userID))
-	if err != nil {
-		return fmt.Errorf("%w: failed to reset failed login attempts: %v", sharedErrors.ErrQueryFailed, err)
-	}
-	return nil
-}
-
-// LockAccount locks account until specified time
-func (r *AuthRepository) LockAccount(ctx context.Context, params db.LockAccountParams) error {
-	err := r.queries.LockAccount(ctx, params)
-	if err != nil {
-		return fmt.Errorf("%w: failed to lock account: %v", sharedErrors.ErrQueryFailed, err)
-	}
-	return nil
-}
-
 // DeactivateUser soft deletes a user
 func (r *AuthRepository) DeactivateUser(ctx context.Context, userID uuid.UUID) error {
 	err := r.queries.DeactivateUser(ctx, utils.UUIDToPgtype(userID))

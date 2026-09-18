@@ -113,6 +113,37 @@ func (c *ClientWrapper) GetMinTokenVersion(ctx context.Context, userID string) (
 }
 
 // ============================================
+// Auth Service - Login Failure Throttle
+// ============================================
+
+// LoginFailureCount returns the failed logins recorded under key in its
+// current window, 0 when there are none.
+func (c *ClientWrapper) LoginFailureCount(ctx context.Context, key string) (int64, error) {
+	n, err := c.client.Get(ctx, key).Int64()
+	if err == redis.Nil {
+		return 0, nil
+	}
+	return n, err
+}
+
+// RecordLoginFailure counts one failed login and restarts the window, so a
+// lockout lasts `window` from the most recent failure. Returns the new count.
+func (c *ClientWrapper) RecordLoginFailure(ctx context.Context, key string, window time.Duration) (int64, error) {
+	pipe := c.client.TxPipeline()
+	incr := pipe.Incr(ctx, key)
+	pipe.Expire(ctx, key, window)
+	if _, err := pipe.Exec(ctx); err != nil {
+		return 0, err
+	}
+	return incr.Val(), nil
+}
+
+// ClearLoginFailures forgets the failures once the login succeeds.
+func (c *ClientWrapper) ClearLoginFailures(ctx context.Context, key string) error {
+	return c.client.Del(ctx, key).Err()
+}
+
+// ============================================
 // Auth Service - Password Reset Token
 // ============================================
 

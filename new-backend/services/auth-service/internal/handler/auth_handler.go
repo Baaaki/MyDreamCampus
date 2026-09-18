@@ -54,6 +54,13 @@ func (h *AuthHandler) clearAuthCookie(c *gin.Context, name string) {
 	)
 }
 
+func respondInvalidCredentials(c *gin.Context) {
+	c.JSON(http.StatusUnauthorized, dto.ErrorResponse{
+		Error:   "INVALID_CREDENTIALS",
+		Message: "Geçersiz e-posta veya şifre",
+	})
+}
+
 type AuthHandler struct {
 	authService *service.AuthService
 	config      *config.Config
@@ -107,22 +114,18 @@ func (h *AuthHandler) Login(c *gin.Context) {
 			zap.String("email", req.Email),
 		)
 
-		// Check for specific auth errors
+		// A lockout answers exactly like a wrong password. A separate status
+		// would confirm the address exists — undoing the dummy-hash timing
+		// protection — so the real reason goes to the audit log only.
 		if sharedErrors.Is(err, authErrors.ErrAccountLocked) {
-			audit.LogSecurityFromContextWithDetails(c, audit.EventAccountLocked, "failure", "", "too many failed attempts", map[string]string{"email": req.Email})
-			c.JSON(http.StatusTooManyRequests, dto.ErrorResponse{
-				Error:   "ACCOUNT_LOCKED",
-				Message: "Hesabınız çok fazla başarısız giriş denemesi nedeniyle geçici olarak kilitlendi. Lütfen 30 dakika sonra tekrar deneyin.",
-			})
+			audit.LogSecurityFromContextWithDetails(c, audit.EventAccountLocked, "failure", "", "locked out after repeated failures", map[string]string{"email": req.Email})
+			respondInvalidCredentials(c)
 			return
 		}
 
-		if sharedErrors.Is(err, authErrors.ErrInvalidCredentials) || err == sharedErrors.ErrUnauthorized {
+		if sharedErrors.Is(err, authErrors.ErrInvalidCredentials) {
 			audit.LogSecurityFromContextWithDetails(c, audit.EventLoginFailed, "failure", "", "invalid credentials", map[string]string{"email": req.Email})
-			c.JSON(http.StatusUnauthorized, dto.ErrorResponse{
-				Error:   "INVALID_CREDENTIALS",
-				Message: "Geçersiz e-posta veya şifre",
-			})
+			respondInvalidCredentials(c)
 			return
 		}
 

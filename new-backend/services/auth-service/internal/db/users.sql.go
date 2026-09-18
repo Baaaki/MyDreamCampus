@@ -170,18 +170,6 @@ func (q *Queries) GetUserByID(ctx context.Context, id pgtype.UUID) (User, error)
 	return i, err
 }
 
-const incrementFailedLoginAttempts = `-- name: IncrementFailedLoginAttempts :exec
-UPDATE auth.users
-SET failed_login_attempts = failed_login_attempts + 1,
-    updated_at = NOW()
-WHERE id = $1
-`
-
-func (q *Queries) IncrementFailedLoginAttempts(ctx context.Context, id pgtype.UUID) error {
-	_, err := q.db.Exec(ctx, incrementFailedLoginAttempts, id)
-	return err
-}
-
 const incrementTokenVersion = `-- name: IncrementTokenVersion :one
 UPDATE auth.users
 SET token_version = token_version + 1,
@@ -195,36 +183,6 @@ func (q *Queries) IncrementTokenVersion(ctx context.Context, id pgtype.UUID) (*i
 	var token_version *int32
 	err := row.Scan(&token_version)
 	return token_version, err
-}
-
-const lockAccount = `-- name: LockAccount :exec
-UPDATE auth.users
-SET locked_until = $2,
-    updated_at = NOW()
-WHERE id = $1
-`
-
-type LockAccountParams struct {
-	ID          pgtype.UUID      `json:"id"`
-	LockedUntil pgtype.Timestamp `json:"locked_until"`
-}
-
-func (q *Queries) LockAccount(ctx context.Context, arg LockAccountParams) error {
-	_, err := q.db.Exec(ctx, lockAccount, arg.ID, arg.LockedUntil)
-	return err
-}
-
-const resetFailedLoginAttempts = `-- name: ResetFailedLoginAttempts :exec
-UPDATE auth.users
-SET failed_login_attempts = 0,
-    locked_until = NULL,
-    updated_at = NOW()
-WHERE id = $1
-`
-
-func (q *Queries) ResetFailedLoginAttempts(ctx context.Context, id pgtype.UUID) error {
-	_, err := q.db.Exec(ctx, resetFailedLoginAttempts, id)
-	return err
 }
 
 const updatePassword = `-- name: UpdatePassword :exec

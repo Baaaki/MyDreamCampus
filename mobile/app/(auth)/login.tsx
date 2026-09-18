@@ -54,11 +54,9 @@ export default function LoginScreen() {
           const errorData = error.response?.data;
           let message = 'Giris yapilamadi. Tekrar dene.';
 
-          if (errorData?.error === 'ACCOUNT_LOCKED') {
-            message = errorData.message || 'Hesabin gecici olarak kilitlendi';
-          } else if (errorData?.error === 'ACCOUNT_DEACTIVATED') {
-            message = 'Hesabin devre disi birakilmis';
-          } else if (errorData?.error === 'INVALID_CREDENTIALS') {
+          // Lockout and deactivated accounts answer INVALID_CREDENTIALS too —
+          // the backend does not say which, so an address cannot be probed.
+          if (errorData?.error === 'INVALID_CREDENTIALS') {
             message = 'E-posta veya sifre hatali';
           } else if (errorData?.message) {
             message = errorData.message;

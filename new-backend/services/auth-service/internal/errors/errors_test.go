@@ -19,7 +19,7 @@ func TestAuthErrors_HTTPStatusCodes(t *testing.T) {
 		"EXPIRED_TOKEN":                    {ErrExpiredToken, http.StatusUnauthorized},
 		"TOKEN_REVOKED":                    {ErrTokenRevoked, http.StatusUnauthorized},
 		"TOKEN_VERSION_MISMATCH":           {ErrTokenVersionMismatch, http.StatusUnauthorized},
-		"ACCOUNT_LOCKED":                   {ErrAccountLocked, http.StatusTooManyRequests},
+		"ACCOUNT_LOCKED":                   {ErrAccountLocked, http.StatusUnauthorized},
 		"ACCOUNT_DEACTIVATED":              {ErrAccountDeactivated, http.StatusUnauthorized},
 		"FORCE_PASSWORD_CHANGE":            {ErrForcePasswordChange, http.StatusForbidden},
 		"CANNOT_TERMINATE_CURRENT_SESSION": {ErrCannotTerminateSession, http.StatusBadRequest},
