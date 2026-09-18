@@ -49,6 +49,13 @@ func NewServer(cfg *config.Config, service string) *Server {
 	}
 
 	r := gin.New()
+	// Gin trusts every peer by default, so ClientIP() returned whatever the
+	// client wrote into X-Forwarded-For — spoofable, which let anyone pick
+	// a fresh rate-limit bucket per request. With the peer list set, the
+	// header is honoured only as far as it was written by a known proxy.
+	if err := r.SetTrustedProxies(cfg.Server.TrustedProxies); err != nil {
+		logger.Fatal("invalid TRUSTED_PROXIES", zap.Error(err))
+	}
 	r.Use(platformMiddleware.Recovery())
 	r.Use(platformMiddleware.SecurityHeaders())
 	r.Use(platformMiddleware.CORS())

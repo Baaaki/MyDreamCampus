@@ -3,6 +3,7 @@ package config
 import (
 	"errors"
 	"fmt"
+	"strings"
 
 	"github.com/spf13/viper"
 )
@@ -31,6 +32,10 @@ type ServerConfig struct {
 	// InternalSecret authenticates loopback service-to-service calls
 	// (X-Internal-Secret header on /internal/* routes).
 	InternalSecret string `mapstructure:"INTERNAL_SERVICE_SECRET"`
+	// TrustedProxies are the peers whose X-Forwarded-For is believed when
+	// resolving the client IP. Services are reachable only over the compose
+	// network, where the one peer that sets the header is Caddy.
+	TrustedProxies []string `mapstructure:"TRUSTED_PROXIES"`
 }
 
 // InternalClientConfig governs how services reach each other: internal REST
@@ -148,6 +153,7 @@ func Load() (*Config, error) {
 			Environment:    viper.GetString("ENVIRONMENT"),
 			Port:           viper.GetString("PORT"),
 			InternalSecret: viper.GetString("INTERNAL_SERVICE_SECRET"),
+			TrustedProxies: splitList(viper.GetString("TRUSTED_PROXIES")),
 		},
 		Database: DatabaseConfig{URL: viper.GetString("DB_URL")},
 		RabbitMQ: RabbitMQConfig{URL: viper.GetString("RABBITMQ_URL")},
@@ -237,6 +243,9 @@ func setDefaults() {
 	viper.SetDefault("ENVIRONMENT", "development")
 	viper.SetDefault("PORT", "8080")
 	viper.SetDefault("INTERNAL_SERVICE_SECRET", "change-this-internal-secret-in-production")
+	// Private ranges only: a service is never reached from a public address
+	// directly, so any public hop in X-Forwarded-For is the client itself.
+	viper.SetDefault("TRUSTED_PROXIES", "127.0.0.0/8,10.0.0.0/8,172.16.0.0/12,192.168.0.0/16,::1/128,fc00::/7")
 
 	// No DB_URL default: every service owns a different database, so any value
 	// here would be wrong for eight of the nine. Services that need a pool
@@ -294,6 +303,17 @@ func setDefaults() {
 	viper.SetDefault("LUNCH_END_HOUR", 13)
 	viper.SetDefault("DINNER_START_HOUR", 16)
 	viper.SetDefault("DINNER_END_HOUR", 19)
+}
+
+// splitList parses a comma-separated env value, dropping blanks.
+func splitList(raw string) []string {
+	var out []string
+	for _, part := range strings.Split(raw, ",") {
+		if part = strings.TrimSpace(part); part != "" {
+			out = append(out, part)
+		}
+	}
+	return out
 }
 
 // ValidateQRSecret is checked only by services that sign QR codes with the
