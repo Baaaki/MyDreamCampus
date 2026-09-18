@@ -45,68 +45,15 @@ func (c *Consumer) BindQueue(queueName, exchangeName, routingKey string) error {
 	)
 }
 
-// Consume starts consuming messages from a queue
-func (c *Consumer) Consume(queueName string, handler MessageHandler) error {
-	msgs, err := c.conn.Channel().Consume(
-		queueName, // queue
-		"",        // consumer tag (auto-generated)
-		false,     // auto-ack (manual ack for reliability)
-		false,     // exclusive
-		false,     // no-local
-		false,     // no-wait
-		nil,       // args
-	)
-	if err != nil {
-		return fmt.Errorf("failed to start consuming: %w", err)
-	}
-
-	logger.Info("consumer started", zap.String("queue", queueName))
-
-	// Process messages
-	go func() {
-		for msg := range msgs {
-			logger.Debug("message received",
-				zap.String("queue", queueName),
-				zap.String("routing_key", msg.RoutingKey),
-				zap.Int("body_size", len(msg.Body)),
-			)
-
-			// Process message
-			if err := handler(msg.Body); err != nil {
-				logger.Error("message processing failed",
-					zap.Error(err),
-					zap.String("queue", queueName),
-					zap.String("routing_key", msg.RoutingKey),
-				)
-
-				// Negative acknowledgment - requeue the message
-				if nackErr := msg.Nack(false, true); nackErr != nil {
-					logger.Warn("nack failed", zap.String("queue", queueName), zap.Error(nackErr))
-				}
-				continue
-			}
-
-			// Acknowledge successful processing
-			if ackErr := msg.Ack(false); ackErr != nil {
-				logger.Warn("ack failed", zap.String("queue", queueName), zap.Error(ackErr))
-			}
-		}
-	}()
-
-	return nil
-}
-
-// ConsumeWithDLQ consumes messages with Dead Letter Queue support
+// ConsumeWithDLQ consumes a queue, retrying a failed message through the
+// queue's retry delay line up to maxRetries times before parking it in the
+// DLQ. The first subscription is made before it returns, so a missing queue
+// still fails startup; after that it re-subscribes on its own whenever the
+// connection is re-established.
 func (c *Consumer) ConsumeWithDLQ(queueName string, handler MessageHandler, maxRetries int) error {
-	msgs, err := c.conn.Channel().Consume(
-		queueName,
-		"",
-		false, // manual ack
-		false,
-		false,
-		false,
-		nil,
-	)
+	// Taken before subscribing: a reconnect between the two must not be missed.
+	next := c.conn.Reconnected()
+	msgs, err := c.subscribe(queueName)
 	if err != nil {
 		return fmt.Errorf("failed to start consuming: %w", err)
 	}
@@ -117,50 +64,91 @@ func (c *Consumer) ConsumeWithDLQ(queueName string, handler MessageHandler, maxR
 	)
 
 	go func() {
-		for msg := range msgs {
-			retryCount := getRetryCount(msg.Headers)
-
-			logger.Debug("message received",
-				zap.String("queue", queueName),
-				zap.Int("retry_count", retryCount),
-			)
-
-			// Process message
-			if err := handler(msg.Body); err != nil {
-				logger.Error("message processing failed",
-					zap.Error(err),
-					zap.String("queue", queueName),
-					zap.Int("retry_count", retryCount),
-				)
-
-				// Check retry limit
-				if retryCount < maxRetries {
-					// Republish with incremented retry count
-					c.republishWithRetry(msg, retryCount+1)
-					if ackErr := msg.Ack(false); ackErr != nil {
-						logger.Warn("ack failed after republish", zap.String("queue", queueName), zap.Error(ackErr))
-					}
-				} else {
-					// Max retries exceeded - send to DLQ
-					logger.Warn("max retries exceeded, sending to DLQ",
-						zap.String("queue", queueName),
-						zap.Int("retry_count", retryCount),
-					)
-					if nackErr := msg.Nack(false, false); nackErr != nil { // Don't requeue - goes to DLQ
-						logger.Warn("nack to DLQ failed", zap.String("queue", queueName), zap.Error(nackErr))
-					}
-				}
-				continue
+		for {
+			for msg := range msgs {
+				c.handleDelivery(queueName, msg, handler, maxRetries)
 			}
-
-			// Success
-			if ackErr := msg.Ack(false); ackErr != nil {
-				logger.Warn("ack failed", zap.String("queue", queueName), zap.Error(ackErr))
+			// The delivery channel closes when the AMQP channel or
+			// connection dies. Wait for the supervisor to bring up a new one
+			// and subscribe again — returning here is how every consumer
+			// used to stop for good after a broker restart.
+			for {
+				select {
+				case <-c.conn.Done():
+					return
+				case <-next:
+				}
+				next = c.conn.Reconnected()
+				msgs, err = c.subscribe(queueName)
+				if err == nil {
+					logger.Info("consumer resubscribed after reconnect", zap.String("queue", queueName))
+					break
+				}
+				logger.Error("consumer resubscribe failed, waiting for the next reconnect",
+					zap.Error(err), zap.String("queue", queueName))
 			}
 		}
 	}()
 
 	return nil
+}
+
+func (c *Consumer) subscribe(queueName string) (<-chan amqp.Delivery, error) {
+	return c.conn.Channel().Consume(
+		queueName,
+		"",
+		false, // manual ack
+		false,
+		false,
+		false,
+		nil,
+	)
+}
+
+func (c *Consumer) handleDelivery(queueName string, msg amqp.Delivery, handler MessageHandler, maxRetries int) {
+	retryCount := getRetryCount(msg.Headers)
+
+	logger.Debug("message received",
+		zap.String("queue", queueName),
+		zap.Int("retry_count", retryCount),
+	)
+
+	if err := handler(msg.Body); err != nil {
+		logger.Error("message processing failed",
+			zap.Error(err),
+			zap.String("queue", queueName),
+			zap.Int("retry_count", retryCount),
+		)
+
+		if retryCount < maxRetries {
+			if pubErr := c.scheduleRetry(queueName, msg, retryCount+1); pubErr != nil {
+				// Could not park it for later: requeue now rather than lose it.
+				logger.Error("failed to schedule retry, requeueing",
+					zap.Error(pubErr), zap.String("queue", queueName))
+				if nackErr := msg.Nack(false, true); nackErr != nil {
+					logger.Warn("nack failed", zap.String("queue", queueName), zap.Error(nackErr))
+				}
+				return
+			}
+			if ackErr := msg.Ack(false); ackErr != nil {
+				logger.Warn("ack failed after scheduling retry", zap.String("queue", queueName), zap.Error(ackErr))
+			}
+			return
+		}
+
+		logger.Warn("max retries exceeded, sending to DLQ",
+			zap.String("queue", queueName),
+			zap.Int("retry_count", retryCount),
+		)
+		if nackErr := msg.Nack(false, false); nackErr != nil { // Don't requeue - goes to DLQ
+			logger.Warn("nack to DLQ failed", zap.String("queue", queueName), zap.Error(nackErr))
+		}
+		return
+	}
+
+	if ackErr := msg.Ack(false); ackErr != nil {
+		logger.Warn("ack failed", zap.String("queue", queueName), zap.Error(ackErr))
+	}
 }
 
 // EnvelopeHandler processes one event body with a context that already
@@ -196,30 +184,39 @@ func (c *Consumer) ConsumeEnvelope(ctx context.Context, queueName string, handle
 	}, MaxDeliveryAttempts)
 }
 
-// getRetryCount extracts retry count from message headers
+// getRetryCount extracts retry count from message headers. The broker may
+// hand an integer header back in any width, so all of them are accepted.
 func getRetryCount(headers amqp.Table) int {
-	if headers == nil {
-		return 0
+	switch v := headers[retryCountHeader].(type) {
+	case int32:
+		return int(v)
+	case int64:
+		return int(v)
+	case int:
+		return v
+	case int16:
+		return int(v)
+	case int8:
+		return int(v)
 	}
-
-	if retryCount, ok := headers["x-retry-count"].(int32); ok {
-		return int(retryCount)
-	}
-
 	return 0
 }
 
-// republishWithRetry republishes a message with incremented retry count
-func (c *Consumer) republishWithRetry(msg amqp.Delivery, retryCount int) {
-	headers := msg.Headers
-	if headers == nil {
-		headers = amqp.Table{}
-	}
-	headers["x-retry-count"] = utils.ClampToInt32(retryCount)
+const retryCountHeader = "x-retry-count"
 
-	err := c.conn.Channel().Publish(
-		msg.Exchange,   // exchange
-		msg.RoutingKey, // routing key
+// scheduleRetry parks the message in the queue's retry delay line. It goes
+// through the default exchange by queue name, so only this queue sees it
+// again.
+func (c *Consumer) scheduleRetry(queueName string, msg amqp.Delivery, retryCount int) error {
+	headers := amqp.Table{}
+	for k, v := range msg.Headers {
+		headers[k] = v
+	}
+	headers[retryCountHeader] = utils.ClampToInt32(retryCount)
+
+	return c.conn.Channel().Publish(
+		"",                        // default exchange: routes by queue name
+		RetryQueueName(queueName), // routing key = the retry queue
 		false,
 		false,
 		amqp.Publishing{
@@ -229,13 +226,6 @@ func (c *Consumer) republishWithRetry(msg amqp.Delivery, retryCount int) {
 			Headers:      headers,
 		},
 	)
-
-	if err != nil {
-		logger.Error("failed to republish message with retry",
-			zap.Error(err),
-			zap.Int("retry_count", retryCount),
-		)
-	}
 }
 
 // UnmarshalEvent unmarshals JSON event body
