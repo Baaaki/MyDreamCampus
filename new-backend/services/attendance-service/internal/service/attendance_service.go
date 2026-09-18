@@ -20,6 +20,7 @@ import (
 	"github.com/baaaki/mydreamcampus/shared/platform/rules"
 	"github.com/baaaki/mydreamcampus/shared/platform/utils"
 	"github.com/google/uuid"
+	"github.com/jackc/pgx/v5/pgtype"
 	"go.uber.org/zap"
 )
 
@@ -124,9 +125,12 @@ func (s *AttendanceService) CreateSession(ctx context.Context, instructorID uuid
 		WeekNumber:   req.WeekNumber,
 		SessionDate:  utils.TimeToPgDate(now),
 		QrSecret:     qrSecret,
-		StartedAt:    utils.TimeToPgTimestamp(now),
-		ExpiresAt:    utils.TimeToPgTimestamp(expiresAt),
-		SessionType:  sessionType,
+		// Stored per session so a later change to the default cannot
+		// invalidate codes already on screen.
+		QrRotationInterval: pgtype.Int2{Int16: int16(DefaultQRRotation / time.Second), Valid: true},
+		StartedAt:          utils.TimeToPgTimestamp(now),
+		ExpiresAt:          utils.TimeToPgTimestamp(expiresAt),
+		SessionType:        sessionType,
 	})
 	if err != nil {
 		return dto.CreateSessionResponse{}, err
@@ -200,8 +204,8 @@ func (s *AttendanceService) ScanQR(ctx context.Context, studentID uuid.UUID, req
 		return dto.ScanQRResponse{}, err
 	}
 
-	// 2. Validate QR signature
-	if !s.qrService.ValidateQRSignature(req.QRPayload, session.QrSecret) {
+	// 2. Validate QR signature — also rejects a code whose window has passed
+	if !s.qrService.ValidateQRSignature(req.QRPayload, session.QrSecret, clock.Now(), qrRotation(session)) {
 		return dto.ScanQRResponse{}, errors.ErrInvalidQRCode
 	}
 
@@ -278,14 +282,24 @@ func (s *AttendanceService) GetQRCode(ctx context.Context, sessionID, instructor
 		return dto.GetQRResponse{}, errors.ErrForbidden
 	}
 
-	// Generate QR payload (static for entire session)
-	payload := s.qrService.GenerateQRPayload(sessionID.String(), session.QrSecret)
+	rotation := qrRotation(session)
+	payload := s.qrService.GenerateQRPayload(sessionID.String(), session.QrSecret, clock.Now(), rotation)
 
 	return dto.GetQRResponse{
-		SessionID:  sessionID,
-		QRPayload:  payload,
-		ValidUntil: utils.PgTimestampToTime(session.ExpiresAt),
+		SessionID:        sessionID,
+		QRPayload:        payload,
+		ValidUntil:       utils.PgTimestampToTime(session.ExpiresAt),
+		RotationInterval: int(rotation / time.Second),
 	}, nil
+}
+
+// qrRotation reads the session's rotation interval. Sessions created before
+// it was stored have NULL there and get the default.
+func qrRotation(session db.AttendanceSession) time.Duration {
+	if session.QrRotationInterval.Valid && session.QrRotationInterval.Int16 > 0 {
+		return time.Duration(session.QrRotationInterval.Int16) * time.Second
+	}
+	return DefaultQRRotation
 }
 
 // CreateManualAttendance creates manual attendance record
@@ -819,6 +833,7 @@ func (s *AttendanceService) GetSessionDetails(ctx context.Context, sessionID, in
 		EnrolledStudentCount: totalEnrolled,
 		PresentCount:         int(presentCount),
 		AbsentCount:          totalEnrolled - int(presentCount),
+		QRRotationInterval:   int(qrRotation(session) / time.Second),
 	}, nil
 }
 

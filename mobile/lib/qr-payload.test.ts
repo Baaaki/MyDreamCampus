@@ -6,8 +6,8 @@ import { createScanGate, parseQRPayload } from './qr-payload';
 // because a partial match would let bogus QRs through to the API.
 describe('parseQRPayload', () => {
   it('returns the typed payload for a well-formed QR', () => {
-    const raw = JSON.stringify({ sid: 'session-1', sig: 'sig-1' });
-    expect(parseQRPayload(raw)).toEqual({ sid: 'session-1', sig: 'sig-1' });
+    const raw = JSON.stringify({ sid: 'session-1', win: 7, sig: 'sig-1' });
+    expect(parseQRPayload(raw)).toEqual({ sid: 'session-1', win: 7, sig: 'sig-1' });
   });
 
   it('returns null for invalid JSON without throwing', () => {
@@ -16,23 +16,33 @@ describe('parseQRPayload', () => {
     expect(parseQRPayload('{not closed')).toBeNull();
   });
 
+  it('returns null for a pre-rotation code without a window', () => {
+    const raw = JSON.stringify({ sid: 'session-1', sig: 'sig-1' });
+    expect(parseQRPayload(raw)).toBeNull();
+  });
+
+  it('returns null when win is not an integer', () => {
+    expect(parseQRPayload(JSON.stringify({ sid: 'session-1', win: '7', sig: 'sig-1' }))).toBeNull();
+    expect(parseQRPayload(JSON.stringify({ sid: 'session-1', win: 7.5, sig: 'sig-1' }))).toBeNull();
+  });
+
   it('returns null when sid is missing', () => {
-    const raw = JSON.stringify({ sig: 'sig-1' });
+    const raw = JSON.stringify({ win: 7, sig: 'sig-1' });
     expect(parseQRPayload(raw)).toBeNull();
   });
 
   it('returns null when sig is missing', () => {
-    const raw = JSON.stringify({ sid: 'session-1' });
+    const raw = JSON.stringify({ sid: 'session-1', win: 7 });
     expect(parseQRPayload(raw)).toBeNull();
   });
 
   it('returns null when sid is not a string', () => {
-    const raw = JSON.stringify({ sid: 12345, sig: 'sig-1' });
+    const raw = JSON.stringify({ sid: 12345, win: 7, sig: 'sig-1' });
     expect(parseQRPayload(raw)).toBeNull();
   });
 
   it('returns null when sig is not a string', () => {
-    const raw = JSON.stringify({ sid: 'session-1', sig: { v: 'x' } });
+    const raw = JSON.stringify({ sid: 'session-1', win: 7, sig: { v: 'x' } });
     expect(parseQRPayload(raw)).toBeNull();
   });
 
@@ -47,9 +57,9 @@ describe('parseQRPayload', () => {
   });
 
   it('ignores extra unknown fields', () => {
-    const raw = JSON.stringify({ sid: 'session-1', sig: 'sig-1', extra: 'ignore-me' });
+    const raw = JSON.stringify({ sid: 'session-1', win: 7, sig: 'sig-1', extra: 'ignore-me' });
     const out = parseQRPayload(raw);
-    expect(out).toEqual({ sid: 'session-1', sig: 'sig-1' });
+    expect(out).toEqual({ sid: 'session-1', win: 7, sig: 'sig-1' });
     expect((out as { extra?: string }).extra).toBeUndefined();
   });
 });

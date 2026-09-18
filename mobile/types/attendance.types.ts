@@ -1,6 +1,9 @@
 // QR Scan
+// win is the rotation window the signature covers; the backend rejects a
+// code once its window has passed, so a forwarded photo stops working.
 export interface QRPayload {
   sid: string;
+  win: number;
   sig: string;
 }
 

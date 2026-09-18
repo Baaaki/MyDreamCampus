@@ -116,7 +116,7 @@ export default function AttendanceSessionPage() {
 
     const interval = setInterval(() => {
       fetchQRCode();
-    }, (sessionInfo.qr_rotation_interval || 30) * 1000);
+    }, (sessionInfo.qr_rotation_interval || 15) * 1000);
 
     return () => clearInterval(interval);
   }, [sessionInfo, fetchQRCode]);
@@ -319,7 +319,7 @@ export default function AttendanceSessionPage() {
                 <div className="mt-4 flex items-center gap-2 text-sm text-gray-500 dark:text-gray-400">
                   <RefreshCw className="h-4 w-4" />
                   <span>
-                    Her {sessionInfo?.qr_rotation_interval || 30} saniyede otomatik yenilenir
+                    Her {sessionInfo?.qr_rotation_interval || 15} saniyede otomatik yenilenir
                   </span>
                 </div>
                 <Button

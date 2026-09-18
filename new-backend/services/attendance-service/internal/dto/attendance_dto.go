@@ -28,17 +28,20 @@ type CreateSessionResponse struct {
 	EnrolledStudentCount int       `json:"enrolled_student_count"`
 }
 
-// QRPayload is the data embedded in QR code
+// QRPayload is the data embedded in QR code. Window is the rotation bucket
+// the signature covers; keys stay short because they are drawn as pixels.
 type QRPayload struct {
 	SessionID string `json:"sid"`
+	Window    int64  `json:"win"`
 	Signature string `json:"sig"`
 }
 
 // GetQRResponse is the response for QR code data
 type GetQRResponse struct {
-	SessionID  uuid.UUID `json:"session_id"`
-	QRPayload  QRPayload `json:"qr_payload"`
-	ValidUntil time.Time `json:"valid_until"`
+	SessionID        uuid.UUID `json:"session_id"`
+	QRPayload        QRPayload `json:"qr_payload"`
+	ValidUntil       time.Time `json:"valid_until"`
+	RotationInterval int       `json:"rotation_interval"`
 }
 
 // ScanQRRequest is the request for QR code scanning
@@ -246,6 +249,9 @@ type GetSessionDetailsResponse struct {
 	EnrolledStudentCount int       `json:"enrolled_student_count"`
 	PresentCount         int       `json:"present_count"`
 	AbsentCount          int       `json:"absent_count"`
+	// QRRotationInterval (seconds) is how often the instructor screen must
+	// fetch a new code; an older one stops scanning soon after.
+	QRRotationInterval int `json:"qr_rotation_interval"`
 }
 
 // AttendanceRecordItem represents a single attendance record

@@ -13,9 +13,10 @@ export function parseQRPayload(raw: string): QRPayload | null {
       parsed &&
       typeof parsed === 'object' &&
       typeof parsed.sid === 'string' &&
+      Number.isInteger(parsed.win) &&
       typeof parsed.sig === 'string'
     ) {
-      return { sid: parsed.sid, sig: parsed.sig };
+      return { sid: parsed.sid, win: parsed.win, sig: parsed.sig };
     }
   } catch {
     // fall through to null

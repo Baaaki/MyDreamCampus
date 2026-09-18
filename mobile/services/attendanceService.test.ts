@@ -28,10 +28,10 @@ describe("attendanceService.scanQR", () => {
       },
     });
 
-    const res = await attendanceService.scanQR({ qr_payload: { sid: "s-1", sig: "sig-abc" } });
+    const res = await attendanceService.scanQR({ qr_payload: { sid: "s-1", win: 7, sig: "sig-abc" } });
 
     expect(apiMock.post).toHaveBeenCalledWith("/attendance/scan", {
-      qr_payload: { sid: "s-1", sig: "sig-abc" },
+      qr_payload: { sid: "s-1", win: 7, sig: "sig-abc" },
     });
     expect(res.course_code).toBe("CS101");
     expect(res.week_number).toBe(5);
@@ -40,7 +40,7 @@ describe("attendanceService.scanQR", () => {
   it("propagates API errors", async () => {
     apiMock.post.mockRejectedValueOnce(new Error("invalid qr"));
     await expect(
-      attendanceService.scanQR({ qr_payload: { sid: "s-1", sig: "bad" } })
+      attendanceService.scanQR({ qr_payload: { sid: "s-1", win: 7, sig: "bad" } })
     ).rejects.toThrow("invalid qr");
   });
 });

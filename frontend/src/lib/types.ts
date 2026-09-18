@@ -236,10 +236,10 @@ export interface MyRejectionsResponse {
   rejections: RejectionDetail[];
 }
 
-// Attendance types
+// Attendance types — win is the rotation window the signature covers
 export interface QRPayload {
   sid: string;
-  ts: number;
+  win: number;
   sig: string;
 }
 
