@@ -2,6 +2,7 @@
 import { useState } from "react";
 import { useNavigate } from 'react-router';
 import { authApi } from "@/lib/api-client";
+import { apiErrorMessage } from "@/lib/api-error";
 import { validatePasswordPolicy } from "@/lib/password-policy";
 
 export default function ChangePasswordPage() {
@@ -40,8 +41,8 @@ export default function ChangePasswordPage() {
       // httpOnly cookies are managed by the backend
       localStorage.removeItem("user");
       navigate("/auth/login");
-    } catch (err: any) {
-      setError(err.message || "Şifre değiştirme başarısız");
+    } catch (err) {
+      setError(await apiErrorMessage(err, "Şifre değiştirme başarısız"));
     } finally {
       setLoading(false);
     }

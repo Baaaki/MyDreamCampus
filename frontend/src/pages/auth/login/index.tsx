@@ -1,7 +1,8 @@
 
 import { useState } from "react";
-import { useNavigate, useSearchParams } from 'react-router';
+import { Link, useNavigate, useSearchParams } from 'react-router';
 import { authApi } from "@/lib/api-client";
+import { apiErrorMessage } from "@/lib/api-error";
 import type { AuthResponse } from "@/lib/types";
 
 export default function LoginPage() {
@@ -55,8 +56,8 @@ export default function LoginPage() {
         default:
           navigate("/dashboard");
       }
-    } catch (err: any) {
-      setError(err.message || "Giriş başarısız. Lütfen bilgilerinizi kontrol edin.");
+    } catch (err) {
+      setError(await apiErrorMessage(err, "Giriş başarısız. Lütfen bilgilerinizi kontrol edin."));
     } finally {
       setLoading(false);
     }
@@ -125,6 +126,11 @@ export default function LoginPage() {
               {loading ? "Giriş yapılıyor..." : "Giriş Yap"}
             </button>
           </div>
+          <p className="text-center text-sm">
+            <Link to="/auth/forgot-password" className="font-medium text-indigo-600 hover:text-indigo-500">
+              Şifremi unuttum
+            </Link>
+          </p>
         </form>
       </div>
     </div>

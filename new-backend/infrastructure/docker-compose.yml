@@ -348,8 +348,14 @@ services:
       # — the separate notification-postgres container is gone.
       NOTIF_DATABASE_URL: postgres://notification_svc:${SERVICE_DB_PASSWORD:?}@postgres:5432/notification?sslmode=disable
       NOTIF_RABBITMQ_URL: amqp://${RABBITMQ_USER:-rabbitmq}:${RABBITMQ_PASSWORD:?RABBITMQ_PASSWORD is required — see .env.example}@rabbitmq:5672/
-      NOTIF_SMTP_HOST: mailhog
-      NOTIF_SMTP_PORT: "1025"
+      # MailHog catches everything by default — nothing leaves the host.
+      # Point SMTP_* in .env at a real relay for reset and welcome mail to
+      # reach anyone; see .env.example.
+      NOTIF_SMTP_HOST: ${SMTP_HOST:-mailhog}
+      NOTIF_SMTP_PORT: ${SMTP_PORT:-1025}
+      NOTIF_SMTP_USERNAME: ${SMTP_USERNAME:-}
+      NOTIF_SMTP_PASSWORD: ${SMTP_PASSWORD:-}
+      NOTIF_SMTP_FROM: ${SMTP_FROM:-noreply@mydreamcampus.com}
       NOTIF_APP_URL: ${PUBLIC_ORIGIN:?set PUBLIC_ORIGIN in .env}
     expose:
       - "9090"

@@ -5,6 +5,7 @@ import (
 	"context"
 	"fmt"
 	"html/template"
+	"net/url"
 	"path/filepath"
 
 	"github.com/baaaki/mydreamcampus/notification/config"
@@ -53,7 +54,7 @@ func (s *Service) SendWelcomeEmail(ctx context.Context, data map[string]any) err
 	err := s.tpl.ExecuteTemplate(&body, "welcome.html", map[string]any{
 		"first_name": firstName,
 		"role":       role,
-		"login_url":  s.cfg.AppURL + "/login",
+		"login_url":  s.cfg.AppURL + "/auth/login",
 	})
 	if err != nil {
 		return fmt.Errorf("failed to render welcome template: %w", err)
@@ -79,7 +80,9 @@ func (s *Service) SendPasswordResetEmail(ctx context.Context, data map[string]an
 	var body bytes.Buffer
 	err := s.tpl.ExecuteTemplate(&body, "password_reset.html", map[string]any{
 		"expires_at": expiresAt,
-		"reset_url":  s.cfg.AppURL + "/reset-password?token=" + resetToken,
+		// The SPA serves its auth pages under /auth; a bare /reset-password
+		// falls through to the 404 page.
+		"reset_url": s.cfg.AppURL + "/auth/reset-password?token=" + url.QueryEscape(resetToken),
 	})
 	if err != nil {
 		return fmt.Errorf("failed to render password reset template: %w", err)
@@ -101,10 +104,10 @@ func (s *Service) SendPasswordResetEmail(ctx context.Context, data map[string]an
 // Routing: Email + Mobile Push
 func (s *Service) SendImportantNotification(ctx context.Context, userID, emailAddr, title, message string) error {
 	s.log.Info("Sending IMPORTANT notification (Email + Push)", zap.String("title", title))
-	
+
 	// 1. Send Mobile Push (Fire & Forget)
 	_ = s.push.Send(ctx, userID, title, message)
-	
+
 	// 2. Send Email (Persistent)
 	// For a real app, you would execute an HTML template here, just like SendWelcomeEmail.
 	err := s.email.Send(ctx, emailAddr, title, []byte(message))
@@ -119,7 +122,7 @@ func (s *Service) SendImportantNotification(ctx context.Context, userID, emailAd
 // Routing: Mobile Push ONLY (Fire & Forget)
 func (s *Service) SendStandardNotification(ctx context.Context, userID, title, message string) error {
 	s.log.Info("Sending STANDARD notification (Push Only)", zap.String("title", title))
-	
+
 	// Only send Push Notification. No email is sent.
 	err := s.push.Send(ctx, userID, title, message)
 	if err != nil {
@@ -128,4 +131,3 @@ func (s *Service) SendStandardNotification(ctx context.Context, userID, title, m
 
 	return nil
 }
-

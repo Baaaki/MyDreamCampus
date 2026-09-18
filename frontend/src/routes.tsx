@@ -12,6 +12,8 @@ import LoginPage from '@/pages/auth/login';
 import NotFoundPage from '@/pages/not-found';
 import ChangePasswordPage from '@/pages/auth/change-password';
 import SessionsPage from '@/pages/auth/sessions';
+import ForgotPasswordPage from '@/pages/auth/forgot-password';
+import ResetPasswordPage from '@/pages/auth/reset-password';
 
 // Admin pages — lazy loaded; users only land here after auth.
 const DashboardPage = lazy(() => import('@/pages/admin/dashboard'));
@@ -81,6 +83,8 @@ export function AppRoutes() {
         <Route path="/auth/login" element={<LoginPage />} />
         <Route path="/auth/change-password" element={<ChangePasswordPage />} />
         <Route path="/auth/sessions" element={<SessionsPage />} />
+        <Route path="/auth/forgot-password" element={<ForgotPasswordPage />} />
+        <Route path="/auth/reset-password" element={<ResetPasswordPage />} />
 
         {/* Admin */}
         <Route element={<AuthGuard allowedRoles={['admin']} />}>
