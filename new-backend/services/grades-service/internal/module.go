@@ -132,8 +132,6 @@ func (m *Module) RegisterRoutes(rg *gin.RouterGroup) {
 			teacher.POST("/courses/:course_id/scores", platformMiddleware.Idempotency(), m.gradeHandler.SubmitScore)
 			teacher.POST("/courses/:course_id/scores/bulk", platformMiddleware.Idempotency(), m.gradeHandler.BulkSubmitScores)
 			teacher.POST("/courses/:course_id/scores/lock", m.gradeHandler.LockAssessment)
-			teacher.POST("/courses/:course_id/scores/:slug/lock", m.gradeHandler.LockScore)
-			teacher.POST("/courses/:course_id/scores/:slug/unlock", m.gradeHandler.UnlockScore)
 		}
 
 		// Student facing routes
@@ -151,6 +149,11 @@ func (m *Module) RegisterRoutes(rg *gin.RouterGroup) {
 		admin.Use(platformMiddleware.RequireAdmin())
 		{
 			admin.POST("/appeals", m.gradeHandler.ProcessAppeal)
+			// Single-score lock/unlock takes a bare registration_id and skips
+			// the course-instructor check, and a lock can trigger finalize —
+			// under the teacher group any teacher could close any course.
+			admin.POST("/scores/lock", m.gradeHandler.LockScore)
+			admin.POST("/scores/unlock", m.gradeHandler.UnlockScore)
 		}
 	}
 }
