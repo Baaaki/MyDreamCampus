@@ -16,7 +16,10 @@ import (
 var (
 	ErrInvalidToken = errors.New("invalid token")
 	ErrExpiredToken = errors.New("token has expired")
-	jwtSecret       []byte
+	// ErrWrongTokenType is a validly signed token of the other kind — a
+	// refresh token presented where an access token is required.
+	ErrWrongTokenType = errors.New("wrong token type")
+	jwtSecret         []byte
 )
 
 // InitJWTSecret sets the global JWT secret.
@@ -156,6 +159,26 @@ func ValidateTokenWithSecret(tokenString string, secret []byte) (*Claims, error)
 		return nil, ErrInvalidToken
 	}
 
+	return claims, nil
+}
+
+// ValidateAccessToken is what request authentication must use: on top of
+// ValidateToken it requires token_type=access. Both kinds share the signing
+// key, so without this a 24-hour refresh token — which carries no role —
+// passes as a 15-minute access token on every route that checks no role.
+func ValidateAccessToken(tokenString string) (*Claims, error) {
+	return ValidateAccessTokenWithSecret(tokenString, GetJWTSecret())
+}
+
+// ValidateAccessTokenWithSecret is ValidateAccessToken with an explicit key.
+func ValidateAccessTokenWithSecret(tokenString string, secret []byte) (*Claims, error) {
+	claims, err := ValidateTokenWithSecret(tokenString, secret)
+	if err != nil {
+		return nil, err
+	}
+	if claims.TokenType != string(AccessToken) {
+		return nil, ErrWrongTokenType
+	}
 	return claims, nil
 }
 

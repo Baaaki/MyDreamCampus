@@ -81,7 +81,7 @@ func JWTAuth(opts ...AuthOption) gin.HandlerFunc {
 		}
 
 		// Validate token
-		claims, err := utils.ValidateToken(tokenString)
+		claims, err := utils.ValidateAccessToken(tokenString)
 		if err != nil {
 			logger.Warn("token validation failed",
 				zap.Error(err),
@@ -213,7 +213,7 @@ func OptionalJWTAuth() gin.HandlerFunc {
 			return
 		}
 
-		claims, err := utils.ValidateToken(tokenString)
+		claims, err := utils.ValidateAccessToken(tokenString)
 		if err != nil {
 			c.Next()
 			return

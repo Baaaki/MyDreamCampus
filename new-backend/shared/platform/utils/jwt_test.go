@@ -128,3 +128,34 @@ func TestGenerateTokens_UniqueJTI(t *testing.T) {
 		seen[jti] = true
 	}
 }
+
+func TestValidateAccessTokenWithSecret_AccessToken_Accepted(t *testing.T) {
+	token, _, err := GenerateAccessTokenWithSecret("u", "student", "", 1, testSecret, 15)
+	require.NoError(t, err)
+
+	claims, err := ValidateAccessTokenWithSecret(token, testSecret)
+	require.NoError(t, err)
+	assert.Equal(t, "student", claims.Role)
+}
+
+func TestValidateAccessTokenWithSecret_RefreshToken_Rejected(t *testing.T) {
+	token, _, err := GenerateRefreshTokenWithSecret("u", 1, testSecret, 24)
+	require.NoError(t, err)
+
+	_, err = ValidateAccessTokenWithSecret(token, testSecret)
+	assert.ErrorIs(t, err, ErrWrongTokenType)
+}
+
+func TestValidateAccessTokenWithSecret_UntypedToken_Rejected(t *testing.T) {
+	// Tokens minted before token_type existed carry no type at all.
+	legacy := jwt.NewWithClaims(jwt.SigningMethodHS256, jwt.MapClaims{
+		"user_id": "u",
+		"role":    "admin",
+		"exp":     time.Now().Add(time.Minute).Unix(),
+	})
+	signed, err := legacy.SignedString(testSecret)
+	require.NoError(t, err)
+
+	_, err = ValidateAccessTokenWithSecret(signed, testSecret)
+	assert.ErrorIs(t, err, ErrWrongTokenType)
+}

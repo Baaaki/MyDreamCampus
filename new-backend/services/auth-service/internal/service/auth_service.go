@@ -214,7 +214,10 @@ func (s *AuthService) Logout(ctx context.Context, refreshToken string, accessTok
 	}
 
 	// Delete session from DB
-	jti := claims["jti"].(string)
+	jti, _ := claims["jti"].(string)
+	if jti == "" {
+		return serviceErrors.ErrInvalidToken
+	}
 	err = s.sessionRepo.DeleteSession(ctx, jti)
 	if err != nil {
 		// Check if session not found
@@ -368,13 +371,20 @@ func (s *AuthService) RefreshAccessToken(ctx context.Context, refreshToken strin
 		return dto.RefreshResponse{}, "", serviceErrors.ErrInvalidToken
 	}
 
-	userID, err := uuid.Parse(claims["user_id"].(string))
+	// Comma-ok throughout: a bare assertion on a missing claim panics, and
+	// Recovery turns that into a 500 for what is just a bad token.
+	userIDClaim, _ := claims["user_id"].(string)
+	userID, err := uuid.Parse(userIDClaim)
 	if err != nil {
 		return dto.RefreshResponse{}, "", serviceErrors.ErrInvalidToken
 	}
 
-	jti := claims["jti"].(string)
-	tokenVersion := int32(claims["token_version"].(float64))
+	jti, _ := claims["jti"].(string)
+	if jti == "" {
+		return dto.RefreshResponse{}, "", serviceErrors.ErrInvalidToken
+	}
+	versionClaim, _ := claims["token_version"].(float64)
+	tokenVersion := int32(versionClaim)
 
 	// Check if session exists
 	session, err := s.sessionRepo.GetSessionByJTI(ctx, jti)
@@ -741,6 +751,7 @@ func (s *AuthService) generateAccessToken(user db.User) (string, error) {
 		"token_version":         utils.DerefInt32(user.TokenVersion, 0),
 		"jti":                   jti,
 		"force_password_change": utils.DerefBool(user.ForcePasswordChange, false),
+		"token_type":            string(utils.AccessToken),
 		"exp":                   expiresAt.Unix(),
 		"iat":                   now.Unix(),
 	}
@@ -759,6 +770,7 @@ func (s *AuthService) generateRefreshToken(user db.User) (string, string, error)
 		"user_id":       utils.PgtypeToUUID(user.ID).String(),
 		"jti":           jti,
 		"token_version": user.TokenVersion,
+		"token_type":    string(utils.RefreshToken),
 		"exp":           expiresAt.Unix(),
 		"iat":           now.Unix(),
 	}
@@ -785,11 +797,24 @@ func (s *AuthService) parseRefreshToken(tokenString string) (jwt.MapClaims, erro
 		return nil, err
 	}
 
-	if claims, ok := token.Claims.(jwt.MapClaims); ok && token.Valid {
-		return claims, nil
+	claims, ok := token.Claims.(jwt.MapClaims)
+	if !ok || !token.Valid {
+		return nil, fmt.Errorf("invalid token")
 	}
+	if err := requireRefreshType(claims); err != nil {
+		return nil, err
+	}
+	return claims, nil
+}
 
-	return nil, fmt.Errorf("invalid token")
+// requireRefreshType rejects an access token handed to a refresh-token path.
+// Both share the signing key, so the signature alone cannot tell them apart;
+// without this an access token could rotate itself into a fresh session.
+func requireRefreshType(claims jwt.MapClaims) error {
+	if tokenType, _ := claims["token_type"].(string); tokenType != string(utils.RefreshToken) {
+		return utils.ErrWrongTokenType
+	}
+	return nil
 }
 
 // parseRefreshTokenWithoutValidation parses token with signature validation but without expiry check
@@ -805,9 +830,12 @@ func (s *AuthService) parseRefreshTokenWithoutValidation(tokenString string) (jw
 		return nil, err
 	}
 
-	if claims, ok := token.Claims.(jwt.MapClaims); ok {
-		return claims, nil
+	claims, ok := token.Claims.(jwt.MapClaims)
+	if !ok {
+		return nil, fmt.Errorf("invalid token")
 	}
-
-	return nil, fmt.Errorf("invalid token")
+	if err := requireRefreshType(claims); err != nil {
+		return nil, err
+	}
+	return claims, nil
 }

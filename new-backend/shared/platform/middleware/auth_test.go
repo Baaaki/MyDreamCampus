@@ -222,3 +222,17 @@ func TestOptionalJWTAuth_SetsClaimsWhenPresent(t *testing.T) {
 
 	assert.Contains(t, w.Body.String(), "opt-1")
 }
+
+func TestJWTAuth_RefreshToken_Rejected(t *testing.T) {
+	r := setupAuthTest(t, nil)
+	refresh, _, err := utils.GenerateRefreshTokenWithSecret("user-1", 1, []byte(authTestSecret), 24)
+	require.NoError(t, err)
+
+	req := httptest.NewRequest("GET", "/protected", nil)
+	req.Header.Set("Authorization", "Bearer "+refresh)
+	w := httptest.NewRecorder()
+	r.ServeHTTP(w, req)
+
+	assert.Equal(t, http.StatusUnauthorized, w.Code,
+		"a refresh token must not authenticate an API request")
+}
