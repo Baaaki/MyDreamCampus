@@ -72,23 +72,3 @@ func (r *TeacherProfileRepository) DeleteTeacherProfileByStaffID(ctx context.Con
 	}
 	return nil
 }
-
-// ListTeacherProfiles lists teacher profiles with pagination
-func (r *TeacherProfileRepository) ListTeacherProfiles(ctx context.Context, limit, offset int32) ([]db.ListTeacherProfilesRow, int64, error) {
-	// Get total count
-	total, err := r.queries.CountTeacherProfiles(ctx)
-	if err != nil {
-		return nil, 0, fmt.Errorf("%w: failed to count teacher profiles: %v", sharedErrors.ErrQueryFailed, err)
-	}
-
-	// Get profiles list
-	profiles, err := r.queries.ListTeacherProfiles(ctx, db.ListTeacherProfilesParams{
-		Limit:  limit,
-		Offset: offset,
-	})
-	if err != nil {
-		return nil, 0, fmt.Errorf("%w: failed to list teacher profiles: %v", sharedErrors.ErrQueryFailed, err)
-	}
-
-	return profiles, total, nil
-}

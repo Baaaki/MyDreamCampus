@@ -91,8 +91,55 @@ func (h *StudentHandler) CreateStudent(c *gin.Context) {
 	c.JSON(http.StatusCreated, response)
 }
 
-// GetStudentByID retrieves student by ID
+// GetStudentByID retrieves student by ID. It trusts its caller, so it is only
+// mounted on the internal route; user-facing reads go through
+// GetStudentByIDForCaller.
 func (h *StudentHandler) GetStudentByID(c *gin.Context) {
+	h.getStudent(c, nil)
+}
+
+// GetStudentByIDForCaller is the JWT-facing read. A student record carries
+// e-mail, phone and advisor, so a student sees only their own and a teacher
+// only their advisees; admin sees everyone.
+func (h *StudentHandler) GetStudentByIDForCaller(c *gin.Context) {
+	callerID := c.GetString("user_id")
+
+	switch c.GetString("role") {
+	case "admin":
+		h.getStudent(c, nil)
+	case "student":
+		// Checked before the lookup so a 403-vs-404 difference cannot be used
+		// to probe which student IDs exist.
+		if !sameUUID(c.Param("id"), callerID) {
+			respondForbidden(c)
+			return
+		}
+		h.getStudent(c, nil)
+	case "teacher":
+		h.getStudent(c, func(s dto.StudentResponse) bool {
+			return s.AdvisorID != nil && sameUUID(*s.AdvisorID, callerID)
+		})
+	default:
+		respondForbidden(c)
+	}
+}
+
+func sameUUID(a, b string) bool {
+	ua, errA := uuid.Parse(a)
+	ub, errB := uuid.Parse(b)
+	return errA == nil && errB == nil && ua == ub
+}
+
+func respondForbidden(c *gin.Context) {
+	c.JSON(http.StatusForbidden, dto.ErrorResponse{
+		Error: errors.ErrForbidden.Message,
+		Code:  errors.ErrForbidden.Code,
+	})
+}
+
+// getStudent writes the student as JSON. allow, when set, runs after the
+// lookup and turns a record the caller may not see into 403.
+func (h *StudentHandler) getStudent(c *gin.Context, allow func(dto.StudentResponse) bool) {
 	ctx, cancel := context.WithTimeout(c.Request.Context(), requestTimeout)
 	defer cancel()
 
@@ -127,6 +174,12 @@ func (h *StudentHandler) GetStudentByID(c *gin.Context) {
 			Error: errors.ErrInternal.Message,
 			Code:  errors.ErrInternal.Code,
 		})
+		return
+	}
+
+	if allow != nil && !allow(response) {
+		reqLogger.Warn("student read denied for caller")
+		respondForbidden(c)
 		return
 	}
 

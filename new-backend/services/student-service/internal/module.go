@@ -110,10 +110,10 @@ func (m *Module) RegisterRoutes(rg *gin.RouterGroup) {
 	rg.Use(platformMiddleware.CSRFProtection())
 	rg.Use(platformMiddleware.UserRateLimit())
 	{
-		// Read endpoints — any authenticated user.
-		rg.GET("", m.studentHandler.ListStudents)
-		rg.POST("/search", m.studentHandler.SearchStudents)
-		rg.GET("/:id", m.studentHandler.GetStudentByID)
+		// Single-record read: the handler narrows it to the caller's own
+		// record (student) or advisees (teacher). Listing and search expose
+		// every student's contact details, so they are admin-only below.
+		rg.GET("/:id", m.studentHandler.GetStudentByIDForCaller)
 		// Teacher/admin only — view their assigned advisees.
 		rg.GET("/my-advisees",
 			platformMiddleware.RequireRole("teacher", "admin"),
@@ -123,6 +123,8 @@ func (m *Module) RegisterRoutes(rg *gin.RouterGroup) {
 		admin := rg.Group("")
 		admin.Use(platformMiddleware.RequireAdmin())
 		{
+			admin.GET("", m.studentHandler.ListStudents)
+			admin.POST("/search", m.studentHandler.SearchStudents)
 			// A retried create must not produce a second student record.
 			admin.POST("", platformMiddleware.Idempotency(), m.studentHandler.CreateStudent)
 			admin.PUT("/:id", m.studentHandler.UpdateStudent)

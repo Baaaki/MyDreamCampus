@@ -109,9 +109,3 @@ type TeacherProfileResponse struct {
 	CreatedAt        time.Time         `json:"created_at"`
 	UpdatedAt        time.Time         `json:"updated_at"`
 }
-
-// TeacherProfileListResponse represents paginated teacher profile list
-type TeacherProfileListResponse struct {
-	Data       []TeacherProfileResponse `json:"data"`
-	Pagination PaginationResponse       `json:"pagination"`
-}

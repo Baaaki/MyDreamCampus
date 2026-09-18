@@ -85,13 +85,18 @@ func (m *Module) RegisterRoutes(rg *gin.RouterGroup) {
 	rg.Use(platformMiddleware.CSRFProtection())
 	rg.Use(platformMiddleware.UserRateLimit())
 	{
-		rg.GET("", m.staffHandler.ListStaff)
-		rg.GET("/:id", m.staffHandler.GetStaffByID)
-		rg.GET("/instructors", m.staffHandler.GetInstructorsByDepartment)
+		// A staff record carries phone and office; any teacher may read their
+		// own, only admin reads anyone else's.
+		rg.GET("/:id", platformMiddleware.RequireSelfOrRole("id", "admin"), m.staffHandler.GetStaffByID)
 
 		admin := rg.Group("")
 		admin.Use(platformMiddleware.RequireAdmin())
 		{
+			// Listing is a directory of every employee's contact details.
+			// Other services reach the same reads over /internal instead.
+			admin.GET("", m.staffHandler.ListStaff)
+			admin.GET("/instructors", m.staffHandler.GetInstructorsByDepartment)
+
 			admin.POST("", m.staffHandler.CreateStaff)
 			admin.PUT("/:id", m.staffHandler.UpdateStaff)
 			admin.DELETE("/:id", m.staffHandler.DeleteStaff)
@@ -107,13 +112,7 @@ func (m *Module) RegisterRoutes(rg *gin.RouterGroup) {
 }
 
 // RegisterPublicRoutes implements httpserver.PublicRoutesProvider.
-// Anonymous teacher browsing lives outside /api so the front-end can keep
-// hitting /public/teachers without an auth token.
 func (m *Module) RegisterPublicRoutes(r *gin.Engine) {
-	public := r.Group("/public/teachers")
-	public.GET("", m.teacherProfileHandler.ListTeacherProfiles)
-	public.GET("/:id", m.teacherProfileHandler.GetTeacherProfileByStaffID)
-
 	// Same reads as the JWT routes, reached by other services with the shared
 	// secret instead of a user token. Mounted at the root rather than under
 	// /api because Caddy only proxies /api — these are unreachable from

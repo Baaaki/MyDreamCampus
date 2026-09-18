@@ -6,6 +6,7 @@ import (
 	"github.com/baaaki/mydreamcampus/shared/platform/errors"
 	"github.com/baaaki/mydreamcampus/shared/platform/logger"
 	"github.com/gin-gonic/gin"
+	"github.com/google/uuid"
 	"go.uber.org/zap"
 )
 
@@ -41,6 +42,36 @@ func RequireRole(allowedRoles ...string) gin.HandlerFunc {
 		c.JSON(403, gin.H{
 			"error":   errors.ErrForbidden.Code,
 			"message": "You do not have permission to access this resource",
+		})
+		c.Abort()
+	}
+}
+
+// RequireSelfOrRole lets a request through when the :param path segment is
+// the caller's own user ID, or when the caller holds one of the roles. Use it
+// on per-user reads (GET /staff/:id) that must not become a directory of
+// everyone else's contact details.
+func RequireSelfOrRole(param string, allowedRoles ...string) gin.HandlerFunc {
+	return func(c *gin.Context) {
+		if slices.Contains(allowedRoles, c.GetString("role")) {
+			c.Next()
+			return
+		}
+
+		self, errSelf := uuid.Parse(c.GetString("user_id"))
+		target, errTarget := uuid.Parse(c.Param(param))
+		if errSelf == nil && errTarget == nil && self == target {
+			c.Next()
+			return
+		}
+
+		logger.Warn("access denied - not the resource owner",
+			zap.String("user_role", c.GetString("role")),
+			zap.String("path", c.Request.URL.Path),
+		)
+		c.JSON(403, gin.H{
+			"error":   errors.ErrForbidden.Code,
+			"message": "Bu kaynağa erişim yetkiniz yok",
 		})
 		c.Abort()
 	}

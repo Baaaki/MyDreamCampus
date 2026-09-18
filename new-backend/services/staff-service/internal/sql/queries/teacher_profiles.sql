@@ -35,19 +35,3 @@ RETURNING id, staff_id, academic_title, faculty, profile_image_url,
 
 -- name: DeleteTeacherProfileByStaffID :exec
 DELETE FROM staff.teacher_profiles WHERE staff_id = $1;
-
--- name: ListTeacherProfiles :many
-SELECT tp.id, tp.staff_id, tp.academic_title, tp.faculty, tp.profile_image_url,
-       tp.education, tp.articles, tp.bulletins, tp.projects, tp.awards,
-       tp.scholarships, tp.admin_assignments, tp.created_at, tp.updated_at,
-       s.email, s.first_name, s.last_name, s.department, s.phone, s.office_location
-FROM staff.teacher_profiles tp
-JOIN staff.staff s ON tp.staff_id = s.id
-WHERE s.is_active = true
-ORDER BY s.last_name, s.first_name
-LIMIT $1 OFFSET $2;
-
--- name: CountTeacherProfiles :one
-SELECT COUNT(*) FROM staff.teacher_profiles tp
-JOIN staff.staff s ON tp.staff_id = s.id
-WHERE s.is_active = true;

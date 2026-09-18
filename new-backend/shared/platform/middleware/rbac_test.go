@@ -78,3 +78,44 @@ func TestRequireStudent(t *testing.T) {
 	w = runWithRole(t, "admin", RequireStudent())
 	assert.Equal(t, 403, w.Code)
 }
+
+func runSelfOrRole(t *testing.T, role, userID, target string) int {
+	t.Helper()
+	require.NoError(t, logger.Init("test"))
+	gin.SetMode(gin.TestMode)
+	r := gin.New()
+	r.Use(func(c *gin.Context) {
+		c.Set("role", role)
+		c.Set("user_id", userID)
+		c.Next()
+	})
+	r.GET("/staff/:id", RequireSelfOrRole("id", "admin"), func(c *gin.Context) { c.Status(200) })
+
+	w := httptest.NewRecorder()
+	r.ServeHTTP(w, httptest.NewRequest("GET", "/staff/"+target, nil))
+	return w.Code
+}
+
+func TestRequireSelfOrRole_OwnID_Allows(t *testing.T) {
+	id := "5f0c7b1e-2d3a-4b5c-8d9e-0f1a2b3c4d5e"
+	assert.Equal(t, 200, runSelfOrRole(t, "teacher", id, id))
+}
+
+func TestRequireSelfOrRole_OwnIDDifferentCase_Allows(t *testing.T) {
+	assert.Equal(t, 200, runSelfOrRole(t, "teacher",
+		"5f0c7b1e-2d3a-4b5c-8d9e-0f1a2b3c4d5e", "5F0C7B1E-2D3A-4B5C-8D9E-0F1A2B3C4D5E"))
+}
+
+func TestRequireSelfOrRole_OtherID_Denies(t *testing.T) {
+	assert.Equal(t, 403, runSelfOrRole(t, "teacher",
+		"5f0c7b1e-2d3a-4b5c-8d9e-0f1a2b3c4d5e", "9a8b7c6d-5e4f-4a3b-8c2d-1e0f9a8b7c6d"))
+}
+
+func TestRequireSelfOrRole_AllowedRole_Allows(t *testing.T) {
+	assert.Equal(t, 200, runSelfOrRole(t, "admin",
+		"5f0c7b1e-2d3a-4b5c-8d9e-0f1a2b3c4d5e", "9a8b7c6d-5e4f-4a3b-8c2d-1e0f9a8b7c6d"))
+}
+
+func TestRequireSelfOrRole_MalformedTarget_Denies(t *testing.T) {
+	assert.Equal(t, 403, runSelfOrRole(t, "student", "", ""+"not-a-uuid"))
+}

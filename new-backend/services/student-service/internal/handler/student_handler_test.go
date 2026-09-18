@@ -102,3 +102,38 @@ func TestCreateStudentRequest_Validation(t *testing.T) {
 		})
 	}
 }
+
+// The deny paths return before the service is touched, so a nil service is
+// enough — reaching it would panic and fail the test.
+func TestGetStudentByIDForCaller_DenyPaths_Return403(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+	self := "2b1f6c1e-8f0a-4a57-9a53-3f3b1f1d2a10"
+	other := "7c3d9e2a-1b4f-4e6a-8d2c-5a6b7c8d9e0f"
+
+	tests := []struct {
+		name     string
+		role     string
+		targetID string
+	}{
+		{name: "student reading another student", role: "student", targetID: other},
+		{name: "student with malformed id", role: "student", targetID: "not-a-uuid"},
+		{name: "unknown role", role: "guest", targetID: self},
+	}
+
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			h := &StudentHandler{}
+			router := gin.New()
+			router.GET("/students/:id", func(c *gin.Context) {
+				c.Set("user_id", self)
+				c.Set("role", tc.role)
+				h.GetStudentByIDForCaller(c)
+			})
+
+			resp := httptest.NewRecorder()
+			router.ServeHTTP(resp, httptest.NewRequest(http.MethodGet, "/students/"+tc.targetID, nil))
+
+			assert.Equal(t, http.StatusForbidden, resp.Code)
+		})
+	}
+}

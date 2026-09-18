@@ -11,19 +11,6 @@ import (
 	"github.com/jackc/pgx/v5/pgtype"
 )
 
-const countTeacherProfiles = `-- name: CountTeacherProfiles :one
-SELECT COUNT(*) FROM staff.teacher_profiles tp
-JOIN staff.staff s ON tp.staff_id = s.id
-WHERE s.is_active = true
-`
-
-func (q *Queries) CountTeacherProfiles(ctx context.Context) (int64, error) {
-	row := q.db.QueryRow(ctx, countTeacherProfiles)
-	var count int64
-	err := row.Scan(&count)
-	return count, err
-}
-
 const createTeacherProfile = `-- name: CreateTeacherProfile :one
 INSERT INTO staff.teacher_profiles (staff_id, academic_title, faculty, profile_image_url)
 VALUES ($1, $2, $3, $4)
@@ -135,87 +122,6 @@ func (q *Queries) GetTeacherProfileByStaffID(ctx context.Context, staffID pgtype
 		&i.OfficeLocation,
 	)
 	return i, err
-}
-
-const listTeacherProfiles = `-- name: ListTeacherProfiles :many
-SELECT tp.id, tp.staff_id, tp.academic_title, tp.faculty, tp.profile_image_url,
-       tp.education, tp.articles, tp.bulletins, tp.projects, tp.awards,
-       tp.scholarships, tp.admin_assignments, tp.created_at, tp.updated_at,
-       s.email, s.first_name, s.last_name, s.department, s.phone, s.office_location
-FROM staff.teacher_profiles tp
-JOIN staff.staff s ON tp.staff_id = s.id
-WHERE s.is_active = true
-ORDER BY s.last_name, s.first_name
-LIMIT $1 OFFSET $2
-`
-
-type ListTeacherProfilesParams struct {
-	Limit  int32 `json:"limit"`
-	Offset int32 `json:"offset"`
-}
-
-type ListTeacherProfilesRow struct {
-	ID               pgtype.UUID      `json:"id"`
-	StaffID          pgtype.UUID      `json:"staff_id"`
-	AcademicTitle    pgtype.Text      `json:"academic_title"`
-	Faculty          pgtype.Text      `json:"faculty"`
-	ProfileImageUrl  pgtype.Text      `json:"profile_image_url"`
-	Education        []byte           `json:"education"`
-	Articles         []byte           `json:"articles"`
-	Bulletins        []byte           `json:"bulletins"`
-	Projects         []byte           `json:"projects"`
-	Awards           []byte           `json:"awards"`
-	Scholarships     []byte           `json:"scholarships"`
-	AdminAssignments []byte           `json:"admin_assignments"`
-	CreatedAt        pgtype.Timestamp `json:"created_at"`
-	UpdatedAt        pgtype.Timestamp `json:"updated_at"`
-	Email            string           `json:"email"`
-	FirstName        string           `json:"first_name"`
-	LastName         string           `json:"last_name"`
-	Department       pgtype.Text      `json:"department"`
-	Phone            pgtype.Text      `json:"phone"`
-	OfficeLocation   pgtype.Text      `json:"office_location"`
-}
-
-func (q *Queries) ListTeacherProfiles(ctx context.Context, arg ListTeacherProfilesParams) ([]ListTeacherProfilesRow, error) {
-	rows, err := q.db.Query(ctx, listTeacherProfiles, arg.Limit, arg.Offset)
-	if err != nil {
-		return nil, err
-	}
-	defer rows.Close()
-	items := []ListTeacherProfilesRow{}
-	for rows.Next() {
-		var i ListTeacherProfilesRow
-		if err := rows.Scan(
-			&i.ID,
-			&i.StaffID,
-			&i.AcademicTitle,
-			&i.Faculty,
-			&i.ProfileImageUrl,
-			&i.Education,
-			&i.Articles,
-			&i.Bulletins,
-			&i.Projects,
-			&i.Awards,
-			&i.Scholarships,
-			&i.AdminAssignments,
-			&i.CreatedAt,
-			&i.UpdatedAt,
-			&i.Email,
-			&i.FirstName,
-			&i.LastName,
-			&i.Department,
-			&i.Phone,
-			&i.OfficeLocation,
-		); err != nil {
-			return nil, err
-		}
-		items = append(items, i)
-	}
-	if err := rows.Err(); err != nil {
-		return nil, err
-	}
-	return items, nil
 }
 
 const updateTeacherProfile = `-- name: UpdateTeacherProfile :one

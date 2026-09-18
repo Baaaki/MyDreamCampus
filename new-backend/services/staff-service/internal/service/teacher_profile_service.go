@@ -146,88 +146,8 @@ func (s *TeacherProfileService) UpdateTeacherProfile(ctx context.Context, staffI
 	return s.toTeacherProfileResponse(updatedProfile), nil
 }
 
-// ListTeacherProfiles lists teacher profiles with pagination
-func (s *TeacherProfileService) ListTeacherProfiles(ctx context.Context, query dto.PaginationQuery) (dto.TeacherProfileListResponse, error) {
-	serviceLogger := logger.WithContextAndFields(ctx,
-		zap.String("service", "TeacherProfileService"),
-		zap.String("method", "ListTeacherProfiles"),
-		zap.Int("page", query.Page),
-		zap.Int("limit", query.Limit),
-	)
-
-	limit := utils.ClampToInt32(query.Limit)
-	offset := utils.ClampToInt32((query.Page - 1) * query.Limit)
-
-	profiles, total, err := s.profileRepo.ListTeacherProfiles(ctx, limit, offset)
-	if err != nil {
-		if sharedErrors.Is(err, sharedErrors.ErrQueryFailed) {
-			return dto.TeacherProfileListResponse{}, sharedErrors.Wrap(sharedErrors.ErrInternal, err)
-		}
-		return dto.TeacherProfileListResponse{}, sharedErrors.Wrap(sharedErrors.ErrInternal, err)
-	}
-
-	var responses []dto.TeacherProfileResponse
-	for _, profile := range profiles {
-		responses = append(responses, s.listRowToTeacherProfileResponse(profile))
-	}
-
-	totalPages := (int(total) + query.Limit - 1) / query.Limit
-
-	serviceLogger.Info("teacher profiles list retrieved",
-		zap.Int("total_records", int(total)),
-		zap.Int("returned_records", len(responses)),
-	)
-
-	return dto.TeacherProfileListResponse{
-		Data: responses,
-		Pagination: dto.PaginationResponse{
-			Page:       query.Page,
-			Limit:      query.Limit,
-			Total:      int(total),
-			TotalPages: totalPages,
-		},
-	}, nil
-}
-
 // toTeacherProfileResponse converts db row to dto response
 func (s *TeacherProfileService) toTeacherProfileResponse(row db.GetTeacherProfileByStaffIDRow) dto.TeacherProfileResponse {
-	response := dto.TeacherProfileResponse{
-		ID:               utils.PgtypeToUUIDString(row.ID),
-		StaffID:          utils.PgtypeToUUIDString(row.StaffID),
-		AcademicTitle:    utils.PgTextToString(row.AcademicTitle),
-		FirstName:        row.FirstName,
-		LastName:         row.LastName,
-		Faculty:          utils.PgTextToString(row.Faculty),
-		Department:       utils.PgTextToString(row.Department),
-		Email:            row.Email,
-		Phone:            utils.PgTextToString(row.Phone),
-		OfficeLocation:   utils.PgTextToString(row.OfficeLocation),
-		ProfileImageURL:  utils.PgTextToString(row.ProfileImageUrl),
-		Education:        []dto.Education{},
-		Articles:         []dto.Article{},
-		Bulletins:        []dto.Bulletin{},
-		Projects:         []dto.Project{},
-		Awards:           []dto.Award{},
-		Scholarships:     []dto.Scholarship{},
-		AdminAssignments: []dto.AdminAssignment{},
-		CreatedAt:        row.CreatedAt.Time,
-		UpdatedAt:        row.UpdatedAt.Time,
-	}
-
-	// Parse JSONB fields
-	decodeJSONBField(row.Education, &response.Education, "education")
-	decodeJSONBField(row.Articles, &response.Articles, "articles")
-	decodeJSONBField(row.Bulletins, &response.Bulletins, "bulletins")
-	decodeJSONBField(row.Projects, &response.Projects, "projects")
-	decodeJSONBField(row.Awards, &response.Awards, "awards")
-	decodeJSONBField(row.Scholarships, &response.Scholarships, "scholarships")
-	decodeJSONBField(row.AdminAssignments, &response.AdminAssignments, "admin_assignments")
-
-	return response
-}
-
-// listRowToTeacherProfileResponse converts list row to dto response
-func (s *TeacherProfileService) listRowToTeacherProfileResponse(row db.ListTeacherProfilesRow) dto.TeacherProfileResponse {
 	response := dto.TeacherProfileResponse{
 		ID:               utils.PgtypeToUUIDString(row.ID),
 		StaffID:          utils.PgtypeToUUIDString(row.StaffID),
