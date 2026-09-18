@@ -36,8 +36,9 @@ func (s *RedisService) GetSessionCache(ctx context.Context, sessionID string) (m
 	return s.client.HGetAll(ctx, key).Result()
 }
 
-// Enrolled students set
-func (s *RedisService) AddEnrolledStudents(ctx context.Context, sessionID string, studentIDs []uuid.UUID) error {
+// Enrolled students set. ttl matters: Redis runs with noeviction, so a key
+// that outlives a session nobody closed would sit there forever.
+func (s *RedisService) AddEnrolledStudents(ctx context.Context, sessionID string, studentIDs []uuid.UUID, ttl time.Duration) error {
 	// SADD with zero members is a protocol error; a course with no
 	// enrollments simply gets no set and scans fall back to the DB check.
 	if len(studentIDs) == 0 {
@@ -48,7 +49,11 @@ func (s *RedisService) AddEnrolledStudents(ctx context.Context, sessionID string
 	for i, id := range studentIDs {
 		members[i] = id.String()
 	}
-	return s.client.SAdd(ctx, key, members...).Err()
+	pipe := s.client.Pipeline()
+	pipe.SAdd(ctx, key, members...)
+	pipe.Expire(ctx, key, ttl)
+	_, err := pipe.Exec(ctx)
+	return err
 }
 
 func (s *RedisService) IsStudentEnrolled(ctx context.Context, sessionID, studentID string) (bool, error) {
@@ -75,6 +80,9 @@ func (s *RedisService) AddToBuffer(ctx context.Context, sessionID, studentID, da
 	pipe := s.client.Pipeline()
 	pipe.HSet(ctx, bufferKey, studentID, data)
 	pipe.Expire(ctx, scannedKey, scannedTTL)
+	// The flusher drains the buffer within seconds; the TTL only bounds a
+	// buffer left behind if it never runs.
+	pipe.Expire(ctx, bufferKey, scannedTTL)
 	if _, err := pipe.Exec(ctx); err != nil {
 		// Roll back the claim so the student can retry.
 		s.client.SRem(ctx, scannedKey, studentID)

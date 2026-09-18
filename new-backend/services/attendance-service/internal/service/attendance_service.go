@@ -148,7 +148,7 @@ func (s *AttendanceService) CreateSession(ctx context.Context, instructorID uuid
 		for i, student := range enrolledStudents {
 			studentIDs[i] = utils.PgUUIDToUUID(student.ID)
 		}
-		if err := s.redisService.AddEnrolledStudents(ctx, sessionID, studentIDs); err != nil {
+		if err := s.redisService.AddEnrolledStudents(ctx, sessionID, studentIDs, time.Until(expiresAt)+CacheTTLBuffer); err != nil {
 			// Best-effort warm: scan path falls back to DB when the set is missing.
 			logger.Warn("failed to warm enrolled-student set", zap.Error(err))
 		}
