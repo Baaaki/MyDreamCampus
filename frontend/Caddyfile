@@ -1,3 +1,15 @@
+{
+	servers {
+		# Which peers may tell Caddy the client's address. Loopback and the
+		# Docker bridge ranges cover cloudflared on the host (it arrives
+		# through the Docker port proxy); their X-Forwarded-For is kept and
+		# appended to. Any other peer — a LAN or Internet client talking to
+		# Caddy directly — has the header it sent replaced by its own
+		# address, so it cannot pose as someone else to the rate limiter.
+		trusted_proxies static 127.0.0.1/8 ::1 172.16.0.0/12
+	}
+}
+
 # SITE_ADDRESS is the public hostname (e.g. 203-0-113-5.sslip.io). Caddy
 # fetches a real Let's Encrypt cert for it automatically. Default localhost
 # lets `docker compose up` work locally with Caddy's internal CA.
@@ -138,7 +150,25 @@
 
 	# Everything else is the SPA; unknown paths fall back to index.html so
 	# client-side routes (react-router) resolve on hard refresh.
+	#
+	# The services set their own security headers on API responses, but the
+	# HTML, JS and CSS the browser actually runs come from here — without
+	# this block none of them carried a CSP or HSTS. Google Fonts is the one
+	# third-party origin index.html loads. style-src needs 'unsafe-inline'
+	# for the <style> tags UI libraries inject at runtime. HSTS is ignored by
+	# browsers on plain-HTTP LAN deployments and takes effect behind TLS.
 	handle {
+		header {
+			Content-Security-Policy "default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src 'self' data: https://fonts.gstatic.com; img-src 'self' data: blob:; connect-src 'self'; object-src 'none'; frame-ancestors 'none'; base-uri 'self'; form-action 'self'"
+			Strict-Transport-Security "max-age=31536000; includeSubDomains"
+			X-Content-Type-Options "nosniff"
+			X-Frame-Options "DENY"
+			# Keeps the password-reset token in /auth/reset-password?token=
+			# out of the Referer sent to other origins.
+			Referrer-Policy "strict-origin-when-cross-origin"
+			Permissions-Policy "camera=(), microphone=(), geolocation=()"
+			-Server
+		}
 		root * /srv
 		try_files {path} /index.html
 		file_server
