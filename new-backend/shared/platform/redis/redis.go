@@ -153,18 +153,14 @@ func (c *ClientWrapper) StoreResetToken(ctx context.Context, token, email string
 	return c.client.Set(ctx, key, email, expiry).Err()
 }
 
-// GetResetToken retrieves email by reset token
-func (c *ClientWrapper) GetResetToken(ctx context.Context, token string) (string, error) {
+// ConsumeResetToken returns the e-mail a reset token was issued for and
+// deletes it in the same step, "" when the token is unknown or expired.
+// GETDEL keeps the token single-use even when two resets race.
+func (c *ClientWrapper) ConsumeResetToken(ctx context.Context, token string) (string, error) {
 	key := fmt.Sprintf("reset_token:%s", token)
-	val, err := c.client.Get(ctx, key).Result()
+	val, err := c.client.GetDel(ctx, key).Result()
 	if err == redis.Nil {
-		return "", nil // Token not found or expired
+		return "", nil
 	}
 	return val, err
-}
-
-// DeleteResetToken removes a password reset token from Redis
-func (c *ClientWrapper) DeleteResetToken(ctx context.Context, token string) error {
-	key := fmt.Sprintf("reset_token:%s", token)
-	return c.client.Del(ctx, key).Err()
 }

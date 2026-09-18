@@ -3,11 +3,11 @@ package handler
 import (
 	"context"
 	"net/http"
+	"strings"
 	"time"
 
 	"github.com/baaaki/mydreamcampus/auth/internal/dto"
 	authErrors "github.com/baaaki/mydreamcampus/auth/internal/errors"
-	"github.com/baaaki/mydreamcampus/auth/internal/service"
 	"github.com/baaaki/mydreamcampus/shared/config"
 	"github.com/baaaki/mydreamcampus/shared/platform/audit"
 	sharedErrors "github.com/baaaki/mydreamcampus/shared/platform/errors"
@@ -19,58 +19,142 @@ import (
 
 const (
 	requestTimeout = 10 * time.Second
+
+	accessCookie  = "access_token"
+	refreshCookie = "refresh_token"
+	// Every service validates the access token, so its cookie has to reach
+	// all of /api. Only auth ever reads the refresh token; scoping it to
+	// /api/auth keeps it off the nine other services' requests and logs.
+	accessCookiePath  = "/api"
+	refreshCookiePath = "/api/auth"
+
+	// ClientTypeHeader marks a client without a cookie jar (the mobile app).
+	// Only those get the refresh token in a response body: there it is
+	// readable by any script on the page, which is exactly what the HttpOnly
+	// cookie exists to prevent for browsers.
+	ClientTypeHeader = "X-Client-Type"
+	clientTypeMobile = "mobile"
 )
 
-// setAuthCookie writes an access/refresh token cookie with the strictest
-// flags appropriate for production: HttpOnly, Secure (when running in
-// production), and SameSite=Strict so the cookie cannot ride along on
-// cross-site navigations or top-level requests.
-func (h *AuthHandler) setAuthCookie(c *gin.Context, name, value string, maxAgeSeconds int) {
-	c.SetSameSite(http.SameSiteStrictMode)
-	c.SetCookie(
-		name,
-		value,
-		maxAgeSeconds,
-		"/api",
-		"",
-		h.config.Server.Environment == "production",
-		true,
-	)
-}
-
-// clearAuthCookie deletes a previously-set auth cookie. Flags must
-// match those used when setting the cookie so the browser overwrites
-// the entry rather than leaving the original.
-func (h *AuthHandler) clearAuthCookie(c *gin.Context, name string) {
-	c.SetSameSite(http.SameSiteStrictMode)
-	c.SetCookie(
-		name,
-		"",
-		-1,
-		"/api",
-		"",
-		h.config.Server.Environment == "production",
-		true,
-	)
-}
-
-func respondInvalidCredentials(c *gin.Context) {
-	c.JSON(http.StatusUnauthorized, dto.ErrorResponse{
-		Error:   "INVALID_CREDENTIALS",
-		Message: "Geçersiz e-posta veya şifre",
-	})
+// authService is what the handler needs from service.AuthService; an
+// interface so the HTTP mapping can be tested without Postgres and Redis.
+type authService interface {
+	Login(ctx context.Context, req dto.LoginRequest, deviceInfo, ipAddress string) (dto.LoginResponse, string, error)
+	Logout(ctx context.Context, refreshToken, accessToken, authenticatedUserID string) error
+	LogoutAll(ctx context.Context, userID uuid.UUID, accessToken string) error
+	RefreshAccessToken(ctx context.Context, refreshToken string) (dto.RefreshResponse, string, error)
+	ChangePassword(ctx context.Context, userID uuid.UUID, req dto.ChangePasswordRequest) (dto.ChangePasswordResponse, string, error)
+	RequestPasswordReset(ctx context.Context, email string) error
+	ResetPassword(ctx context.Context, token, newPassword string) error
+	GetUserSessions(ctx context.Context, userID uuid.UUID, currentJTI string) (dto.SessionsResponse, error)
+	DeleteSession(ctx context.Context, sessionID, userID uuid.UUID, currentJTI string) error
 }
 
 type AuthHandler struct {
-	authService *service.AuthService
+	authService authService
 	config      *config.Config
 }
 
-func NewAuthHandler(authService *service.AuthService, cfg *config.Config) *AuthHandler {
+func NewAuthHandler(authService authService, cfg *config.Config) *AuthHandler {
 	return &AuthHandler{
 		authService: authService,
 		config:      cfg,
 	}
+}
+
+// setAuthCookie writes an auth cookie HttpOnly, Secure in production and
+// SameSite=Strict so it never rides along on a cross-site request.
+func (h *AuthHandler) setAuthCookie(c *gin.Context, name, value, path string, maxAgeSeconds int) {
+	c.SetSameSite(http.SameSiteStrictMode)
+	c.SetCookie(name, value, maxAgeSeconds, path, "", h.config.Server.Environment == "production", true)
+}
+
+// clearAuthCookie deletes an auth cookie. Name, path and flags must match the
+// ones it was set with, or the browser keeps the original.
+func (h *AuthHandler) clearAuthCookie(c *gin.Context, name, path string) {
+	h.setAuthCookie(c, name, "", path, -1)
+}
+
+// issueSession hands a new token pair to the client: cookies for browsers,
+// the refresh token in the body for mobile. It returns the value to put in
+// the response's refresh_token field ("" means omitted).
+func (h *AuthHandler) issueSession(c *gin.Context, accessToken, refreshToken string, refreshInBody bool) string {
+	if refreshInBody {
+		return refreshToken
+	}
+	h.setAuthCookie(c, accessCookie, accessToken, accessCookiePath, h.config.JWT.AccessTokenExpiry*60)
+	h.setAuthCookie(c, refreshCookie, refreshToken, refreshCookiePath, h.config.JWT.RefreshTokenExpiry*3600)
+	// Refresh cookies used to be scoped to /api. Left alone, that copy would
+	// keep being sent next to the new one until it expires.
+	h.clearAuthCookie(c, refreshCookie, accessCookiePath)
+	return ""
+}
+
+func (h *AuthHandler) endSession(c *gin.Context) {
+	h.clearAuthCookie(c, accessCookie, accessCookiePath)
+	h.clearAuthCookie(c, refreshCookie, refreshCookiePath)
+	h.clearAuthCookie(c, refreshCookie, accessCookiePath)
+}
+
+func isMobileClient(c *gin.Context) bool {
+	return c.GetHeader(ClientTypeHeader) == clientTypeMobile
+}
+
+func bearerOrCookieAccessToken(c *gin.Context) string {
+	if token, ok := strings.CutPrefix(c.GetHeader("Authorization"), "Bearer "); ok {
+		return token
+	}
+	if cookie, err := c.Cookie(accessCookie); err == nil {
+		return cookie
+	}
+	return ""
+}
+
+// bodyRefreshToken reads the optional {"refresh_token": ...} body mobile sends.
+func bodyRefreshToken(c *gin.Context) string {
+	var body dto.RefreshTokenRequest
+	_ = c.ShouldBindJSON(&body) // the body is optional; absent means cookie client
+	return body.RefreshToken
+}
+
+func respondInvalidCredentials(c *gin.Context) {
+	c.JSON(http.StatusUnauthorized, dto.ErrorResponse{
+		Error:   authErrors.ErrInvalidCredentials.Code,
+		Message: authErrors.ErrInvalidCredentials.Message,
+	})
+}
+
+func respondValidationError(c *gin.Context, message string) {
+	c.JSON(http.StatusBadRequest, dto.ErrorResponse{
+		Error:   sharedErrors.ErrValidation.Code,
+		Message: message,
+	})
+}
+
+// respondError answers with the AppError's own status, code and (Turkish)
+// message; anything else is an internal error whose details stay in the log.
+func respondError(c *gin.Context, err error) {
+	if appErr, ok := sharedErrors.As(err); ok && appErr.HTTPStatus < http.StatusInternalServerError {
+		c.JSON(appErr.HTTPStatus, dto.ErrorResponse{Error: appErr.Code, Message: appErr.Message})
+		return
+	}
+	c.JSON(http.StatusInternalServerError, dto.ErrorResponse{
+		Error:   sharedErrors.ErrInternal.Code,
+		Message: "Beklenmeyen bir hata oluştu, lütfen tekrar deneyin",
+	})
+}
+
+// authenticatedUserID reads the user JWTAuth put on the context.
+func authenticatedUserID(c *gin.Context) (uuid.UUID, bool) {
+	id, err := uuid.Parse(c.GetString("user_id"))
+	if err != nil {
+		c.JSON(http.StatusUnauthorized, dto.ErrorResponse{
+			Error:   sharedErrors.ErrUnauthorized.Code,
+			Message: "Oturum açmanız gerekiyor",
+		})
+		return uuid.Nil, false
+	}
+	return id, true
 }
 
 // Login handles user login
@@ -78,7 +162,6 @@ func (h *AuthHandler) Login(c *gin.Context) {
 	ctx, cancel := context.WithTimeout(c.Request.Context(), requestTimeout)
 	defer cancel()
 
-	// Create child logger with request context and endpoint info
 	reqLogger := logger.WithContextAndFields(ctx,
 		zap.String("endpoint", "Login"),
 		zap.String("handler", "AuthHandler"),
@@ -86,33 +169,17 @@ func (h *AuthHandler) Login(c *gin.Context) {
 
 	var req dto.LoginRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
-		reqLogger.Error("invalid request body",
-			zap.Error(err),
-		)
-		c.JSON(http.StatusBadRequest, dto.ErrorResponse{
-			Error:   "VALIDATION_ERROR",
-			Message: err.Error(),
-		})
+		reqLogger.Warn("invalid request body", zap.Error(err))
+		respondValidationError(c, "Geçerli bir e-posta adresi ve şifre girin")
 		return
 	}
 
-	// Get device info and IP
-	deviceInfo := c.GetHeader("User-Agent")
 	ipAddress := c.ClientIP()
+	reqLogger.Info("login attempt", zap.String("email", req.Email), zap.String("ip", ipAddress))
 
-	reqLogger.Info("login attempt",
-		zap.String("email", req.Email),
-		zap.String("ip", ipAddress),
-	)
-
-	// Perform login
-	response, refreshToken, err := h.authService.Login(ctx, req, deviceInfo, ipAddress)
-
+	response, refreshToken, err := h.authService.Login(ctx, req, c.GetHeader("User-Agent"), ipAddress)
 	if err != nil {
-		reqLogger.Error("login failed",
-			zap.Error(err),
-			zap.String("email", req.Email),
-		)
+		reqLogger.Warn("login failed", zap.Error(err), zap.String("email", req.Email))
 
 		// A lockout answers exactly like a wrong password. A separate status
 		// would confirm the address exists — undoing the dummy-hash timing
@@ -122,103 +189,50 @@ func (h *AuthHandler) Login(c *gin.Context) {
 			respondInvalidCredentials(c)
 			return
 		}
-
 		if sharedErrors.Is(err, authErrors.ErrInvalidCredentials) {
 			audit.LogSecurityFromContextWithDetails(c, audit.EventLoginFailed, "failure", "", "invalid credentials", map[string]string{"email": req.Email})
 			respondInvalidCredentials(c)
 			return
 		}
-
-		c.JSON(http.StatusInternalServerError, dto.ErrorResponse{
-			Error:   "INTERNAL_ERROR",
-			Message: "Giriş sırasında bir hata oluştu",
-		})
+		respondError(c, err)
 		return
 	}
 
-	reqLogger.Info("login successful",
-		zap.String("email", req.Email),
-		zap.String("role", response.User.Role),
-	)
-
+	reqLogger.Info("login successful", zap.String("email", req.Email), zap.String("role", response.User.Role))
 	audit.LogSecurityFromContext(c, audit.EventLogin, "success", response.User.ID)
 
-	h.setAuthCookie(c, "access_token", response.AccessToken, h.config.JWT.AccessTokenExpiry*60)
-	h.setAuthCookie(c, "refresh_token", refreshToken, h.config.JWT.RefreshTokenExpiry*3600)
-
-	// Also return refresh token in body for non-cookie clients (mobile).
-	response.RefreshToken = refreshToken
+	response.RefreshToken = h.issueSession(c, response.AccessToken, refreshToken, isMobileClient(c))
 	c.JSON(http.StatusOK, response)
 }
 
-// Logout handles user logout
+// Logout ends the caller's session. It always answers 200 and clears the
+// cookies: a client asking to log out must end up logged out locally even
+// when the server-side cleanup had nothing to do.
 func (h *AuthHandler) Logout(c *gin.Context) {
 	ctx, cancel := context.WithTimeout(c.Request.Context(), requestTimeout)
 	defer cancel()
 
-	// Create child logger with request context and endpoint info
 	reqLogger := logger.WithContextAndFields(ctx,
 		zap.String("endpoint", "Logout"),
 		zap.String("handler", "AuthHandler"),
 	)
 
-	// Get authenticated user ID from JWT context
-	authenticatedUserID := ""
-	if uid, exists := c.Get("user_id"); exists {
-		authenticatedUserID = uid.(string)
+	userID := c.GetString("user_id")
+
+	// Mobile sends the refresh token in the body, browsers in the cookie.
+	refreshToken := bodyRefreshToken(c)
+	if refreshToken == "" {
+		refreshToken, _ = c.Cookie(refreshCookie)
 	}
 
-	// Get refresh token from cookie
-	refreshToken, err := c.Cookie("refresh_token")
-	if err != nil {
-		reqLogger.Warn("logout without refresh token cookie",
-			zap.Error(err),
-		)
-		c.JSON(http.StatusBadRequest, dto.ErrorResponse{
-			Error:   "MISSING_REFRESH_TOKEN",
-			Message: "Refresh token not found",
-		})
-		return
+	if err := h.authService.Logout(ctx, refreshToken, bearerOrCookieAccessToken(c), userID); err != nil {
+		reqLogger.Warn("logout cleanup incomplete", zap.Error(err))
 	}
 
-	// Get access token from Authorization header or cookie for blacklisting
-	accessToken := ""
-	authHeader := c.GetHeader("Authorization")
-	if len(authHeader) > 7 && authHeader[:7] == "Bearer " {
-		accessToken = authHeader[7:]
-	}
-	if accessToken == "" {
-		if cookie, cookieErr := c.Cookie("access_token"); cookieErr == nil {
-			accessToken = cookie
-		}
-	}
+	h.endSession(c)
+	audit.LogSecurityFromContext(c, audit.EventLogout, "success", userID)
 
-	reqLogger.Info("logout attempt")
-
-	// Perform logout (also blacklists the access token)
-	err = h.authService.Logout(ctx, refreshToken, accessToken, authenticatedUserID)
-	if err != nil {
-		reqLogger.Error("logout failed",
-			zap.Error(err),
-		)
-		// Don't fail logout even if there's an error
-	}
-
-	h.clearAuthCookie(c, "access_token")
-	h.clearAuthCookie(c, "refresh_token")
-
-	reqLogger.Info("logout successful")
-
-	// Extract user ID if available from JWT context
-	logoutUserID := ""
-	if uid, exists := c.Get("user_id"); exists {
-		logoutUserID = uid.(string)
-	}
-	audit.LogSecurityFromContext(c, audit.EventLogout, "success", logoutUserID)
-
-	c.JSON(http.StatusOK, dto.MessageResponse{
-		Message: "Successfully logged out",
-	})
+	c.JSON(http.StatusOK, dto.MessageResponse{Message: "Çıkış yapıldı"})
 }
 
 // LogoutAll handles logout from all devices
@@ -226,136 +240,95 @@ func (h *AuthHandler) LogoutAll(c *gin.Context) {
 	ctx, cancel := context.WithTimeout(c.Request.Context(), requestTimeout)
 	defer cancel()
 
-	// Create child logger with request context and endpoint info
+	userID, ok := authenticatedUserID(c)
+	if !ok {
+		return
+	}
 	reqLogger := logger.WithContextAndFields(ctx,
 		zap.String("endpoint", "LogoutAll"),
 		zap.String("handler", "AuthHandler"),
+		zap.String("user_id", userID.String()),
 	)
 
-	// Get user ID from JWT (set by auth middleware)
-	userIDStr, exists := c.Get("user_id")
-	if !exists {
-		reqLogger.Warn("logout all attempted without user authentication")
-		c.JSON(http.StatusUnauthorized, dto.ErrorResponse{
-			Error:   "UNAUTHORIZED",
-			Message: "User not authenticated",
-		})
+	if err := h.authService.LogoutAll(ctx, userID, bearerOrCookieAccessToken(c)); err != nil {
+		reqLogger.Error("logout all failed", zap.Error(err))
+		respondError(c, err)
 		return
 	}
-
-	userID, err := uuid.Parse(userIDStr.(string))
-	if err != nil {
-		reqLogger.Error("invalid user ID format",
-			zap.Error(err),
-		)
-		c.JSON(http.StatusBadRequest, dto.ErrorResponse{
-			Error:   "INVALID_USER_ID",
-			Message: "Invalid user ID",
-		})
-		return
-	}
-
-	reqLogger = reqLogger.With(zap.String("user_id", userID.String()))
-	reqLogger.Info("logout all attempt")
-
-	// Get access token from Authorization header or cookie for blacklisting
-	accessToken := ""
-	authHeader := c.GetHeader("Authorization")
-	if len(authHeader) > 7 && authHeader[:7] == "Bearer " {
-		accessToken = authHeader[7:]
-	}
-	if accessToken == "" {
-		if cookie, cookieErr := c.Cookie("access_token"); cookieErr == nil {
-			accessToken = cookie
-		}
-	}
-
-	// Perform logout all (also blacklists all tokens)
-	err = h.authService.LogoutAll(ctx, userID, accessToken)
-	if err != nil {
-		reqLogger.Error("logout all failed",
-			zap.Error(err),
-		)
-		c.JSON(http.StatusInternalServerError, dto.ErrorResponse{
-			Error:   "INTERNAL_ERROR",
-			Message: "Failed to logout from all devices",
-		})
-		return
-	}
-
-	reqLogger.Info("logout all successful")
 
 	audit.LogSecurityFromContext(c, audit.EventLogoutAll, "success", userID.String())
+	h.endSession(c)
 
-	h.clearAuthCookie(c, "access_token")
-	h.clearAuthCookie(c, "refresh_token")
-
-	c.JSON(http.StatusOK, dto.MessageResponse{
-		Message: "Successfully logged out from all devices",
-	})
+	c.JSON(http.StatusOK, dto.MessageResponse{Message: "Tüm cihazlardan çıkış yapıldı"})
 }
 
-// RefreshToken handles access token refresh
+// RefreshToken rotates the token pair. A body token (mobile) wins over the
+// cookie: a native HTTP stack may keep a cookie jar of its own, and a mobile
+// client that got its new refresh token only as a cookie could never store it.
 func (h *AuthHandler) RefreshToken(c *gin.Context) {
 	ctx, cancel := context.WithTimeout(c.Request.Context(), requestTimeout)
 	defer cancel()
 
-	// Create child logger with request context and endpoint info
 	reqLogger := logger.WithContextAndFields(ctx,
 		zap.String("endpoint", "RefreshToken"),
 		zap.String("handler", "AuthHandler"),
 	)
 
-	// Refresh token: cookie (web) or body (mobile/non-cookie clients).
-	refreshToken, err := c.Cookie("refresh_token")
-	if err != nil || refreshToken == "" {
-		var body dto.RefreshTokenRequest
-		_ = c.ShouldBindJSON(&body) // body is optional; we already checked cookie
-		refreshToken = body.RefreshToken
+	refreshToken := bodyRefreshToken(c)
+	// The new refresh token goes back the way the old one came: a token the
+	// client already held in the body may be returned in the body, one that
+	// arrived as an HttpOnly cookie never is.
+	fromBody := refreshToken != ""
+	if !fromBody {
+		refreshToken, _ = c.Cookie(refreshCookie)
 	}
 	if refreshToken == "" {
-		reqLogger.Warn("refresh token not found in cookie or body")
+		reqLogger.Warn("refresh token not found in body or cookie")
 		c.JSON(http.StatusUnauthorized, dto.ErrorResponse{
 			Error:   "MISSING_REFRESH_TOKEN",
-			Message: "Refresh token not found",
+			Message: "Oturum bulunamadı, lütfen tekrar giriş yapın",
 		})
 		return
 	}
 
-	reqLogger.Info("refresh token attempt")
-
-	// Perform refresh
 	response, newRefreshToken, err := h.authService.RefreshAccessToken(ctx, refreshToken)
 	if err != nil {
-		reqLogger.Error("refresh token failed",
-			zap.Error(err),
-		)
-
-		if err == sharedErrors.ErrUnauthorized {
+		if isSessionEnded(err) {
+			reqLogger.Warn("refresh rejected", zap.Error(err))
+			// The cookie is dead; clearing it stops the browser from
+			// replaying it on every page load.
+			h.endSession(c)
 			c.JSON(http.StatusUnauthorized, dto.ErrorResponse{
-				Error:   "INVALID_TOKEN",
-				Message: "Invalid or expired refresh token",
+				Error:   authErrors.ErrInvalidToken.Code,
+				Message: authErrors.ErrInvalidToken.Message,
 			})
 			return
 		}
-
-		c.JSON(http.StatusInternalServerError, dto.ErrorResponse{
-			Error:   "INTERNAL_ERROR",
-			Message: "Failed to refresh token",
-		})
+		reqLogger.Error("refresh failed", zap.Error(err))
+		respondError(c, err)
 		return
 	}
 
-	reqLogger.Info("refresh token successful")
-
 	audit.LogSecurityFromContext(c, audit.EventTokenRefresh, "success", "")
 
-	h.setAuthCookie(c, "access_token", response.AccessToken, h.config.JWT.AccessTokenExpiry*60)
-	h.setAuthCookie(c, "refresh_token", newRefreshToken, h.config.JWT.RefreshTokenExpiry*3600)
-
-	// Also return rotated refresh token in body for non-cookie clients.
-	response.RefreshToken = newRefreshToken
+	response.RefreshToken = h.issueSession(c, response.AccessToken, newRefreshToken, fromBody)
 	c.JSON(http.StatusOK, response)
+}
+
+// isSessionEnded reports the refresh failures that mean "log in again" — as
+// opposed to the server failing, which must stay a 5xx so clients retry.
+func isSessionEnded(err error) bool {
+	for _, target := range []error{
+		authErrors.ErrInvalidToken,
+		authErrors.ErrSessionNotFound,
+		authErrors.ErrUserNotFound,
+		authErrors.ErrTokenVersionMismatch,
+	} {
+		if sharedErrors.Is(err, target) {
+			return true
+		}
+	}
+	return false
 }
 
 // ChangePassword handles password change
@@ -363,71 +336,37 @@ func (h *AuthHandler) ChangePassword(c *gin.Context) {
 	ctx, cancel := context.WithTimeout(c.Request.Context(), requestTimeout)
 	defer cancel()
 
-	log := logger.WithContextAndFields(ctx,
+	userID, ok := authenticatedUserID(c)
+	if !ok {
+		return
+	}
+	reqLogger := logger.WithContextAndFields(ctx,
 		zap.String("handler", "AuthHandler"),
 		zap.String("method", "ChangePassword"),
+		zap.String("user_id", userID.String()),
 	)
-
-	// Get user ID from JWT
-	userIDStr, exists := c.Get("user_id")
-	if !exists {
-		c.JSON(http.StatusUnauthorized, dto.ErrorResponse{
-			Error:   "UNAUTHORIZED",
-			Message: "User not authenticated",
-		})
-		return
-	}
-
-	userID, err := uuid.Parse(userIDStr.(string))
-	if err != nil {
-		c.JSON(http.StatusBadRequest, dto.ErrorResponse{
-			Error:   "INVALID_USER_ID",
-			Message: "Invalid user ID",
-		})
-		return
-	}
 
 	var req dto.ChangePasswordRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
-		c.JSON(http.StatusBadRequest, dto.ErrorResponse{
-			Error:   "VALIDATION_ERROR",
-			Message: err.Error(),
-		})
+		respondValidationError(c, "Mevcut ve yeni şifre alanları zorunludur (en az 8 karakter)")
 		return
 	}
 
-	// Perform password change
 	response, newRefreshToken, err := h.authService.ChangePassword(ctx, userID, req)
 	if err != nil {
-		log.Error("change password failed",
-			zap.Error(err),
-			zap.String("user_id", userID.String()),
-		)
-
-		if err == sharedErrors.ErrUnauthorized {
-			audit.LogSecurityFromContextWithDetails(c, audit.EventPasswordChange, "failure", userID.String(), "invalid old password", nil)
-			c.JSON(http.StatusUnauthorized, dto.ErrorResponse{
-				Error:   "INVALID_OLD_PASSWORD",
-				Message: "Invalid old password",
-			})
-			return
+		reqLogger.Warn("change password failed", zap.Error(err))
+		reason := "internal error"
+		if appErr, ok := sharedErrors.As(err); ok {
+			reason = appErr.Code
 		}
-
-		audit.LogSecurityFromContextWithDetails(c, audit.EventPasswordChange, "failure", userID.String(), err.Error(), nil)
-		c.JSON(http.StatusBadRequest, dto.ErrorResponse{
-			Error:   "PASSWORD_CHANGE_FAILED",
-			Message: err.Error(),
-		})
+		audit.LogSecurityFromContextWithDetails(c, audit.EventPasswordChange, "failure", userID.String(), reason, nil)
+		respondError(c, err)
 		return
 	}
 
 	audit.LogSecurityFromContext(c, audit.EventPasswordChange, "success", userID.String())
 
-	h.setAuthCookie(c, "access_token", response.AccessToken, h.config.JWT.AccessTokenExpiry*60)
-	h.setAuthCookie(c, "refresh_token", newRefreshToken, h.config.JWT.RefreshTokenExpiry*3600)
-
-	// Also return refresh token in body for non-cookie clients.
-	response.RefreshToken = newRefreshToken
+	response.RefreshToken = h.issueSession(c, response.AccessToken, newRefreshToken, isMobileClient(c))
 	c.JSON(http.StatusOK, response)
 }
 
@@ -436,48 +375,16 @@ func (h *AuthHandler) GetSessions(c *gin.Context) {
 	ctx, cancel := context.WithTimeout(c.Request.Context(), requestTimeout)
 	defer cancel()
 
-	log := logger.WithContextAndFields(ctx,
-		zap.String("handler", "AuthHandler"),
-		zap.String("method", "GetSessions"),
-	)
-
-	// Get user ID from JWT
-	userIDStr, exists := c.Get("user_id")
-	if !exists {
-		c.JSON(http.StatusUnauthorized, dto.ErrorResponse{
-			Error:   "UNAUTHORIZED",
-			Message: "User not authenticated",
-		})
+	userID, ok := authenticatedUserID(c)
+	if !ok {
 		return
 	}
 
-	userID, err := uuid.Parse(userIDStr.(string))
+	response, err := h.authService.GetUserSessions(ctx, userID, c.GetString("jti"))
 	if err != nil {
-		c.JSON(http.StatusBadRequest, dto.ErrorResponse{
-			Error:   "INVALID_USER_ID",
-			Message: "Invalid user ID",
-		})
-		return
-	}
-
-	// Get current JTI from context (set by middleware)
-	currentJTI, _ := c.Get("jti")
-	jti := ""
-	if currentJTI != nil {
-		jti = currentJTI.(string)
-	}
-
-	// Get sessions
-	response, err := h.authService.GetUserSessions(ctx, userID, jti)
-	if err != nil {
-		log.Error("get sessions failed",
-			zap.Error(err),
-			zap.String("user_id", userID.String()),
-		)
-		c.JSON(http.StatusInternalServerError, dto.ErrorResponse{
-			Error:   "INTERNAL_ERROR",
-			Message: "Failed to retrieve sessions",
-		})
+		logger.WithContextAndFields(ctx, zap.String("handler", "AuthHandler"), zap.String("method", "GetSessions")).
+			Error("get sessions failed", zap.Error(err), zap.String("user_id", userID.String()))
+		respondError(c, err)
 		return
 	}
 
@@ -489,109 +396,71 @@ func (h *AuthHandler) DeleteSession(c *gin.Context) {
 	ctx, cancel := context.WithTimeout(c.Request.Context(), requestTimeout)
 	defer cancel()
 
-	log := logger.WithContextAndFields(ctx,
-		zap.String("handler", "AuthHandler"),
-		zap.String("method", "DeleteSession"),
-	)
-
-	// Get user ID from JWT
-	userIDStr, exists := c.Get("user_id")
-	if !exists {
-		c.JSON(http.StatusUnauthorized, dto.ErrorResponse{
-			Error:   "UNAUTHORIZED",
-			Message: "User not authenticated",
-		})
+	userID, ok := authenticatedUserID(c)
+	if !ok {
 		return
 	}
 
-	userID, err := uuid.Parse(userIDStr.(string))
+	sessionID, err := uuid.Parse(c.Param("id"))
 	if err != nil {
-		c.JSON(http.StatusBadRequest, dto.ErrorResponse{
-			Error:   "INVALID_USER_ID",
-			Message: "Invalid user ID",
-		})
+		respondValidationError(c, "Geçersiz oturum kimliği")
 		return
 	}
 
-	// Get session ID from URL param
-	sessionIDStr := c.Param("id")
-	sessionID, err := uuid.Parse(sessionIDStr)
-	if err != nil {
-		c.JSON(http.StatusBadRequest, dto.ErrorResponse{
-			Error:   "INVALID_SESSION_ID",
-			Message: "Invalid session ID",
-		})
+	if err := h.authService.DeleteSession(ctx, sessionID, userID, c.GetString("jti")); err != nil {
+		logger.WithContextAndFields(ctx, zap.String("handler", "AuthHandler"), zap.String("method", "DeleteSession")).
+			Warn("delete session failed", zap.Error(err), zap.String("session_id", sessionID.String()))
+		respondError(c, err)
 		return
 	}
 
-	// Get current JTI from context
-	currentJTI, _ := c.Get("jti")
-	jti := ""
-	if currentJTI != nil {
-		jti = currentJTI.(string)
-	}
-
-	// Delete session
-	err = h.authService.DeleteSession(ctx, sessionID, userID, jti)
-	if err != nil {
-		log.Error("delete session failed",
-			zap.Error(err),
-			zap.String("session_id", sessionID.String()),
-		)
-
-		if err.Error() == "cannot terminate current session, use logout instead" {
-			c.JSON(http.StatusBadRequest, dto.ErrorResponse{
-				Error:   "CANNOT_TERMINATE_CURRENT_SESSION",
-				Message: "Aktif oturumunuzu sonlandırmak için logout endpoint'ini kullanın",
-			})
-			return
-		}
-
-		c.JSON(http.StatusInternalServerError, dto.ErrorResponse{
-			Error:   "INTERNAL_ERROR",
-			Message: "Failed to delete session",
-		})
-		return
-	}
-
-	c.JSON(http.StatusOK, dto.MessageResponse{
-		Message: "Session terminated successfully",
-	})
+	c.JSON(http.StatusOK, dto.MessageResponse{Message: "Oturum sonlandırıldı"})
 }
 
-// RequestPasswordReset handles password reset request
+// RequestPasswordReset handles password reset request. The answer is the
+// same whether or not the address exists.
 func (h *AuthHandler) RequestPasswordReset(c *gin.Context) {
 	ctx, cancel := context.WithTimeout(c.Request.Context(), requestTimeout)
 	defer cancel()
 
-	log := logger.WithContextAndFields(ctx,
-		zap.String("handler", "AuthHandler"),
-		zap.String("method", "RequestPasswordReset"),
-	)
-
 	var req dto.RequestPasswordResetRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
-		c.JSON(http.StatusBadRequest, dto.ErrorResponse{
-			Error:   "VALIDATION_ERROR",
-			Message: err.Error(),
-		})
+		respondValidationError(c, "Geçerli bir e-posta adresi girin")
 		return
 	}
 
-	err := h.authService.RequestPasswordReset(ctx, req.Email)
-	if err != nil {
-		log.Error("request password reset failed",
-			zap.Error(err),
-			zap.String("email", req.Email),
-		)
-		c.JSON(http.StatusInternalServerError, dto.ErrorResponse{
-			Error:   "INTERNAL_ERROR",
-			Message: "Failed to request password reset",
-		})
+	if err := h.authService.RequestPasswordReset(ctx, req.Email); err != nil {
+		logger.WithContextAndFields(ctx, zap.String("handler", "AuthHandler"), zap.String("method", "RequestPasswordReset")).
+			Error("request password reset failed", zap.Error(err), zap.String("email", req.Email))
+		respondError(c, err)
 		return
 	}
 
 	c.JSON(http.StatusOK, dto.MessageResponse{
-		Message: "If an account with that email exists, a password reset link has been sent.",
+		Message: "Bu adrese kayıtlı bir hesap varsa şifre sıfırlama bağlantısı gönderildi.",
 	})
+}
+
+// ResetPassword sets a new password with the token from the reset e-mail.
+func (h *AuthHandler) ResetPassword(c *gin.Context) {
+	ctx, cancel := context.WithTimeout(c.Request.Context(), requestTimeout)
+	defer cancel()
+
+	var req dto.ResetPasswordRequest
+	if err := c.ShouldBindJSON(&req); err != nil {
+		respondValidationError(c, "Sıfırlama bağlantısı ve yeni şifre zorunludur")
+		return
+	}
+
+	if err := h.authService.ResetPassword(ctx, req.Token, req.NewPassword); err != nil {
+		logger.WithContextAndFields(ctx, zap.String("handler", "AuthHandler"), zap.String("method", "ResetPassword")).
+			Warn("password reset failed", zap.Error(err))
+		audit.LogSecurityFromContextWithDetails(c, audit.EventPasswordChange, "failure", "", "password reset rejected", nil)
+		respondError(c, err)
+		return
+	}
+
+	audit.LogSecurityFromContextWithDetails(c, audit.EventPasswordChange, "success", "", "password reset", nil)
+	h.endSession(c)
+	c.JSON(http.StatusOK, dto.MessageResponse{Message: "Şifreniz güncellendi, yeni şifrenizle giriş yapabilirsiniz"})
 }

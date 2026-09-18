@@ -15,6 +15,8 @@ func TestAuthErrors_HTTPStatusCodes(t *testing.T) {
 	}{
 		"INVALID_CREDENTIALS":              {ErrInvalidCredentials, http.StatusUnauthorized},
 		"WEAK_PASSWORD":                    {ErrWeakPassword, http.StatusBadRequest},
+		"INVALID_OLD_PASSWORD":             {ErrInvalidOldPassword, http.StatusBadRequest},
+		"INVALID_RESET_TOKEN":              {ErrInvalidResetToken, http.StatusBadRequest},
 		"INVALID_TOKEN":                    {ErrInvalidToken, http.StatusUnauthorized},
 		"EXPIRED_TOKEN":                    {ErrExpiredToken, http.StatusUnauthorized},
 		"TOKEN_REVOKED":                    {ErrTokenRevoked, http.StatusUnauthorized},
@@ -44,7 +46,7 @@ func TestRepositorySentinels_AliasShared(t *testing.T) {
 
 func TestAuthErrors_DistinctCodes(t *testing.T) {
 	all := []*sharedErrors.AppError{
-		ErrInvalidCredentials, ErrWeakPassword,
+		ErrInvalidCredentials, ErrWeakPassword, ErrInvalidOldPassword, ErrInvalidResetToken,
 		ErrInvalidToken, ErrExpiredToken, ErrTokenRevoked, ErrTokenVersionMismatch,
 		ErrAccountLocked, ErrAccountDeactivated, ErrForcePasswordChange,
 		ErrCannotTerminateSession, ErrRateLimitExceeded,

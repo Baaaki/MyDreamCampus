@@ -8,13 +8,12 @@ type LoginRequest struct {
 	Password string `json:"password" binding:"required,min=8"`
 }
 
-// LoginResponse represents the login response payload.
-// RefreshToken is returned in the body so non-cookie clients (mobile,
-// CLI) can persist it; web clients can ignore it and rely on the
-// HttpOnly cookie set by the same response.
+// LoginResponse represents the login response payload. RefreshToken is set
+// only for clients that sent X-Client-Type: mobile; browsers get it as an
+// HttpOnly cookie and never in a body script could read.
 type LoginResponse struct {
 	AccessToken         string       `json:"access_token"`
-	RefreshToken        string       `json:"refresh_token"`
+	RefreshToken        string       `json:"refresh_token,omitempty"`
 	ExpiresIn           int          `json:"expires_in"` // seconds
 	User                UserResponse `json:"user"`
 	ForcePasswordChange bool         `json:"force_password_change"`
@@ -28,17 +27,18 @@ type RefreshTokenRequest struct {
 	RefreshToken string `json:"refresh_token"`
 }
 
-// RefreshResponse represents the refresh token response
+// RefreshResponse represents the refresh token response. RefreshToken is set
+// only when the old one arrived in the body.
 type RefreshResponse struct {
 	AccessToken  string `json:"access_token"`
-	RefreshToken string `json:"refresh_token"`
+	RefreshToken string `json:"refresh_token,omitempty"`
 	ExpiresIn    int    `json:"expires_in"` // seconds
 }
 
 // ChangePasswordRequest represents the change password request
 type ChangePasswordRequest struct {
 	OldPassword string `json:"old_password" binding:"required,min=8"`
-	NewPassword string `json:"new_password" binding:"required,min=8"`
+	NewPassword string `json:"new_password" binding:"required,min=8,max=128"`
 }
 
 // RequestPasswordResetRequest represents the password reset request
@@ -46,11 +46,17 @@ type RequestPasswordResetRequest struct {
 	Email string `json:"email" binding:"required,email"`
 }
 
+// ResetPasswordRequest completes a password reset with the e-mailed token.
+type ResetPasswordRequest struct {
+	Token       string `json:"token" binding:"required"`
+	NewPassword string `json:"new_password" binding:"required,min=8,max=128"`
+}
+
 // ChangePasswordResponse represents the change password response
 type ChangePasswordResponse struct {
 	Message      string `json:"message"`
 	AccessToken  string `json:"access_token"`
-	RefreshToken string `json:"refresh_token"`
+	RefreshToken string `json:"refresh_token,omitempty"`
 	ExpiresIn    int    `json:"expires_in"` // seconds
 }
 

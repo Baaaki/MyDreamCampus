@@ -100,6 +100,7 @@ func (m *Module) RegisterRoutes(rg *gin.RouterGroup) {
 	rg.POST("/login", platformMiddleware.EndpointRateLimit("login"), m.handler.Login)
 	rg.POST("/refresh", platformMiddleware.EndpointRateLimit("refresh"), m.handler.RefreshToken)
 	rg.POST("/request-password-reset", platformMiddleware.EndpointRateLimit("password"), m.handler.RequestPasswordReset)
+	rg.POST("/reset-password", platformMiddleware.EndpointRateLimit("password"), m.handler.ResetPassword)
 
 	// Protected — JWT + CSRF + per-user rate limit.
 	protected := rg.Group("")

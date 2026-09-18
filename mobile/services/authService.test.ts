@@ -69,6 +69,15 @@ describe("authService.logout", () => {
     expect(await SecureStore.getItemAsync("user_data")).toBeNull();
   });
 
+  it("sends the stored refresh token so the server can end the session", async () => {
+    await SecureStore.setItemAsync("refresh_token", "rt-to-end");
+    apiMock.post.mockResolvedValueOnce({ data: { message: "ok" } });
+
+    await authService.logout();
+
+    expect(apiMock.post).toHaveBeenCalledWith("/auth/logout", { refresh_token: "rt-to-end" });
+  });
+
   it("clears storage on successful API call", async () => {
     await SecureStore.setItemAsync("jwt_token", "at");
     apiMock.post.mockResolvedValueOnce({ data: { message: "ok" } });
@@ -85,6 +94,10 @@ describe("authService.changePassword", () => {
     });
 
     const res = await authService.changePassword({
+      old_password: "OldPass1",
+      new_password: "NewPass1",
+    });
+    expect(apiMock.post).toHaveBeenCalledWith("/auth/change-password", {
       old_password: "OldPass1",
       new_password: "NewPass1",
     });

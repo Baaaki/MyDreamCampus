@@ -56,9 +56,9 @@ func (f *fakeAuthCache) StoreResetToken(context.Context, string, string, time.Du
 	return nil
 }
 
-func (f *fakeAuthCache) GetResetToken(context.Context, string) (string, error) { return "", nil }
-
-func (f *fakeAuthCache) DeleteResetToken(context.Context, string) error { return nil }
+func (f *fakeAuthCache) ConsumeResetToken(context.Context, string) (string, error) {
+	return "", nil
+}
 
 func newLockoutService(cache *fakeAuthCache, lockMinutes int) *AuthService {
 	cfg := &config.Config{}

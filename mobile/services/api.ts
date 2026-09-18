@@ -11,12 +11,17 @@ const getBaseURL = () => {
   return 'http://localhost/api';
 };
 
+// The app has no cookie jar, so it identifies itself and the backend hands
+// the refresh token over in the response body instead of a cookie.
+export const CLIENT_HEADERS = {
+  'Content-Type': 'application/json',
+  'X-Client-Type': 'mobile',
+} as const;
+
 export const api = axios.create({
   baseURL: getBaseURL(),
   timeout: 15000,
-  headers: {
-    'Content-Type': 'application/json',
-  },
+  headers: { ...CLIENT_HEADERS },
 });
 
 api.interceptors.request.use(
@@ -54,7 +59,7 @@ async function refreshOnce(): Promise<string | null> {
       const res = await axios.post<{ access_token: string; refresh_token: string }>(
         `${getBaseURL()}/auth/refresh`,
         { refresh_token: refreshToken },
-        { timeout: 15000, headers: { 'Content-Type': 'application/json' } }
+        { timeout: 15000, headers: { ...CLIENT_HEADERS } }
       );
       await SecureStore.setItemAsync('jwt_token', res.data.access_token);
       await SecureStore.setItemAsync('refresh_token', res.data.refresh_token);

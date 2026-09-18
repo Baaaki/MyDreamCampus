@@ -35,8 +35,7 @@ type authCache interface {
 	RecordLoginFailure(ctx context.Context, key string, window time.Duration) (int64, error)
 	ClearLoginFailures(ctx context.Context, key string) error
 	StoreResetToken(ctx context.Context, token, email string, expiry time.Duration) error
-	GetResetToken(ctx context.Context, token string) (string, error)
-	DeleteResetToken(ctx context.Context, token string) error
+	ConsumeResetToken(ctx context.Context, token string) (string, error)
 }
 
 var _ authCache = (*redis.ClientWrapper)(nil)
@@ -198,8 +197,23 @@ func (s *AuthService) Login(ctx context.Context, req dto.LoginRequest, deviceInf
 	return response, refreshToken, nil
 }
 
-// Logout invalidates the current session and blacklists the access token
+// Logout blacklists the caller's access token and ends the session the
+// refresh token belongs to. refreshToken may be empty — a client that lost
+// it still expects logout to end the access token it is holding.
 func (s *AuthService) Logout(ctx context.Context, refreshToken string, accessToken string, authenticatedUserID string) error {
+	if accessToken != "" {
+		if err := s.blacklistAccessToken(ctx, accessToken); err != nil {
+			logger.Error("failed to blacklist access token", zap.Error(err))
+		}
+	}
+
+	if refreshToken == "" {
+		logger.Warn("logout without refresh token; session left to expire",
+			zap.String("user_id", authenticatedUserID),
+		)
+		return nil
+	}
+
 	// Parse refresh token without validation (even expired tokens should be processable)
 	claims, err := s.parseRefreshTokenWithoutValidation(refreshToken)
 	if err != nil {
@@ -216,42 +230,20 @@ func (s *AuthService) Logout(ctx context.Context, refreshToken string, accessTok
 		return serviceErrors.ErrInvalidToken
 	}
 
-	// Delete session from DB
 	jti, _ := claims["jti"].(string)
 	if jti == "" {
 		return serviceErrors.ErrInvalidToken
 	}
-	err = s.sessionRepo.DeleteSession(ctx, jti)
-	if err != nil {
-		// Check if session not found
+	if err := s.sessionRepo.DeleteSession(ctx, jti); err != nil {
 		if sharedErrors.Is(err, serviceErrors.ErrSessionNotFoundRepo) {
-			// Don't return error, logout should succeed even if session not found
-			logger.Info("logout attempted for already deleted session",
-				zap.String("jti", jti),
-			)
-		} else if sharedErrors.Is(err, sharedErrors.ErrQueryFailed) {
-			logger.Error("database error deleting session",
-				zap.Error(err),
-				zap.String("jti", jti),
-			)
-			// Don't return error, logout should succeed
+			// Logout must succeed even if the session is already gone.
+			logger.Info("logout attempted for already deleted session", zap.String("jti", jti))
+		} else {
+			logger.Error("database error deleting session", zap.Error(err), zap.String("jti", jti))
 		}
 	}
 
-	// Blacklist the access token if provided
-	if accessToken != "" {
-		if err := s.blacklistAccessToken(ctx, accessToken); err != nil {
-			logger.Error("failed to blacklist access token",
-				zap.Error(err),
-			)
-			// Continue even if blacklisting fails
-		}
-	}
-
-	logger.Info("user logged out",
-		zap.String("refresh_jti", jti),
-	)
-
+	logger.Info("user logged out", zap.String("refresh_jti", jti))
 	return nil
 }
 
@@ -506,7 +498,10 @@ func (s *AuthService) ChangePassword(ctx context.Context, userID uuid.UUID, req 
 	// Get user
 	user, err := s.authRepo.GetUserByID(ctx, userID)
 	if err != nil {
-		return dto.ChangePasswordResponse{}, "", sharedErrors.ErrUnauthorized
+		if sharedErrors.Is(err, serviceErrors.ErrUserNotFoundRepo) {
+			return dto.ChangePasswordResponse{}, "", serviceErrors.ErrUserNotFound
+		}
+		return dto.ChangePasswordResponse{}, "", sharedErrors.Wrap(sharedErrors.ErrInternal, err)
 	}
 
 	// Verify old password
@@ -514,11 +509,11 @@ func (s *AuthService) ChangePassword(ctx context.Context, userID uuid.UUID, req 
 		logger.Warn("invalid old password during password change",
 			zap.String("user_id", userID.String()),
 		)
-		return dto.ChangePasswordResponse{}, "", sharedErrors.ErrUnauthorized
+		return dto.ChangePasswordResponse{}, "", serviceErrors.ErrInvalidOldPassword
 	}
 
 	if err := utils.ValidatePasswordPolicy(req.NewPassword); err != nil {
-		return dto.ChangePasswordResponse{}, "", err
+		return dto.ChangePasswordResponse{}, "", serviceErrors.ErrWeakPassword
 	}
 
 	// Hash new password
@@ -582,7 +577,7 @@ func (s *AuthService) ChangePassword(ctx context.Context, userID uuid.UUID, req 
 	)
 
 	return dto.ChangePasswordResponse{
-		Message:     "Password changed successfully",
+		Message:     "Şifreniz değiştirildi",
 		AccessToken: accessToken,
 		ExpiresIn:   s.config.JWT.AccessTokenExpiry * 60,
 	}, refreshToken, nil
@@ -641,6 +636,58 @@ func (s *AuthService) RequestPasswordReset(ctx context.Context, email string) er
 	return nil
 }
 
+// ResetPassword completes the flow RequestPasswordReset starts: it spends
+// the e-mailed token, sets the new password and ends every session, since
+// whoever needed a reset may not be the only one holding the old password.
+func (s *AuthService) ResetPassword(ctx context.Context, token, newPassword string) error {
+	// Policy first: a rejected password must not burn the single-use token.
+	if err := utils.ValidatePasswordPolicy(newPassword); err != nil {
+		return serviceErrors.ErrWeakPassword
+	}
+
+	email, err := s.redisClient.ConsumeResetToken(ctx, token)
+	if err != nil {
+		return sharedErrors.Wrap(sharedErrors.ErrInternal, fmt.Errorf("failed to consume reset token: %w", err))
+	}
+	if email == "" {
+		return serviceErrors.ErrInvalidResetToken
+	}
+
+	user, err := s.authRepo.GetUserByEmail(ctx, email)
+	if err != nil {
+		if sharedErrors.Is(err, serviceErrors.ErrUserNotFoundRepo) {
+			// The account went away between request and reset.
+			return serviceErrors.ErrInvalidResetToken
+		}
+		return sharedErrors.Wrap(sharedErrors.ErrInternal, err)
+	}
+	if !utils.DerefBool(user.IsActive, false) {
+		return serviceErrors.ErrInvalidResetToken
+	}
+
+	hash, err := utils.HashPassword(newPassword)
+	if err != nil {
+		return sharedErrors.Wrap(sharedErrors.ErrInternal, err)
+	}
+	userID := utils.PgtypeToUUID(user.ID)
+	// UpdatePassword bumps token_version, which retires every refresh token.
+	if err := s.authRepo.UpdatePassword(ctx, userID, hash, false); err != nil {
+		return sharedErrors.Wrap(sharedErrors.ErrInternal, err)
+	}
+
+	updated, err := s.authRepo.GetUserByID(ctx, userID)
+	if err != nil {
+		return sharedErrors.Wrap(sharedErrors.ErrInternal, err)
+	}
+	s.revokeOutstandingAccessTokens(ctx, userID.String(), int(utils.DerefInt32(updated.TokenVersion, 0)))
+	if err := s.sessionRepo.DeleteAllUserSessions(ctx, userID); err != nil {
+		logger.Error("failed to delete sessions after password reset", zap.Error(err))
+	}
+
+	logger.Info("password reset completed", zap.String("user_id", userID.String()))
+	return nil
+}
+
 // GetUserSessions returns all active sessions for a user
 func (s *AuthService) GetUserSessions(ctx context.Context, userID uuid.UUID, currentJTI string) (dto.SessionsResponse, error) {
 	sessions, err := s.sessionRepo.GetSessionsByUserID(ctx, userID)
@@ -675,7 +722,7 @@ func (s *AuthService) DeleteSession(ctx context.Context, sessionID, userID uuid.
 	for _, session := range sessions {
 		if utils.PgtypeToUUID(session.ID) == sessionID {
 			if session.RefreshTokenJti == currentJTI {
-				return fmt.Errorf("cannot terminate current session, use logout instead")
+				return serviceErrors.ErrCannotTerminateSession
 			}
 		}
 	}

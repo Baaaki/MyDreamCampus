@@ -147,6 +147,21 @@ describe("api.ts response interceptor (401 + refresh)", () => {
 
     expect(await SecureStore.getItemAsync("jwt_token")).toBe("new-at");
     expect(await SecureStore.getItemAsync("refresh_token")).toBe("new-rt");
+
+    // Without the client header the backend would answer the refresh with a
+    // cookie only, and the rotated refresh token would be lost.
+    const refreshCall = axiosMock.post.mock.calls[0] as [string, unknown, { headers: Record<string, string> }];
+    expect(refreshCall[0]).toMatch(/\/auth\/refresh$/);
+    expect(refreshCall[1]).toEqual({ refresh_token: "rt-1" });
+    expect(refreshCall[2].headers["X-Client-Type"]).toBe("mobile");
+  });
+
+  it("identifies itself as the mobile client on every request", () => {
+    loadApi();
+    const createArgs = axiosMock.create.mock.calls[axiosMock.create.mock.calls.length - 1][0] as {
+      headers: Record<string, string>;
+    };
+    expect(createArgs.headers["X-Client-Type"]).toBe("mobile");
   });
 
   it("does not loop: retried requests bail out and trigger logout", async () => {

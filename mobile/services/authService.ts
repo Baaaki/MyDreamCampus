@@ -30,7 +30,11 @@ export const authService = {
 
   async logout(): Promise<void> {
     try {
-      await api.post('/auth/logout');
+      // Sent in the body because there is no cookie to carry it; without it
+      // the server cannot end the session and the refresh token outlives
+      // the logout by a day.
+      const refreshToken = await SecureStore.getItemAsync(REFRESH_TOKEN_KEY);
+      await api.post('/auth/logout', refreshToken ? { refresh_token: refreshToken } : {});
     } catch (error) {
       console.error('Logout API error:', error);
     } finally {
@@ -41,7 +45,7 @@ export const authService = {
   },
 
   async changePassword(data: ChangePasswordRequest): Promise<ChangePasswordResponse> {
-    const response = await api.post<ChangePasswordResponse>('/auth/password/change', data);
+    const response = await api.post<ChangePasswordResponse>('/auth/change-password', data);
     await persistTokens(response.data.access_token, response.data.refresh_token);
     return response.data;
   },
