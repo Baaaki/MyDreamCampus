@@ -45,6 +45,9 @@ type Options struct {
 	// LoginRateLimits adds the per-endpoint buckets for login, refresh and
 	// password. Only auth serves those routes; the values come from config.
 	LoginRateLimits bool
+	// SignsQRCodes refuses to start in production without a real QR_SECRET.
+	// Only meal signs with the shared key; attendance uses per-session keys.
+	SignsQRCodes bool
 }
 
 // Runtime is the wired infrastructure handed back to a service's main.
@@ -92,6 +95,12 @@ func Init(opts Options) *Runtime {
 	logger.Log = logger.Log.With(zap.String("service", opts.Service))
 
 	audit.InitSecurity(cfg.Server.Environment)
+
+	if opts.SignsQRCodes {
+		if err := cfg.ValidateQRSecret(); err != nil {
+			logger.Fatal("invalid QR configuration", zap.Error(err))
+		}
+	}
 
 	if cfg.Server.InternalSecret == "" {
 		// An empty secret makes RequireInternalSecret a no-op, which would

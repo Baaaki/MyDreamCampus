@@ -200,6 +200,16 @@ func Load() (*Config, error) {
 			CancelCutoffHours:       viper.GetInt("RESERVATION_CANCEL_CUTOFF_HOURS"),
 			QRValidityWindowSeconds: viper.GetInt("QR_VALIDITY_WINDOW_SECONDS"),
 		},
+		// Same trap as Reservation: these two were never read, so meal and
+		// attendance signed QR codes with an empty HMAC key and every meal
+		// time window collapsed to 00:00-00:00.
+		QR: QRConfig{Secret: viper.GetString("QR_SECRET")},
+		MealTime: MealTimeConfig{
+			LunchStartHour:  viper.GetInt("LUNCH_START_HOUR"),
+			LunchEndHour:    viper.GetInt("LUNCH_END_HOUR"),
+			DinnerStartHour: viper.GetInt("DINNER_START_HOUR"),
+			DinnerEndHour:   viper.GetInt("DINNER_END_HOUR"),
+		},
 		InternalClient: InternalClientConfig{
 			ServiceURLs: map[string]string{
 				"staff":   viper.GetString("STAFF_SERVICE_URL"),
@@ -284,6 +294,20 @@ func setDefaults() {
 	viper.SetDefault("LUNCH_END_HOUR", 13)
 	viper.SetDefault("DINNER_START_HOUR", 16)
 	viper.SetDefault("DINNER_END_HOUR", 19)
+}
+
+// ValidateQRSecret is checked only by services that sign QR codes with the
+// shared key (meal). Validate cannot do it: every service runs it, and the
+// others are deliberately not given QR_SECRET at all.
+func (c *Config) ValidateQRSecret() error {
+	if c.Server.Environment != "production" {
+		return nil
+	}
+	// Anyone holding this key can mint a valid meal QR code.
+	if c.QR.Secret == "change-this-qr-secret-in-production" || len(c.QR.Secret) < minJWTSecretLength {
+		return fmt.Errorf("QR_SECRET must be set to a random value of at least %d bytes in production", minJWTSecretLength)
+	}
+	return nil
 }
 
 func (c *Config) Validate() error {

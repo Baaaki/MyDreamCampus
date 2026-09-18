@@ -278,7 +278,6 @@ services:
       PORT: "8086"
       DB_URL: postgres://attendance_svc:${SERVICE_DB_PASSWORD:?}@postgres:5432/attendance?sslmode=disable
       CATALOG_SERVICE_URL: http://catalog-service:8084
-      QR_SECRET: ${QR_SECRET:?set QR_SECRET in .env}
     expose:
       - "8086"
 

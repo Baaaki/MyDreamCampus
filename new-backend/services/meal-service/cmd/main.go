@@ -16,6 +16,8 @@ func main() {
 		// Redis is a data store here, not just the rate-limit backend: the
 		// cafeteria QR flow reads and writes it directly.
 		RedisFatal: true,
+		// Meal QR codes are HMAC'd with QR_SECRET.
+		SignsQRCodes: true,
 	})
 
 	// Meal declares its own queues. Payment used to declare the two
