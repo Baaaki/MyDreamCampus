@@ -588,7 +588,7 @@ func (s *StudentService) BulkAssignAdvisor(ctx context.Context, req dto.BulkAdvi
 	)
 
 	return dto.BulkAdvisorAssignResponse{
-		Message:      "Advisor assigned successfully",
+		Message:      "Danışman atandı",
 		UpdatedCount: len(req.StudentIDs),
 		Advisor: dto.AdvisorInfo{
 			AdvisorID:   req.AdvisorID.String(),

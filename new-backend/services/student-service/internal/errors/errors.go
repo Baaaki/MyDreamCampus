@@ -15,23 +15,23 @@ import (
 
 var (
 	// Student resource errors
-	ErrStudentNotFound     = sharedErrors.New("STUDENT_NOT_FOUND", "Student not found", http.StatusNotFound)
-	ErrStudentNumberExists = sharedErrors.New("STUDENT_NUMBER_EXISTS", "Student number already exists", http.StatusConflict)
-	ErrStudentEmailExists  = sharedErrors.New("STUDENT_EMAIL_EXISTS", "Email already exists", http.StatusConflict)
+	ErrStudentNotFound     = sharedErrors.New("STUDENT_NOT_FOUND", "Öğrenci bulunamadı", http.StatusNotFound)
+	ErrStudentNumberExists = sharedErrors.New("STUDENT_NUMBER_EXISTS", "Bu öğrenci numarası zaten kullanılıyor", http.StatusConflict)
+	ErrStudentEmailExists  = sharedErrors.New("STUDENT_EMAIL_EXISTS", "Bu e-posta adresi zaten kullanılıyor", http.StatusConflict)
 
 	// Advisor-related errors
-	ErrAdvisorNotFound = sharedErrors.New("ADVISOR_NOT_FOUND", "Advisor not found", http.StatusNotFound)
+	ErrAdvisorNotFound = sharedErrors.New("ADVISOR_NOT_FOUND", "Danışman bulunamadı", http.StatusNotFound)
 
 	// Import/bulk operation errors
-	ErrInvalidCSVFormat = sharedErrors.New("INVALID_CSV_FORMAT", "Invalid CSV format", http.StatusBadRequest)
+	ErrInvalidCSVFormat = sharedErrors.New("INVALID_CSV_FORMAT", "Geçersiz CSV biçimi", http.StatusBadRequest)
 
 	// External service errors
-	ErrStaffServiceUnavailable = sharedErrors.New("STAFF_SERVICE_UNAVAILABLE", "Staff service is unavailable", http.StatusServiceUnavailable)
+	ErrStaffServiceUnavailable = sharedErrors.New("STAFF_SERVICE_UNAVAILABLE", "Personel bilgisi şu anda alınamıyor, lütfen birazdan tekrar deneyin", http.StatusServiceUnavailable)
 
 	// Future enrollment-related errors (for when enrollment features are implemented)
-	ErrStudentAlreadyEnrolled = sharedErrors.New("ALREADY_ENROLLED", "Student is already enrolled in this course", http.StatusConflict)
-	ErrStudentGPALow          = sharedErrors.New("GPA_TOO_LOW", "Student GPA does not meet course requirements", http.StatusBadRequest)
-	ErrEnrollmentCapacity     = sharedErrors.New("ENROLLMENT_FULL", "Course has reached maximum enrollment capacity", http.StatusConflict)
+	ErrStudentAlreadyEnrolled = sharedErrors.New("ALREADY_ENROLLED", "Öğrenci bu derse zaten kayıtlı", http.StatusConflict)
+	ErrStudentGPALow          = sharedErrors.New("GPA_TOO_LOW", "Öğrencinin not ortalaması ders için yeterli değil", http.StatusBadRequest)
+	ErrEnrollmentCapacity     = sharedErrors.New("ENROLLMENT_FULL", "Ders kontenjanı dolu", http.StatusConflict)
 
 	// Repository-specific sentinel errors (for internal use)
 	ErrStudentNotFoundRepo     = sharedErrors.ErrNotFoundRepo

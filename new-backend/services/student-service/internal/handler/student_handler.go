@@ -281,7 +281,7 @@ func (h *StudentHandler) DeleteStudent(c *gin.Context) {
 	)
 
 	c.JSON(http.StatusOK, dto.MessageResponse{
-		Message: "Student deleted successfully",
+		Message: "Öğrenci silindi",
 	})
 }
 
@@ -361,7 +361,7 @@ func (h *StudentHandler) GetMyAdvisees(c *gin.Context) {
 	userIDStr, exists := c.Get("user_id")
 	if !exists {
 		c.JSON(http.StatusUnauthorized, dto.ErrorResponse{
-			Error: "User not authenticated",
+			Error: "Oturum açmanız gerekiyor",
 			Code:  "UNAUTHORIZED",
 		})
 		return
@@ -370,7 +370,7 @@ func (h *StudentHandler) GetMyAdvisees(c *gin.Context) {
 	advisorID, err := uuid.Parse(userIDStr.(string))
 	if err != nil {
 		c.JSON(http.StatusBadRequest, dto.ErrorResponse{
-			Error: "invalid user ID in token",
+			Error: "Geçersiz kullanıcı kimliği",
 			Code:  "INVALID_USER_ID",
 		})
 		return
@@ -416,7 +416,7 @@ func (h *StudentHandler) ListStudentsByAdvisor(c *gin.Context) {
 	advisorID, err := uuid.Parse(c.Query("advisor_id"))
 	if err != nil {
 		c.JSON(http.StatusBadRequest, dto.ErrorResponse{
-			Error: "advisor_id must be a valid UUID",
+			Error: "Geçersiz danışman kimliği",
 			Code:  errors.ErrValidation.Code,
 		})
 		return
@@ -617,7 +617,7 @@ func (h *StudentHandler) BulkImport(c *gin.Context) {
 			zap.Error(err),
 		)
 		c.JSON(http.StatusBadRequest, dto.ErrorResponse{
-			Error: "File is required",
+			Error: "Dosya seçilmedi",
 			Code:  errors.ErrValidation.Code,
 		})
 		return
@@ -631,7 +631,7 @@ func (h *StudentHandler) BulkImport(c *gin.Context) {
 	fileName := header.Filename
 	if !strings.HasSuffix(strings.ToLower(fileName), ".csv") {
 		c.JSON(http.StatusBadRequest, dto.ErrorResponse{
-			Error: "Only CSV files are supported",
+			Error: "Yalnızca CSV dosyası yüklenebilir",
 			Code:  errors.ErrValidation.Code,
 		})
 		return
@@ -671,7 +671,7 @@ func (h *StudentHandler) BulkImport(c *gin.Context) {
 	c.JSON(http.StatusAccepted, gin.H{
 		"job_id":  jobID,
 		"status":  "pending",
-		"message": "Import job created successfully",
+		"message": "İçe aktarma başlatıldı",
 	})
 }
 
@@ -686,7 +686,7 @@ func (h *StudentHandler) GetImportJobStatus(c *gin.Context) {
 	userIDStr, exists := c.Get("user_id")
 	if !exists {
 		c.JSON(http.StatusUnauthorized, dto.ErrorResponse{
-			Error: "User not authenticated",
+			Error: "Oturum açmanız gerekiyor",
 			Code:  "UNAUTHORIZED",
 		})
 		return
