@@ -66,18 +66,25 @@ export default function StudentEnrollmentPage() {
     isVisible: false,
   })
 
-  useEffect(() => {
-    const init = async () => {
-      setLoading(true)
-      await fetchCourses()
-      // Fetch enrollment status after courses (though they can be parallel, doing sequential for simplicity)
-      await fetchEnrollmentStatus()
-      setLoading(false)
+  const [enrolledCourses, setEnrolledCourses] = useState<AvailableCourse[]>([])
+
+  const fetchLatestRejection = useCallback(async () => {
+    try {
+      const semesterParam = getCurrentSemester()
+
+      const response = await enrollmentApi
+        .get(`latest-rejection?semester=${semesterParam}`)
+        .json<LatestRejectionResponse>()
+
+      if (response.has_rejection && response.latest_rejection) {
+        setRejectionInfo(response.latest_rejection)
+      }
+    } catch (err) {
+      console.error("Failed to fetch rejection info", err)
     }
-    init()
   }, [])
 
-  const fetchCourses = async () => {
+  const fetchCourses = useCallback(async () => {
     try {
       const semesterParam = getCurrentSemester()
 
@@ -87,19 +94,17 @@ export default function StudentEnrollmentPage() {
 
       setAvailableCourses(response.available_courses || [])
       setStudentId(response.student_id)
-    } catch (err: any) {
+    } catch (err: unknown) {
       setAvailableCourses([])
       setToast({
-        message: err.message || "Dersler yüklenemedi",
+        message: err instanceof Error ? err.message : "Dersler yüklenemedi",
         type: "error",
         isVisible: true,
       })
     }
-  }
+  }, [])
 
-  const [enrolledCourses, setEnrolledCourses] = useState<AvailableCourse[]>([])
-
-  const fetchEnrollmentStatus = async () => {
+  const fetchEnrollmentStatus = useCallback(async () => {
     try {
       const semesterParam = getCurrentSemester()
 
@@ -159,23 +164,18 @@ export default function StudentEnrollmentPage() {
       // Still try to check for rejections
       await fetchLatestRejection()
     }
-  }
+  }, [fetchLatestRejection])
 
-  const fetchLatestRejection = async () => {
-    try {
-      const semesterParam = getCurrentSemester()
-
-      const response = await enrollmentApi
-        .get(`latest-rejection?semester=${semesterParam}`)
-        .json<LatestRejectionResponse>()
-
-      if (response.has_rejection && response.latest_rejection) {
-        setRejectionInfo(response.latest_rejection)
-      }
-    } catch (err) {
-      console.error("Failed to fetch rejection info", err)
+  useEffect(() => {
+    const init = async () => {
+      setLoading(true)
+      await fetchCourses()
+      // Fetch enrollment status after courses (though they can be parallel, doing sequential for simplicity)
+      await fetchEnrollmentStatus()
+      setLoading(false)
     }
-  }
+    init()
+  }, [fetchCourses, fetchEnrollmentStatus])
 
   // Use enrolled courses for the grid if read-only, otherwise use filtered available courses
   const selectedCourses = enrollmentStatus
@@ -319,9 +319,9 @@ export default function StudentEnrollmentPage() {
         type: "success",
         isVisible: true,
       })
-    } catch (err: any) {
+    } catch (err: unknown) {
       setToast({
-        message: err.message || "Kayıt işlemi başarısız",
+        message: err instanceof Error ? err.message : "Kayıt işlemi başarısız",
         type: "error",
         isVisible: true,
       })
@@ -355,7 +355,7 @@ export default function StudentEnrollmentPage() {
           type: "success",
           isVisible: true,
         })
-      } catch (err: any) {
+      } catch {
         // If DELETE fails (e.g., no enrollment to delete), just clear UI state
         setEnrollmentStatus(null)
         setEnrolledCourses([])
