@@ -162,6 +162,6 @@ func (s *PaymentService) RequestRefund(ctx context.Context, req RefundRequest) (
 		Amount:   req.Amount,
 		Currency: req.Currency,
 		Status:   "completed",
-		Message:  "Refund processed successfully",
+		Message:  "İade işlendi",
 	}, nil
 }
