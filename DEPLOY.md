@@ -623,6 +623,30 @@ Kalıcı olsun istersen `~/.bashrc`'ye ekle.
 | `migrate` exit code ≠ 0 | `logs migrate`. DB henüz hazır değilse tekrar: `docker compose up -d migrate`. |
 | Login 500 / CORS | `.env`'de `PUBLIC_ORIGIN` tam `https://<host>` mi (sonda `/` yok)? |
 | Build OOM (2GB) | Adım 4b swap ekle veya droplet'i 4GB'a resize et. |
+| `rabbitmq` açılmıyor, logda `feature flag` / `incompatible` | Broker yeni bir sürüm serisine, eski sürümde kapalı kalmış feature flag'lerle geçmiş. Aşağıdaki "RabbitMQ sürüm yükseltmesi" bölümüne bak. |
+
+### RabbitMQ sürüm yükseltmesi
+
+RabbitMQ, mevcut veri dizinini yeni bir sürüm serisinde açmadan önce eski
+sürümün tüm *stable* feature flag'lerinin açık olmasını ister. 3.13 → 4.2
+geçişi de bu kurala tabi. 4.3 ise yalnızca 4.2'den yükseltilebiliyor.
+
+`make deploy` ve `make deploy-update` bunu zaten yapar: `up`'tan önce çalışan
+broker'da `rabbitmqctl enable_feature_flag all` çalıştırır (işlem idempotent,
+broker yoksa atlanır). Otomatik deploy da `make deploy` kullandığı için ek bir
+adım gerekmez.
+
+Compose'u elle çalıştırıyorsan imajı değiştirmeden **önce** kendin yap:
+
+```bash
+docker exec mydreamcampus-rabbitmq rabbitmqctl enable_feature_flag all
+docker compose up -d rabbitmq
+```
+
+Bu adımı atlayıp broker açılmıyorsa: imajı geçici olarak eski sürüme
+(`rabbitmq:3.13-management`) döndür, broker'ı başlat, yukarıdaki komutu
+çalıştır, sonra yeni imaja geç. Kuyruktaki mesajlar volume'da durduğu için
+bu sırada kaybolmaz.
 
 ## Domain alınca (opsiyonel, sonra)
 

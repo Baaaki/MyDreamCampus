@@ -127,8 +127,8 @@ kaybolması demektir.
 | Konteyner | Image | Host portu | Tahmini RAM |
 |---|---|---|---|
 | `mydreamcampus-postgres` | postgres:18 | 127.0.0.1:5432 (standalone) | ~300 MB |
-| `mydreamcampus-rabbitmq` | rabbitmq:3-management | 127.0.0.1:5672/15672 (standalone) | ~130 MB |
-| `mydreamcampus-redis` | redis:7-alpine | 127.0.0.1:6379 (standalone) | ~15 MB |
+| `mydreamcampus-rabbitmq` | rabbitmq:4.2-management | 127.0.0.1:5672/15672 (standalone) | ~130 MB |
+| `mydreamcampus-redis` | redis:7.4-alpine | 127.0.0.1:6379 (standalone) | ~15 MB |
 | `mydreamcampus-mailhog` | mailhog/mailhog | 127.0.0.1:1025/8025 (standalone) | ~10 MB |
 | `mydreamcampus-migrate` | one-shot | — | — |
 | `mydreamcampus-seed` | one-shot | — | — |

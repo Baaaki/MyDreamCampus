@@ -1,6 +1,6 @@
 .PHONY: help dev up down stop infra infra-down frontend mobile clean \
 	test test-backend test-frontend test-mobile test-coverage \
-	deploy deploy-down deploy-logs deploy-ps deploy-update check-env \
+	deploy deploy-down deploy-logs deploy-ps deploy-update check-env rabbitmq-feature-flags \
 	backup restore \
 	autodeploy-install autodeploy-status autodeploy-logs autodeploy-now autodeploy-off
 
@@ -124,15 +124,25 @@ check-env:
 		echo "  openssl rand -base64 48"; \
 		exit 1; } || true
 
+# RabbitMQ will not start a new release series on a data directory whose
+# stable feature flags the previous release left disabled — the 3.13 -> 4.2
+# upgrade fails exactly that way. Enabling them on the running broker before
+# `up` is idempotent, and after an upgrade it turns on the new release's
+# flags as the upgrade guide asks. No broker yet (first deploy) is fine.
+rabbitmq-feature-flags:
+	@$(SUDO) docker exec mydreamcampus-rabbitmq rabbitmqctl enable_feature_flag all >/dev/null 2>&1 \
+		&& echo "rabbitmq: stable feature flags enabled" || true
+
 # --remove-orphans: a container whose service left the compose file keeps
 # running and keeps holding its host ports, so the next `up` fails on a port
 # that looks free. Only on the two whole-stack targets — a single-service
 # target must never sweep.
-deploy: check-env
+deploy: check-env rabbitmq-feature-flags
 	$(SUDO) docker compose $(COMPOSE) up -d --build --remove-orphans
 
 deploy-update: check-env
 	git pull
+	@$(MAKE) --no-print-directory rabbitmq-feature-flags
 	$(SUDO) docker compose $(COMPOSE) up -d --build --remove-orphans
 
 deploy-logs:

@@ -62,7 +62,7 @@ kesici, idempotency anahtarları ve outbox bunun için var.
 
 Sistem tamamen sektör standartlarında, güncel ve yüksek performanslı araçlarla inşa edilmiştir:
 
-*   **Arka Uç (Backend):** Go 1.26, Gin, PostgreSQL 18, RabbitMQ 4.0, Redis 7.2
+*   **Arka Uç (Backend):** Go 1.26, Gin, PostgreSQL 18, RabbitMQ 4.2, Redis 7.4
 *   **Ön Yüz (Web):** React 19, Vite, Tailwind CSS v4, shadcn/ui
 *   **Mobil Uygulama:** React Native 0.81, Expo 54
 *   **Bildirim Sistemi:** E-posta (MailHog ile test) ve Mobil Anlık Bildirim (Push Notification) altyapısı ayrı bir servis olarak asenkron çalışır.
