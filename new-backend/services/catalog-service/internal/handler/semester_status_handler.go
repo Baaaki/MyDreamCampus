@@ -142,13 +142,13 @@ func (h *SemesterStatusHandler) CreateSemester(c *gin.Context) {
 	var req createSemesterRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
 		handlerLogger.Warn("invalid request body", zap.Error(err))
-		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid request body", "code": "VALIDATION_ERROR"})
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Gönderilen bilgiler geçersiz", "code": "VALIDATION_ERROR"})
 		return
 	}
 
 	if !isValidSemesterName(req.Name) {
 		c.JSON(http.StatusBadRequest, gin.H{
-			"error": "semester name must match format: YYYY-YYYY-Fall or YYYY-YYYY-Spring (consecutive years, e.g. 2025-2026-Fall)",
+			"error": "Dönem adı YYYY-YYYY-Fall veya YYYY-YYYY-Spring biçiminde, ardışık yıllarla olmalıdır (ör. 2025-2026-Fall)",
 			"code":  "VALIDATION_ERROR",
 		})
 		return
@@ -156,7 +156,7 @@ func (h *SemesterStatusHandler) CreateSemester(c *gin.Context) {
 
 	if req.HardDeadline.Before(time.Now()) {
 		c.JSON(http.StatusBadRequest, gin.H{
-			"error": "hard_deadline must be in the future",
+			"error": "Son tarih ileri bir tarih olmalıdır",
 			"code":  "VALIDATION_ERROR",
 		})
 		return
@@ -166,10 +166,10 @@ func (h *SemesterStatusHandler) CreateSemester(c *gin.Context) {
 	if err != nil {
 		handlerLogger.Error("failed to create semester", zap.Error(err))
 		if isUniqueViolation(err) {
-			c.JSON(http.StatusConflict, gin.H{"error": "semester already exists", "code": "CONFLICT"})
+			c.JSON(http.StatusConflict, gin.H{"error": "Bu dönem zaten mevcut", "code": "CONFLICT"})
 			return
 		}
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to create semester", "code": "INTERNAL_ERROR"})
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Dönem oluşturulamadı, lütfen tekrar deneyin", "code": "INTERNAL_ERROR"})
 		return
 	}
 
@@ -355,7 +355,7 @@ func (h *SemesterStatusHandler) RepublishPeriods(c *gin.Context) {
 	periods, err := h.periodRepo.ListProjectedPeriods(ctx)
 	if err != nil {
 		handlerLogger.Error("failed to list projected periods", zap.Error(err))
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to list periods", "code": "INTERNAL_ERROR"})
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Dönem takvimi alınamadı, lütfen tekrar deneyin", "code": "INTERNAL_ERROR"})
 		return
 	}
 	if len(periods) == 0 {
@@ -366,7 +366,7 @@ func (h *SemesterStatusHandler) RepublishPeriods(c *gin.Context) {
 	tx, err := h.pool.Begin(ctx)
 	if err != nil {
 		handlerLogger.Error("failed to begin transaction", zap.Error(err))
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "internal error", "code": "INTERNAL_ERROR"})
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Beklenmeyen bir hata oluştu, lütfen tekrar deneyin", "code": "INTERNAL_ERROR"})
 		return
 	}
 	defer func() { _ = tx.Rollback(ctx) }()
@@ -376,14 +376,14 @@ func (h *SemesterStatusHandler) RepublishPeriods(c *gin.Context) {
 		if err := queuePeriodEvent(ctx, qtx, &p.SimplePeriod, p.PeriodType, events.PeriodActionUpdated); err != nil {
 			handlerLogger.Error("failed to queue period event", zap.Error(err),
 				zap.String("semester", p.Semester), zap.String("period_type", p.PeriodType))
-			c.JSON(http.StatusInternalServerError, gin.H{"error": "internal error", "code": "INTERNAL_ERROR"})
+			c.JSON(http.StatusInternalServerError, gin.H{"error": "Beklenmeyen bir hata oluştu, lütfen tekrar deneyin", "code": "INTERNAL_ERROR"})
 			return
 		}
 	}
 
 	if err := tx.Commit(ctx); err != nil {
 		handlerLogger.Error("failed to commit transaction", zap.Error(err))
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "internal error", "code": "INTERNAL_ERROR"})
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Beklenmeyen bir hata oluştu, lütfen tekrar deneyin", "code": "INTERNAL_ERROR"})
 		return
 	}
 
@@ -457,7 +457,7 @@ func (h *SemesterStatusHandler) ListSemesters(c *gin.Context) {
 	semesters, err := h.repo.ListSemesters(ctx)
 	if err != nil {
 		log.Error("failed to list semesters", zap.Error(err))
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to list semesters", "code": "INTERNAL_ERROR"})
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Dönemler alınamadı, lütfen tekrar deneyin", "code": "INTERNAL_ERROR"})
 		return
 	}
 
@@ -479,7 +479,7 @@ func (h *SemesterStatusHandler) GetActiveSemester(c *gin.Context) {
 
 	semester, err := h.repo.GetActiveSemester(ctx)
 	if err != nil {
-		c.JSON(http.StatusNotFound, gin.H{"error": "no active semester found", "code": "NOT_FOUND"})
+		c.JSON(http.StatusNotFound, gin.H{"error": "Aktif dönem bulunamadı", "code": "NOT_FOUND"})
 		return
 	}
 
@@ -507,7 +507,7 @@ func (h *SemesterStatusHandler) ActivateSemester(c *gin.Context) {
 
 	id, err := uuid.Parse(c.Param("id"))
 	if err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid semester ID", "code": "VALIDATION_ERROR"})
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Geçersiz dönem kimliği", "code": "VALIDATION_ERROR"})
 		return
 	}
 
@@ -516,7 +516,7 @@ func (h *SemesterStatusHandler) ActivateSemester(c *gin.Context) {
 	hasActive, err := h.repo.HasActiveSemester(ctx)
 	if err != nil {
 		handlerLogger.Error("failed to check active semester", zap.Error(err))
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to check active semester", "code": "INTERNAL_ERROR"})
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Aktif dönem kontrol edilemedi, lütfen tekrar deneyin", "code": "INTERNAL_ERROR"})
 		return
 	}
 	if hasActive {
@@ -530,7 +530,7 @@ func (h *SemesterStatusHandler) ActivateSemester(c *gin.Context) {
 	tx, err := h.pool.Begin(ctx)
 	if err != nil {
 		handlerLogger.Error("failed to begin transaction", zap.Error(err))
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "internal error", "code": "INTERNAL_ERROR"})
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Beklenmeyen bir hata oluştu, lütfen tekrar deneyin", "code": "INTERNAL_ERROR"})
 		return
 	}
 	// Rollback after successful commit is a no-op returning ErrTxClosed — safe to discard.
@@ -543,7 +543,7 @@ func (h *SemesterStatusHandler) ActivateSemester(c *gin.Context) {
 	if err != nil {
 		handlerLogger.Error("failed to activate semester", zap.Error(err))
 		c.JSON(http.StatusBadRequest, gin.H{
-			"error": "failed to activate semester — it may not be in 'planned' status",
+			"error": "Dönem aktifleştirilemedi; yalnızca planlanmış dönemler aktifleştirilebilir",
 			"code":  "INVALID_STATE_TRANSITION",
 		})
 		return
@@ -553,7 +553,7 @@ func (h *SemesterStatusHandler) ActivateSemester(c *gin.Context) {
 	courses, err := qtx.ListSemesterCoursesForActivation(ctx, semester.Name)
 	if err != nil {
 		handlerLogger.Error("failed to list semester courses for activation", zap.Error(err))
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to list courses", "code": "INTERNAL_ERROR"})
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Dersler alınamadı, lütfen tekrar deneyin", "code": "INTERNAL_ERROR"})
 		return
 	}
 
@@ -563,7 +563,7 @@ func (h *SemesterStatusHandler) ActivateSemester(c *gin.Context) {
 		payloadJSON, err := json.Marshal(payload)
 		if err != nil {
 			handlerLogger.Error("failed to marshal event payload", zap.Error(err))
-			c.JSON(http.StatusInternalServerError, gin.H{"error": "internal error", "code": "INTERNAL_ERROR"})
+			c.JSON(http.StatusInternalServerError, gin.H{"error": "Beklenmeyen bir hata oluştu, lütfen tekrar deneyin", "code": "INTERNAL_ERROR"})
 			return
 		}
 
@@ -576,7 +576,7 @@ func (h *SemesterStatusHandler) ActivateSemester(c *gin.Context) {
 		if err != nil {
 			handlerLogger.Error("failed to create outbox event", zap.Error(err),
 				zap.String("course_code", course.CourseCode))
-			c.JSON(http.StatusInternalServerError, gin.H{"error": "internal error", "code": "INTERNAL_ERROR"})
+			c.JSON(http.StatusInternalServerError, gin.H{"error": "Beklenmeyen bir hata oluştu, lütfen tekrar deneyin", "code": "INTERNAL_ERROR"})
 			return
 		}
 	}
@@ -584,7 +584,7 @@ func (h *SemesterStatusHandler) ActivateSemester(c *gin.Context) {
 	// Commit transaction
 	if err := tx.Commit(ctx); err != nil {
 		handlerLogger.Error("failed to commit transaction", zap.Error(err))
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "internal error", "code": "INTERNAL_ERROR"})
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Beklenmeyen bir hata oluştu, lütfen tekrar deneyin", "code": "INTERNAL_ERROR"})
 		return
 	}
 
@@ -663,7 +663,7 @@ func (h *SemesterStatusHandler) CompleteSemester(c *gin.Context) {
 
 	id, err := uuid.Parse(c.Param("id"))
 	if err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid semester ID", "code": "VALIDATION_ERROR"})
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Geçersiz dönem kimliği", "code": "VALIDATION_ERROR"})
 		return
 	}
 
@@ -671,7 +671,7 @@ func (h *SemesterStatusHandler) CompleteSemester(c *gin.Context) {
 	if err != nil {
 		handlerLogger.Error("failed to complete semester", zap.Error(err))
 		c.JSON(http.StatusBadRequest, gin.H{
-			"error": "failed to complete semester — it may not be in 'active' status",
+			"error": "Dönem tamamlanamadı; yalnızca aktif dönemler tamamlanabilir",
 			"code":  "INVALID_STATE_TRANSITION",
 		})
 		return
@@ -708,7 +708,7 @@ func (h *SemesterStatusHandler) GetSemesterInfo(c *gin.Context) {
 
 	info, err := h.repo.GetSemesterInfo(ctx, name)
 	if err != nil {
-		c.JSON(http.StatusNotFound, gin.H{"error": "semester not found", "code": "NOT_FOUND"})
+		c.JSON(http.StatusNotFound, gin.H{"error": "Dönem bulunamadı", "code": "NOT_FOUND"})
 		return
 	}
 
@@ -729,7 +729,7 @@ func (h *SemesterStatusHandler) IsSemesterActive(c *gin.Context) {
 
 	active, err := h.repo.IsSemesterActive(ctx, name)
 	if err != nil {
-		c.JSON(http.StatusOK, gin.H{"active": false, "error": "semester not found"})
+		c.JSON(http.StatusOK, gin.H{"active": false, "error": "Dönem bulunamadı"})
 		return
 	}
 
@@ -790,7 +790,7 @@ func (h *SemesterStatusHandler) DeletePlannedSemester(c *gin.Context) {
 
 	id, err := uuid.Parse(c.Param("id"))
 	if err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid semester ID", "code": "VALIDATION_ERROR"})
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Geçersiz dönem kimliği", "code": "VALIDATION_ERROR"})
 		return
 	}
 
@@ -799,7 +799,7 @@ func (h *SemesterStatusHandler) DeletePlannedSemester(c *gin.Context) {
 	// Get semester
 	semester, err := queries.GetSemesterByID(ctx, utils.UUIDToPgtype(id))
 	if err != nil {
-		c.JSON(http.StatusNotFound, gin.H{"error": "semester not found", "code": "NOT_FOUND"})
+		c.JSON(http.StatusNotFound, gin.H{"error": "Dönem bulunamadı", "code": "NOT_FOUND"})
 		return
 	}
 
@@ -815,7 +815,7 @@ func (h *SemesterStatusHandler) DeletePlannedSemester(c *gin.Context) {
 	tx, err := h.pool.Begin(ctx)
 	if err != nil {
 		handlerLogger.Error("failed to begin transaction", zap.Error(err))
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "internal error", "code": "INTERNAL_ERROR"})
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Beklenmeyen bir hata oluştu, lütfen tekrar deneyin", "code": "INTERNAL_ERROR"})
 		return
 	}
 	// Rollback after successful commit is a no-op returning ErrTxClosed — safe to discard.
@@ -826,7 +826,7 @@ func (h *SemesterStatusHandler) DeletePlannedSemester(c *gin.Context) {
 	// Delete semester courses (CASCADE deletes schedule_sessions)
 	if err := qtx.DeleteSemesterCoursesBySemester(ctx, semester.Name); err != nil {
 		handlerLogger.Error("failed to delete semester courses", zap.Error(err))
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "internal error", "code": "INTERNAL_ERROR"})
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Beklenmeyen bir hata oluştu, lütfen tekrar deneyin", "code": "INTERNAL_ERROR"})
 		return
 	}
 
@@ -834,7 +834,7 @@ func (h *SemesterStatusHandler) DeletePlannedSemester(c *gin.Context) {
 	// consumer rows alike.
 	if err := qtx.DeletePeriodsBySemester(ctx, semester.Name); err != nil {
 		handlerLogger.Error("failed to delete periods", zap.Error(err))
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "internal error", "code": "INTERNAL_ERROR"})
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Beklenmeyen bir hata oluştu, lütfen tekrar deneyin", "code": "INTERNAL_ERROR"})
 		return
 	}
 
@@ -844,7 +844,7 @@ func (h *SemesterStatusHandler) DeletePlannedSemester(c *gin.Context) {
 		if err := queuePeriodDeletedEvent(ctx, qtx, semester.Name, periodType); err != nil {
 			handlerLogger.Error("failed to queue period deleted event", zap.Error(err),
 				zap.String("period_type", periodType))
-			c.JSON(http.StatusInternalServerError, gin.H{"error": "internal error", "code": "INTERNAL_ERROR"})
+			c.JSON(http.StatusInternalServerError, gin.H{"error": "Beklenmeyen bir hata oluştu, lütfen tekrar deneyin", "code": "INTERNAL_ERROR"})
 			return
 		}
 	}
@@ -852,13 +852,13 @@ func (h *SemesterStatusHandler) DeletePlannedSemester(c *gin.Context) {
 	// Delete semester
 	if err := qtx.DeletePlannedSemester(ctx, utils.UUIDToPgtype(id)); err != nil {
 		handlerLogger.Error("failed to delete semester", zap.Error(err))
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "internal error", "code": "INTERNAL_ERROR"})
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Beklenmeyen bir hata oluştu, lütfen tekrar deneyin", "code": "INTERNAL_ERROR"})
 		return
 	}
 
 	if err := tx.Commit(ctx); err != nil {
 		handlerLogger.Error("failed to commit transaction", zap.Error(err))
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "internal error", "code": "INTERNAL_ERROR"})
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Beklenmeyen bir hata oluştu, lütfen tekrar deneyin", "code": "INTERNAL_ERROR"})
 		return
 	}
 
@@ -901,13 +901,13 @@ func (h *SemesterStatusHandler) UpdatePlannedSemester(c *gin.Context) {
 
 	id, err := uuid.Parse(c.Param("id"))
 	if err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid semester ID", "code": "VALIDATION_ERROR"})
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Geçersiz dönem kimliği", "code": "VALIDATION_ERROR"})
 		return
 	}
 
 	var req updateSemesterRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid request body", "code": "VALIDATION_ERROR"})
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Gönderilen bilgiler geçersiz", "code": "VALIDATION_ERROR"})
 		return
 	}
 
@@ -916,7 +916,7 @@ func (h *SemesterStatusHandler) UpdatePlannedSemester(c *gin.Context) {
 	// Get semester
 	semester, err := queries.GetSemesterByID(ctx, utils.UUIDToPgtype(id))
 	if err != nil {
-		c.JSON(http.StatusNotFound, gin.H{"error": "semester not found", "code": "NOT_FOUND"})
+		c.JSON(http.StatusNotFound, gin.H{"error": "Dönem bulunamadı", "code": "NOT_FOUND"})
 		return
 	}
 
@@ -931,7 +931,7 @@ func (h *SemesterStatusHandler) UpdatePlannedSemester(c *gin.Context) {
 	// Validation: hard_deadline must be in the future
 	if req.HardDeadline.Before(time.Now()) {
 		c.JSON(http.StatusBadRequest, gin.H{
-			"error": "hard_deadline must be in the future",
+			"error": "Son tarih ileri bir tarih olmalıdır",
 			"code":  "VALIDATION_ERROR",
 		})
 		return
@@ -944,7 +944,7 @@ func (h *SemesterStatusHandler) UpdatePlannedSemester(c *gin.Context) {
 	})
 	if err != nil {
 		handlerLogger.Error("failed to update semester", zap.Error(err))
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "internal error", "code": "INTERNAL_ERROR"})
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Beklenmeyen bir hata oluştu, lütfen tekrar deneyin", "code": "INTERNAL_ERROR"})
 		return
 	}
 

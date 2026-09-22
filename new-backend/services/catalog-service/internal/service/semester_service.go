@@ -592,7 +592,7 @@ func (s *SemesterService) DeleteSemesterCourse(ctx context.Context, semester, co
 	)
 
 	return dto.DeleteSemesterCourseResponse{
-		Message:          "Semester course deleted successfully",
+		Message:          "Dönem dersi silindi",
 		SemesterCourseID: courseID,
 		CourseCode:       existingCourse.CourseCode,
 		Semester:         semester,

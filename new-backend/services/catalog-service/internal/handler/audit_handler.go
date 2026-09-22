@@ -76,7 +76,7 @@ func (h *AuditHandler) ListAuditLog(c *gin.Context) {
 	logs, err := h.repo.ListAuditLog(ctx, params)
 	if err != nil {
 		log.Error("failed to list audit logs", zap.Error(err))
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to list audit logs", "code": "INTERNAL_ERROR"})
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Denetim kayıtları alınamadı, lütfen tekrar deneyin", "code": "INTERNAL_ERROR"})
 		return
 	}
 
@@ -89,7 +89,7 @@ func (h *AuditHandler) ListAuditLog(c *gin.Context) {
 	total, err := h.repo.CountAuditLog(ctx, countParams)
 	if err != nil {
 		log.Error("failed to count audit logs", zap.Error(err))
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to count audit logs", "code": "INTERNAL_ERROR"})
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Denetim kayıtları alınamadı, lütfen tekrar deneyin", "code": "INTERNAL_ERROR"})
 		return
 	}
 
@@ -119,7 +119,7 @@ func (h *AuditHandler) CreateAuditLog(c *gin.Context) {
 
 	var event audit.AuditEvent
 	if err := c.ShouldBindJSON(&event); err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid request body"})
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Gönderilen bilgiler geçersiz"})
 		return
 	}
 
@@ -128,7 +128,7 @@ func (h *AuditHandler) CreateAuditLog(c *gin.Context) {
 		var err error
 		details, err = json.Marshal(event.Details)
 		if err != nil {
-			c.JSON(http.StatusBadRequest, gin.H{"error": "invalid details"})
+			c.JSON(http.StatusBadRequest, gin.H{"error": "Geçersiz ayrıntı bilgisi"})
 			return
 		}
 	}
@@ -158,11 +158,11 @@ func (h *AuditHandler) CreateAuditLog(c *gin.Context) {
 	_, err := h.repo.InsertAuditLog(ctx, params)
 	if err != nil {
 		log.Error("failed to insert audit log", zap.Error(err))
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to insert audit log"})
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Denetim kaydı yazılamadı, lütfen tekrar deneyin"})
 		return
 	}
 
-	c.JSON(http.StatusCreated, gin.H{"message": "audit log created"})
+	c.JSON(http.StatusCreated, gin.H{"message": "Denetim kaydı oluşturuldu"})
 }
 
 type auditLogResponse struct {

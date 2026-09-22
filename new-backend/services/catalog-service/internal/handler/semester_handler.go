@@ -274,7 +274,7 @@ func (h *SemesterHandler) GetTeacherCourses(c *gin.Context) {
 	if !exists {
 		reqLogger.Error("user_id not found in context")
 		c.JSON(http.StatusUnauthorized, dto.ErrorResponse{
-			Error: "unauthorized",
+			Error: "Oturum açmanız gerekiyor",
 			Code:  "UNAUTHORIZED",
 		})
 		return
@@ -292,7 +292,7 @@ func (h *SemesterHandler) GetTeacherCourses(c *gin.Context) {
 				zap.Error(parseErr),
 			)
 			c.JSON(http.StatusBadRequest, dto.ErrorResponse{
-				Error: "invalid user_id format",
+				Error: "Geçersiz kullanıcı kimliği",
 				Code:  "INVALID_USER_ID",
 			})
 			return
@@ -302,7 +302,7 @@ func (h *SemesterHandler) GetTeacherCourses(c *gin.Context) {
 	default:
 		reqLogger.Error("invalid user_id type in context")
 		c.JSON(http.StatusBadRequest, dto.ErrorResponse{
-			Error: "invalid user_id",
+			Error: "Geçersiz kullanıcı kimliği",
 			Code:  "INVALID_USER_ID",
 		})
 		return
