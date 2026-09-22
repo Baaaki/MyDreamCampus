@@ -416,7 +416,7 @@ func (s *EnrollmentService) CancelMyEnrollment(ctx context.Context, studentID uu
 	if err != nil {
 		if sharedErrors.Is(err, sharedErrors.ErrNotFound) {
 			serviceLogger.Warn("enrollment program not found")
-			return sharedErrors.WrapWithMessage(sharedErrors.ErrNotFound, err, "enrollment program not found for this semester")
+			return sharedErrors.WrapWithMessage(sharedErrors.ErrNotFound, err, "Bu dönem için ders kaydı bulunamadı")
 		}
 		return sharedErrors.Wrap(sharedErrors.ErrInternal, err)
 	}
@@ -424,13 +424,13 @@ func (s *EnrollmentService) CancelMyEnrollment(ctx context.Context, studentID uu
 	// Check if program exists
 	if !existingProgram.ID.Valid {
 		serviceLogger.Warn("no enrollment program found")
-		return sharedErrors.WrapWithMessage(sharedErrors.ErrNotFound, nil, "enrollment program not found for this semester")
+		return sharedErrors.WrapWithMessage(sharedErrors.ErrNotFound, nil, "Bu dönem için ders kaydı bulunamadı")
 	}
 
 	// Check if already approved - cannot cancel approved enrollments
 	if existingProgram.Status.EnrollmentStatusEnum == db.EnrollmentEnrollmentStatusEnumApproved {
 		serviceLogger.Warn("cannot cancel approved enrollment")
-		return sharedErrors.WrapWithMessage(sharedErrors.ErrForbidden, serviceErrors.ErrCannotModifyApproved, "cannot cancel approved enrollment")
+		return sharedErrors.WrapWithMessage(sharedErrors.ErrForbidden, serviceErrors.ErrCannotModifyApproved, "Onaylanmış ders kaydı iptal edilemez")
 	}
 
 	// Get courses to decrement enrollments

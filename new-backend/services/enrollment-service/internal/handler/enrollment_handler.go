@@ -53,14 +53,14 @@ func (h *EnrollmentHandler) GetAvailableCourses(c *gin.Context) {
 	studentIDStr, exists := c.Get("user_id")
 	if !exists {
 		handlerLogger.Error("user_id not found in context")
-		c.JSON(http.StatusUnauthorized, gin.H{"error": sharedErrors.ErrUnauthorized.Error()})
+		c.JSON(http.StatusUnauthorized, gin.H{"error": sharedErrors.ErrUnauthorized.Message})
 		return
 	}
 
 	studentID, err := uuid.Parse(studentIDStr.(string))
 	if err != nil {
 		handlerLogger.Error("invalid user_id format", zap.Error(err))
-		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid user_id"})
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Geçersiz kullanıcı kimliği"})
 		return
 	}
 
@@ -68,7 +68,7 @@ func (h *EnrollmentHandler) GetAvailableCourses(c *gin.Context) {
 	semester := c.Query("semester")
 	if semester == "" {
 		handlerLogger.Error("semester query parameter is required")
-		c.JSON(http.StatusBadRequest, gin.H{"error": "semester query parameter is required"})
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Dönem bilgisi zorunludur"})
 		return
 	}
 
@@ -117,21 +117,21 @@ func (h *EnrollmentHandler) CreateEnrollmentProgram(c *gin.Context) {
 	studentIDStr, exists := c.Get("user_id")
 	if !exists {
 		handlerLogger.Error("user_id not found in context")
-		c.JSON(http.StatusUnauthorized, gin.H{"error": sharedErrors.ErrUnauthorized.Error()})
+		c.JSON(http.StatusUnauthorized, gin.H{"error": sharedErrors.ErrUnauthorized.Message})
 		return
 	}
 
 	studentID, err := uuid.Parse(studentIDStr.(string))
 	if err != nil {
 		handlerLogger.Error("invalid user_id format", zap.Error(err))
-		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid user_id"})
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Geçersiz kullanıcı kimliği"})
 		return
 	}
 
 	var req dto.CreateEnrollmentRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
 		handlerLogger.Error("invalid request body", zap.Error(err))
-		c.JSON(http.StatusBadRequest, gin.H{"error": sharedErrors.ErrValidation.Error()})
+		c.JSON(http.StatusBadRequest, gin.H{"error": sharedErrors.ErrValidation.Message})
 		return
 	}
 
@@ -183,14 +183,14 @@ func (h *EnrollmentHandler) GetMyEnrollments(c *gin.Context) {
 	studentIDStr, exists := c.Get("user_id")
 	if !exists {
 		handlerLogger.Error("user_id not found in context")
-		c.JSON(http.StatusUnauthorized, gin.H{"error": sharedErrors.ErrUnauthorized.Error()})
+		c.JSON(http.StatusUnauthorized, gin.H{"error": sharedErrors.ErrUnauthorized.Message})
 		return
 	}
 
 	studentID, err := uuid.Parse(studentIDStr.(string))
 	if err != nil {
 		handlerLogger.Error("invalid user_id format", zap.Error(err))
-		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid user_id"})
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Geçersiz kullanıcı kimliği"})
 		return
 	}
 
@@ -249,21 +249,21 @@ func (h *EnrollmentHandler) GetLatestRejection(c *gin.Context) {
 	studentIDStr, exists := c.Get("user_id")
 	if !exists {
 		handlerLogger.Error("user_id not found in context")
-		c.JSON(http.StatusUnauthorized, gin.H{"error": sharedErrors.ErrUnauthorized.Error()})
+		c.JSON(http.StatusUnauthorized, gin.H{"error": sharedErrors.ErrUnauthorized.Message})
 		return
 	}
 
 	studentID, err := uuid.Parse(studentIDStr.(string))
 	if err != nil {
 		handlerLogger.Error("invalid user_id format", zap.Error(err))
-		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid user_id"})
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Geçersiz kullanıcı kimliği"})
 		return
 	}
 
 	semester := c.Query("semester")
 	if semester == "" {
 		handlerLogger.Error("semester query parameter is required")
-		c.JSON(http.StatusBadRequest, gin.H{"error": "semester query parameter is required"})
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Dönem bilgisi zorunludur"})
 		return
 	}
 
@@ -308,14 +308,14 @@ func (h *EnrollmentHandler) GetMyRejections(c *gin.Context) {
 	studentIDStr, exists := c.Get("user_id")
 	if !exists {
 		handlerLogger.Error("user_id not found in context")
-		c.JSON(http.StatusUnauthorized, gin.H{"error": sharedErrors.ErrUnauthorized.Error()})
+		c.JSON(http.StatusUnauthorized, gin.H{"error": sharedErrors.ErrUnauthorized.Message})
 		return
 	}
 
 	studentID, err := uuid.Parse(studentIDStr.(string))
 	if err != nil {
 		handlerLogger.Error("invalid user_id format", zap.Error(err))
-		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid user_id"})
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Geçersiz kullanıcı kimliği"})
 		return
 	}
 
@@ -369,14 +369,14 @@ func (h *EnrollmentHandler) ApproveEnrollmentProgram(c *gin.Context) {
 	advisorIDStr, exists := c.Get("user_id")
 	if !exists {
 		handlerLogger.Error("user_id not found in context")
-		c.JSON(http.StatusUnauthorized, gin.H{"error": sharedErrors.ErrUnauthorized.Error()})
+		c.JSON(http.StatusUnauthorized, gin.H{"error": sharedErrors.ErrUnauthorized.Message})
 		return
 	}
 
 	advisorID, err := uuid.Parse(advisorIDStr.(string))
 	if err != nil {
 		handlerLogger.Error("invalid user_id format", zap.Error(err))
-		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid user_id"})
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Geçersiz kullanıcı kimliği"})
 		return
 	}
 
@@ -384,7 +384,7 @@ func (h *EnrollmentHandler) ApproveEnrollmentProgram(c *gin.Context) {
 	programID, err := uuid.Parse(programIDStr)
 	if err != nil {
 		handlerLogger.Error("invalid program_id format", zap.Error(err))
-		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid program_id"})
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Geçersiz ders kayıt programı kimliği"})
 		return
 	}
 
@@ -435,14 +435,14 @@ func (h *EnrollmentHandler) RejectEnrollmentProgram(c *gin.Context) {
 	advisorIDStr, exists := c.Get("user_id")
 	if !exists {
 		handlerLogger.Error("user_id not found in context")
-		c.JSON(http.StatusUnauthorized, gin.H{"error": sharedErrors.ErrUnauthorized.Error()})
+		c.JSON(http.StatusUnauthorized, gin.H{"error": sharedErrors.ErrUnauthorized.Message})
 		return
 	}
 
 	advisorID, err := uuid.Parse(advisorIDStr.(string))
 	if err != nil {
 		handlerLogger.Error("invalid user_id format", zap.Error(err))
-		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid user_id"})
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Geçersiz kullanıcı kimliği"})
 		return
 	}
 
@@ -457,14 +457,14 @@ func (h *EnrollmentHandler) RejectEnrollmentProgram(c *gin.Context) {
 	programID, err := uuid.Parse(programIDStr)
 	if err != nil {
 		handlerLogger.Error("invalid program_id format", zap.Error(err))
-		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid program_id"})
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Geçersiz ders kayıt programı kimliği"})
 		return
 	}
 
 	var req dto.RejectEnrollmentRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
 		handlerLogger.Error("invalid request body", zap.Error(err))
-		c.JSON(http.StatusBadRequest, gin.H{"error": sharedErrors.ErrValidation.Error()})
+		c.JSON(http.StatusBadRequest, gin.H{"error": sharedErrors.ErrValidation.Message})
 		return
 	}
 
@@ -484,7 +484,7 @@ func (h *EnrollmentHandler) RejectEnrollmentProgram(c *gin.Context) {
 	handlerLogger.Info("enrollment program rejected successfully",
 		zap.String("program_id", programID.String()),
 	)
-	c.JSON(http.StatusOK, gin.H{"message": "enrollment program rejected successfully"})
+	c.JSON(http.StatusOK, gin.H{"message": "Ders kaydı reddedildi"})
 }
 
 // CancelMyEnrollment godoc
@@ -515,14 +515,14 @@ func (h *EnrollmentHandler) CancelMyEnrollment(c *gin.Context) {
 	studentIDStr, exists := c.Get("user_id")
 	if !exists {
 		handlerLogger.Error("user_id not found in context")
-		c.JSON(http.StatusUnauthorized, gin.H{"error": sharedErrors.ErrUnauthorized.Error()})
+		c.JSON(http.StatusUnauthorized, gin.H{"error": sharedErrors.ErrUnauthorized.Message})
 		return
 	}
 
 	studentID, err := uuid.Parse(studentIDStr.(string))
 	if err != nil {
 		handlerLogger.Error("invalid user_id format", zap.Error(err))
-		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid user_id"})
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Geçersiz kullanıcı kimliği"})
 		return
 	}
 
@@ -530,7 +530,7 @@ func (h *EnrollmentHandler) CancelMyEnrollment(c *gin.Context) {
 	semester := c.Query("semester")
 	if semester == "" {
 		handlerLogger.Error("semester query parameter is required")
-		c.JSON(http.StatusBadRequest, gin.H{"error": "semester query parameter is required"})
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Dönem bilgisi zorunludur"})
 		return
 	}
 
@@ -550,7 +550,7 @@ func (h *EnrollmentHandler) CancelMyEnrollment(c *gin.Context) {
 		zap.String("student_id", studentID.String()),
 		zap.String("semester", semester),
 	)
-	c.JSON(http.StatusOK, gin.H{"message": "enrollment cancelled successfully"})
+	c.JSON(http.StatusOK, gin.H{"message": "Ders kaydı iptal edildi"})
 }
 
 // GetPendingProgramsByAdvisor godoc
@@ -577,14 +577,14 @@ func (h *EnrollmentHandler) GetPendingProgramsByAdvisor(c *gin.Context) {
 	advisorIDStr, exists := c.Get("user_id")
 	if !exists {
 		handlerLogger.Error("user_id not found in context")
-		c.JSON(http.StatusUnauthorized, gin.H{"error": sharedErrors.ErrUnauthorized.Error()})
+		c.JSON(http.StatusUnauthorized, gin.H{"error": sharedErrors.ErrUnauthorized.Message})
 		return
 	}
 
 	advisorID, err := uuid.Parse(advisorIDStr.(string))
 	if err != nil {
 		handlerLogger.Error("invalid user_id format", zap.Error(err))
-		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid user_id"})
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Geçersiz kullanıcı kimliği"})
 		return
 	}
 

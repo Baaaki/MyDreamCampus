@@ -9,8 +9,8 @@ import (
 
 // Enrollment-specific AppErrors (with HTTP status for handler mapping)
 var (
-	ErrEnrollmentPeriodEnded   = sharedErrors.New("ENROLLMENT_PERIOD_ENDED", "enrollment period has ended for this semester", http.StatusForbidden)
-	ErrEnrollmentPeriodNotOpen = sharedErrors.New("ENROLLMENT_PERIOD_NOT_OPEN", "enrollment period has not started yet", http.StatusForbidden)
+	ErrEnrollmentPeriodEnded   = sharedErrors.New("ENROLLMENT_PERIOD_ENDED", "Bu dönem için ders kayıt süresi sona erdi", http.StatusForbidden)
+	ErrEnrollmentPeriodNotOpen = sharedErrors.New("ENROLLMENT_PERIOD_NOT_OPEN", "Ders kayıt dönemi henüz başlamadı", http.StatusForbidden)
 )
 
 // Enrollment-specific errors
