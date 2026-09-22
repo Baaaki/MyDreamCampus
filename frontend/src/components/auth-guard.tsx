@@ -13,18 +13,27 @@ export function AuthGuard({ allowedRoles }: AuthGuardProps) {
     return <Navigate to="/auth/login" replace />
   }
 
+  let redirectPath: string | null = null
+
   try {
     const user = JSON.parse(userStr)
     if (!allowedRoles.includes(user.role)) {
-      if (user.role === "admin") return <Navigate to="/dashboard" replace />
-      if (user.role === "teacher")
-        return <Navigate to="/teacher/attendance" replace />
-      if (user.role === "student")
-        return <Navigate to="/student/dashboard" replace />
-      return <Navigate to="/auth/login" replace />
+      if (user.role === "admin") {
+        redirectPath = "/dashboard"
+      } else if (user.role === "teacher") {
+        redirectPath = "/teacher/attendance"
+      } else if (user.role === "student") {
+        redirectPath = "/student/dashboard"
+      } else {
+        redirectPath = "/auth/login"
+      }
     }
   } catch {
-    return <Navigate to="/auth/login" replace />
+    redirectPath = "/auth/login"
+  }
+
+  if (redirectPath) {
+    return <Navigate to={redirectPath} replace />
   }
 
   return <Outlet />
