@@ -5,6 +5,7 @@ import (
 	"time"
 
 	"github.com/baaaki/mydreamcampus/shared/config"
+	"github.com/baaaki/mydreamcampus/shared/platform/utils"
 )
 
 // FromConfig builds the transport for one target service. Every caller goes
@@ -26,9 +27,9 @@ func FromConfig(cfg *config.Config, target string) (*Base, error) {
 		Secret:  cfg.Server.InternalSecret,
 		Timeout: time.Duration(cfg.InternalClient.TimeoutSeconds) * time.Second,
 		Breaker: BreakerConfig{
-			MaxRequests:         uint32(max(breaker.MaxRequests, 0)),
+			MaxRequests:         utils.ClampToUint32(breaker.MaxRequests),
 			Timeout:             time.Duration(breaker.TimeoutSeconds) * time.Second,
-			ConsecutiveFailures: uint32(max(breaker.ConsecutiveFailures, 0)),
+			ConsecutiveFailures: utils.ClampToUint32(breaker.ConsecutiveFailures),
 		},
 	}), nil
 }
