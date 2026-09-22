@@ -74,7 +74,7 @@ func (h *AttendanceHandler) CreateSession(c *gin.Context) {
 	if err != nil {
 		handlerLogger.Error("failed to parse user_id", zap.Error(err))
 		c.JSON(http.StatusUnauthorized, dto.ErrorResponse{
-			Error: "unauthorized",
+			Error: "Oturum açmanız gerekiyor",
 			Code:  "UNAUTHORIZED",
 		})
 		return
@@ -130,7 +130,7 @@ func (h *AttendanceHandler) ScanQR(c *gin.Context) {
 	if err != nil {
 		handlerLogger.Error("failed to parse user_id", zap.Error(err))
 		c.JSON(http.StatusUnauthorized, dto.ErrorResponse{
-			Error: "unauthorized",
+			Error: "Oturum açmanız gerekiyor",
 			Code:  "UNAUTHORIZED",
 		})
 		return
@@ -171,7 +171,7 @@ func (h *AttendanceHandler) GetQRCode(c *gin.Context) {
 	if err != nil {
 		handlerLogger.Error("invalid session ID format", zap.Error(err))
 		c.JSON(http.StatusBadRequest, dto.ErrorResponse{
-			Error: "invalid session ID",
+			Error: "Geçersiz yoklama oturumu kimliği",
 			Code:  "INVALID_ID",
 		})
 		return
@@ -181,7 +181,7 @@ func (h *AttendanceHandler) GetQRCode(c *gin.Context) {
 	if err != nil {
 		handlerLogger.Error("failed to parse user_id", zap.Error(err))
 		c.JSON(http.StatusUnauthorized, dto.ErrorResponse{
-			Error: "unauthorized",
+			Error: "Oturum açmanız gerekiyor",
 			Code:  "UNAUTHORIZED",
 		})
 		return
@@ -224,7 +224,7 @@ func (h *AttendanceHandler) CreateManualAttendance(c *gin.Context) {
 	if err != nil {
 		handlerLogger.Error("invalid session ID format", zap.Error(err))
 		c.JSON(http.StatusBadRequest, dto.ErrorResponse{
-			Error: "invalid session ID",
+			Error: "Geçersiz yoklama oturumu kimliği",
 			Code:  "INVALID_ID",
 		})
 		return
@@ -244,7 +244,7 @@ func (h *AttendanceHandler) CreateManualAttendance(c *gin.Context) {
 	if err != nil {
 		handlerLogger.Error("failed to parse user_id", zap.Error(err))
 		c.JSON(http.StatusUnauthorized, dto.ErrorResponse{
-			Error: "unauthorized",
+			Error: "Oturum açmanız gerekiyor",
 			Code:  "UNAUTHORIZED",
 		})
 		return
@@ -286,7 +286,7 @@ func (h *AttendanceHandler) CloseSession(c *gin.Context) {
 	if err != nil {
 		handlerLogger.Error("invalid session ID format", zap.Error(err))
 		c.JSON(http.StatusBadRequest, dto.ErrorResponse{
-			Error: "invalid session ID",
+			Error: "Geçersiz yoklama oturumu kimliği",
 			Code:  "INVALID_ID",
 		})
 		return
@@ -296,7 +296,7 @@ func (h *AttendanceHandler) CloseSession(c *gin.Context) {
 	if err != nil {
 		handlerLogger.Error("failed to parse user_id", zap.Error(err))
 		c.JSON(http.StatusUnauthorized, dto.ErrorResponse{
-			Error: "unauthorized",
+			Error: "Oturum açmanız gerekiyor",
 			Code:  "UNAUTHORIZED",
 		})
 		return
@@ -342,7 +342,7 @@ func (h *AttendanceHandler) GetMyAttendance(c *gin.Context) {
 	if err != nil {
 		handlerLogger.Error("failed to parse user_id", zap.Error(err))
 		c.JSON(http.StatusUnauthorized, dto.ErrorResponse{
-			Error: "unauthorized",
+			Error: "Oturum açmanız gerekiyor",
 			Code:  "UNAUTHORIZED",
 		})
 		return
@@ -384,7 +384,7 @@ func (h *AttendanceHandler) FinalizeAttendance(c *gin.Context) {
 	if err != nil {
 		handlerLogger.Error("invalid course ID format", zap.Error(err))
 		c.JSON(http.StatusBadRequest, dto.ErrorResponse{
-			Error: "invalid course ID",
+			Error: "Geçersiz ders kimliği",
 			Code:  "INVALID_ID",
 		})
 		return
@@ -394,7 +394,7 @@ func (h *AttendanceHandler) FinalizeAttendance(c *gin.Context) {
 	if semester == "" {
 		handlerLogger.Error("semester query parameter is required")
 		c.JSON(http.StatusBadRequest, dto.ErrorResponse{
-			Error: "semester is required",
+			Error: "Dönem bilgisi zorunludur",
 			Code:  "VALIDATION_ERROR",
 		})
 		return
@@ -404,7 +404,7 @@ func (h *AttendanceHandler) FinalizeAttendance(c *gin.Context) {
 	if err != nil {
 		handlerLogger.Error("failed to parse user_id", zap.Error(err))
 		c.JSON(http.StatusUnauthorized, dto.ErrorResponse{
-			Error: "unauthorized",
+			Error: "Oturum açmanız gerekiyor",
 			Code:  "UNAUTHORIZED",
 		})
 		return
@@ -450,7 +450,7 @@ func (h *AttendanceHandler) GetSessionDetails(c *gin.Context) {
 	if err != nil {
 		handlerLogger.Error("invalid session ID format", zap.Error(err))
 		c.JSON(http.StatusBadRequest, dto.ErrorResponse{
-			Error: "invalid session ID",
+			Error: "Geçersiz yoklama oturumu kimliği",
 			Code:  "INVALID_ID",
 		})
 		return
@@ -460,7 +460,7 @@ func (h *AttendanceHandler) GetSessionDetails(c *gin.Context) {
 	if err != nil {
 		handlerLogger.Error("failed to parse user_id", zap.Error(err))
 		c.JSON(http.StatusUnauthorized, dto.ErrorResponse{
-			Error: "unauthorized",
+			Error: "Oturum açmanız gerekiyor",
 			Code:  "UNAUTHORIZED",
 		})
 		return
@@ -500,7 +500,7 @@ func (h *AttendanceHandler) GetSessionRecords(c *gin.Context) {
 	if err != nil {
 		handlerLogger.Error("invalid session ID format", zap.Error(err))
 		c.JSON(http.StatusBadRequest, dto.ErrorResponse{
-			Error: "invalid session ID",
+			Error: "Geçersiz yoklama oturumu kimliği",
 			Code:  "INVALID_ID",
 		})
 		return
@@ -510,7 +510,7 @@ func (h *AttendanceHandler) GetSessionRecords(c *gin.Context) {
 	if err != nil {
 		handlerLogger.Error("failed to parse user_id", zap.Error(err))
 		c.JSON(http.StatusUnauthorized, dto.ErrorResponse{
-			Error: "unauthorized",
+			Error: "Oturum açmanız gerekiyor",
 			Code:  "UNAUTHORIZED",
 		})
 		return
@@ -551,7 +551,7 @@ func (h *AttendanceHandler) GetSessionStudents(c *gin.Context) {
 	if err != nil {
 		handlerLogger.Error("invalid session ID format", zap.Error(err))
 		c.JSON(http.StatusBadRequest, dto.ErrorResponse{
-			Error: "invalid session ID",
+			Error: "Geçersiz yoklama oturumu kimliği",
 			Code:  "INVALID_ID",
 		})
 		return
@@ -562,7 +562,7 @@ func (h *AttendanceHandler) GetSessionStudents(c *gin.Context) {
 	if err != nil {
 		handlerLogger.Error("failed to parse user_id", zap.Error(err))
 		c.JSON(http.StatusUnauthorized, dto.ErrorResponse{
-			Error: "unauthorized",
+			Error: "Oturum açmanız gerekiyor",
 			Code:  "UNAUTHORIZED",
 		})
 		return
@@ -599,7 +599,7 @@ func (h *AttendanceHandler) AdminListSessions(c *gin.Context) {
 
 	if startStr == "" || endStr == "" {
 		c.JSON(http.StatusBadRequest, dto.ErrorResponse{
-			Error: "start_date and end_date query parameters are required (YYYY-MM-DD)",
+			Error: "Başlangıç ve bitiş tarihi zorunludur (YYYY-MM-DD)",
 			Code:  "VALIDATION_ERROR",
 		})
 		return
@@ -608,7 +608,7 @@ func (h *AttendanceHandler) AdminListSessions(c *gin.Context) {
 	startDate, err := time.Parse("2006-01-02", startStr)
 	if err != nil {
 		c.JSON(http.StatusBadRequest, dto.ErrorResponse{
-			Error: "invalid start_date format, expected YYYY-MM-DD",
+			Error: "Geçersiz başlangıç tarihi, beklenen biçim YYYY-MM-DD",
 			Code:  "VALIDATION_ERROR",
 		})
 		return
@@ -617,7 +617,7 @@ func (h *AttendanceHandler) AdminListSessions(c *gin.Context) {
 	endDate, err := time.Parse("2006-01-02", endStr)
 	if err != nil {
 		c.JSON(http.StatusBadRequest, dto.ErrorResponse{
-			Error: "invalid end_date format, expected YYYY-MM-DD",
+			Error: "Geçersiz bitiş tarihi, beklenen biçim YYYY-MM-DD",
 			Code:  "VALIDATION_ERROR",
 		})
 		return
