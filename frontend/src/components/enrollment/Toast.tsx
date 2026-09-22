@@ -15,11 +15,16 @@ export default function Toast({
   onClose,
   duration = 5000,
 }: ToastProps) {
-  const [isShowing, setIsShowing] = useState(false)
+  const [isShowing, setIsShowing] = useState(isVisible)
+  const [prevIsVisible, setPrevIsVisible] = useState(isVisible)
+
+  if (isVisible !== prevIsVisible) {
+    setPrevIsVisible(isVisible)
+    setIsShowing(isVisible)
+  }
 
   useEffect(() => {
     if (isVisible) {
-      setIsShowing(true)
       const timer = setTimeout(() => {
         setIsShowing(false)
         setTimeout(onClose, 300) // Wait for animation to finish

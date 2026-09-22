@@ -1,6 +1,7 @@
-import { useState, useEffect } from "react"
+import { useState } from "react"
 import { useNavigate } from "react-router"
 import { useMutation } from "@tanstack/react-query"
+import { HTTPError } from "ky"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Textarea } from "@/components/ui/textarea"
@@ -129,8 +130,12 @@ const initialFormData: FormData = {
 export default function AddCoursePage() {
   const navigate = useNavigate()
   const [formData, setFormData] = useState<FormData>(initialFormData)
-  const [, setSelectedFaculty] = useState<Faculty | null>(null)
-  const [departments, setDepartments] = useState<Department[]>([])
+
+  const selectedFaculty: Faculty | null =
+    mockFaculties.find((f) => f.id === formData.faculty_id) || null
+  const departments: Department[] = selectedFaculty
+    ? selectedFaculty.departments
+    : []
 
   // Mutation for creating course
   const createMutation = useMutation({
@@ -139,37 +144,31 @@ export default function AddCoursePage() {
       alert("Ders başarıyla eklendi!")
       navigate("/catalog")
     },
-    onError: async (error: any) => {
+    onError: async (error: Error) => {
       console.error("Ders eklenirken hata:", error)
       let message = error.message
-      try {
-        const body = await error.response?.json()
-        if (body?.error) message = body.error
-      } catch {
-        /* ignore parse errors */
+      if (error instanceof HTTPError) {
+        try {
+          const body = await error.response.json<{ error?: string }>()
+          if (body?.error) message = body.error
+        } catch {
+          /* ignore parse errors */
+        }
       }
       alert(`Hata: ${message}`)
     },
   })
 
-  // Fakülte değiştiğinde bölümleri güncelle
-  useEffect(() => {
-    if (formData.faculty_id) {
-      const faculty = mockFaculties.find((f) => f.id === formData.faculty_id)
-      if (faculty) {
-        setSelectedFaculty(faculty)
-        setDepartments(faculty.departments)
-        // Bölüm seçimini sıfırla
-        setFormData((prev) => ({ ...prev, department_id: "" }))
-      }
-    } else {
-      setSelectedFaculty(null)
-      setDepartments([])
-    }
-  }, [formData.faculty_id])
-
   const handleInputChange = (field: keyof FormData, value: string | number) => {
-    setFormData((prev) => ({ ...prev, [field]: value }))
+    if (field === "faculty_id") {
+      setFormData((prev) => ({
+        ...prev,
+        faculty_id: String(value),
+        department_id: "",
+      }))
+    } else {
+      setFormData((prev) => ({ ...prev, [field]: value }))
+    }
   }
 
   const handleCoordinatorChange = (

@@ -714,8 +714,12 @@ export default function MenusPage() {
       fetchMonthlyMenu(parseInt(selectedYear), parseInt(selectedMonth)),
   })
 
-  // Menü verisi geldiğinde state'leri güncelle
-  useEffect(() => {
+  // Menü verisi geldiğinde veya değiştiğinde state'leri render sırasında senkronize et
+  const [prevMenuKey, setPrevMenuKey] = useState<string>("")
+  const currentMenuKey = `${selectedYear}-${selectedMonth}-${existingMenu ? existingMenu.id || "found" : "none"}`
+
+  if (currentMenuKey !== prevMenuKey) {
+    setPrevMenuKey(currentMenuKey)
     if (existingMenu) {
       // Veritabanından gelen menüyü form state'ine yükle
       setWeeklyMenus(existingMenu.menu_data.normalMenus)
@@ -753,7 +757,7 @@ export default function MenusPage() {
       setIsCreatingNew(false) // Oluştur butonuna basılana kadar tablo gizli
       setPendingChanges([])
     }
-  }, [existingMenu, isPastMonth, selectedYear, selectedMonth])
+  }
 
   // Save mutation
   const saveMutation = useMutation({

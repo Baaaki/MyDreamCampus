@@ -1,5 +1,5 @@
-import { useState, useEffect } from "react"
 import { useNavigate } from "react-router"
+import { useQuery } from "@tanstack/react-query"
 import {
   Dialog,
   DialogContent,
@@ -9,7 +9,6 @@ import {
 } from "@/components/ui/dialog"
 import { Badge } from "@/components/ui/badge"
 import { gradesService } from "@/lib/services/grades-service"
-import type { CourseStatusResponse } from "@/lib/types"
 import {
   Loader2,
   ChevronRight,
@@ -35,31 +34,18 @@ export function AssessmentSelectDialog({
   onClose,
 }: AssessmentSelectDialogProps) {
   const navigate = useNavigate()
-  const [courseStatus, setCourseStatus] = useState<CourseStatusResponse | null>(
-    null
-  )
-  const [loading, setLoading] = useState(false)
-  const [error, setError] = useState("")
 
-  useEffect(() => {
-    if (isOpen && courseId) {
-      setLoading(true)
-      setError("")
-      setCourseStatus(null)
+  const {
+    data: courseStatus = null,
+    isLoading: loading,
+    isError,
+  } = useQuery({
+    queryKey: ["courseStatus", courseId],
+    queryFn: () => gradesService.getCourseStatus(courseId!),
+    enabled: isOpen && !!courseId,
+  })
 
-      gradesService
-        .getCourseStatus(courseId)
-        .then((status) => {
-          setCourseStatus(status)
-        })
-        .catch(() => {
-          setError("Ders durumu yüklenirken bir hata oluştu.")
-        })
-        .finally(() => {
-          setLoading(false)
-        })
-    }
-  }, [isOpen, courseId])
+  const error = isError ? "Ders durumu yüklenirken bir hata oluştu." : ""
 
   const handleAssessmentClick = (slug: string) => {
     if (!courseId) return
