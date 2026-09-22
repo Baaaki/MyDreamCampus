@@ -15,28 +15,28 @@ import (
 
 var (
 	// Grade submission errors (AppError for HTTP responses)
-	ErrInvalidScore         = sharedErrors.New("INVALID_SCORE", "score must be between 0 and 100", http.StatusBadRequest)
-	ErrInvalidSlug          = sharedErrors.New("INVALID_SLUG", "assessment slug not found in schema", http.StatusBadRequest)
-	ErrAlreadyFinalized     = sharedErrors.New("ALREADY_FINALIZED", "course already finalized, cannot modify scores", http.StatusConflict)
-	ErrScoreExists          = sharedErrors.New("SCORE_EXISTS", "score already exists for this assessment", http.StatusConflict)
-	ErrAttendanceFailed     = sharedErrors.New("ATTENDANCE_FAILED", "student failed due to attendance, cannot enter score manually", http.StatusBadRequest)
-	ErrScoreLocked          = sharedErrors.New("SCORE_LOCKED", "score is locked and cannot be modified", http.StatusForbidden)
-	ErrIncompleteAssessment = sharedErrors.New("INCOMPLETE_ASSESSMENT", "cannot lock assessment: not every student has a score entered", http.StatusBadRequest)
-	ErrGradingPeriodEnded   = sharedErrors.New("GRADING_PERIOD_ENDED", "grading period has ended", http.StatusForbidden)
-	ErrNoPeriodDefined      = sharedErrors.New("NO_PERIOD_DEFINED", "no active grading period defined for this semester", http.StatusBadRequest)
+	ErrInvalidScore         = sharedErrors.New("INVALID_SCORE", "Not 0 ile 100 arasında olmalıdır", http.StatusBadRequest)
+	ErrInvalidSlug          = sharedErrors.New("INVALID_SLUG", "Değerlendirme, dersin değerlendirme şemasında yok", http.StatusBadRequest)
+	ErrAlreadyFinalized     = sharedErrors.New("ALREADY_FINALIZED", "Dersin notları kesinleşti, değiştirilemez", http.StatusConflict)
+	ErrScoreExists          = sharedErrors.New("SCORE_EXISTS", "Bu değerlendirme için not zaten girilmiş", http.StatusConflict)
+	ErrAttendanceFailed     = sharedErrors.New("ATTENDANCE_FAILED", "Öğrenci devamsızlıktan kaldı, not girilemez", http.StatusBadRequest)
+	ErrScoreLocked          = sharedErrors.New("SCORE_LOCKED", "Not kilitli, değiştirilemez", http.StatusForbidden)
+	ErrIncompleteAssessment = sharedErrors.New("INCOMPLETE_ASSESSMENT", "Değerlendirme kilitlenemez: her öğrencinin notu girilmemiş", http.StatusBadRequest)
+	ErrGradingPeriodEnded   = sharedErrors.New("GRADING_PERIOD_ENDED", "Not giriş dönemi sona erdi", http.StatusForbidden)
+	ErrNoPeriodDefined      = sharedErrors.New("NO_PERIOD_DEFINED", "Bu dönem için tanımlı bir not giriş dönemi yok", http.StatusBadRequest)
 	// Raised when catalog cannot be reached: the hard deadline binds admins
 	// too, so an unverifiable deadline blocks the edit.
 	ErrSemesterInfoUnavailable = sharedErrors.New("SEMESTER_INFO_UNAVAILABLE", "Dönem bilgisi şu anda alınamıyor, lütfen birazdan tekrar deneyin", http.StatusServiceUnavailable)
 
 	// Authorization errors (AppError for HTTP responses)
-	ErrNotCourseInstructor = sharedErrors.New("NOT_COURSE_INSTRUCTOR", "you are not the instructor of this course", http.StatusForbidden)
-	ErrStudentDeactivated  = sharedErrors.New("STUDENT_DEACTIVATED", "student is deactivated", http.StatusForbidden)
+	ErrNotCourseInstructor = sharedErrors.New("NOT_COURSE_INSTRUCTOR", "Bu dersin öğretim üyesi değilsiniz", http.StatusForbidden)
+	ErrStudentDeactivated  = sharedErrors.New("STUDENT_DEACTIVATED", "Öğrenci hesabı devre dışı", http.StatusForbidden)
 
 	// Not found errors (AppError for HTTP responses)
-	ErrCourseNotFound       = sharedErrors.New("COURSE_NOT_FOUND", "course not found", http.StatusNotFound)
-	ErrRegistrationNotFound = sharedErrors.New("REGISTRATION_NOT_FOUND", "registration not found", http.StatusNotFound)
-	ErrScoreNotFound        = sharedErrors.New("SCORE_NOT_FOUND", "score not found", http.StatusNotFound)
-	ErrStudentNotFound      = sharedErrors.New("STUDENT_NOT_FOUND", "student not found", http.StatusNotFound)
+	ErrCourseNotFound       = sharedErrors.New("COURSE_NOT_FOUND", "Ders bulunamadı", http.StatusNotFound)
+	ErrRegistrationNotFound = sharedErrors.New("REGISTRATION_NOT_FOUND", "Ders kaydı bulunamadı", http.StatusNotFound)
+	ErrScoreNotFound        = sharedErrors.New("SCORE_NOT_FOUND", "Not bulunamadı", http.StatusNotFound)
+	ErrStudentNotFound      = sharedErrors.New("STUDENT_NOT_FOUND", "Öğrenci bulunamadı", http.StatusNotFound)
 
 	// Repository-specific sentinel errors (for internal use)
 	ErrCourseNotFoundRepo       = sharedErrors.ErrNotFoundRepo

@@ -61,7 +61,7 @@ func (h *GradeHandler) GetCourseStatus(c *gin.Context) {
 	if err != nil {
 		handlerLogger.Error("invalid instructor ID format", zap.Error(err))
 		c.JSON(http.StatusBadRequest, dto.ErrorResponse{
-			Error: "invalid instructor ID",
+			Error: "Geçersiz öğretim üyesi kimliği",
 			Code:  "INVALID_ID",
 		})
 		return
@@ -73,7 +73,7 @@ func (h *GradeHandler) GetCourseStatus(c *gin.Context) {
 	if err != nil {
 		handlerLogger.Error("invalid course ID format", zap.Error(err))
 		c.JSON(http.StatusBadRequest, dto.ErrorResponse{
-			Error: "invalid course ID",
+			Error: "Geçersiz ders kimliği",
 			Code:  "INVALID_ID",
 		})
 		return
@@ -125,7 +125,7 @@ func (h *GradeHandler) GetCourseStudents(c *gin.Context) {
 	if err != nil {
 		handlerLogger.Error("invalid instructor ID format", zap.Error(err))
 		c.JSON(http.StatusBadRequest, dto.ErrorResponse{
-			Error: "invalid instructor ID",
+			Error: "Geçersiz öğretim üyesi kimliği",
 			Code:  "INVALID_ID",
 		})
 		return
@@ -137,7 +137,7 @@ func (h *GradeHandler) GetCourseStudents(c *gin.Context) {
 	if err != nil {
 		handlerLogger.Error("invalid course ID format", zap.Error(err))
 		c.JSON(http.StatusBadRequest, dto.ErrorResponse{
-			Error: "invalid course ID",
+			Error: "Geçersiz ders kimliği",
 			Code:  "INVALID_ID",
 		})
 		return
@@ -189,7 +189,7 @@ func (h *GradeHandler) SubmitScore(c *gin.Context) {
 	if err != nil {
 		handlerLogger.Error("invalid instructor ID format", zap.Error(err))
 		c.JSON(http.StatusBadRequest, dto.ErrorResponse{
-			Error: "invalid instructor ID",
+			Error: "Geçersiz öğretim üyesi kimliği",
 			Code:  "INVALID_ID",
 		})
 		return
@@ -201,7 +201,7 @@ func (h *GradeHandler) SubmitScore(c *gin.Context) {
 	if err != nil {
 		handlerLogger.Error("invalid course ID format", zap.Error(err))
 		c.JSON(http.StatusBadRequest, dto.ErrorResponse{
-			Error: "invalid course ID",
+			Error: "Geçersiz ders kimliği",
 			Code:  "INVALID_ID",
 		})
 		return
@@ -262,7 +262,7 @@ func (h *GradeHandler) BulkSubmitScores(c *gin.Context) {
 	if err != nil {
 		handlerLogger.Error("invalid instructor ID format", zap.Error(err))
 		c.JSON(http.StatusBadRequest, dto.ErrorResponse{
-			Error: "invalid instructor ID",
+			Error: "Geçersiz öğretim üyesi kimliği",
 			Code:  "INVALID_ID",
 		})
 		return
@@ -274,7 +274,7 @@ func (h *GradeHandler) BulkSubmitScores(c *gin.Context) {
 	if err != nil {
 		handlerLogger.Error("invalid course ID format", zap.Error(err))
 		c.JSON(http.StatusBadRequest, dto.ErrorResponse{
-			Error: "invalid course ID",
+			Error: "Geçersiz ders kimliği",
 			Code:  "INVALID_ID",
 		})
 		return
@@ -334,19 +334,19 @@ func (h *GradeHandler) LockAssessment(c *gin.Context) {
 	}
 	instructorID, err := uuid.Parse(instructorIDStr.(string))
 	if err != nil {
-		c.JSON(http.StatusBadRequest, dto.ErrorResponse{Error: "invalid instructor ID", Code: "INVALID_ID"})
+		c.JSON(http.StatusBadRequest, dto.ErrorResponse{Error: "Geçersiz öğretim üyesi kimliği", Code: "INVALID_ID"})
 		return
 	}
 
 	courseID, err := uuid.Parse(c.Param("course_id"))
 	if err != nil {
-		c.JSON(http.StatusBadRequest, dto.ErrorResponse{Error: "invalid course ID", Code: "INVALID_ID"})
+		c.JSON(http.StatusBadRequest, dto.ErrorResponse{Error: "Geçersiz ders kimliği", Code: "INVALID_ID"})
 		return
 	}
 
 	slug := c.Param("slug")
 	if slug == "" {
-		c.JSON(http.StatusBadRequest, dto.ErrorResponse{Error: "slug is required", Code: "VALIDATION_ERROR"})
+		c.JSON(http.StatusBadRequest, dto.ErrorResponse{Error: "Değerlendirme kısa adı zorunludur", Code: "VALIDATION_ERROR"})
 		return
 	}
 
@@ -396,7 +396,7 @@ func (h *GradeHandler) GetMyGrades(c *gin.Context) {
 	if err != nil {
 		handlerLogger.Error("invalid student ID format", zap.Error(err))
 		c.JSON(http.StatusBadRequest, dto.ErrorResponse{
-			Error: "invalid student ID",
+			Error: "Geçersiz öğrenci kimliği",
 			Code:  "INVALID_ID",
 		})
 		return
@@ -443,7 +443,7 @@ func (h *GradeHandler) GetTranscript(c *gin.Context) {
 	if err != nil {
 		handlerLogger.Error("invalid requester ID format", zap.Error(err))
 		c.JSON(http.StatusBadRequest, dto.ErrorResponse{
-			Error: "invalid requester ID",
+			Error: "Geçersiz kullanıcı kimliği",
 			Code:  "INVALID_ID",
 		})
 		return
@@ -465,7 +465,7 @@ func (h *GradeHandler) GetTranscript(c *gin.Context) {
 	if err != nil {
 		handlerLogger.Error("invalid student ID format", zap.Error(err))
 		c.JSON(http.StatusBadRequest, dto.ErrorResponse{
-			Error: "invalid student ID",
+			Error: "Geçersiz öğrenci kimliği",
 			Code:  "INVALID_ID",
 		})
 		return
@@ -513,7 +513,7 @@ func (h *GradeHandler) ProcessAppeal(c *gin.Context) {
 	if !exists || role.(string) != "admin" {
 		handlerLogger.Warn("unauthorized appeal attempt", zap.Any("role", role))
 		c.JSON(http.StatusForbidden, dto.ErrorResponse{
-			Error: "only admins can process appeals",
+			Error: "İtirazları yalnızca yöneticiler işleyebilir",
 			Code:  "FORBIDDEN",
 		})
 		return
@@ -590,7 +590,7 @@ func (h *GradeHandler) UnlockScore(c *gin.Context) {
 
 	handlerLogger.Info("score unlocked successfully")
 	c.JSON(http.StatusOK, gin.H{
-		"message":         "score unlocked successfully",
+		"message":         "Notun kilidi açıldı",
 		"registration_id": req.RegistrationID,
 		"slug":            req.Slug,
 	})
@@ -630,7 +630,7 @@ func (h *GradeHandler) LockScore(c *gin.Context) {
 
 	handlerLogger.Info("score locked successfully")
 	c.JSON(http.StatusOK, gin.H{
-		"message":         "score locked successfully",
+		"message":         "Not kilitlendi",
 		"registration_id": req.RegistrationID,
 		"slug":            req.Slug,
 	})
