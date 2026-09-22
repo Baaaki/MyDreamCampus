@@ -113,9 +113,8 @@ func (m *Module) Bootstrap(ctx context.Context) error {
 	return m.auditConsumer.Start(ctx)
 }
 
-// Name is the URL slug under /api. Plan section 0.2 names the module
-// `course_catalog`; the legacy URL prefix is `/api/catalog` and the
-// frontend depends on it, so we keep that here.
+// Name is the URL slug under /api. The schema is `course_catalog`, but the
+// clients call `/api/catalog`, so the slug keeps the shorter name.
 func (m *Module) Name() string { return "catalog" }
 
 // OutboxStore for the outbox worker.
