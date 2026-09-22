@@ -16,6 +16,33 @@ function attachCSRFToken(request: Request): void {
   }
 }
 
+const MUTATING_METHODS = new Set(['POST', 'PUT', 'PATCH', 'DELETE']);
+
+/**
+ * A random UUID v4. crypto.randomUUID exists only in secure contexts, and a
+ * LAN deployment serves the SPA over plain http:// — getRandomValues works
+ * in both.
+ */
+function randomUUID(): string {
+  const bytes = crypto.getRandomValues(new Uint8Array(16));
+  bytes[6] = (bytes[6] & 0x0f) | 0x40; // version 4
+  bytes[8] = (bytes[8] & 0x3f) | 0x80; // RFC 4122 variant
+  const hex = Array.from(bytes, (b) => b.toString(16).padStart(2, '0')).join('');
+  return `${hex.slice(0, 8)}-${hex.slice(8, 12)}-${hex.slice(12, 16)}-${hex.slice(16, 20)}-${hex.slice(20)}`;
+}
+
+/**
+ * Tags a mutation with an Idempotency-Key once. ky's retries and the 401
+ * replay below clone the request, so every attempt carries the same key and
+ * the backend answers a repeat with the first result instead of doing the
+ * work twice (a second reservation, a second grade write).
+ */
+function attachIdempotencyKey(request: Request): void {
+  if (MUTATING_METHODS.has(request.method) && !request.headers.has('Idempotency-Key')) {
+    request.headers.set('Idempotency-Key', randomUUID());
+  }
+}
+
 // Single-flight refresh: if multiple in-flight requests hit 401 concurrently,
 // they should all wait on one /auth/refresh call rather than racing.
 let refreshInFlight: Promise<boolean> | null = null;
@@ -46,16 +73,20 @@ const apiClient = ky.create({
   prefixUrl: API_BASE_URL,
   timeout: 30000,
   credentials: 'include',
+  // POST is not retried: a timed-out POST may well have succeeded, and only
+  // the routes behind the Idempotency middleware could absorb a repeat.
+  // 500 is not retried either — it is an answer, not a lost request.
   retry: {
     limit: 2,
-    methods: ['get', 'post', 'put', 'delete'],
-    statusCodes: [408, 413, 500, 502, 503, 504],
+    methods: ['get', 'put', 'delete'],
+    statusCodes: [408, 502, 503, 504],
   },
   hooks: {
     beforeRequest: [
       async (request) => {
         // Attach CSRF token for state-changing requests
         attachCSRFToken(request);
+        attachIdempotencyKey(request);
 
         // Remove trailing slash from URL (Gin doesn't handle /api/students/ the same as /api/students)
         const url = new URL(request.url);
@@ -139,6 +170,7 @@ const noRedirectClient = ky.create({
     beforeRequest: [
       (request) => {
         attachCSRFToken(request);
+        attachIdempotencyKey(request);
       },
     ],
   },

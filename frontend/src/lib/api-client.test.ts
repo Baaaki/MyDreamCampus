@@ -137,3 +137,59 @@ describe("api-client - 401 refresh logic", () => {
     expect(refreshCalls).toBe(1);
   });
 });
+
+describe("api-client - idempotency and retries", () => {
+  afterEach(() => {
+    vi.unstubAllGlobals();
+    vi.resetAllMocks();
+  });
+
+  it("tags a mutation with a UUID Idempotency-Key", async () => {
+    const fetchSpy = vi.fn(async (_input: RequestInfo | URL, _init?: RequestInit) => new Response("{}", { status: 200 }));
+    vi.stubGlobal("fetch", fetchSpy);
+
+    const { apiClient } = await loadClient();
+    await apiClient.post("api/meals/reservations", { json: { menu: 1 } });
+
+    const req = fetchSpy.mock.calls[0]![0] as Request;
+    expect(req.headers.get("Idempotency-Key")).toMatch(
+      /^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/
+    );
+  });
+
+  it("does not tag reads", async () => {
+    const fetchSpy = vi.fn(async (_input: RequestInfo | URL, _init?: RequestInit) => new Response("{}", { status: 200 }));
+    vi.stubGlobal("fetch", fetchSpy);
+
+    const { apiClient } = await loadClient();
+    await apiClient.get("api/meals/menus");
+
+    const req = fetchSpy.mock.calls[0]![0] as Request;
+    expect(req.headers.get("Idempotency-Key")).toBeNull();
+  });
+
+  it("never retries a POST that failed with 503", async () => {
+    const fetchSpy = vi.fn(async (_input: RequestInfo | URL, _init?: RequestInit) => new Response("{}", { status: 503 }));
+    vi.stubGlobal("fetch", fetchSpy);
+
+    const { apiClient } = await loadClient();
+    await expect(apiClient.post("api/meals/reservations", { json: {} })).rejects.toThrow();
+
+    expect(fetchSpy).toHaveBeenCalledTimes(1);
+  });
+
+  it("retries a PUT with the same Idempotency-Key", async () => {
+    const fetchSpy = vi
+      .fn(async (_input: RequestInfo | URL, _init?: RequestInit) => new Response("{}", { status: 200 }))
+      .mockResolvedValueOnce(new Response("{}", { status: 503 }));
+    vi.stubGlobal("fetch", fetchSpy);
+
+    const { apiClient } = await loadClient();
+    await apiClient.put("api/students/1", { json: {}, retry: { limit: 1, methods: ["put"], statusCodes: [503], backoffLimit: 1 } });
+
+    expect(fetchSpy).toHaveBeenCalledTimes(2);
+    const first = fetchSpy.mock.calls[0]![0] as Request;
+    const second = fetchSpy.mock.calls[1]![0] as Request;
+    expect(second.headers.get("Idempotency-Key")).toBe(first.headers.get("Idempotency-Key"));
+  });
+});
