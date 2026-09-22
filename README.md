@@ -20,10 +20,10 @@ konteyner ve **kendi veritabanı**:
 | Servis | Sorumluluk | Servis | Sorumluluk |
 |---|---|---|---|
 | `auth` | Kimlik doğrulama, oturum, token | `attendance` | Yoklama oturumları, QR okutma |
-| `staff` | Öğretim üyeleri, profiller | `grades` | Not girişi, finalizasyon |
+| `staff` | Öğretim üyeleri, profiller, idari personel rehberi | `grades` | Not girişi, finalizasyon |
 | `student` | Öğrenci kayıtları, danışman | `meal` | Yemekhane rezervasyonu |
 | `catalog` | Ders kataloğu, dönemler | `payment` | Ödeme (mock) |
-| `enrollment` | Ders seçimi, danışman onayı | `notification` | E-posta ve push bildirim |
+| `enrollment` | Ders seçimi, danışman onayı | `notification` | E-posta bildirimi (push iskelet) |
 
 **Servisler birbirini nasıl görür**
 
@@ -65,7 +65,7 @@ Sistem tamamen sektör standartlarında, güncel ve yüksek performanslı araçl
 *   **Arka Uç (Backend):** Go 1.26, Gin, PostgreSQL 18, RabbitMQ 4.2, Redis 7.4
 *   **Ön Yüz (Web):** React 19, Vite, Tailwind CSS v4, shadcn/ui
 *   **Mobil Uygulama:** React Native 0.81, Expo 54
-*   **Bildirim Sistemi:** E-posta (MailHog ile test) ve Mobil Anlık Bildirim (Push Notification) altyapısı ayrı bir servis olarak asenkron çalışır.
+*   **Bildirim Sistemi:** Ayrı bir servis olayları asenkron tüketip e-posta gönderir (geliştirmede MailHog, üretimde `.env`'deki SMTP). Mobil push gönderimi henüz iskelet: çağrılar yalnızca loglanır.
 
 ## Güvenlik (Security by Design)
 
@@ -74,8 +74,8 @@ Sistem, OWASP tavsiyeleri temel alınarak katmanlı savunma (defense in depth) p
 **Kimlik Doğrulama ve Oturum Yönetimi**
 - Parolalar **Argon2id** ile hash'lenir (OWASP önerilen parametreler) ve constant-time karşılaştırılır. Var olmayan kullanıcı için de dummy hash doğrulaması çalıştırılır; login yanıt süresi üzerinden **kullanıcı adı sızdırma (user enumeration)** engellenir.
 - **JWT (HS256, algoritma pinlemeli)** + kısa ömürlü access token (15 dk) + **refresh token rotation**. Redis üzerinde JTI blacklist ve token-version takibiyle tek oturum veya tüm oturumlar anında iptal edilebilir (logout-all).
-- Token'lar tarayıcıda **httpOnly + Secure + SameSite=Strict** cookie'lerde taşınır; localStorage'da token tutulmaz.
-- Brute-force'a karşı **hesap kilitleme** ve Redis tabanlı **rate limiting** (IP / kullanıcı / endpoint bazlı; login gibi hassas endpoint'lerde fail-closed).
+- Token'lar tarayıcıda **httpOnly + SameSite=Strict** (production'da **Secure**) cookie'lerde taşınır; refresh token yanıt gövdesine yazılmaz ve yalnızca `/api/auth` altına gönderilir. localStorage'da token tutulmaz. Access ve refresh token'ları `token_type` ile ayrılır; refresh token bir API isteğini doğrulayamaz.
+- Brute-force'a karşı **hesap + istemci adresi bazlı geçici kilitleme**: kilitli deneme yanlış şifreyle aynı yanıtı alır (kullanıcı adı sızmaz) ve saldırgan, hesap sahibini başka bir adresten dışarıda bırakamaz. Redis tabanlı **rate limiting** kimliği doğrulanmış istekte kullanıcı, anonim istekte istemci IP'si bazlıdır; login gibi hassas endpoint'lerde fail-closed.
 
 **Uygulama Katmanı**
 - **RBAC**: admin / teacher / student rolleri route seviyesinde middleware ile zorunlu kılınır.
@@ -84,7 +84,7 @@ Sistem, OWASP tavsiyeleri temel alınarak katmanlı savunma (defense in depth) p
 - SQL erişimi **sqlc + pgx** ile tamamen parametrize edilir; string birleştirmeli sorgu yoktur (SQL injection yüzeyi kapalı).
 - 1 MB **request body limiti** ve slowloris'e karşı HTTP read/write timeout'ları.
 - Servisler arası çağrılar **X-Internal-Secret** başlığı ile doğrulanır (constant-time compare); `/internal/*` yolları ağ geçidinden dışarı açılmaz.
-- Yemekhane QR doğrulaması **HMAC-SHA256** imzalı ve kısa geçerlilik pencereli; imzasız/expired QR reddedilir.
+- Yoklama ve yemekhane QR'ları **HMAC-SHA256** imzalıdır ve kısa bir zaman penceresine bağlıdır. Yoklama QR'ı 15 saniyede bir yenilenir; sınıftan paylaşılan bir fotoğraf birkaç saniye içinde geçersizleşir. İmzasız veya süresi geçmiş QR reddedilir.
 - Güvenlik olayları (başarısız login, hesap kilitleme, yetki ihlali) **audit log**'a yazılır.
 
 **Yapılandırma ve Tedarik Zinciri**

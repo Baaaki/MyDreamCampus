@@ -227,10 +227,11 @@ Service URL formatı: `http://<servis-adı>:<port>` (compose DNS).
 
 Mimarinin taşıdığı, henüz kapatılmamış açıklar:
 
-- Prerequisite kontrolü bypass (enrollment `grade.student.prerequisite.passed` tüketmiyor)
 - payment mock (gerçek sağlayıcı entegrasyonu yok, outbox kullanmıyor)
 - İlk şifre = email (`force_password_change`)
 - Notification'daki iskelet handler'lar (`grades.entered`, `student.graduated`)
+- Mobil push gönderimi iskelet (`delivery/push` yalnızca logluyor; FCM entegrasyonu yok)
+- İdari personel rehberinde (`/api/admin-staff`) kayıt oluşturma yalnızca API ve seed üzerinden; arayüzde oluşturma formu yok
 - Grafana/Loki/Promtail compose'a ekli değil
 
 Bunlar ayrı iş kalemleri — hiçbiri mikroservis bölünmesinden kaynaklanmıyor.

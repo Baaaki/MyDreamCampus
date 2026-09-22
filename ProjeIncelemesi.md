@@ -1,5 +1,23 @@
 # MyDreamCampus — Gerçekçi Proje Değerlendirmesi
 
+> **Güncel durum (23.09.2026).** Bu değerlendirme 14.06.2026'da, projenin
+> modüler monolith döneminde yazıldı ve aşağıda o günkü hâliyle duruyor.
+> Bulgularının bugünkü karşılığı:
+>
+> | O gün | Bugün |
+> |---|---|
+> | Modüler monolith, 9 modül | 10 ayrı servis (`new-backend/services/`), servis başına ayrı veritabanı ve rol. Monolith `v0-microservices` etiketinde arşivli |
+> | Git geçmişinde 6 commit | 190'ı aşkın atomik commit |
+> | `checkPrerequisites` içinde `passed := true` | Kapandı: enrollment, grades'in `grade.student.prerequisite.passed` olaylarıyla beslenen projeksiyondan kontrol ediyor |
+> | 78 backend, 8 frontend test dosyası | 100 backend, 10 frontend, 8 mobil test dosyası. Vitest de CI'da koşuyor |
+> | E2E testi boş veya minimal | CI'daki `backend-e2e` job'u 16 konteyneri ayağa kaldırıp golden path'i Caddy üzerinden koşuyor |
+> | CI içeriği belirsiz | Servis başına lint/test/build, gosec, govulncheck, CodeQL, gitleaks; imajlar düzeltilebilir CRITICAL CVE varsa push edilmiyor |
+> | "plan section" referansları | Go kodunda kalmadı; iki uygulanmış migration dosyasının yorumunda duruyor (uygulanmış migration değiştirilmez) |
+> | Git'te binary | Takip edilen binary yok |
+> | Grafana/Loki/Promtail altyapıda | Compose'ta yok, kapsam dışı ([01-REFERANS-MIMARI.md](microservices-migration/01-REFERANS-MIMARI.md) §7) |
+> | Payment neredeyse boş | Hâlâ mock (aynı yerde, §7) |
+> | Canlı demo ve video yok | Hâlâ yok |
+
 ## Projenin Rakamsal Özeti
 
 | Metrik | Değer |
