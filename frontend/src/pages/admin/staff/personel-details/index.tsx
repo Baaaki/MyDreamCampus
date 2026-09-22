@@ -1,7 +1,8 @@
 import { useState, useEffect } from "react"
-import { staffApi, adminStaffApi } from "@/lib/api-client"
-import { mockFaculties, mockAdminStaff } from "@/mock_data"
-import type { AdminStaffProfile } from "@/mock_data/admin-staff"
+import { staffApi } from "@/lib/api-client"
+import { apiErrorMessage } from "@/lib/api-error"
+import { adminStaffService } from "@/lib/services/admin-staff-service"
+import { mockFaculties } from "@/mock_data"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
@@ -47,7 +48,7 @@ import {
   MapPin,
   Calendar,
 } from "lucide-react"
-import type { Staff } from "@/lib/types"
+import type { AdminStaffProfile, AdminStaffRecord, Staff } from "@/lib/types"
 
 // Eğitim bilgisi interface
 interface EducationInfo {
@@ -259,9 +260,7 @@ export default function StaffProfilePage() {
   const [selectedFacultyId, setSelectedFacultyId] = useState<string>("")
   const [selectedDepartmentId, setSelectedDepartmentId] = useState<string>("")
   const [staffList, setStaffList] = useState<Staff[]>([])
-  const [adminStaffList, setAdminStaffList] = useState<typeof mockAdminStaff>(
-    []
-  )
+  const [adminStaffList, setAdminStaffList] = useState<AdminStaffRecord[]>([])
   const [selectedStaffId, setSelectedStaffId] = useState<string | null>(null)
   const [isLoadingStaff, setIsLoadingStaff] = useState(false)
 
@@ -343,14 +342,16 @@ export default function StaffProfilePage() {
         setIsLoadingStaff(false)
       }
     } else {
-      // Administrative staff - still using mock for now (no real API endpoint)
-      const filteredAdminStaff = mockAdminStaff.filter(
-        (staff) => staff.faculty === selectedFac?.name
-      )
-
-      setAdminStaffList(filteredAdminStaff)
-      setIsLoadingStaff(false)
-      setViewMode("list")
+      try {
+        setAdminStaffList(await adminStaffService.list(selectedFac?.name ?? ""))
+        setViewMode("list")
+      } catch (error) {
+        console.error("[Personel Details] Failed to fetch admin staff:", error)
+        setAdminStaffList([])
+        alert(await apiErrorMessage(error, "İdari personel listesi alınamadı"))
+      } finally {
+        setIsLoadingStaff(false)
+      }
     }
   }
 
@@ -389,19 +390,12 @@ export default function StaffProfilePage() {
     setIsLoading(true)
 
     try {
-      const data = (await adminStaffApi
-        .get(`profile/${staffId}`)
-        .json()) as AdminStaffProfile
-
-      if (data) {
-        setAdminProfile(data)
-        setProfile(null)
-        setViewMode("profile")
-      } else {
-        console.error("Admin profile not found for staff ID:", staffId)
-      }
+      setAdminProfile(await adminStaffService.get(staffId))
+      setProfile(null)
+      setViewMode("profile")
     } catch (error) {
       console.error("Failed to fetch admin profile:", error)
+      alert(await apiErrorMessage(error, "İdari personel profili alınamadı"))
     } finally {
       setIsLoading(false)
     }
@@ -729,9 +723,9 @@ export default function StaffProfilePage() {
   }
 
   // Admin Info Handlers (Administrative Staff)
-  const handleAdminInfoChange = (
-    field: keyof AdminStaffProfile,
-    value: any
+  const handleAdminInfoChange = <K extends keyof AdminStaffProfile>(
+    field: K,
+    value: AdminStaffProfile[K]
   ) => {
     setAdminProfile((prev) => (prev ? { ...prev, [field]: value } : null))
   }
@@ -803,24 +797,18 @@ export default function StaffProfilePage() {
     } else if (staffType === "administrative" && adminProfile) {
       try {
         setIsSaving(true)
-        const response = (await adminStaffApi
-          .put("profile", { json: adminProfile })
-          .json()) as {
-          success: boolean
-          message: string
-          data: AdminStaffProfile
-        }
-
-        if (response.success) {
-          setAdminProfile(response.data)
-          setIsEditing(false)
-          alert(
-            response.message || "İdari personel profili başarıyla kaydedildi!"
-          )
-        }
+        setAdminProfile(
+          await adminStaffService.update(adminProfile.id, adminProfile)
+        )
+        setIsEditing(false)
+        alert("İdari personel profili başarıyla kaydedildi!")
       } catch (error) {
         console.error("Failed to save admin profile:", error)
-        alert("Profil kaydedilirken bir hata oluştu!")
+        // The backend's Turkish text says which field it refused (a taken
+        // e-mail, an invalid image URL); a generic message hides that.
+        alert(
+          await apiErrorMessage(error, "Profil kaydedilirken bir hata oluştu!")
+        )
       } finally {
         setIsSaving(false)
       }

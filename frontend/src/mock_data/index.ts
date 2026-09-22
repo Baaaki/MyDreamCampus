@@ -2,7 +2,6 @@
 export * from "./auth"
 export * from "./staff"
 export * from "./staff-profile"
-export * from "./admin-staff"
 export * from "./students"
 export * from "./catalog"
 export * from "./attendance"
@@ -13,7 +12,6 @@ export * from "./meal"
 import { mockUsers, mockSessions, mockAuthResponse } from "./auth"
 import { mockStaff } from "./staff"
 import { mockStaffProfile, mockStaffProfiles } from "./staff-profile"
-import { mockAdminStaff, mockAdminStaffProfiles } from "./admin-staff"
 import { mockStudents } from "./students"
 import {
   mockCourseCatalog,
@@ -42,8 +40,6 @@ export const MockData = {
   staff: mockStaff,
   staffProfile: mockStaffProfile,
   staffProfiles: mockStaffProfiles,
-  adminStaff: mockAdminStaff,
-  adminStaffProfiles: mockAdminStaffProfiles,
   students: mockStudents,
 
   // Catalog & Enrollment

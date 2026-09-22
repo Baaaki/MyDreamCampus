@@ -41,6 +41,47 @@ export interface Staff {
   updated_at: string
 }
 
+// Administrative staff directory (/api/admin-staff) — records, not accounts
+export interface AdminStaffRecord {
+  id: string
+  email: string
+  title: string
+  first_name: string
+  last_name: string
+  faculty: string
+  department: string
+  phone: string
+  profile_image_url: string
+  position: string
+  job_description: string
+  responsibilities: string[]
+  working_hours: string
+  office_location: string
+  start_date?: string
+  status: string
+  created_at: string
+  updated_at: string
+}
+
+// The profile editor's shape for an AdminStaffRecord
+export interface AdminStaffProfile {
+  id: string
+  title: string
+  firstName: string
+  lastName: string
+  faculty: string
+  department?: string
+  email: string
+  phone: string
+  profileImage?: string
+  position: string
+  jobDescription: string
+  responsibilities: string[]
+  workingHours: string
+  officeLocation: string
+  startDate: string
+}
+
 // Student types
 export interface Student {
   id: string
