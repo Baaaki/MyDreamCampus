@@ -1,5 +1,5 @@
 import { useState, useEffect } from "react"
-import { useTheme } from "@/components/providers/theme-provider"
+import { useTheme } from "@/components/providers/theme-context"
 import { Button } from "@/components/ui/button"
 import {
   DropdownMenu,
