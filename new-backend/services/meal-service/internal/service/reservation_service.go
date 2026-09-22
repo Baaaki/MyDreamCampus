@@ -242,7 +242,7 @@ func (s *ReservationService) CreateBatchReservation(ctx context.Context, student
 				Date:     r.Date,
 				MealTime: r.MealTime,
 				Code:     "INVALID_DATE_FORMAT",
-				Message:  "Invalid date format (expected YYYY-MM-DD)",
+				Message:  "Geçersiz tarih, beklenen biçim YYYY-MM-DD",
 			})
 			continue
 		}
@@ -267,7 +267,7 @@ func (s *ReservationService) CreateBatchReservation(ctx context.Context, student
 				Date:     r.Date,
 				MealTime: r.MealTime,
 				Code:     "INVALID_CAFETERIA_ID",
-				Message:  "Invalid cafeteria ID format",
+				Message:  "Geçersiz yemekhane kimliği",
 			})
 			continue
 		}
@@ -285,7 +285,7 @@ func (s *ReservationService) CreateBatchReservation(ctx context.Context, student
 						Date:     r.Date,
 						MealTime: r.MealTime,
 						Code:     "CAFETERIA_NOT_FOUND",
-						Message:  "Cafeteria not found",
+						Message:  "Yemekhane bulunamadı",
 					})
 				} else {
 					return nil, err
@@ -301,7 +301,7 @@ func (s *ReservationService) CreateBatchReservation(ctx context.Context, student
 				Date:     r.Date,
 				MealTime: r.MealTime,
 				Code:     "CAFETERIA_NOT_ACTIVE",
-				Message:  "Cafeteria is not active",
+				Message:  "Yemekhane aktif değil",
 			})
 			continue
 		}
@@ -738,7 +738,7 @@ func (s *ReservationService) UseReservation(ctx context.Context, studentID uuid.
 	)
 
 	return &dto.UseReservationResponse{
-		Message:       "Reservation validated",
+		Message:       "Rezervasyon doğrulandı",
 		ReservationID: reservation.ID.String(),
 		CafeteriaName: reservation.CafeteriaName,
 		MealTime:      mealTime,

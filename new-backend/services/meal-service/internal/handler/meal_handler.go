@@ -164,7 +164,7 @@ func (h *MealHandler) DeleteCafeteria(c *gin.Context) {
 	c.JSON(http.StatusOK, dto.SuccessResponse{
 		Success: true,
 		Data: dto.MessageResponse{
-			Message: "Cafeteria deactivated",
+			Message: "Yemekhane devre dışı bırakıldı",
 			ID:      cafeteriaID,
 		},
 	})
@@ -529,7 +529,7 @@ func (h *MealHandler) handleError(c *gin.Context, err error) {
 			Success: false,
 			Error: dto.ErrorResponse{
 				Code:    "VALIDATION_ERRORS",
-				Message: "Some reservations have validation errors",
+				Message: "Bazı rezervasyonlar geçersiz",
 			},
 		})
 	case errors.Is(err, serviceErrors.ErrReservationConflicts):
@@ -537,7 +537,7 @@ func (h *MealHandler) handleError(c *gin.Context, err error) {
 			Success: false,
 			Error: dto.ErrorResponse{
 				Code:    "RESERVATION_CONFLICTS",
-				Message: "Some dates/meals already have active reservations",
+				Message: "Bazı gün ve öğünler için zaten rezervasyonunuz var",
 			},
 		})
 	default:
@@ -546,7 +546,7 @@ func (h *MealHandler) handleError(c *gin.Context, err error) {
 			Success: false,
 			Error: dto.ErrorResponse{
 				Code:    "INTERNAL_ERROR",
-				Message: "An unexpected error occurred",
+				Message: "Beklenmeyen bir hata oluştu, lütfen tekrar deneyin",
 			},
 		})
 	}

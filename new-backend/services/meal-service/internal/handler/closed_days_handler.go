@@ -76,7 +76,7 @@ func (h *ClosedDaysHandler) CreateClosedDay(c *gin.Context) {
 	var req createClosedDayRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{
-			"error": "invalid request body",
+			"error": "Gönderilen bilgiler geçersiz",
 			"code":  "VALIDATION_ERROR",
 		})
 		return
@@ -85,7 +85,7 @@ func (h *ClosedDaysHandler) CreateClosedDay(c *gin.Context) {
 	date, err := time.Parse("2006-01-02", req.Date)
 	if err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{
-			"error": "invalid date format (expected YYYY-MM-DD)",
+			"error": "Geçersiz tarih, beklenen biçim YYYY-MM-DD",
 			"code":  "VALIDATION_ERROR",
 		})
 		return
@@ -99,7 +99,7 @@ func (h *ClosedDaysHandler) CreateClosedDay(c *gin.Context) {
 	if err != nil {
 		h.logger.Error("failed to create closed day", zap.Error(err))
 		c.JSON(http.StatusConflict, gin.H{
-			"error": "a closed day already exists for this date",
+			"error": "Bu tarih zaten kapalı gün olarak tanımlı",
 			"code":  "CONFLICT",
 		})
 		return
@@ -143,7 +143,7 @@ func (h *ClosedDaysHandler) ListClosedDays(c *gin.Context) {
 		t, err := time.Parse("2006-01-02", from)
 		if err != nil {
 			c.JSON(http.StatusBadRequest, gin.H{
-				"error": "invalid 'from' date format (expected YYYY-MM-DD)",
+				"error": "Geçersiz başlangıç tarihi, beklenen biçim YYYY-MM-DD",
 				"code":  "VALIDATION_ERROR",
 			})
 			return
@@ -155,7 +155,7 @@ func (h *ClosedDaysHandler) ListClosedDays(c *gin.Context) {
 		t, err := time.Parse("2006-01-02", to)
 		if err != nil {
 			c.JSON(http.StatusBadRequest, gin.H{
-				"error": "invalid 'to' date format (expected YYYY-MM-DD)",
+				"error": "Geçersiz bitiş tarihi, beklenen biçim YYYY-MM-DD",
 				"code":  "VALIDATION_ERROR",
 			})
 			return
@@ -170,7 +170,7 @@ func (h *ClosedDaysHandler) ListClosedDays(c *gin.Context) {
 	if err != nil {
 		h.logger.Error("failed to list closed days", zap.Error(err))
 		c.JSON(http.StatusInternalServerError, gin.H{
-			"error": "failed to list closed days",
+			"error": "Kapalı günler alınamadı, lütfen tekrar deneyin",
 			"code":  "INTERNAL_ERROR",
 		})
 		return
@@ -195,7 +195,7 @@ func (h *ClosedDaysHandler) DeleteClosedDay(c *gin.Context) {
 	var id pgtype.UUID
 	if err := id.Scan(idStr); err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{
-			"error": "invalid closed day ID",
+			"error": "Geçersiz kapalı gün kimliği",
 			"code":  "INVALID_ID",
 		})
 		return
@@ -204,7 +204,7 @@ func (h *ClosedDaysHandler) DeleteClosedDay(c *gin.Context) {
 	if err := h.repo.DeleteClosedDay(ctx, id); err != nil {
 		h.logger.Error("failed to delete closed day", zap.Error(err))
 		c.JSON(http.StatusInternalServerError, gin.H{
-			"error": "failed to delete closed day",
+			"error": "Kapalı gün silinemedi, lütfen tekrar deneyin",
 			"code":  "INTERNAL_ERROR",
 		})
 		return
@@ -227,7 +227,7 @@ func (h *ClosedDaysHandler) DeleteClosedDay(c *gin.Context) {
 	h.logger.Info("closed day deleted", zap.String("id", idStr))
 
 	c.JSON(http.StatusOK, gin.H{
-		"message": "closed day deleted successfully",
+		"message": "Kapalı gün silindi",
 	})
 }
 
@@ -250,7 +250,7 @@ func (h *ClosedDaysHandler) BatchCreateClosedDays(c *gin.Context) {
 	var req batchCreateClosedDaysRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{
-			"error": "invalid request body",
+			"error": "Gönderilen bilgiler geçersiz",
 			"code":  "VALIDATION_ERROR",
 		})
 		return
@@ -299,13 +299,13 @@ func (h *ClosedDaysHandler) DeleteClosedDaysBySemester(c *gin.Context) {
 
 	semester := c.Param("semester")
 	if semester == "" {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "semester is required", "code": "VALIDATION_ERROR"})
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Dönem bilgisi zorunludur", "code": "VALIDATION_ERROR"})
 		return
 	}
 
 	if err := h.repo.DeleteClosedDaysBySemester(ctx, semester); err != nil {
 		h.logger.Error("failed to delete closed days by semester", zap.Error(err))
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to delete closed days", "code": "INTERNAL_ERROR"})
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Kapalı günler silinemedi, lütfen tekrar deneyin", "code": "INTERNAL_ERROR"})
 		return
 	}
 
@@ -324,20 +324,20 @@ func (h *ClosedDaysHandler) UpdateClosedDaysBySemester(c *gin.Context) {
 
 	semester := c.Param("semester")
 	if semester == "" {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "semester is required", "code": "VALIDATION_ERROR"})
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Dönem bilgisi zorunludur", "code": "VALIDATION_ERROR"})
 		return
 	}
 
 	var req updateClosedDaysBySemesterRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid request body", "code": "VALIDATION_ERROR"})
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Gönderilen bilgiler geçersiz", "code": "VALIDATION_ERROR"})
 		return
 	}
 
 	// Delete existing closed days for this semester
 	if err := h.repo.DeleteClosedDaysBySemester(ctx, semester); err != nil {
 		h.logger.Error("failed to delete existing closed days", zap.Error(err))
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to update closed days", "code": "INTERNAL_ERROR"})
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Kapalı günler güncellenemedi, lütfen tekrar deneyin", "code": "INTERNAL_ERROR"})
 		return
 	}
 
