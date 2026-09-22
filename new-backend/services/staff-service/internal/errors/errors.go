@@ -15,21 +15,21 @@ import (
 
 var (
 	// Staff resource errors
-	ErrStaffNotFound = sharedErrors.New("STAFF_NOT_FOUND", "Staff not found", http.StatusNotFound)
-	ErrStaffExists   = sharedErrors.New("STAFF_EXISTS", "Staff already exists", http.StatusConflict)
+	ErrStaffNotFound = sharedErrors.New("STAFF_NOT_FOUND", "Personel bulunamadı", http.StatusNotFound)
+	ErrStaffExists   = sharedErrors.New("STAFF_EXISTS", "Personel zaten mevcut", http.StatusConflict)
 
 	// Staff business logic errors
-	ErrEmailExists       = sharedErrors.New("EMAIL_EXISTS", "Email already exists", http.StatusConflict)
-	ErrCannotCreateAdmin = sharedErrors.New("CANNOT_CREATE_ADMIN", "Admin cannot be created via API", http.StatusBadRequest)
-	ErrInvalidRole       = sharedErrors.New("INVALID_ROLE", "Invalid role specified", http.StatusBadRequest)
+	ErrEmailExists       = sharedErrors.New("EMAIL_EXISTS", "Bu e-posta adresi zaten kullanılıyor", http.StatusConflict)
+	ErrCannotCreateAdmin = sharedErrors.New("CANNOT_CREATE_ADMIN", "Yönetici hesabı bu yolla oluşturulamaz", http.StatusBadRequest)
+	ErrInvalidRole       = sharedErrors.New("INVALID_ROLE", "Geçersiz rol", http.StatusBadRequest)
 
 	// Advisor-specific business errors (for future use when advisor features are implemented)
-	ErrAdvisorNotQualified       = sharedErrors.New("ADVISOR_NOT_QUALIFIED", "Staff member is not qualified to be an advisor", http.StatusBadRequest)
-	ErrAdvisorHasTooManyStudents = sharedErrors.New("ADVISOR_OVERLOADED", "Advisor has reached maximum student capacity", http.StatusConflict)
+	ErrAdvisorNotQualified       = sharedErrors.New("ADVISOR_NOT_QUALIFIED", "Bu personel danışman olamaz", http.StatusBadRequest)
+	ErrAdvisorHasTooManyStudents = sharedErrors.New("ADVISOR_OVERLOADED", "Danışmanın öğrenci kontenjanı dolu", http.StatusConflict)
 
 	// Teacher profile errors
-	ErrTeacherProfileNotFound = sharedErrors.New("TEACHER_PROFILE_NOT_FOUND", "Teacher profile not found", http.StatusNotFound)
-	ErrNotATeacher            = sharedErrors.New("NOT_A_TEACHER", "Staff member is not a teacher", http.StatusBadRequest)
+	ErrTeacherProfileNotFound = sharedErrors.New("TEACHER_PROFILE_NOT_FOUND", "Öğretim üyesi profili bulunamadı", http.StatusNotFound)
+	ErrNotATeacher            = sharedErrors.New("NOT_A_TEACHER", "Bu personel öğretim üyesi değil", http.StatusBadRequest)
 
 	// Repository-specific sentinel errors (for internal use)
 	ErrStaffNotFoundRepo          = sharedErrors.ErrNotFoundRepo

@@ -282,7 +282,7 @@ func (h *StaffHandler) DeleteStaff(c *gin.Context) {
 	reqLogger.Info("staff deleted successfully")
 
 	c.JSON(http.StatusOK, dto.MessageResponse{
-		Message: "Staff deleted successfully",
+		Message: "Personel silindi",
 	})
 }
 
@@ -386,7 +386,7 @@ func (h *StaffHandler) GetInstructorsByDepartment(c *gin.Context) {
 	department := c.Query("department")
 	if department == "" {
 		c.JSON(http.StatusBadRequest, dto.ErrorResponse{
-			Error: "Department parameter is required",
+			Error: "Bölüm bilgisi zorunludur",
 			Code:  sharedErrors.ErrValidation.Code,
 		})
 		return
