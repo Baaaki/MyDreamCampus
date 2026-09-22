@@ -21,7 +21,35 @@ export function toAdminStaffProfile(r: AdminStaffRecord): AdminStaffProfile {
   }
 }
 
-export function toAdminStaffPayload(p: AdminStaffProfile) {
+export function toAdminStaffRecord(
+  p: AdminStaffProfile,
+  extra?: Partial<AdminStaffRecord>
+): AdminStaffRecord {
+  return {
+    id: p.id,
+    title: p.title,
+    first_name: p.firstName,
+    last_name: p.lastName,
+    faculty: p.faculty,
+    department: p.department || "",
+    email: p.email,
+    phone: p.phone,
+    profile_image_url: p.profileImage || "",
+    position: p.position,
+    job_description: p.jobDescription,
+    responsibilities: p.responsibilities,
+    working_hours: p.workingHours,
+    office_location: p.officeLocation,
+    start_date: p.startDate,
+    status: extra?.status ?? "active",
+    created_at: extra?.created_at ?? new Date().toISOString(),
+    updated_at: extra?.updated_at ?? new Date().toISOString(),
+  }
+}
+
+export function toAdminStaffPayload(
+  p: AdminStaffProfile | Omit<AdminStaffProfile, "id">
+) {
   return {
     email: p.email,
     title: p.title,
@@ -57,6 +85,15 @@ export const adminStaffService = {
     return toAdminStaffProfile(
       await adminStaffApi.get(id).json<AdminStaffRecord>()
     )
+  },
+
+  async create(
+    profile: AdminStaffProfile | Omit<AdminStaffProfile, "id">
+  ): Promise<AdminStaffProfile> {
+    const res = await adminStaffApi
+      .post("", { json: toAdminStaffPayload(profile) })
+      .json<AdminStaffRecord>()
+    return toAdminStaffProfile(res)
   },
 
   /** Replaces the whole record — the editor always holds every field. */

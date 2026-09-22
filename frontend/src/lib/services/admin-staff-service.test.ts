@@ -103,4 +103,35 @@ describe("adminStaffService", () => {
       responsibilities: ["Yazışmalar"],
     })
   })
+
+  it("creates with a POST to /api/admin-staff and returns the mapped profile", async () => {
+    const fetchSpy = stubFetch(record)
+    const { adminStaffService, toAdminStaffProfile } = await loadService()
+    const newProfile = {
+      ...toAdminStaffProfile(record),
+      responsibilities: ["Yazışmalar", "  ", ""],
+    }
+
+    const created = await adminStaffService.create(newProfile)
+
+    const req = fetchSpy.mock.calls[0]![0] as Request
+    expect(req.method).toBe("POST")
+    expect(new URL(req.url).pathname).toBe("/api/admin-staff")
+    const sent = JSON.parse(sentBodies[0]!)
+    expect(sent).toMatchObject({
+      email: "ali.vural@uni.edu.tr",
+      first_name: "Ali",
+      last_name: "Vural",
+      faculty: "Mühendislik Fakültesi",
+      position: "Fakülte Sekreteri",
+      responsibilities: ["Yazışmalar"],
+    })
+    expect(created).toMatchObject({
+      id: record.id,
+      firstName: "Ali",
+      lastName: "Vural",
+      faculty: "Mühendislik Fakültesi",
+      position: "Fakülte Sekreteri",
+    })
+  })
 })

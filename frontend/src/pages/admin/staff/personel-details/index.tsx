@@ -1,11 +1,22 @@
 import { useState, useEffect } from "react"
 import { staffApi } from "@/lib/api-client"
 import { apiErrorMessage } from "@/lib/api-error"
-import { adminStaffService } from "@/lib/services/admin-staff-service"
+import {
+  adminStaffService,
+  toAdminStaffRecord,
+} from "@/lib/services/admin-staff-service"
 import { mockFaculties } from "@/mock_data"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
+import { Textarea } from "@/components/ui/textarea"
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogTrigger,
+} from "@/components/ui/dialog"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import {
@@ -233,6 +244,40 @@ function transformApiResponseToProfile(
   }
 }
 
+interface CreateAdminStaffFormData {
+  email: string
+  firstName: string
+  lastName: string
+  title: string
+  position: string
+  faculty: string
+  department: string
+  phone: string
+  profileImage: string
+  jobDescription: string
+  responsibilities: string[]
+  workingHours: string
+  officeLocation: string
+  startDate: string
+}
+
+const initialCreateFormData: CreateAdminStaffFormData = {
+  email: "",
+  firstName: "",
+  lastName: "",
+  title: "",
+  position: "",
+  faculty: "",
+  department: "",
+  phone: "",
+  profileImage: "",
+  jobDescription: "",
+  responsibilities: [],
+  workingHours: "",
+  officeLocation: "",
+  startDate: "",
+}
+
 export default function StaffProfilePage() {
   // Check if user is authenticated (has valid token)
   const [isAuthenticated, setIsAuthenticated] = useState(false)
@@ -263,6 +308,13 @@ export default function StaffProfilePage() {
   const [adminStaffList, setAdminStaffList] = useState<AdminStaffRecord[]>([])
   const [selectedStaffId, setSelectedStaffId] = useState<string | null>(null)
   const [isLoadingStaff, setIsLoadingStaff] = useState(false)
+
+  // Create admin staff dialog states
+  const [createDialogOpen, setCreateDialogOpen] = useState(false)
+  const [isCreateSubmitting, setIsCreateSubmitting] = useState(false)
+  const [createError, setCreateError] = useState("")
+  const [createFormData, setCreateFormData] =
+    useState<CreateAdminStaffFormData>(initialCreateFormData)
 
   // Profile states
   const [profile, setProfile] = useState<StaffProfile | null>(null)
@@ -815,6 +867,126 @@ export default function StaffProfilePage() {
     }
   }
 
+  const handleOpenCreateDialog = () => {
+    setCreateFormData({
+      ...initialCreateFormData,
+      faculty: selectedFaculty?.name || "",
+    })
+    setCreateError("")
+    setCreateDialogOpen(true)
+  }
+
+  const handleCreateAdminStaff = async (e: React.FormEvent) => {
+    e.preventDefault()
+    setCreateError("")
+
+    // 1. Zorunlu alanlar
+    if (
+      !createFormData.email.trim() ||
+      !createFormData.firstName.trim() ||
+      !createFormData.lastName.trim() ||
+      !createFormData.faculty.trim() ||
+      !createFormData.position.trim()
+    ) {
+      setCreateError("Lütfen tüm zorunlu alanları (*) doldurunuz.")
+      return
+    }
+
+    // 2. E-posta doğrulaması
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
+    if (!emailRegex.test(createFormData.email.trim())) {
+      setCreateError("Lütfen geçerli bir e-posta adresi giriniz.")
+      return
+    }
+
+    // 3. Tarih doğrulaması
+    if (createFormData.startDate.trim()) {
+      const dateRegex = /^\d{4}-\d{2}-\d{2}$/
+      if (!dateRegex.test(createFormData.startDate.trim())) {
+        setCreateError("Tarih formatı YYYY-AA-GG şeklinde olmalıdır.")
+        return
+      }
+      const parsedDate = new Date(createFormData.startDate.trim())
+      if (isNaN(parsedDate.getTime())) {
+        setCreateError("Lütfen geçerli bir tarih giriniz.")
+        return
+      }
+    }
+
+    // 4. İsteğe bağlı alan kontrolleri
+    if (createFormData.phone.trim().length > 20) {
+      setCreateError("Telefon numarası en fazla 20 karakter olabilir.")
+      return
+    }
+
+    if (
+      createFormData.profileImage.trim() &&
+      !/^https?:\/\//i.test(createFormData.profileImage.trim())
+    ) {
+      setCreateError(
+        "Profil resmi URL'si yalnızca http:// veya https:// ile başlamalıdır."
+      )
+      return
+    }
+
+    if (createFormData.jobDescription.trim().length > 2000) {
+      setCreateError("Görev tanımı en fazla 2000 karakter olabilir.")
+      return
+    }
+
+    const cleanedResponsibilities = createFormData.responsibilities
+      .map((r) => r.trim())
+      .filter((r) => r !== "")
+
+    if (cleanedResponsibilities.length > 30) {
+      setCreateError("En fazla 30 sorumluluk maddesi girilebilir.")
+      return
+    }
+
+    if (cleanedResponsibilities.some((r) => r.length > 300)) {
+      setCreateError(
+        "Her bir sorumluluk maddesi en fazla 300 karakter olabilir."
+      )
+      return
+    }
+
+    setIsCreateSubmitting(true)
+    try {
+      const payload: Omit<AdminStaffProfile, "id"> = {
+        email: createFormData.email.trim(),
+        title: createFormData.title.trim(),
+        firstName: createFormData.firstName.trim(),
+        lastName: createFormData.lastName.trim(),
+        faculty: createFormData.faculty.trim() || selectedFaculty?.name || "",
+        department: createFormData.department.trim() || undefined,
+        phone: createFormData.phone.trim(),
+        profileImage: createFormData.profileImage.trim() || undefined,
+        position: createFormData.position.trim(),
+        jobDescription: createFormData.jobDescription.trim(),
+        responsibilities: cleanedResponsibilities,
+        workingHours: createFormData.workingHours.trim(),
+        officeLocation: createFormData.officeLocation.trim(),
+        startDate: createFormData.startDate.trim(),
+      }
+
+      const created = await adminStaffService.create(payload)
+      const newRecord = toAdminStaffRecord(created)
+
+      setAdminStaffList((prev) => [...prev, newRecord])
+      setCreateDialogOpen(false)
+      setCreateFormData(initialCreateFormData)
+    } catch (err: unknown) {
+      console.error("Failed to create admin staff:", err)
+      const errorMsg = await apiErrorMessage(
+        err,
+        "İdari personel kaydı oluşturulurken bir hata oluştu"
+      )
+      setCreateError(errorMsg)
+    } finally {
+      setIsCreateSubmitting(false)
+    }
+  }
+
   return (
     <div className="min-h-screen bg-gray-50 dark:bg-gray-950">
       {/* ========== SELECTION VIEW ========== */}
@@ -972,14 +1144,416 @@ export default function StaffProfilePage() {
                       </span>
                     )}
                 </CardTitle>
-                <Button
-                  variant="ghost"
-                  onClick={handleBackToSelection}
-                  className="text-white hover:bg-white/20"
-                >
-                  <ArrowLeft className="mr-2 h-4 w-4" />
-                  Geri
-                </Button>
+                <div className="flex items-center gap-2">
+                  {staffType === "administrative" && (
+                    <Dialog
+                      open={createDialogOpen}
+                      onOpenChange={(open) => {
+                        setCreateDialogOpen(open)
+                        if (open) {
+                          setCreateFormData({
+                            ...initialCreateFormData,
+                            faculty: selectedFaculty?.name || "",
+                          })
+                          setCreateError("")
+                        } else {
+                          setCreateError("")
+                        }
+                      }}
+                    >
+                      <DialogTrigger asChild>
+                        <Button className="bg-white text-[#005a87] hover:bg-white/90">
+                          <Plus className="mr-2 h-4 w-4" />
+                          Yeni İdari Personel
+                        </Button>
+                      </DialogTrigger>
+                      <DialogContent className="max-h-[90vh] overflow-y-auto sm:max-w-[650px]">
+                        <DialogHeader>
+                          <DialogTitle>Yeni İdari Personel Ekle</DialogTitle>
+                        </DialogHeader>
+
+                        {createError && (
+                          <div className="rounded-lg border border-destructive bg-destructive/10 px-4 py-3 text-sm text-destructive">
+                            {createError}
+                          </div>
+                        )}
+
+                        <form
+                          onSubmit={handleCreateAdminStaff}
+                          className="space-y-4"
+                        >
+                          {/* Fakülte (dolu gelir) */}
+                          <div className="space-y-2">
+                            <Label htmlFor="create_faculty">Fakülte *</Label>
+                            <Input
+                              id="create_faculty"
+                              value={createFormData.faculty}
+                              readOnly
+                              disabled
+                              className="cursor-not-allowed bg-muted"
+                            />
+                          </div>
+
+                          {/* Ad & Soyad */}
+                          <div className="grid grid-cols-2 gap-4">
+                            <div className="space-y-2">
+                              <Label htmlFor="create_first_name">Ad *</Label>
+                              <Input
+                                id="create_first_name"
+                                required
+                                value={createFormData.firstName}
+                                onChange={(e) =>
+                                  setCreateFormData({
+                                    ...createFormData,
+                                    firstName: e.target.value,
+                                  })
+                                }
+                                placeholder="Ad"
+                              />
+                            </div>
+                            <div className="space-y-2">
+                              <Label htmlFor="create_last_name">Soyad *</Label>
+                              <Input
+                                id="create_last_name"
+                                required
+                                value={createFormData.lastName}
+                                onChange={(e) =>
+                                  setCreateFormData({
+                                    ...createFormData,
+                                    lastName: e.target.value,
+                                  })
+                                }
+                                placeholder="Soyad"
+                              />
+                            </div>
+                          </div>
+
+                          {/* E-posta */}
+                          <div className="space-y-2">
+                            <Label htmlFor="create_email">E-posta *</Label>
+                            <Input
+                              id="create_email"
+                              type="email"
+                              required
+                              value={createFormData.email}
+                              onChange={(e) =>
+                                setCreateFormData({
+                                  ...createFormData,
+                                  email: e.target.value,
+                                })
+                              }
+                              placeholder="ornek@uni.edu.tr"
+                            />
+                          </div>
+
+                          {/* Pozisyon & Unvan */}
+                          <div className="grid grid-cols-2 gap-4">
+                            <div className="space-y-2">
+                              <Label htmlFor="create_position">
+                                Pozisyon *
+                              </Label>
+                              <Input
+                                id="create_position"
+                                required
+                                value={createFormData.position}
+                                onChange={(e) =>
+                                  setCreateFormData({
+                                    ...createFormData,
+                                    position: e.target.value,
+                                  })
+                                }
+                                placeholder="Fakülte Sekreteri, Memur vb."
+                              />
+                            </div>
+                            <div className="space-y-2">
+                              <Label htmlFor="create_title">Unvan</Label>
+                              <Input
+                                id="create_title"
+                                value={createFormData.title}
+                                onChange={(e) =>
+                                  setCreateFormData({
+                                    ...createFormData,
+                                    title: e.target.value,
+                                  })
+                                }
+                                placeholder="Şef, Uzman vb."
+                              />
+                            </div>
+                          </div>
+
+                          {/* Bölüm & Telefon */}
+                          <div className="grid grid-cols-2 gap-4">
+                            <div className="space-y-2">
+                              <Label htmlFor="create_department">Bölüm</Label>
+                              {departments.length > 0 ? (
+                                <Select
+                                  value={
+                                    createFormData.department || "__none__"
+                                  }
+                                  onValueChange={(val) =>
+                                    setCreateFormData({
+                                      ...createFormData,
+                                      department: val === "__none__" ? "" : val,
+                                    })
+                                  }
+                                >
+                                  <SelectTrigger
+                                    id="create_department"
+                                    className="w-full"
+                                  >
+                                    <SelectValue placeholder="Bölüm seçin (opsiyonel)" />
+                                  </SelectTrigger>
+                                  <SelectContent>
+                                    <SelectItem value="__none__">
+                                      Genel / Bölüm Yok
+                                    </SelectItem>
+                                    {departments.map((dept) => (
+                                      <SelectItem
+                                        key={dept.id}
+                                        value={dept.name}
+                                      >
+                                        {dept.name}
+                                      </SelectItem>
+                                    ))}
+                                  </SelectContent>
+                                </Select>
+                              ) : (
+                                <Input
+                                  id="create_department"
+                                  value={createFormData.department}
+                                  onChange={(e) =>
+                                    setCreateFormData({
+                                      ...createFormData,
+                                      department: e.target.value,
+                                    })
+                                  }
+                                  placeholder="Bölüm adı"
+                                />
+                              )}
+                            </div>
+                            <div className="space-y-2">
+                              <Label htmlFor="create_phone">Telefon</Label>
+                              <Input
+                                id="create_phone"
+                                type="tel"
+                                maxLength={20}
+                                value={createFormData.phone}
+                                onChange={(e) =>
+                                  setCreateFormData({
+                                    ...createFormData,
+                                    phone: e.target.value,
+                                  })
+                                }
+                                placeholder="+90 232 301 1001"
+                              />
+                            </div>
+                          </div>
+
+                          {/* Ofis Konumu & Çalışma Saatleri */}
+                          <div className="grid grid-cols-2 gap-4">
+                            <div className="space-y-2">
+                              <Label htmlFor="create_office_location">
+                                Ofis Konumu
+                              </Label>
+                              <Input
+                                id="create_office_location"
+                                maxLength={200}
+                                value={createFormData.officeLocation}
+                                onChange={(e) =>
+                                  setCreateFormData({
+                                    ...createFormData,
+                                    officeLocation: e.target.value,
+                                  })
+                                }
+                                placeholder="Dekanlık, 101"
+                              />
+                            </div>
+                            <div className="space-y-2">
+                              <Label htmlFor="create_working_hours">
+                                Çalışma Saatleri
+                              </Label>
+                              <Input
+                                id="create_working_hours"
+                                maxLength={100}
+                                value={createFormData.workingHours}
+                                onChange={(e) =>
+                                  setCreateFormData({
+                                    ...createFormData,
+                                    workingHours: e.target.value,
+                                  })
+                                }
+                                placeholder="08:30 - 17:30"
+                              />
+                            </div>
+                          </div>
+
+                          {/* Göreve Başlama Tarihi & Profil Resmi URL */}
+                          <div className="grid grid-cols-2 gap-4">
+                            <div className="space-y-2">
+                              <Label htmlFor="create_start_date">
+                                Göreve Başlama Tarihi
+                              </Label>
+                              <Input
+                                id="create_start_date"
+                                type="date"
+                                value={createFormData.startDate}
+                                onChange={(e) =>
+                                  setCreateFormData({
+                                    ...createFormData,
+                                    startDate: e.target.value,
+                                  })
+                                }
+                              />
+                            </div>
+                            <div className="space-y-2">
+                              <Label htmlFor="create_profile_image">
+                                Profil Resmi URL
+                              </Label>
+                              <Input
+                                id="create_profile_image"
+                                type="url"
+                                maxLength={2048}
+                                value={createFormData.profileImage}
+                                onChange={(e) =>
+                                  setCreateFormData({
+                                    ...createFormData,
+                                    profileImage: e.target.value,
+                                  })
+                                }
+                                placeholder="https://..."
+                              />
+                            </div>
+                          </div>
+
+                          {/* Görev Tanımı */}
+                          <div className="space-y-2">
+                            <Label htmlFor="create_job_description">
+                              Görev Tanımı
+                            </Label>
+                            <Textarea
+                              id="create_job_description"
+                              maxLength={2000}
+                              value={createFormData.jobDescription}
+                              onChange={(e) =>
+                                setCreateFormData({
+                                  ...createFormData,
+                                  jobDescription: e.target.value,
+                                })
+                              }
+                              placeholder="İdari personelin görev ve sorumluluk alanı..."
+                              rows={3}
+                            />
+                          </div>
+
+                          {/* Sorumluluklar */}
+                          <div className="space-y-2">
+                            <div className="flex items-center justify-between">
+                              <Label>Sorumluluklar</Label>
+                              <Button
+                                type="button"
+                                variant="outline"
+                                size="sm"
+                                onClick={() =>
+                                  setCreateFormData({
+                                    ...createFormData,
+                                    responsibilities: [
+                                      ...createFormData.responsibilities,
+                                      "",
+                                    ],
+                                  })
+                                }
+                                disabled={
+                                  createFormData.responsibilities.length >= 30
+                                }
+                              >
+                                <Plus className="mr-1 h-3.5 w-3.5" />
+                                Madde Ekle
+                              </Button>
+                            </div>
+                            {createFormData.responsibilities.length > 0 && (
+                              <div className="max-h-40 space-y-2 overflow-y-auto pr-1">
+                                {createFormData.responsibilities.map(
+                                  (resp, idx) => (
+                                    <div
+                                      key={idx}
+                                      className="flex items-center gap-2"
+                                    >
+                                      <Input
+                                        value={resp}
+                                        maxLength={300}
+                                        onChange={(e) => {
+                                          const updated = [
+                                            ...createFormData.responsibilities,
+                                          ]
+                                          updated[idx] = e.target.value
+                                          setCreateFormData({
+                                            ...createFormData,
+                                            responsibilities: updated,
+                                          })
+                                        }}
+                                        placeholder={`Sorumluluk maddesi ${idx + 1}`}
+                                      />
+                                      <Button
+                                        type="button"
+                                        variant="ghost"
+                                        size="sm"
+                                        className="h-9 w-9 p-0 text-red-500 hover:text-red-700"
+                                        onClick={() => {
+                                          setCreateFormData({
+                                            ...createFormData,
+                                            responsibilities:
+                                              createFormData.responsibilities.filter(
+                                                (_, i) => i !== idx
+                                              ),
+                                          })
+                                        }}
+                                      >
+                                        <Trash2 className="h-4 w-4" />
+                                      </Button>
+                                    </div>
+                                  )
+                                )}
+                              </div>
+                            )}
+                          </div>
+
+                          {/* Form Butonları */}
+                          <div className="flex gap-2 pt-4">
+                            <Button
+                              type="submit"
+                              disabled={isCreateSubmitting}
+                              className="flex-1"
+                            >
+                              {isCreateSubmitting
+                                ? "Oluşturuluyor..."
+                                : "Personel Oluştur"}
+                            </Button>
+                            <Button
+                              type="button"
+                              variant="outline"
+                              onClick={() => {
+                                setCreateDialogOpen(false)
+                                setCreateError("")
+                              }}
+                              disabled={isCreateSubmitting}
+                              className="flex-1"
+                            >
+                              İptal
+                            </Button>
+                          </div>
+                        </form>
+                      </DialogContent>
+                    </Dialog>
+                  )}
+                  <Button
+                    variant="ghost"
+                    onClick={handleBackToSelection}
+                    className="text-white hover:bg-white/20"
+                  >
+                    <ArrowLeft className="mr-2 h-4 w-4" />
+                    Geri
+                  </Button>
+                </div>
               </div>
             </CardHeader>
             <CardContent className="p-0">
@@ -1085,13 +1659,21 @@ export default function StaffProfilePage() {
                     <div className="p-8 text-center text-gray-500">
                       <UserCog className="mx-auto mb-4 h-12 w-12 opacity-50" />
                       <p>Bu fakültede kayıtlı idari personel bulunamadı.</p>
-                      <Button
-                        variant="outline"
-                        onClick={handleBackToSelection}
-                        className="mt-4"
-                      >
-                        Farklı Fakülte Seç
-                      </Button>
+                      <div className="mt-4 flex justify-center gap-3">
+                        <Button
+                          variant="outline"
+                          onClick={handleBackToSelection}
+                        >
+                          Farklı Fakülte Seç
+                        </Button>
+                        <Button
+                          onClick={handleOpenCreateDialog}
+                          className="bg-[#005a87] text-white hover:bg-[#004a6d]"
+                        >
+                          <Plus className="mr-2 h-4 w-4" />
+                          Yeni İdari Personel Ekle
+                        </Button>
+                      </div>
                     </div>
                   ) : (
                     <Table>
