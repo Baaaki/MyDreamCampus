@@ -102,8 +102,9 @@ jobs:
             type=sha,format=short
             type=raw,value=latest,enable={{is_default_branch}}
 
-      - name: Build and push
-        id: build
+      # Build, scan, then push: scanning after the push only reports on an
+      # image that is already in the registry under :latest.
+      - name: Build for scanning
         uses: docker/build-push-action@v6
         with:
           # Repo root, matching compose: every service Dockerfile copies both
@@ -111,17 +112,20 @@ jobs:
           # the service cannot see its replace target.
           context: .
           file: ./new-backend/services/${{ matrix.service }}/Dockerfile
-          push: true
+          load: true
+          push: false
           platforms: linux/amd64
-          tags: ${{ steps.meta.outputs.tags }}
-          labels: ${{ steps.meta.outputs.labels }}
+          tags: scan/mydreamcampus-${{ matrix.service }}:${{ github.sha }}
           cache-from: type=gha,scope=${{ matrix.service }}
           cache-to: type=gha,scope=${{ matrix.service }},mode=max
 
-      - name: Trivy vulnerability scan
-        uses: aquasecurity/trivy-action@0.28.0
+      # Pinned to a commit: in March 2026 this action's version tags were
+      # force-pushed to malicious commits and later re-created with a v
+      # prefix (the 0.28.0 this used no longer resolves). A SHA cannot move.
+      - name: Trivy report (CRITICAL, HIGH)
+        uses: aquasecurity/trivy-action@ed142fd0673e97e23eac54620cfb913e5ce36c25 # v0.36.0
         with:
-          image-ref: ${{ env.REGISTRY }}/${{ env.IMAGE_OWNER }}/mydreamcampus-${{ matrix.service }}@${{ steps.build.outputs.digest }}
+          image-ref: scan/mydreamcampus-${{ matrix.service }}:${{ github.sha }}
           format: sarif
           output: trivy-${{ matrix.service }}.sarif
           severity: CRITICAL,HIGH
@@ -129,8 +133,30 @@ jobs:
           ignore-unfixed: true
 
       - name: Upload Trivy results to GitHub Security
-        if: always()
+        if: always() && hashFiles(format('trivy-{0}.sarif', matrix.service)) != ''
         uses: github/codeql-action/upload-sarif@v3
         with:
           sarif_file: trivy-${{ matrix.service }}.sarif
           category: trivy-${{ matrix.service }}
+
+      # HIGH stays a report; a fixable CRITICAL stops the image from being
+      # pushed at all.
+      - name: Trivy gate (CRITICAL)
+        uses: aquasecurity/trivy-action@ed142fd0673e97e23eac54620cfb913e5ce36c25 # v0.36.0
+        with:
+          image-ref: scan/mydreamcampus-${{ matrix.service }}:${{ github.sha }}
+          format: table
+          severity: CRITICAL
+          exit-code: "1"
+          ignore-unfixed: true
+
+      - name: Push
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          file: ./new-backend/services/${{ matrix.service }}/Dockerfile
+          push: true
+          platforms: linux/amd64
+          tags: ${{ steps.meta.outputs.tags }}
+          labels: ${{ steps.meta.outputs.labels }}
+          cache-from: type=gha,scope=${{ matrix.service }}
