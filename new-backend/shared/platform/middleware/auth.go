@@ -74,7 +74,7 @@ func JWTAuth(opts ...AuthOption) gin.HandlerFunc {
 			logger.Warn("no token provided")
 			c.JSON(401, gin.H{
 				"error":   errors.ErrUnauthorized.Code,
-				"message": "No token provided",
+				"message": "Oturum açmanız gerekiyor",
 			})
 			c.Abort()
 			return
@@ -88,11 +88,9 @@ func JWTAuth(opts ...AuthOption) gin.HandlerFunc {
 				zap.String("ip", c.ClientIP()),
 			)
 
-			var errMsg string
-			if err == utils.ErrExpiredToken {
-				errMsg = "Token has expired"
-			} else {
-				errMsg = "Invalid token"
+			errMsg := "Oturum geçersiz, lütfen tekrar giriş yapın"
+			if errors.Is(err, utils.ErrExpiredToken) {
+				errMsg = "Oturumun süresi doldu, lütfen tekrar giriş yapın"
 			}
 
 			c.JSON(401, gin.H{
@@ -119,7 +117,7 @@ func JWTAuth(opts ...AuthOption) gin.HandlerFunc {
 					if cfg.failClosed {
 						c.JSON(http.StatusServiceUnavailable, gin.H{
 							"error":   "SERVICE_UNAVAILABLE",
-							"message": "Token revocation check unavailable, please try again later",
+							"message": "Oturum doğrulanamadı, lütfen birazdan tekrar deneyin",
 						})
 						c.Abort()
 						return
@@ -132,7 +130,7 @@ func JWTAuth(opts ...AuthOption) gin.HandlerFunc {
 					)
 					c.JSON(401, gin.H{
 						"error":   errors.ErrUnauthorized.Code,
-						"message": "Token has been revoked",
+						"message": "Oturum sonlandırıldı, lütfen tekrar giriş yapın",
 					})
 					c.Abort()
 					return
@@ -150,7 +148,7 @@ func JWTAuth(opts ...AuthOption) gin.HandlerFunc {
 				if cfg.failClosed {
 					c.JSON(http.StatusServiceUnavailable, gin.H{
 						"error":   "SERVICE_UNAVAILABLE",
-						"message": "Token revocation check unavailable, please try again later",
+						"message": "Oturum doğrulanamadı, lütfen birazdan tekrar deneyin",
 					})
 					c.Abort()
 					return
@@ -164,7 +162,7 @@ func JWTAuth(opts ...AuthOption) gin.HandlerFunc {
 				)
 				c.JSON(401, gin.H{
 					"error":   errors.ErrUnauthorized.Code,
-					"message": "Token has been revoked",
+					"message": "Oturum sonlandırıldı, lütfen tekrar giriş yapın",
 				})
 				c.Abort()
 				return

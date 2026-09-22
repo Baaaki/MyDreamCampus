@@ -33,7 +33,7 @@ func TestRecovery_DoesNotLeakPanicDetails(t *testing.T) {
 
 	var resp map[string]any
 	require.NoError(t, json.Unmarshal(w.Body.Bytes(), &resp))
-	assert.Equal(t, "Internal server error", resp["message"])
+	assert.Equal(t, "Beklenmeyen bir hata oluştu, lütfen tekrar deneyin", resp["message"])
 	assert.Contains(t, resp, "error")
 	assert.Contains(t, resp, "request_id")
 }

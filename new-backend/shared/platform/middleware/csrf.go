@@ -31,7 +31,7 @@ func CSRFProtection() gin.HandlerFunc {
 		if err != nil || csrfCookie == "" {
 			c.AbortWithStatusJSON(http.StatusForbidden, gin.H{
 				"error":   "CSRF_ERROR",
-				"message": "CSRF token missing",
+				"message": "Güvenlik doğrulaması başarısız, sayfayı yenileyip tekrar deneyin",
 			})
 			return
 		}
@@ -40,7 +40,7 @@ func CSRFProtection() gin.HandlerFunc {
 		if csrfHeader == "" || csrfHeader != csrfCookie {
 			c.AbortWithStatusJSON(http.StatusForbidden, gin.H{
 				"error":   "CSRF_ERROR",
-				"message": "CSRF token mismatch",
+				"message": "Güvenlik doğrulaması başarısız, sayfayı yenileyip tekrar deneyin",
 			})
 			return
 		}

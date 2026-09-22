@@ -129,7 +129,7 @@ func TestJWTAuth_RejectsBlacklistedJTI(t *testing.T) {
 	r.ServeHTTP(w, req)
 
 	assert.Equal(t, http.StatusUnauthorized, w.Code)
-	assert.Contains(t, w.Body.String(), "revoked")
+	assert.Contains(t, w.Body.String(), "Oturum sonlandırıldı")
 }
 
 func TestJWTAuth_RejectsTokenVersionTooOld(t *testing.T) {

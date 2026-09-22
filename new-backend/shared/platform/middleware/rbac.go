@@ -18,7 +18,7 @@ func RequireRole(allowedRoles ...string) gin.HandlerFunc {
 			logger.Error("role not found in context - JWT middleware not applied?")
 			c.JSON(403, gin.H{
 				"error":   errors.ErrForbidden.Code,
-				"message": "Role information not found",
+				"message": "Bu işlem için yetkiniz yok",
 			})
 			c.Abort()
 			return
@@ -41,7 +41,7 @@ func RequireRole(allowedRoles ...string) gin.HandlerFunc {
 
 		c.JSON(403, gin.H{
 			"error":   errors.ErrForbidden.Code,
-			"message": "You do not have permission to access this resource",
+			"message": "Bu işlem için yetkiniz yok",
 		})
 		c.Abort()
 	}

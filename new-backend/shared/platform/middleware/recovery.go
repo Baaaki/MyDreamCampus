@@ -30,7 +30,7 @@ func Recovery() gin.HandlerFunc {
 
 				c.JSON(500, gin.H{
 					"error":      errors.ErrInternalServer.Code,
-					"message":    "Internal server error",
+					"message":    "Beklenmeyen bir hata oluştu, lütfen tekrar deneyin",
 					"request_id": requestID,
 				})
 				c.Abort()

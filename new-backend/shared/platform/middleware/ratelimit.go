@@ -187,7 +187,7 @@ func IPRateLimit() gin.HandlerFunc {
 		if !allowed {
 			c.JSON(http.StatusTooManyRequests, gin.H{
 				"error":   errors.ErrTooManyReqs.Code,
-				"message": "Too many requests, please try again later",
+				"message": "Çok fazla istek, lütfen biraz sonra tekrar deneyin",
 			})
 			c.Abort()
 			return
@@ -231,7 +231,7 @@ func UserRateLimit() gin.HandlerFunc {
 		if !allowed {
 			c.JSON(http.StatusTooManyRequests, gin.H{
 				"error":   errors.ErrTooManyReqs.Code,
-				"message": "Too many requests, please try again later",
+				"message": "Çok fazla istek, lütfen biraz sonra tekrar deneyin",
 			})
 			c.Abort()
 			return
@@ -278,7 +278,7 @@ func EndpointRateLimit(group string) gin.HandlerFunc {
 			if endpointLimit.FailClosed {
 				c.JSON(http.StatusServiceUnavailable, gin.H{
 					"error":   "SERVICE_UNAVAILABLE",
-					"message": "Service temporarily unavailable, please try again later",
+					"message": "Hizmet şu anda kullanılamıyor, lütfen birazdan tekrar deneyin",
 				})
 				c.Abort()
 				return
@@ -292,7 +292,7 @@ func EndpointRateLimit(group string) gin.HandlerFunc {
 		if !allowed {
 			c.JSON(http.StatusTooManyRequests, gin.H{
 				"error":   errors.ErrTooManyReqs.Code,
-				"message": fmt.Sprintf("Too many %s attempts, please try again later", group),
+				"message": "Çok fazla deneme yapıldı, lütfen biraz sonra tekrar deneyin",
 			})
 			c.Abort()
 			return
