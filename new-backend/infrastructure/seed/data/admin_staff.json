@@ -1,0 +1,62 @@
+[
+  {
+    "email": "ali.vural@uni.edu.tr", "first_name": "Ali", "last_name": "Vural",
+    "faculty": "Mühendislik Fakültesi", "phone": "+90 232 301 1001",
+    "position": "Fakülte Sekreteri",
+    "job_description": "Mühendislik Fakültesi idari işlerinin yönetimi ve koordinasyonu. Dekanlık ile bölümler arası iletişimin sağlanması, fakülte bütçe ve kaynak yönetiminin takibi.",
+    "responsibilities": [
+      "Fakülte dekanlığının idari işlerini yürütmek",
+      "Akademik ve idari personelin özlük işlemlerini takip etmek",
+      "Fakülte bütçesinin hazırlanmasına katkıda bulunmak",
+      "Dekanlık yazışmalarını koordine etmek",
+      "Fakülte kurulu ve yönetim kurulu toplantılarını organize etmek"
+    ],
+    "working_hours": "Pazartesi - Cuma: 08:30 - 17:30",
+    "office_location": "Mühendislik Fakültesi Dekanlık Binası, Kat: 1, Oda: 101",
+    "start_date": "2015-03-01"
+  },
+  {
+    "email": "zehra.aksoy@uni.edu.tr", "first_name": "Zehra", "last_name": "Aksoy",
+    "faculty": "Mühendislik Fakültesi", "phone": "+90 232 301 1002",
+    "position": "Öğrenci İşleri Şefi",
+    "job_description": "Mühendislik Fakültesi öğrenci işleri biriminin yönetimi. Öğrenci kayıt, kabul ve mezuniyet işlemlerinin koordinasyonu.",
+    "responsibilities": [
+      "Öğrenci kayıt ve kabul işlemlerini yürütmek",
+      "Mezuniyet belgesi ve diploma işlemlerini takip etmek",
+      "Yatay ve dikey geçiş işlemlerini koordine etmek",
+      "Öğrenci belgesi ve transkript taleplerini karşılamak"
+    ],
+    "working_hours": "Pazartesi - Cuma: 09:00 - 17:00",
+    "office_location": "Mühendislik Fakültesi Öğrenci İşleri, Kat: Zemin, Oda: Z-05",
+    "start_date": "2018-09-15"
+  },
+  {
+    "email": "hasan.yildiz@uni.edu.tr", "first_name": "Hasan", "last_name": "Yıldız",
+    "faculty": "Fen Fakültesi", "phone": "+90 232 301 2001",
+    "position": "Fakülte Sekreteri",
+    "job_description": "Fen Fakültesi genel idari işlerinin yönetimi. Akademik kadro ve bütçe planlaması, fakülte stratejik planlamasına katkı.",
+    "responsibilities": [
+      "Fakülte idari birimlerini koordine etmek",
+      "Akademik personel atama ve yükseltme işlemlerini takip etmek",
+      "Resmi yazışmaları yürütmek",
+      "Laboratuvar ve araştırma altyapı ihtiyaçlarını koordine etmek"
+    ],
+    "working_hours": "Pazartesi - Cuma: 08:30 - 17:30",
+    "office_location": "Fen Fakültesi Dekanlık Binası, Kat: 2, Oda: 201",
+    "start_date": "2012-06-01"
+  },
+  {
+    "email": "ayten.kara@uni.edu.tr", "first_name": "Ayten", "last_name": "Kara",
+    "faculty": "Fen Fakültesi", "phone": "+90 232 301 2002",
+    "position": "Öğrenci İşleri Memuru",
+    "job_description": "Fen Fakültesi öğrenci işleri işlemlerinin yürütülmesi. Öğrenci belge ve evrak işlemlerinin takibi.",
+    "responsibilities": [
+      "Öğrenci belgesi taleplerini karşılamak",
+      "Ders kayıt işlemlerine destek vermek",
+      "Mezuniyet başvurularını almak ve işlemek"
+    ],
+    "working_hours": "Pazartesi - Cuma: 09:00 - 17:00",
+    "office_location": "Fen Fakültesi Öğrenci İşleri, Kat: Zemin, Oda: Z-02",
+    "start_date": "2020-02-01"
+  }
+]

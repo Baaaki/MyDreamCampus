@@ -1,7 +1,8 @@
 #!/bin/sh
-# Demo seed. Creates teachers, courses and students through the REAL admin API
-# so the event chain fires and every service projection (incl. the auth login
-# user) is populated correctly — a raw SQL insert would skip those projections.
+# Demo seed. Creates teachers, administrative staff, courses and students
+# through the REAL admin API so the event chain fires and every service
+# projection (incl. the auth login user) is populated correctly — a raw SQL
+# insert would skip those projections.
 #
 # The API half talks to each service directly rather than through Caddy. Going
 # through the gateway looked tidier but breaks on the edge's own behaviour:
@@ -62,12 +63,6 @@ if [ -z "$TOKEN" ]; then
 fi
 AUTH="Authorization: Bearer $TOKEN"
 
-# --- 3. idempotency: skip if the first demo student already exists ---
-if curl -fsS "$STUDENT_URL/api/students?limit=200" -H "$AUTH" 2>/dev/null | grep -q "2021510001"; then
-	echo ">> demo data already present — skipping."
-	exit 0
-fi
-
 # POST helper: never aborts the run on a single failure (unique-constraint 409s
 # on re-run are expected and harmless). Prints status + a snippet on error.
 post() {
@@ -81,6 +76,18 @@ post() {
 	fi
 	return 0
 }
+
+# Seeded before the idempotency check below: administrative staff joined the
+# seed later, and behind the check a deployment seeded before that would never
+# get any. Records are unique by e-mail, so re-runs only produce harmless 409s.
+echo ">> creating administrative staff"
+jq -c '.[]' /seed/data/admin_staff.json | while IFS= read -r row; do post "$STAFF_URL/api/admin-staff" "$row"; done
+
+# --- 3. idempotency: skip if the first demo student already exists ---
+if curl -fsS "$STUDENT_URL/api/students?limit=200" -H "$AUTH" 2>/dev/null | grep -q "2021510001"; then
+	echo ">> demo data already present — skipping."
+	exit 0
+fi
 
 echo ">> creating teachers"
 jq -c '.[]' /seed/data/teachers.json | while IFS= read -r row; do post "$STAFF_URL/api/staff" "$row"; done

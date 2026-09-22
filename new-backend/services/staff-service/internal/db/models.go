@@ -54,6 +54,27 @@ func (ns NullOutboxStatusEnum) Value() (driver.Value, error) {
 	return string(ns.OutboxStatusEnum), nil
 }
 
+type AdminStaff struct {
+	ID               pgtype.UUID      `json:"id"`
+	Email            string           `json:"email"`
+	Title            string           `json:"title"`
+	FirstName        string           `json:"first_name"`
+	LastName         string           `json:"last_name"`
+	Faculty          string           `json:"faculty"`
+	Department       string           `json:"department"`
+	Phone            string           `json:"phone"`
+	ProfileImageUrl  string           `json:"profile_image_url"`
+	Position         string           `json:"position"`
+	JobDescription   string           `json:"job_description"`
+	Responsibilities []byte           `json:"responsibilities"`
+	WorkingHours     string           `json:"working_hours"`
+	OfficeLocation   string           `json:"office_location"`
+	StartDate        pgtype.Date      `json:"start_date"`
+	IsActive         bool             `json:"is_active"`
+	CreatedAt        pgtype.Timestamp `json:"created_at"`
+	UpdatedAt        pgtype.Timestamp `json:"updated_at"`
+}
+
 type OutboxEvent struct {
 	ID            pgtype.UUID      `json:"id"`
 	EventType     string           `json:"event_type"`

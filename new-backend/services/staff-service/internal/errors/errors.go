@@ -31,6 +31,9 @@ var (
 	ErrTeacherProfileNotFound = sharedErrors.New("TEACHER_PROFILE_NOT_FOUND", "Öğretim üyesi profili bulunamadı", http.StatusNotFound)
 	ErrNotATeacher            = sharedErrors.New("NOT_A_TEACHER", "Bu personel öğretim üyesi değil", http.StatusBadRequest)
 
+	// Administrative staff directory errors
+	ErrAdminStaffNotFound = sharedErrors.New("ADMIN_STAFF_NOT_FOUND", "İdari personel bulunamadı", http.StatusNotFound)
+
 	// Repository-specific sentinel errors (for internal use)
 	ErrStaffNotFoundRepo          = sharedErrors.ErrNotFoundRepo
 	ErrStaffExistsRepo            = sharedErrors.ErrAlreadyExistsRepo

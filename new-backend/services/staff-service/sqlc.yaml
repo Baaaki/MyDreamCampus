@@ -17,9 +17,10 @@ sql:
         emit_exact_table_names: false
         emit_empty_slices: true
         # Strip the `staff` schema prefix so the existing repository code
-        # (db.Staff, db.OutboxEvent, db.TeacherProfile) keeps compiling.
+        # (db.Staff, db.OutboxEvent, db.TeacherProfile, db.AdminStaff) keeps compiling.
         rename:
           staff_staff: "Staff"
           staff_outbox_event: "OutboxEvent"
           staff_outbox_status_enum: "OutboxStatusEnum"
           staff_teacher_profile: "TeacherProfile"
+          staff_admin_staff: "AdminStaff"

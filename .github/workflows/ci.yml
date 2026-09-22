@@ -200,6 +200,12 @@ jobs:
           code=$(api http://localhost/api/staff -H "Authorization: Bearer $TOKEN")
           expect 200 "$code" "list staff (staff)"
 
+          # Its own prefix, mounted outside /api/staff: this proves the Caddy
+          # rule, the migration and the seed rows in one request.
+          code=$(api "http://localhost/api/admin-staff?faculty=Fen%20Fak%C3%BCltesi" -H "Authorization: Bearer $TOKEN")
+          expect 200 "$code" "list administrative staff (staff, /api/admin-staff)"
+          [ "$(jq '.data | length' /tmp/body)" -ge 1 ] || { echo "::error::no administrative staff seeded"; exit 1; }
+
           code=$(api http://localhost/api/catalog/courses)
           expect 200 "$code" "list courses (catalog)"
 
@@ -221,6 +227,9 @@ jobs:
             -d '{"email":"zeynep.sahin@uni.edu.tr","password":"zeynep.sahin@uni.edu.tr"}')
           expect 200 "$code" "seeded student login (student event -> auth projection)"
           STUDENT_TOKEN=$(jq -r '.access_token' /tmp/body)
+
+          code=$(api http://localhost/api/admin-staff -H "Authorization: Bearer $STUDENT_TOKEN")
+          expect 403 "$code" "administrative staff directory is admin-only"
 
           code=$(api http://localhost/api/enrollment/available-courses \
             -H "Authorization: Bearer $STUDENT_TOKEN")

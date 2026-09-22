@@ -2,8 +2,9 @@
 // platform-level Module + lifecycle hooks cmd/main.go consumes.
 //
 // The service owns the staff database (staff, outbox_events,
-// teacher_profiles) and publishes staff.created/updated/deactivated events
-// through its own outbox table.
+// teacher_profiles, admin_staff) and publishes staff.created/updated/
+// deactivated events through its own outbox table. admin_staff is a
+// directory, not accounts, and publishes nothing.
 package staff
 
 import (
@@ -26,14 +27,17 @@ type Module struct {
 	staffRepo          *repository.StaffRepository
 	outboxRepo         *repository.OutboxRepository
 	teacherProfileRepo *repository.TeacherProfileRepository
+	adminStaffRepo     *repository.AdminStaffRepository
 	outboxStore        *repository.OutboxStore
 	retentionStore     *repository.RetentionStore
 
 	staffService          *service.StaffService
 	teacherProfileService *service.TeacherProfileService
+	adminStaffService     *service.AdminStaffService
 
 	staffHandler          *handler.StaffHandler
 	teacherProfileHandler *handler.TeacherProfileHandler
+	adminStaffHandler     *handler.AdminStaffHandler
 	timeHandler           *platformHandler.TimeHandler
 }
 
@@ -44,9 +48,11 @@ func New(cfg *config.Config, pool *pgxpool.Pool) *Module {
 	staffRepo := repository.NewStaffRepository(pool)
 	outboxRepo := repository.NewOutboxRepository(pool)
 	teacherProfileRepo := repository.NewTeacherProfileRepository(pool)
+	adminStaffRepo := repository.NewAdminStaffRepository(pool)
 
 	staffSvc := service.NewStaffService(staffRepo)
 	teacherProfileSvc := service.NewTeacherProfileService(teacherProfileRepo)
+	adminStaffSvc := service.NewAdminStaffService(adminStaffRepo)
 
 	return &Module{
 		cfg:                   cfg,
@@ -54,12 +60,15 @@ func New(cfg *config.Config, pool *pgxpool.Pool) *Module {
 		staffRepo:             staffRepo,
 		outboxRepo:            outboxRepo,
 		teacherProfileRepo:    teacherProfileRepo,
+		adminStaffRepo:        adminStaffRepo,
 		outboxStore:           repository.NewOutboxStore(outboxRepo),
 		retentionStore:        repository.NewRetentionStore(pool),
 		staffService:          staffSvc,
 		teacherProfileService: teacherProfileSvc,
+		adminStaffService:     adminStaffSvc,
 		staffHandler:          handler.NewStaffHandler(staffSvc),
 		teacherProfileHandler: handler.NewTeacherProfileHandler(teacherProfileSvc),
+		adminStaffHandler:     handler.NewAdminStaffHandler(adminStaffSvc),
 		timeHandler:           platformHandler.NewTimeHandler(),
 	}
 }
@@ -123,5 +132,20 @@ func (m *Module) RegisterPublicRoutes(r *gin.Engine) {
 	{
 		internal.GET("/staff/:id", m.staffHandler.GetStaffByID)
 		internal.GET("/staff", m.staffHandler.GetInstructorsByDepartment)
+	}
+
+	// The administrative staff directory. It has its own /api prefix, which
+	// Caddy routes here and the SPA calls, so it is mounted at the root with
+	// the same chain /api/staff gets. Every route is admin-only.
+	adminStaff := r.Group("/api/admin-staff")
+	adminStaff.Use(platformMiddleware.JWTAuth())
+	adminStaff.Use(platformMiddleware.CSRFProtection())
+	adminStaff.Use(platformMiddleware.UserRateLimit())
+	adminStaff.Use(platformMiddleware.RequireAdmin())
+	{
+		adminStaff.GET("", m.adminStaffHandler.List)
+		adminStaff.GET("/:id", m.adminStaffHandler.Get)
+		adminStaff.POST("", platformMiddleware.Idempotency(), m.adminStaffHandler.Create)
+		adminStaff.PUT("/:id", m.adminStaffHandler.Update)
 	}
 }
