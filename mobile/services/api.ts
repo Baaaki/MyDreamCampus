@@ -24,8 +24,34 @@ export const api = axios.create({
   headers: { ...CLIENT_HEADERS },
 });
 
+const MUTATING_METHODS = new Set(['post', 'put', 'patch', 'delete']);
+
+// Idempotency keys only need to be unique per user (the backend scopes them
+// by user id); getRandomValues is used when the runtime has it.
+export function newIdempotencyKey(): string {
+  const bytes = new Uint8Array(16);
+  if (typeof globalThis.crypto?.getRandomValues === 'function') {
+    globalThis.crypto.getRandomValues(bytes);
+  } else {
+    for (let i = 0; i < bytes.length; i++) bytes[i] = Math.floor(Math.random() * 256);
+  }
+  bytes[6] = (bytes[6] & 0x0f) | 0x40;
+  bytes[8] = (bytes[8] & 0x3f) | 0x80;
+  const hex = Array.from(bytes, (b) => b.toString(16).padStart(2, '0')).join('');
+  return `${hex.slice(0, 8)}-${hex.slice(8, 12)}-${hex.slice(12, 16)}-${hex.slice(16, 20)}-${hex.slice(20)}`;
+}
+
 api.interceptors.request.use(
   async (config) => {
+    // Set once per logical request: the 401 refresh-and-replay below reuses
+    // this config, so the replay carries the same key and cannot, say, book
+    // the same meal twice.
+    if (
+      MUTATING_METHODS.has((config.method ?? '').toLowerCase()) &&
+      !config.headers['Idempotency-Key']
+    ) {
+      config.headers['Idempotency-Key'] = newIdempotencyKey();
+    }
     try {
       const token = await SecureStore.getItemAsync('jwt_token');
       if (token) {

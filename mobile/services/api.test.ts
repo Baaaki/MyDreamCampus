@@ -70,6 +70,22 @@ describe("api.ts request interceptor", () => {
     expect(result.headers.Authorization).toBe("Bearer secret-jwt-123");
   });
 
+  it("tags mutations with an Idempotency-Key and keeps an existing one", async () => {
+    const { api } = loadApi();
+    const requestInterceptor = api.interceptors.request.use.mock.calls[0][0] as (
+      c: { method: string; headers: Record<string, string> }
+    ) => Promise<{ headers: Record<string, string> }>;
+
+    const post = await requestInterceptor({ method: "post", headers: {} });
+    expect(post.headers["Idempotency-Key"]).toMatch(/^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/);
+
+    const replay = await requestInterceptor({ method: "post", headers: { "Idempotency-Key": "kept" } });
+    expect(replay.headers["Idempotency-Key"]).toBe("kept");
+
+    const get = await requestInterceptor({ method: "get", headers: {} });
+    expect(get.headers["Idempotency-Key"]).toBeUndefined();
+  });
+
   it("leaves headers untouched when no token in SecureStore", async () => {
     const { api } = loadApi();
     const requestInterceptor = api.interceptors.request.use.mock.calls[0][0] as (
