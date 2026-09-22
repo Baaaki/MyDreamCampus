@@ -15,6 +15,10 @@ concurrency:
 
 env:
   FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: "true"
+  # Pinned so a new release's extra rules or advisories show up as a
+  # deliberate bump, not as a red build on an unrelated commit.
+  GOSEC_VERSION: "v2.29.0"
+  GOVULNCHECK_VERSION: "v1.8.0"
 
 jobs:
   # ─────────────────────────────────────────────
@@ -54,16 +58,20 @@ jobs:
           cache-dependency-path: new-backend/**/go.sum
 
       - name: Install gosec
-        run: go install github.com/securego/gosec/v2/cmd/gosec@latest
+        run: go install github.com/securego/gosec/v2/cmd/gosec@${{ env.GOSEC_VERSION }}
 
       - name: Run gosec
         working-directory: new-backend
+        # Every module is scanned before the step fails, so one finding does
+        # not hide the state of the other ten.
         run: |
+          failed=0
           for mod in shared services/*/; do
             echo "::group::gosec $mod"
-            (cd "$mod" && gosec -quiet -exclude-generated ./...)
+            (cd "$mod" && gosec -quiet -exclude-generated ./...) || failed=1
             echo "::endgroup::"
           done
+          exit $failed
 
   # ─────────────────────────────────────────────
   # govulncheck — reachable known CVEs in deps + stdlib
@@ -83,16 +91,18 @@ jobs:
           cache-dependency-path: new-backend/**/go.sum
 
       - name: Install govulncheck
-        run: go install golang.org/x/vuln/cmd/govulncheck@latest
+        run: go install golang.org/x/vuln/cmd/govulncheck@${{ env.GOVULNCHECK_VERSION }}
 
       - name: Run govulncheck
         working-directory: new-backend
         run: |
+          failed=0
           for mod in shared services/*/; do
             echo "::group::govulncheck $mod"
-            (cd "$mod" && govulncheck ./...)
+            (cd "$mod" && govulncheck ./...) || failed=1
             echo "::endgroup::"
           done
+          exit $failed
 
   # ─────────────────────────────────────────────
   # CodeQL — SAST for Go and JS/TS
