@@ -4,11 +4,14 @@
 
 FROM golang:1.26 AS build
 ENV CGO_ENABLED=0
+# Pinned instead of @latest, so a goose release reaches the migrator only
+# through a commit. v3.26.0 is the goose used locally for `make migrate-*`.
+ARG GOOSE_VERSION=v3.26.0
 # Same caches the service images use, so goose is compiled once per machine
 # rather than once per rebuild of this image.
 RUN --mount=type=cache,target=/go/pkg/mod \
     --mount=type=cache,target=/root/.cache/go-build \
-    go install github.com/pressly/goose/v3/cmd/goose@latest
+    go install github.com/pressly/goose/v3/cmd/goose@${GOOSE_VERSION}
 
 FROM alpine:3.20
 # pg_isready gates the migration run on the server actually accepting
