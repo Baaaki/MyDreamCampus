@@ -156,3 +156,22 @@ func TestCORSForMobile_ProdRequiresAllowlist(t *testing.T) {
 	r.ServeHTTP(w, req)
 	assert.Equal(t, "https://campus.example.com", w.Header().Get("Access-Control-Allow-Origin"))
 }
+
+func TestCORS_Preflight_AllowsEveryClientHeader(t *testing.T) {
+	t.Setenv("ENVIRONMENT", "development")
+	t.Setenv("CORS_ALLOWED_ORIGINS", "")
+
+	r := newCorsRouter(t, CORS())
+
+	req := httptest.NewRequest("OPTIONS", "/", nil)
+	req.Header.Set("Origin", "http://localhost:3000")
+	req.Header.Set("Access-Control-Request-Method", "POST")
+	w := httptest.NewRecorder()
+	r.ServeHTTP(w, req)
+
+	assert.Equal(t, 204, w.Code)
+	allowed := w.Header().Get("Access-Control-Allow-Headers")
+	for _, h := range []string{"X-CSRF-Token", "Idempotency-Key", "X-Client-Type"} {
+		assert.Contains(t, allowed, h)
+	}
+}

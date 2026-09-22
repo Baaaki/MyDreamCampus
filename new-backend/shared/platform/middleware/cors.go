@@ -8,6 +8,12 @@ import (
 	"github.com/gin-gonic/gin"
 )
 
+// corsAllowHeaders lists every request header the clients send. A header
+// missing here fails the preflight of any cross-origin request carrying it —
+// with Idempotency-Key that would be every mutation the SPA makes.
+const corsAllowHeaders = "Content-Type, Authorization, X-Requested-With, X-Request-ID, X-CSRF-Token, " +
+	IdempotencyHeader + ", X-Client-Type"
+
 // devDefaultOrigins is used only when CORS_ALLOWED_ORIGINS is unset and
 // ENVIRONMENT != "production".
 var devDefaultOrigins = []string{
@@ -53,7 +59,7 @@ func CORS() gin.HandlerFunc {
 			c.Writer.Header().Set("Vary", "Origin")
 		}
 
-		c.Writer.Header().Set("Access-Control-Allow-Headers", "Content-Type, Authorization, X-Requested-With, X-Request-ID, X-CSRF-Token")
+		c.Writer.Header().Set("Access-Control-Allow-Headers", corsAllowHeaders)
 		c.Writer.Header().Set("Access-Control-Allow-Methods", "GET, POST, PUT, DELETE, PATCH, OPTIONS")
 		c.Writer.Header().Set("Access-Control-Expose-Headers", "X-RateLimit-Limit, X-RateLimit-Remaining, Retry-After")
 		c.Writer.Header().Set("Access-Control-Max-Age", "86400") // 24 hours
@@ -80,7 +86,7 @@ func CORSWithOrigins(allowedOrigins []string) gin.HandlerFunc {
 			c.Writer.Header().Set("Vary", "Origin")
 		}
 
-		c.Writer.Header().Set("Access-Control-Allow-Headers", "Content-Type, Authorization, X-Requested-With, X-Request-ID, X-CSRF-Token")
+		c.Writer.Header().Set("Access-Control-Allow-Headers", corsAllowHeaders)
 		c.Writer.Header().Set("Access-Control-Allow-Methods", "GET, POST, PUT, DELETE, PATCH, OPTIONS")
 		c.Writer.Header().Set("Access-Control-Expose-Headers", "X-RateLimit-Limit, X-RateLimit-Remaining, Retry-After")
 		c.Writer.Header().Set("Access-Control-Max-Age", "86400")
@@ -145,7 +151,7 @@ func CORSForMobile() gin.HandlerFunc {
 
 // setCORSCommonHeaders writes the shared CORS headers that don't depend on origin validation.
 func setCORSCommonHeaders(c *gin.Context) {
-	c.Writer.Header().Set("Access-Control-Allow-Headers", "Content-Type, Authorization, X-Requested-With, X-Request-ID, X-CSRF-Token")
+	c.Writer.Header().Set("Access-Control-Allow-Headers", corsAllowHeaders)
 	c.Writer.Header().Set("Access-Control-Allow-Methods", "GET, POST, PUT, DELETE, PATCH, OPTIONS")
 	c.Writer.Header().Set("Access-Control-Expose-Headers", "X-RateLimit-Limit, X-RateLimit-Remaining, Retry-After")
 	c.Writer.Header().Set("Access-Control-Max-Age", "86400")
