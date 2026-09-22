@@ -276,6 +276,19 @@ Bu yollardaki dosyalari **manuel duzenleme**. Kaynak dosyayi guncelle ve generat
 | `frontend/src/components/ui/*` | shadcn CLI | `bunx --bun shadcn@latest add <c>` |
 | `*.lock`, `*.lockb`, `go.sum`, `bun.lock`, `package-lock.json` | Paket yoneticisi | Komutu calistir, manuel dokunma |
 
+### Proje disi: `landingpage/`
+
+`landingpage/` projeyi **tanitan** bagimsiz bir site; sistemin mimarisinin
+veya calisma mekanizmasinin parcasi degil. Projeyi yansitir, belirlemez.
+
+- Proje commit'lerine **katma**: `landingpage/` altindaki dosyalari stage etme,
+  `git add -A` / `git add .` kullanma — dosyalari tek tek ekle. Kok
+  `Makefile`'daki `landingpage` hedefi de kullanicinin isi; o da stage edilmez.
+- Mimari, route, API kontrati veya servis davranisi icin kaynak olarak alma;
+  oradaki metin ile kod celisirse kod gecerlidir.
+- Proje degisikligi landingpage'i guncelleme zorunlulugu dogurmaz; `skills.md`
+  kurallari ve CI oraya uygulanmaz.
+
 ---
 
 ## 15. Detayli Rehberler
