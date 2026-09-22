@@ -1,56 +1,55 @@
-
-import { useState } from "react";
-import { useNavigate } from 'react-router';
-import { authApi } from "@/lib/api-client";
-import { apiErrorMessage } from "@/lib/api-error";
-import { validatePasswordPolicy } from "@/lib/password-policy";
+import { useState } from "react"
+import { useNavigate } from "react-router"
+import { authApi } from "@/lib/api-client"
+import { apiErrorMessage } from "@/lib/api-error"
+import { validatePasswordPolicy } from "@/lib/password-policy"
 
 export default function ChangePasswordPage() {
-  const navigate = useNavigate();
-  const [currentPassword, setCurrentPassword] = useState("");
-  const [newPassword, setNewPassword] = useState("");
-  const [confirmPassword, setConfirmPassword] = useState("");
-  const [error, setError] = useState("");
-  const [loading, setLoading] = useState(false);
+  const navigate = useNavigate()
+  const [currentPassword, setCurrentPassword] = useState("")
+  const [newPassword, setNewPassword] = useState("")
+  const [confirmPassword, setConfirmPassword] = useState("")
+  const [error, setError] = useState("")
+  const [loading, setLoading] = useState(false)
 
   const handleChangePassword = async (e: React.FormEvent) => {
-    e.preventDefault();
-    setError("");
+    e.preventDefault()
+    setError("")
 
     if (newPassword !== confirmPassword) {
-      setError("Yeni şifreler eşleşmiyor");
-      return;
+      setError("Yeni şifreler eşleşmiyor")
+      return
     }
 
-    const policyError = validatePasswordPolicy(newPassword);
+    const policyError = validatePasswordPolicy(newPassword)
     if (policyError) {
-      setError(policyError);
-      return;
+      setError(policyError)
+      return
     }
 
-    setLoading(true);
+    setLoading(true)
 
     try {
       await authApi.post("change-password", {
         json: { old_password: currentPassword, new_password: newPassword },
-      });
+      })
 
-      alert("Şifreniz başarıyla değiştirildi. Lütfen tekrar giriş yapın.");
+      alert("Şifreniz başarıyla değiştirildi. Lütfen tekrar giriş yapın.")
 
       // Clear UI state and redirect to login
       // httpOnly cookies are managed by the backend
-      localStorage.removeItem("user");
-      navigate("/auth/login");
+      localStorage.removeItem("user")
+      navigate("/auth/login")
     } catch (err) {
-      setError(await apiErrorMessage(err, "Şifre değiştirme başarısız"));
+      setError(await apiErrorMessage(err, "Şifre değiştirme başarısız"))
     } finally {
-      setLoading(false);
+      setLoading(false)
     }
-  };
+  }
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-gray-50">
-      <div className="max-w-md w-full space-y-8 p-8 bg-white rounded-lg shadow-md">
+    <div className="flex min-h-screen items-center justify-center bg-gray-50">
+      <div className="w-full max-w-md space-y-8 rounded-lg bg-white p-8 shadow-md">
         <div>
           <h2 className="mt-6 text-center text-3xl font-extrabold text-gray-900">
             Şifre Değiştir
@@ -67,7 +66,10 @@ export default function ChangePasswordPage() {
           )}
           <div className="space-y-4">
             <div>
-              <label htmlFor="current-password" className="block text-sm font-medium text-gray-700">
+              <label
+                htmlFor="current-password"
+                className="block text-sm font-medium text-gray-700"
+              >
                 Mevcut Şifre
               </label>
               <input
@@ -75,7 +77,7 @@ export default function ChangePasswordPage() {
                 name="current-password"
                 type="password"
                 required
-                className="mt-1 appearance-none relative block w-full px-3 py-2 border border-gray-300 placeholder-gray-500 text-gray-900 rounded-md focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm"
+                className="relative mt-1 block w-full appearance-none rounded-md border border-gray-300 px-3 py-2 text-gray-900 placeholder-gray-500 focus:border-indigo-500 focus:ring-indigo-500 focus:outline-none sm:text-sm"
                 placeholder="Mevcut şifreniz"
                 value={currentPassword}
                 onChange={(e) => setCurrentPassword(e.target.value)}
@@ -83,7 +85,10 @@ export default function ChangePasswordPage() {
               />
             </div>
             <div>
-              <label htmlFor="new-password" className="block text-sm font-medium text-gray-700">
+              <label
+                htmlFor="new-password"
+                className="block text-sm font-medium text-gray-700"
+              >
                 Yeni Şifre
               </label>
               <input
@@ -91,7 +96,7 @@ export default function ChangePasswordPage() {
                 name="new-password"
                 type="password"
                 required
-                className="mt-1 appearance-none relative block w-full px-3 py-2 border border-gray-300 placeholder-gray-500 text-gray-900 rounded-md focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm"
+                className="relative mt-1 block w-full appearance-none rounded-md border border-gray-300 px-3 py-2 text-gray-900 placeholder-gray-500 focus:border-indigo-500 focus:ring-indigo-500 focus:outline-none sm:text-sm"
                 placeholder="Yeni şifreniz (min 8 karakter, 1 büyük, 1 küçük, 1 rakam)"
                 value={newPassword}
                 onChange={(e) => setNewPassword(e.target.value)}
@@ -99,7 +104,10 @@ export default function ChangePasswordPage() {
               />
             </div>
             <div>
-              <label htmlFor="confirm-password" className="block text-sm font-medium text-gray-700">
+              <label
+                htmlFor="confirm-password"
+                className="block text-sm font-medium text-gray-700"
+              >
                 Yeni Şifre (Tekrar)
               </label>
               <input
@@ -107,7 +115,7 @@ export default function ChangePasswordPage() {
                 name="confirm-password"
                 type="password"
                 required
-                className="mt-1 appearance-none relative block w-full px-3 py-2 border border-gray-300 placeholder-gray-500 text-gray-900 rounded-md focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm"
+                className="relative mt-1 block w-full appearance-none rounded-md border border-gray-300 px-3 py-2 text-gray-900 placeholder-gray-500 focus:border-indigo-500 focus:ring-indigo-500 focus:outline-none sm:text-sm"
                 placeholder="Yeni şifrenizi tekrar girin"
                 value={confirmPassword}
                 onChange={(e) => setConfirmPassword(e.target.value)}
@@ -120,7 +128,7 @@ export default function ChangePasswordPage() {
             <button
               type="submit"
               disabled={loading}
-              className="group relative w-full flex justify-center py-2 px-4 border border-transparent text-sm font-medium rounded-md text-white bg-indigo-600 hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 disabled:opacity-50 disabled:cursor-not-allowed"
+              className="group relative flex w-full justify-center rounded-md border border-transparent bg-indigo-600 px-4 py-2 text-sm font-medium text-white hover:bg-indigo-700 focus:ring-2 focus:ring-indigo-500 focus:ring-offset-2 focus:outline-none disabled:cursor-not-allowed disabled:opacity-50"
             >
               {loading ? "Değiştiriliyor..." : "Şifre Değiştir"}
             </button>
@@ -128,5 +136,5 @@ export default function ChangePasswordPage() {
         </form>
       </div>
     </div>
-  );
+  )
 }

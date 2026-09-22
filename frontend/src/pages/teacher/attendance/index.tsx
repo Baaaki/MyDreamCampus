@@ -1,37 +1,46 @@
-
-import { useState, useEffect } from 'react';
-import { Link } from 'react-router';
-import { Calendar, Users, Clock, MapPin, ChevronRight, Loader2, AlertCircle } from 'lucide-react';
-import { semesterApi } from '@/lib/api-client';
-import type { TeacherCoursesResponse, TeacherCourse } from '@/lib/types';
+import { useState, useEffect } from "react"
+import { Link } from "react-router"
+import {
+  Calendar,
+  Users,
+  Clock,
+  MapPin,
+  ChevronRight,
+  Loader2,
+  AlertCircle,
+} from "lucide-react"
+import { semesterApi } from "@/lib/api-client"
+import type { TeacherCoursesResponse, TeacherCourse } from "@/lib/types"
 
 export default function AttendancePage() {
-  const [courses, setCourses] = useState<TeacherCourse[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState('');
+  const [courses, setCourses] = useState<TeacherCourse[]>([])
+  const [loading, setLoading] = useState(true)
+  const [error, setError] = useState("")
 
   useEffect(() => {
     const fetchCourses = async () => {
       try {
-        const response = await semesterApi.get('teacher/courses').json<TeacherCoursesResponse>();
-        setCourses(response.courses || []);
+        const response = await semesterApi
+          .get("teacher/courses")
+          .json<TeacherCoursesResponse>()
+        setCourses(response.courses || [])
       } catch (err: any) {
-        console.error('Failed to fetch courses:', err);
-        setError('Dersler yüklenirken bir hata oluştu.');
+        console.error("Failed to fetch courses:", err)
+        setError("Dersler yüklenirken bir hata oluştu.")
       } finally {
-        setLoading(false);
+        setLoading(false)
       }
-    };
+    }
 
-    fetchCourses();
-  }, []);
+    fetchCourses()
+  }, [])
 
   if (loading) {
     return (
       <div className="flex h-96 items-center justify-center">
         <Loader2 className="h-8 w-8 animate-spin text-blue-600" />
       </div>
-    );
+    )
   }
 
   if (error) {
@@ -40,11 +49,11 @@ export default function AttendancePage() {
         <AlertCircle className="h-12 w-12 text-red-500" />
         <p className="text-red-600 dark:text-red-400">{error}</p>
       </div>
-    );
+    )
   }
 
   // Group courses by semester
-  const currentSemester = courses.length > 0 ? courses[0].semester : '';
+  const currentSemester = courses.length > 0 ? courses[0].semester : ""
 
   return (
     <div className="space-y-6">
@@ -103,7 +112,9 @@ export default function AttendancePage() {
                     <div key={idx} className="flex items-center gap-3">
                       <div className="flex items-center gap-1.5">
                         <Clock className="h-4 w-4" />
-                        <span>{s.day} {s.time}</span>
+                        <span>
+                          {s.day} {s.time}
+                        </span>
                       </div>
                       <div className="flex items-center gap-1.5">
                         <MapPin className="h-4 w-4" />
@@ -131,5 +142,5 @@ export default function AttendancePage() {
         </div>
       )}
     </div>
-  );
+  )
 }

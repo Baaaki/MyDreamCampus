@@ -1,6 +1,5 @@
-
-import { useState, useEffect } from 'react'
-import { Button } from '@/components/ui/button'
+import { useState, useEffect } from "react"
+import { Button } from "@/components/ui/button"
 import {
   Table,
   TableBody,
@@ -9,7 +8,7 @@ import {
   TableHead,
   TableHeader,
   TableRow,
-} from '@/components/ui/table'
+} from "@/components/ui/table"
 import {
   Dialog,
   DialogContent,
@@ -17,22 +16,36 @@ import {
   DialogHeader,
   DialogTitle,
   DialogTrigger,
-} from '@/components/ui/dialog'
+} from "@/components/ui/dialog"
 import {
   Select,
   SelectContent,
   SelectItem,
   SelectTrigger,
   SelectValue,
-} from '@/components/ui/select'
+} from "@/components/ui/select"
 
-import { Label } from '@/components/ui/label'
-import { Badge } from '@/components/ui/badge'
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
-import { studentApi, staffApi } from '@/lib/api-client'
-import { ArrowLeft, UserPlus, Users, ArrowUpDown, ArrowUp, ArrowDown, Loader2 } from 'lucide-react'
-import { Link } from 'react-router'
-import { mockFaculties } from '@/mock_data/catalog'
+import { Label } from "@/components/ui/label"
+import { Badge } from "@/components/ui/badge"
+import {
+  Card,
+  CardContent,
+  CardDescription,
+  CardHeader,
+  CardTitle,
+} from "@/components/ui/card"
+import { studentApi, staffApi } from "@/lib/api-client"
+import {
+  ArrowLeft,
+  UserPlus,
+  Users,
+  ArrowUpDown,
+  ArrowUp,
+  ArrowDown,
+  Loader2,
+} from "lucide-react"
+import { Link } from "react-router"
+import { mockFaculties } from "@/mock_data/catalog"
 
 type Student = {
   id: string
@@ -93,21 +106,24 @@ export default function AdvisorManagementPage() {
   const [orphanedStudents, setOrphanedStudents] = useState<Student[]>([])
   const [advisorStudents, setAdvisorStudents] = useState<Student[]>([])
   const [staffList, setStaffList] = useState<Staff[]>([])
-  const [selectedAdvisor, setSelectedAdvisor] = useState<string>('')
+  const [selectedAdvisor, setSelectedAdvisor] = useState<string>("")
   const [loading, setLoading] = useState(false)
   const [isAssignOpen, setIsAssignOpen] = useState(false)
   const [isBulkAssignOpen, setIsBulkAssignOpen] = useState(false)
   const [assigningStudent, setAssigningStudent] = useState<Student | null>(null)
-  const [selectedAdvisorId, setSelectedAdvisorId] = useState<string>('')
-  const [bulkAdvisorId, setBulkAdvisorId] = useState<string>('')
+  const [selectedAdvisorId, setSelectedAdvisorId] = useState<string>("")
+  const [bulkAdvisorId, setBulkAdvisorId] = useState<string>("")
   const [selectedStudentIds, setSelectedStudentIds] = useState<string[]>([])
 
   // Cascade dropdown states for bulk assignment
-  const [bulkSelectedFaculty, setBulkSelectedFaculty] = useState<string>('')
-  const [bulkSelectedDepartment, setBulkSelectedDepartment] = useState<string>('')
+  const [bulkSelectedFaculty, setBulkSelectedFaculty] = useState<string>("")
+  const [bulkSelectedDepartment, setBulkSelectedDepartment] =
+    useState<string>("")
 
   // Department-specific instructors (fetched from API)
-  const [departmentInstructors, setDepartmentInstructors] = useState<Staff[]>([])
+  const [departmentInstructors, setDepartmentInstructors] = useState<Staff[]>(
+    []
+  )
   const [loadingInstructors, setLoadingInstructors] = useState(false)
 
   // Pagination states
@@ -120,12 +136,18 @@ export default function AdvisorManagementPage() {
   const [limit] = useState(10)
 
   // Sort states for orphaned students
-  const [orphanedSortField, setOrphanedSortField] = useState<keyof Student>('student_number')
-  const [orphanedSortDirection, setOrphanedSortDirection] = useState<'asc' | 'desc'>('asc')
+  const [orphanedSortField, setOrphanedSortField] =
+    useState<keyof Student>("student_number")
+  const [orphanedSortDirection, setOrphanedSortDirection] = useState<
+    "asc" | "desc"
+  >("asc")
 
   // Sort states for advisor students
-  const [advisorSortField, setAdvisorSortField] = useState<keyof Student>('student_number')
-  const [advisorSortDirection, setAdvisorSortDirection] = useState<'asc' | 'desc'>('asc')
+  const [advisorSortField, setAdvisorSortField] =
+    useState<keyof Student>("student_number")
+  const [advisorSortDirection, setAdvisorSortDirection] = useState<
+    "asc" | "desc"
+  >("asc")
 
   useEffect(() => {
     fetchStaffList()
@@ -141,18 +163,18 @@ export default function AdvisorManagementPage() {
   const fetchStaffList = async () => {
     try {
       const response = (await staffApi
-        .get('', {
+        .get("", {
           searchParams: {
-            page: '1',
-            limit: '100',
+            page: "1",
+            limit: "100",
           },
         })
         .json()) as StaffListResponse
 
       setStaffList(response.data)
-      console.log('Staff list loaded:', response.data.length, 'staff members')
+      console.log("Staff list loaded:", response.data.length, "staff members")
     } catch (error) {
-      console.error('Failed to fetch staff list:', error)
+      console.error("Failed to fetch staff list:", error)
     }
   }
 
@@ -160,7 +182,7 @@ export default function AdvisorManagementPage() {
     setLoading(true)
     try {
       const response = (await studentApi
-        .get('orphaned', {
+        .get("orphaned", {
           searchParams: {
             page: orphanedPage.toString(),
             limit: limit.toString(),
@@ -172,15 +194,19 @@ export default function AdvisorManagementPage() {
         setOrphanedStudents(response.data)
         setOrphanedTotalPages(response.pagination.total_pages)
         setOrphanedTotal(response.pagination.total)
-        console.log('Orphaned students loaded:', response.data.length, 'students')
+        console.log(
+          "Orphaned students loaded:",
+          response.data.length,
+          "students"
+        )
       } else {
-        console.warn('No data received for orphaned students')
+        console.warn("No data received for orphaned students")
         setOrphanedStudents([])
         setOrphanedTotalPages(1)
         setOrphanedTotal(0)
       }
     } catch (error) {
-      console.error('Failed to fetch orphaned students:', error)
+      console.error("Failed to fetch orphaned students:", error)
       setOrphanedStudents([])
       setOrphanedTotalPages(1)
       setOrphanedTotal(0)
@@ -205,15 +231,19 @@ export default function AdvisorManagementPage() {
         setAdvisorStudents(response.data)
         setAdvisorTotalPages(response.pagination.total_pages)
         setAdvisorTotal(response.pagination.total)
-        console.log('Advisor students loaded:', response.data.length, 'students')
+        console.log(
+          "Advisor students loaded:",
+          response.data.length,
+          "students"
+        )
       } else {
-        console.warn('No data received for advisor students')
+        console.warn("No data received for advisor students")
         setAdvisorStudents([])
         setAdvisorTotalPages(1)
         setAdvisorTotal(0)
       }
     } catch (error) {
-      console.error('Failed to fetch advisor students:', error)
+      console.error("Failed to fetch advisor students:", error)
       setAdvisorStudents([])
       setAdvisorTotalPages(1)
       setAdvisorTotal(0)
@@ -224,30 +254,38 @@ export default function AdvisorManagementPage() {
 
   const handleAssignAdvisor = async (e: React.FormEvent) => {
     e.preventDefault()
-    console.log('[Advisors] handleAssignAdvisor called', { assigningStudent, selectedAdvisorId })
+    console.log("[Advisors] handleAssignAdvisor called", {
+      assigningStudent,
+      selectedAdvisorId,
+    })
     if (!assigningStudent || !selectedAdvisorId) {
-      console.log('[Advisors] Missing data, returning early')
+      console.log("[Advisors] Missing data, returning early")
       return
     }
 
     try {
-      console.log('[Advisors] Sending PUT request to:', `${assigningStudent.id}`)
-      const response = await studentApi.put(`${assigningStudent.id}`, {
-        json: {
-          advisor_id: selectedAdvisorId,
-        },
-      }).json()
-      console.log('[Advisors] PUT response:', response)
+      console.log(
+        "[Advisors] Sending PUT request to:",
+        `${assigningStudent.id}`
+      )
+      const response = await studentApi
+        .put(`${assigningStudent.id}`, {
+          json: {
+            advisor_id: selectedAdvisorId,
+          },
+        })
+        .json()
+      console.log("[Advisors] PUT response:", response)
 
       setIsAssignOpen(false)
       setAssigningStudent(null)
-      setSelectedAdvisorId('')
+      setSelectedAdvisorId("")
       fetchOrphanedStudents()
       if (selectedAdvisor) {
         fetchAdvisorStudents()
       }
     } catch (error) {
-      console.error('Failed to assign advisor:', error)
+      console.error("Failed to assign advisor:", error)
     }
   }
 
@@ -256,7 +294,7 @@ export default function AdvisorManagementPage() {
     if (selectedStudentIds.length === 0 || !bulkAdvisorId) return
 
     try {
-      await studentApi.put('bulk-advisor-assign', {
+      await studentApi.put("bulk-advisor-assign", {
         json: {
           student_ids: selectedStudentIds,
           advisor_id: bulkAdvisorId,
@@ -265,15 +303,15 @@ export default function AdvisorManagementPage() {
 
       setIsBulkAssignOpen(false)
       setSelectedStudentIds([])
-      setBulkSelectedFaculty('')
-      setBulkSelectedDepartment('')
-      setBulkAdvisorId('')
+      setBulkSelectedFaculty("")
+      setBulkSelectedDepartment("")
+      setBulkAdvisorId("")
       fetchOrphanedStudents()
       if (selectedAdvisor) {
         fetchAdvisorStudents()
       }
     } catch (error) {
-      console.error('Failed to bulk assign advisor:', error)
+      console.error("Failed to bulk assign advisor:", error)
     }
   }
 
@@ -288,32 +326,40 @@ export default function AdvisorManagementPage() {
   // Sort handler for orphaned students
   const handleOrphanedSort = (field: keyof Student) => {
     if (orphanedSortField === field) {
-      setOrphanedSortDirection(orphanedSortDirection === 'asc' ? 'desc' : 'asc')
+      setOrphanedSortDirection(orphanedSortDirection === "asc" ? "desc" : "asc")
     } else {
       setOrphanedSortField(field)
-      setOrphanedSortDirection('asc')
+      setOrphanedSortDirection("asc")
     }
   }
 
   // Sort handler for advisor students
   const handleAdvisorSort = (field: keyof Student) => {
     if (advisorSortField === field) {
-      setAdvisorSortDirection(advisorSortDirection === 'asc' ? 'desc' : 'asc')
+      setAdvisorSortDirection(advisorSortDirection === "asc" ? "desc" : "asc")
     } else {
       setAdvisorSortField(field)
-      setAdvisorSortDirection('asc')
+      setAdvisorSortDirection("asc")
     }
   }
 
   // Sort icon component
-  const SortIcon = ({ field, currentField, direction }: { field: string; currentField: string; direction: 'asc' | 'desc' }) => {
+  const SortIcon = ({
+    field,
+    currentField,
+    direction,
+  }: {
+    field: string
+    currentField: string
+    direction: "asc" | "desc"
+  }) => {
     if (field !== currentField) {
-      return <ArrowUpDown className="ml-2 h-4 w-4 inline" />
+      return <ArrowUpDown className="ml-2 inline h-4 w-4" />
     }
-    return direction === 'asc' ? (
-      <ArrowUp className="ml-2 h-4 w-4 inline" />
+    return direction === "asc" ? (
+      <ArrowUp className="ml-2 inline h-4 w-4" />
     ) : (
-      <ArrowDown className="ml-2 h-4 w-4 inline" />
+      <ArrowDown className="ml-2 inline h-4 w-4" />
     )
   }
 
@@ -325,14 +371,14 @@ export default function AdvisorManagementPage() {
     if (aValue === null || aValue === undefined) return 1
     if (bValue === null || bValue === undefined) return -1
 
-    if (typeof aValue === 'string' && typeof bValue === 'string') {
-      return orphanedSortDirection === 'asc'
+    if (typeof aValue === "string" && typeof bValue === "string") {
+      return orphanedSortDirection === "asc"
         ? aValue.localeCompare(bValue)
         : bValue.localeCompare(aValue)
     }
 
-    if (typeof aValue === 'number' && typeof bValue === 'number') {
-      return orphanedSortDirection === 'asc' ? aValue - bValue : bValue - aValue
+    if (typeof aValue === "number" && typeof bValue === "number") {
+      return orphanedSortDirection === "asc" ? aValue - bValue : bValue - aValue
     }
 
     return 0
@@ -346,14 +392,14 @@ export default function AdvisorManagementPage() {
     if (aValue === null || aValue === undefined) return 1
     if (bValue === null || bValue === undefined) return -1
 
-    if (typeof aValue === 'string' && typeof bValue === 'string') {
-      return advisorSortDirection === 'asc'
+    if (typeof aValue === "string" && typeof bValue === "string") {
+      return advisorSortDirection === "asc"
         ? aValue.localeCompare(bValue)
         : bValue.localeCompare(aValue)
     }
 
-    if (typeof aValue === 'number' && typeof bValue === 'number') {
-      return advisorSortDirection === 'asc' ? aValue - bValue : bValue - aValue
+    if (typeof aValue === "number" && typeof bValue === "number") {
+      return advisorSortDirection === "asc" ? aValue - bValue : bValue - aValue
     }
 
     return 0
@@ -361,23 +407,27 @@ export default function AdvisorManagementPage() {
 
   // Helper: Get unique faculties from mock data
   const getUniqueFaculties = () => {
-    return mockFaculties.map(f => f.name).sort()
+    return mockFaculties.map((f) => f.name).sort()
   }
 
   // Helper: Get departments for a specific faculty from mock data
   const getDepartmentsForFaculty = (facultyName: string) => {
-    const faculty = mockFaculties.find(f => f.name === facultyName)
+    const faculty = mockFaculties.find((f) => f.name === facultyName)
     if (!faculty) return []
-    return faculty.departments.map(d => d.name).sort()
+    return faculty.departments.map((d) => d.name).sort()
   }
 
   // Fetch instructors by department from API (with Turkish-English normalization on backend)
-  const fetchInstructorsByDepartment = async (department: string): Promise<Staff[]> => {
+  const fetchInstructorsByDepartment = async (
+    department: string
+  ): Promise<Staff[]> => {
     try {
-      const response = await staffApi.get('instructors', { searchParams: { department } }).json() as { data: Staff[] }
+      const response = (await staffApi
+        .get("instructors", { searchParams: { department } })
+        .json()) as { data: Staff[] }
       return response.data || []
     } catch (err) {
-      console.error('Error fetching instructors by department:', err)
+      console.error("Error fetching instructors by department:", err)
       // Fallback to client-side filtering
       return staffList.filter((staff) => staff.department === department)
     }
@@ -418,11 +468,9 @@ export default function AdvisorManagementPage() {
     }
   }, [bulkSelectedDepartment])
 
-
-
   return (
     <div className="container mx-auto py-10">
-      <div className="flex items-center justify-between mb-6">
+      <div className="mb-6 flex items-center justify-between">
         <div className="flex items-center gap-4">
           <Link to="/students">
             <Button variant="ghost" size="icon">
@@ -443,21 +491,24 @@ export default function AdvisorManagementPage() {
                 Bu öğrencilere danışman atayabilirsiniz
               </CardDescription>
             </div>
-            <Dialog open={isBulkAssignOpen} onOpenChange={(open) => {
-              setIsBulkAssignOpen(open)
-              if (!open) {
-                setBulkSelectedFaculty('')
-                setBulkSelectedDepartment('')
-                setBulkAdvisorId('')
-              }
-            }}>
+            <Dialog
+              open={isBulkAssignOpen}
+              onOpenChange={(open) => {
+                setIsBulkAssignOpen(open)
+                if (!open) {
+                  setBulkSelectedFaculty("")
+                  setBulkSelectedDepartment("")
+                  setBulkAdvisorId("")
+                }
+              }}
+            >
               <DialogTrigger asChild>
                 <Button
                   disabled={selectedStudentIds.length === 0}
                   onClick={() => {
-                    setBulkSelectedFaculty('')
-                    setBulkSelectedDepartment('')
-                    setBulkAdvisorId('')
+                    setBulkSelectedFaculty("")
+                    setBulkSelectedDepartment("")
+                    setBulkAdvisorId("")
                   }}
                 >
                   <Users className="mr-2 h-4 w-4" />
@@ -478,8 +529,8 @@ export default function AdvisorManagementPage() {
                       value={bulkSelectedFaculty}
                       onValueChange={(value) => {
                         setBulkSelectedFaculty(value)
-                        setBulkSelectedDepartment('')
-                        setBulkAdvisorId('')
+                        setBulkSelectedDepartment("")
+                        setBulkAdvisorId("")
                       }}
                     >
                       <SelectTrigger>
@@ -502,18 +553,20 @@ export default function AdvisorManagementPage() {
                         value={bulkSelectedDepartment}
                         onValueChange={(value) => {
                           setBulkSelectedDepartment(value)
-                          setBulkAdvisorId('')
+                          setBulkAdvisorId("")
                         }}
                       >
                         <SelectTrigger>
                           <SelectValue placeholder="Bölüm seçin" />
                         </SelectTrigger>
                         <SelectContent>
-                          {getDepartmentsForFaculty(bulkSelectedFaculty).map((dept) => (
-                            <SelectItem key={dept} value={dept}>
-                              {dept}
-                            </SelectItem>
-                          ))}
+                          {getDepartmentsForFaculty(bulkSelectedFaculty).map(
+                            (dept) => (
+                              <SelectItem key={dept} value={dept}>
+                                {dept}
+                              </SelectItem>
+                            )
+                          )}
                         </SelectContent>
                       </Select>
                     </div>
@@ -524,22 +577,27 @@ export default function AdvisorManagementPage() {
                       <Label htmlFor="bulk_advisor">
                         Danışman
                         {loadingInstructors && (
-                          <Loader2 className="ml-2 h-4 w-4 animate-spin inline" />
+                          <Loader2 className="ml-2 inline h-4 w-4 animate-spin" />
                         )}
                       </Label>
                       {loadingInstructors ? (
-                        <div className="mt-1.5 p-2 border rounded-md text-sm text-muted-foreground">
+                        <div className="mt-1.5 rounded-md border p-2 text-sm text-muted-foreground">
                           Danışmanlar yükleniyor...
                         </div>
                       ) : (
                         <>
-                          <Select value={bulkAdvisorId} onValueChange={setBulkAdvisorId}>
+                          <Select
+                            value={bulkAdvisorId}
+                            onValueChange={setBulkAdvisorId}
+                          >
                             <SelectTrigger className="mt-1.5">
                               <SelectValue placeholder="Danışman seçin" />
                             </SelectTrigger>
                             <SelectContent>
                               {departmentInstructors.length === 0 ? (
-                                <SelectItem value="none" disabled>Hoca bulunamadı</SelectItem>
+                                <SelectItem value="none" disabled>
+                                  Hoca bulunamadı
+                                </SelectItem>
                               ) : (
                                 departmentInstructors.map((staff) => (
                                   <SelectItem key={staff.id} value={staff.id}>
@@ -565,9 +623,9 @@ export default function AdvisorManagementPage() {
                       variant="outline"
                       onClick={() => {
                         setIsBulkAssignOpen(false)
-                        setBulkSelectedFaculty('')
-                        setBulkSelectedDepartment('')
-                        setBulkAdvisorId('')
+                        setBulkSelectedFaculty("")
+                        setBulkSelectedDepartment("")
+                        setBulkAdvisorId("")
                       }}
                     >
                       İptal
@@ -583,9 +641,9 @@ export default function AdvisorManagementPage() {
         </CardHeader>
         <CardContent>
           {loading ? (
-            <div className="text-center py-4">Yükleniyor...</div>
+            <div className="py-4 text-center">Yükleniyor...</div>
           ) : orphanedStudents.length === 0 ? (
-            <div className="text-center py-4 text-muted-foreground">
+            <div className="py-4 text-center text-muted-foreground">
               Danışmanı olmayan öğrenci bulunmamaktadır.
             </div>
           ) : (
@@ -595,10 +653,14 @@ export default function AdvisorManagementPage() {
                   <TableHead className="w-[50px]">
                     <input
                       type="checkbox"
-                      checked={selectedStudentIds.length === orphanedStudents.length}
+                      checked={
+                        selectedStudentIds.length === orphanedStudents.length
+                      }
                       onChange={(e) => {
                         if (e.target.checked) {
-                          setSelectedStudentIds(orphanedStudents.map((s) => s.id))
+                          setSelectedStudentIds(
+                            orphanedStudents.map((s) => s.id)
+                          )
                         } else {
                           setSelectedStudentIds([])
                         }
@@ -608,45 +670,69 @@ export default function AdvisorManagementPage() {
                   </TableHead>
                   <TableHead
                     className="cursor-pointer select-none hover:bg-muted/50"
-                    onClick={() => handleOrphanedSort('student_number')}
+                    onClick={() => handleOrphanedSort("student_number")}
                   >
                     Öğrenci No
-                    <SortIcon field="student_number" currentField={orphanedSortField} direction={orphanedSortDirection} />
+                    <SortIcon
+                      field="student_number"
+                      currentField={orphanedSortField}
+                      direction={orphanedSortDirection}
+                    />
                   </TableHead>
                   <TableHead
                     className="cursor-pointer select-none hover:bg-muted/50"
-                    onClick={() => handleOrphanedSort('first_name')}
+                    onClick={() => handleOrphanedSort("first_name")}
                   >
                     Ad Soyad
-                    <SortIcon field="first_name" currentField={orphanedSortField} direction={orphanedSortDirection} />
+                    <SortIcon
+                      field="first_name"
+                      currentField={orphanedSortField}
+                      direction={orphanedSortDirection}
+                    />
                   </TableHead>
                   <TableHead
                     className="cursor-pointer select-none hover:bg-muted/50"
-                    onClick={() => handleOrphanedSort('email')}
+                    onClick={() => handleOrphanedSort("email")}
                   >
                     Email
-                    <SortIcon field="email" currentField={orphanedSortField} direction={orphanedSortDirection} />
+                    <SortIcon
+                      field="email"
+                      currentField={orphanedSortField}
+                      direction={orphanedSortDirection}
+                    />
                   </TableHead>
                   <TableHead
                     className="cursor-pointer select-none hover:bg-muted/50"
-                    onClick={() => handleOrphanedSort('faculty')}
+                    onClick={() => handleOrphanedSort("faculty")}
                   >
                     Fakülte
-                    <SortIcon field="faculty" currentField={orphanedSortField} direction={orphanedSortDirection} />
+                    <SortIcon
+                      field="faculty"
+                      currentField={orphanedSortField}
+                      direction={orphanedSortDirection}
+                    />
                   </TableHead>
                   <TableHead
                     className="cursor-pointer select-none hover:bg-muted/50"
-                    onClick={() => handleOrphanedSort('department')}
+                    onClick={() => handleOrphanedSort("department")}
                   >
                     Bölüm
-                    <SortIcon field="department" currentField={orphanedSortField} direction={orphanedSortDirection} />
+                    <SortIcon
+                      field="department"
+                      currentField={orphanedSortField}
+                      direction={orphanedSortDirection}
+                    />
                   </TableHead>
                   <TableHead
                     className="cursor-pointer select-none hover:bg-muted/50"
-                    onClick={() => handleOrphanedSort('class_level')}
+                    onClick={() => handleOrphanedSort("class_level")}
                   >
                     Sınıf
-                    <SortIcon field="class_level" currentField={orphanedSortField} direction={orphanedSortDirection} />
+                    <SortIcon
+                      field="class_level"
+                      currentField={orphanedSortField}
+                      direction={orphanedSortDirection}
+                    />
                   </TableHead>
                   <TableHead>İşlemler</TableHead>
                 </TableRow>
@@ -662,7 +748,9 @@ export default function AdvisorManagementPage() {
                         className="cursor-pointer"
                       />
                     </TableCell>
-                    <TableCell className="font-medium">{student.student_number}</TableCell>
+                    <TableCell className="font-medium">
+                      {student.student_number}
+                    </TableCell>
                     <TableCell>
                       {student.first_name} {student.last_name}
                     </TableCell>
@@ -671,20 +759,25 @@ export default function AdvisorManagementPage() {
                     <TableCell>{student.department}</TableCell>
                     <TableCell>{student.class_level}</TableCell>
                     <TableCell>
-                      <Dialog open={isAssignOpen && assigningStudent?.id === student.id} onOpenChange={(open) => {
-                        setIsAssignOpen(open)
-                        if (!open) {
-                          setAssigningStudent(null)
-                          setSelectedAdvisorId('')
+                      <Dialog
+                        open={
+                          isAssignOpen && assigningStudent?.id === student.id
                         }
-                      }}>
+                        onOpenChange={(open) => {
+                          setIsAssignOpen(open)
+                          if (!open) {
+                            setAssigningStudent(null)
+                            setSelectedAdvisorId("")
+                          }
+                        }}
+                      >
                         <DialogTrigger asChild>
                           <Button
                             variant="outline"
                             size="sm"
                             onClick={() => {
                               setAssigningStudent(student)
-                              setSelectedAdvisorId('')
+                              setSelectedAdvisorId("")
                             }}
                           >
                             <UserPlus className="mr-2 h-4 w-4" />
@@ -695,58 +788,83 @@ export default function AdvisorManagementPage() {
                           <DialogHeader>
                             <DialogTitle>Danışman Atama</DialogTitle>
                             <DialogDescription>
-                              {student.first_name} {student.last_name} için danışman seçin
+                              {student.first_name} {student.last_name} için
+                              danışman seçin
                             </DialogDescription>
                           </DialogHeader>
-                            <form onSubmit={handleAssignAdvisor} className="space-y-4">
-                              <div className="grid grid-cols-2 gap-4">
-                                <div className="space-y-1">
-                                  <Label className="text-muted-foreground text-xs">Fakülte</Label>
-                                  <div className="font-medium text-sm">{student.faculty || '-'}</div>
-                                </div>
-                                <div className="space-y-1">
-                                  <Label className="text-muted-foreground text-xs">Bölüm</Label>
-                                  <div className="font-medium text-sm">{student.department || '-'}</div>
-                                </div>
-                              </div>
-
-                              <div>
-                                <Label htmlFor="advisor">
-                                  Danışman Seçin
-                                  {loadingInstructors && (
-                                    <Loader2 className="ml-2 h-4 w-4 animate-spin inline" />
-                                  )}
+                          <form
+                            onSubmit={handleAssignAdvisor}
+                            className="space-y-4"
+                          >
+                            <div className="grid grid-cols-2 gap-4">
+                              <div className="space-y-1">
+                                <Label className="text-xs text-muted-foreground">
+                                  Fakülte
                                 </Label>
-                                {loadingInstructors ? (
-                                  <div className="mt-1.5 p-2 border rounded-md text-sm text-muted-foreground">
-                                    Danışmanlar yükleniyor...
-                                  </div>
-                                ) : (
-                                  <>
-                                    <Select value={selectedAdvisorId} onValueChange={setSelectedAdvisorId}>
-                                      <SelectTrigger className="mt-1.5">
-                                        <SelectValue placeholder="Danışman seçin" />
-                                      </SelectTrigger>
-                                      <SelectContent>
-                                        {departmentInstructors.length === 0 ? (
-                                          <SelectItem value="none" disabled>Hoca bulunamadı</SelectItem>
-                                        ) : (
-                                          departmentInstructors.map((staff) => (
-                                            <SelectItem key={staff.id} value={staff.id}>
-                                              {staff.first_name} {staff.last_name} {staff.department !== student.department ? `(${staff.department})` : ''}
-                                            </SelectItem>
-                                          ))
-                                        )}
-                                      </SelectContent>
-                                    </Select>
-                                    {departmentInstructors.length > 0 && (
-                                      <p className="mt-1 text-xs text-green-600">
-                                        {departmentInstructors.length} danışman bulundu
-                                      </p>
-                                    )}
-                                  </>
-                                )}
+                                <div className="text-sm font-medium">
+                                  {student.faculty || "-"}
+                                </div>
                               </div>
+                              <div className="space-y-1">
+                                <Label className="text-xs text-muted-foreground">
+                                  Bölüm
+                                </Label>
+                                <div className="text-sm font-medium">
+                                  {student.department || "-"}
+                                </div>
+                              </div>
+                            </div>
+
+                            <div>
+                              <Label htmlFor="advisor">
+                                Danışman Seçin
+                                {loadingInstructors && (
+                                  <Loader2 className="ml-2 inline h-4 w-4 animate-spin" />
+                                )}
+                              </Label>
+                              {loadingInstructors ? (
+                                <div className="mt-1.5 rounded-md border p-2 text-sm text-muted-foreground">
+                                  Danışmanlar yükleniyor...
+                                </div>
+                              ) : (
+                                <>
+                                  <Select
+                                    value={selectedAdvisorId}
+                                    onValueChange={setSelectedAdvisorId}
+                                  >
+                                    <SelectTrigger className="mt-1.5">
+                                      <SelectValue placeholder="Danışman seçin" />
+                                    </SelectTrigger>
+                                    <SelectContent>
+                                      {departmentInstructors.length === 0 ? (
+                                        <SelectItem value="none" disabled>
+                                          Hoca bulunamadı
+                                        </SelectItem>
+                                      ) : (
+                                        departmentInstructors.map((staff) => (
+                                          <SelectItem
+                                            key={staff.id}
+                                            value={staff.id}
+                                          >
+                                            {staff.first_name} {staff.last_name}{" "}
+                                            {staff.department !==
+                                            student.department
+                                              ? `(${staff.department})`
+                                              : ""}
+                                          </SelectItem>
+                                        ))
+                                      )}
+                                    </SelectContent>
+                                  </Select>
+                                  {departmentInstructors.length > 0 && (
+                                    <p className="mt-1 text-xs text-green-600">
+                                      {departmentInstructors.length} danışman
+                                      bulundu
+                                    </p>
+                                  )}
+                                </>
+                              )}
+                            </div>
 
                             <div className="flex justify-end space-x-2">
                               <Button
@@ -754,12 +872,15 @@ export default function AdvisorManagementPage() {
                                 variant="outline"
                                 onClick={() => {
                                   setIsAssignOpen(false)
-                                  setSelectedAdvisorId('')
+                                  setSelectedAdvisorId("")
                                 }}
                               >
                                 İptal
                               </Button>
-                              <Button type="submit" disabled={!selectedAdvisorId}>
+                              <Button
+                                type="submit"
+                                disabled={!selectedAdvisorId}
+                              >
                                 Danışman Ata
                               </Button>
                             </div>
@@ -775,7 +896,7 @@ export default function AdvisorManagementPage() {
 
           {/* Pagination for Orphaned Students */}
           {!loading && orphanedStudents.length > 0 && (
-            <div className="flex items-center justify-between mt-4">
+            <div className="mt-4 flex items-center justify-between">
               <div className="text-sm text-muted-foreground">
                 Showing {orphanedStudents.length} of {orphanedTotal} students
               </div>
@@ -783,7 +904,9 @@ export default function AdvisorManagementPage() {
                 <Button
                   variant="outline"
                   size="sm"
-                  onClick={() => setOrphanedPage((prev) => Math.max(1, prev - 1))}
+                  onClick={() =>
+                    setOrphanedPage((prev) => Math.max(1, prev - 1))
+                  }
                   disabled={orphanedPage === 1}
                 >
                   Previous
@@ -796,7 +919,11 @@ export default function AdvisorManagementPage() {
                 <Button
                   variant="outline"
                   size="sm"
-                  onClick={() => setOrphanedPage((prev) => Math.min(orphanedTotalPages, prev + 1))}
+                  onClick={() =>
+                    setOrphanedPage((prev) =>
+                      Math.min(orphanedTotalPages, prev + 1)
+                    )
+                  }
                   disabled={orphanedPage === orphanedTotalPages}
                 >
                   Next
@@ -811,7 +938,9 @@ export default function AdvisorManagementPage() {
       <Card>
         <CardHeader>
           <CardTitle>Danışmanın Öğrencileri</CardTitle>
-          <CardDescription>Bir danışman seçerek öğrencilerini görün</CardDescription>
+          <CardDescription>
+            Bir danışman seçerek öğrencilerini görün
+          </CardDescription>
         </CardHeader>
         <CardContent>
           <div className="mb-4">
@@ -839,81 +968,113 @@ export default function AdvisorManagementPage() {
           {selectedAdvisor && (
             <>
               {loading ? (
-                <div className="text-center py-4">Yükleniyor...</div>
+                <div className="py-4 text-center">Yükleniyor...</div>
               ) : advisorStudents.length === 0 ? (
-                <div className="text-center py-4 text-muted-foreground">
+                <div className="py-4 text-center text-muted-foreground">
                   Bu danışmanın öğrencisi bulunmamaktadır.
                 </div>
               ) : (
                 <>
                   <Table>
-                    <TableCaption>
-                      Toplam {advisorTotal} öğrenci
-                    </TableCaption>
+                    <TableCaption>Toplam {advisorTotal} öğrenci</TableCaption>
                     <TableHeader>
                       <TableRow>
                         <TableHead
                           className="cursor-pointer select-none hover:bg-muted/50"
-                          onClick={() => handleAdvisorSort('student_number')}
+                          onClick={() => handleAdvisorSort("student_number")}
                         >
                           Öğrenci No
-                          <SortIcon field="student_number" currentField={advisorSortField} direction={advisorSortDirection} />
+                          <SortIcon
+                            field="student_number"
+                            currentField={advisorSortField}
+                            direction={advisorSortDirection}
+                          />
                         </TableHead>
                         <TableHead
                           className="cursor-pointer select-none hover:bg-muted/50"
-                          onClick={() => handleAdvisorSort('first_name')}
+                          onClick={() => handleAdvisorSort("first_name")}
                         >
                           Ad Soyad
-                          <SortIcon field="first_name" currentField={advisorSortField} direction={advisorSortDirection} />
+                          <SortIcon
+                            field="first_name"
+                            currentField={advisorSortField}
+                            direction={advisorSortDirection}
+                          />
                         </TableHead>
                         <TableHead
                           className="cursor-pointer select-none hover:bg-muted/50"
-                          onClick={() => handleAdvisorSort('email')}
+                          onClick={() => handleAdvisorSort("email")}
                         >
                           Email
-                          <SortIcon field="email" currentField={advisorSortField} direction={advisorSortDirection} />
+                          <SortIcon
+                            field="email"
+                            currentField={advisorSortField}
+                            direction={advisorSortDirection}
+                          />
                         </TableHead>
                         <TableHead
                           className="cursor-pointer select-none hover:bg-muted/50"
-                          onClick={() => handleAdvisorSort('faculty')}
+                          onClick={() => handleAdvisorSort("faculty")}
                         >
                           Fakülte
-                          <SortIcon field="faculty" currentField={advisorSortField} direction={advisorSortDirection} />
+                          <SortIcon
+                            field="faculty"
+                            currentField={advisorSortField}
+                            direction={advisorSortDirection}
+                          />
                         </TableHead>
                         <TableHead
                           className="cursor-pointer select-none hover:bg-muted/50"
-                          onClick={() => handleAdvisorSort('department')}
+                          onClick={() => handleAdvisorSort("department")}
                         >
                           Bölüm
-                          <SortIcon field="department" currentField={advisorSortField} direction={advisorSortDirection} />
+                          <SortIcon
+                            field="department"
+                            currentField={advisorSortField}
+                            direction={advisorSortDirection}
+                          />
                         </TableHead>
                         <TableHead
                           className="cursor-pointer select-none hover:bg-muted/50"
-                          onClick={() => handleAdvisorSort('enrollment_year')}
+                          onClick={() => handleAdvisorSort("enrollment_year")}
                         >
                           Kayıt Yılı
-                          <SortIcon field="enrollment_year" currentField={advisorSortField} direction={advisorSortDirection} />
+                          <SortIcon
+                            field="enrollment_year"
+                            currentField={advisorSortField}
+                            direction={advisorSortDirection}
+                          />
                         </TableHead>
                         <TableHead
                           className="cursor-pointer select-none hover:bg-muted/50"
-                          onClick={() => handleAdvisorSort('class_level')}
+                          onClick={() => handleAdvisorSort("class_level")}
                         >
                           Sınıf
-                          <SortIcon field="class_level" currentField={advisorSortField} direction={advisorSortDirection} />
+                          <SortIcon
+                            field="class_level"
+                            currentField={advisorSortField}
+                            direction={advisorSortDirection}
+                          />
                         </TableHead>
                         <TableHead
                           className="cursor-pointer select-none hover:bg-muted/50"
-                          onClick={() => handleAdvisorSort('status')}
+                          onClick={() => handleAdvisorSort("status")}
                         >
                           Durum
-                          <SortIcon field="status" currentField={advisorSortField} direction={advisorSortDirection} />
+                          <SortIcon
+                            field="status"
+                            currentField={advisorSortField}
+                            direction={advisorSortDirection}
+                          />
                         </TableHead>
                       </TableRow>
                     </TableHeader>
                     <TableBody>
                       {sortedAdvisorStudents.map((student) => (
                         <TableRow key={student.id}>
-                          <TableCell className="font-medium">{student.student_number}</TableCell>
+                          <TableCell className="font-medium">
+                            {student.student_number}
+                          </TableCell>
                           <TableCell>
                             {student.first_name} {student.last_name}
                           </TableCell>
@@ -925,11 +1086,11 @@ export default function AdvisorManagementPage() {
                           <TableCell>
                             <Badge
                               variant={
-                                student.status === 'active'
-                                  ? 'default'
-                                  : student.status === 'graduated'
-                                  ? 'secondary'
-                                  : 'destructive'
+                                student.status === "active"
+                                  ? "default"
+                                  : student.status === "graduated"
+                                    ? "secondary"
+                                    : "destructive"
                               }
                             >
                               {student.status}
@@ -941,15 +1102,18 @@ export default function AdvisorManagementPage() {
                   </Table>
 
                   {/* Pagination for Advisor Students */}
-                  <div className="flex items-center justify-between mt-4">
+                  <div className="mt-4 flex items-center justify-between">
                     <div className="text-sm text-muted-foreground">
-                      Showing {advisorStudents.length} of {advisorTotal} students
+                      Showing {advisorStudents.length} of {advisorTotal}{" "}
+                      students
                     </div>
                     <div className="flex gap-2">
                       <Button
                         variant="outline"
                         size="sm"
-                        onClick={() => setAdvisorPage((prev) => Math.max(1, prev - 1))}
+                        onClick={() =>
+                          setAdvisorPage((prev) => Math.max(1, prev - 1))
+                        }
                         disabled={advisorPage === 1}
                       >
                         Previous
@@ -962,7 +1126,11 @@ export default function AdvisorManagementPage() {
                       <Button
                         variant="outline"
                         size="sm"
-                        onClick={() => setAdvisorPage((prev) => Math.min(advisorTotalPages, prev + 1))}
+                        onClick={() =>
+                          setAdvisorPage((prev) =>
+                            Math.min(advisorTotalPages, prev + 1)
+                          )
+                        }
                         disabled={advisorPage === advisorTotalPages}
                       >
                         Next

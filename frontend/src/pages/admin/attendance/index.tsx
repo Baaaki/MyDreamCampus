@@ -1,10 +1,10 @@
-import { useState, useMemo } from 'react';
-import { useNavigate } from 'react-router';
-import { useQuery } from '@tanstack/react-query';
-import { attendanceApiSafe } from '@/lib/api-client';
-import type { AdminSessionsResponse, AdminSessionItem } from '@/lib/types';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { Badge } from '@/components/ui/badge';
+import { useState, useMemo } from "react"
+import { useNavigate } from "react-router"
+import { useQuery } from "@tanstack/react-query"
+import { attendanceApiSafe } from "@/lib/api-client"
+import type { AdminSessionsResponse, AdminSessionItem } from "@/lib/types"
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
+import { Badge } from "@/components/ui/badge"
 import {
   Table,
   TableBody,
@@ -12,146 +12,168 @@ import {
   TableHead,
   TableHeader,
   TableRow,
-} from '@/components/ui/table';
-import { Button } from '@/components/ui/button';
-import {
-  ChevronLeft,
-  ChevronRight,
-  Calendar,
-} from 'lucide-react';
-import { catalogService } from '@/lib/services/catalog-service';
-import { mockFaculties, mockCourseCatalog } from '@/mock_data/catalog';
-import { mockAdminSessionsResponse } from '@/mock_data/admin_attendance';
+} from "@/components/ui/table"
+import { Button } from "@/components/ui/button"
+import { ChevronLeft, ChevronRight, Calendar } from "lucide-react"
+import { catalogService } from "@/lib/services/catalog-service"
+import { mockFaculties, mockCourseCatalog } from "@/mock_data/catalog"
+import { mockAdminSessionsResponse } from "@/mock_data/admin_attendance"
 
 function getMonthRange(year: number, month: number) {
-  const start = new Date(year, month, 1);
-  const end = new Date(year, month + 1, 0);
+  const start = new Date(year, month, 1)
+  const end = new Date(year, month + 1, 0)
   return {
     start_date: formatDate(start),
     end_date: formatDate(end),
-  };
+  }
 }
 
 function formatDate(d: Date) {
-  return d.toISOString().split('T')[0];
+  return d.toISOString().split("T")[0]
 }
 
 function getDaysInMonth(year: number, month: number) {
-  return new Date(year, month + 1, 0).getDate();
+  return new Date(year, month + 1, 0).getDate()
 }
 
 function getFirstDayOfMonth(year: number, month: number) {
   // 0=Sunday, convert so Monday=0
-  const day = new Date(year, month, 1).getDay();
-  return day === 0 ? 6 : day - 1;
+  const day = new Date(year, month, 1).getDay()
+  return day === 0 ? 6 : day - 1
 }
 
 const MONTH_NAMES = [
-  'Ocak', 'Şubat', 'Mart', 'Nisan', 'Mayıs', 'Haziran',
-  'Temmuz', 'Ağustos', 'Eylül', 'Ekim', 'Kasım', 'Aralık',
-];
+  "Ocak",
+  "Şubat",
+  "Mart",
+  "Nisan",
+  "Mayıs",
+  "Haziran",
+  "Temmuz",
+  "Ağustos",
+  "Eylül",
+  "Ekim",
+  "Kasım",
+  "Aralık",
+]
 
-const DAY_NAMES = ['Pzt', 'Sal', 'Çar', 'Per', 'Cum', 'Cmt', 'Paz'];
+const DAY_NAMES = ["Pzt", "Sal", "Çar", "Per", "Cum", "Cmt", "Paz"]
 
 export default function AdminAttendancePage() {
-  const navigate = useNavigate();
-  const today = new Date();
-  const [year, setYear] = useState(today.getFullYear());
-  const [month, setMonth] = useState(today.getMonth());
-  const [selectedDate, setSelectedDate] = useState<string | null>(null);
+  const navigate = useNavigate()
+  const today = new Date()
+  const [year, setYear] = useState(today.getFullYear())
+  const [month, setMonth] = useState(today.getMonth())
+  const [selectedDate, setSelectedDate] = useState<string | null>(null)
 
-  const { start_date, end_date } = getMonthRange(year, month);
+  const { start_date, end_date } = getMonthRange(year, month)
 
-  const [useMockData, setUseMockData] = useState(false);
+  const [useMockData, setUseMockData] = useState(false)
 
   const { data: apiData, isLoading } = useQuery({
-    queryKey: ['admin-attendance-sessions', start_date, end_date],
+    queryKey: ["admin-attendance-sessions", start_date, end_date],
     queryFn: () =>
       attendanceApiSafe
-        .get('admin/sessions', { searchParams: { start_date, end_date } })
+        .get("admin/sessions", { searchParams: { start_date, end_date } })
         .json<AdminSessionsResponse>(),
     enabled: !useMockData,
-  });
+  })
 
-  const data = useMockData ? mockAdminSessionsResponse : apiData;
+  const data = useMockData ? mockAdminSessionsResponse : apiData
 
-  const [facultyFilter, setFacultyFilter] = useState('');
-  const [departmentFilter, setDepartmentFilter] = useState('');
+  const [facultyFilter, setFacultyFilter] = useState("")
+  const [departmentFilter, setDepartmentFilter] = useState("")
 
   // Fetch courses for the selected department/faculty to filter sessions
   const { data: coursesData } = useQuery({
-    queryKey: ['courses-for-attendance-filter', facultyFilter, departmentFilter],
-    queryFn: () => catalogService.listCourses({ faculty: facultyFilter, department: departmentFilter, limit: 1000 }),
+    queryKey: [
+      "courses-for-attendance-filter",
+      facultyFilter,
+      departmentFilter,
+    ],
+    queryFn: () =>
+      catalogService.listCourses({
+        faculty: facultyFilter,
+        department: departmentFilter,
+        limit: 1000,
+      }),
     enabled: !!facultyFilter && !useMockData,
-  });
+  })
 
   const validCourseCodes = useMemo(() => {
     if (useMockData) {
-      if (!facultyFilter) return new Set<string>();
-      return new Set(mockCourseCatalog
-        .filter(c => c.faculty === facultyFilter && (departmentFilter ? c.department === departmentFilter : true))
-        .map(c => c.course_code)
-      );
+      if (!facultyFilter) return new Set<string>()
+      return new Set(
+        mockCourseCatalog
+          .filter(
+            (c) =>
+              c.faculty === facultyFilter &&
+              (departmentFilter ? c.department === departmentFilter : true)
+          )
+          .map((c) => c.course_code)
+      )
     }
-    if (!coursesData?.courses) return new Set<string>();
-    return new Set(coursesData.courses.map(c => c.course_code));
-  }, [coursesData, useMockData, facultyFilter, departmentFilter]);
+    if (!coursesData?.courses) return new Set<string>()
+    return new Set(coursesData.courses.map((c) => c.course_code))
+  }, [coursesData, useMockData, facultyFilter, departmentFilter])
 
   // Group sessions by date
   const sessionsByDate = useMemo(() => {
-    const map: Record<string, AdminSessionItem[]> = {};
+    const map: Record<string, AdminSessionItem[]> = {}
     if (data?.sessions) {
       for (const session of data.sessions) {
         if (facultyFilter && !validCourseCodes.has(session.course_code)) {
-          continue;
+          continue
         }
 
         if (!map[session.session_date]) {
-          map[session.session_date] = [];
+          map[session.session_date] = []
         }
-        map[session.session_date].push(session);
+        map[session.session_date].push(session)
       }
     }
-    return map;
-  }, [data, facultyFilter, validCourseCodes]);
+    return map
+  }, [data, facultyFilter, validCourseCodes])
 
-  const selectedSessions = selectedDate ? sessionsByDate[selectedDate] ?? [] : [];
+  const selectedSessions = selectedDate
+    ? (sessionsByDate[selectedDate] ?? [])
+    : []
 
-  const daysInMonth = getDaysInMonth(year, month);
-  const firstDay = getFirstDayOfMonth(year, month);
+  const daysInMonth = getDaysInMonth(year, month)
+  const firstDay = getFirstDayOfMonth(year, month)
 
   const prevMonth = () => {
     if (month === 0) {
-      setMonth(11);
-      setYear(year - 1);
+      setMonth(11)
+      setYear(year - 1)
     } else {
-      setMonth(month - 1);
+      setMonth(month - 1)
     }
-    setSelectedDate(null);
-  };
+    setSelectedDate(null)
+  }
 
   const nextMonth = () => {
     if (month === 11) {
-      setMonth(0);
-      setYear(year + 1);
+      setMonth(0)
+      setYear(year + 1)
     } else {
-      setMonth(month + 1);
+      setMonth(month + 1)
     }
-    setSelectedDate(null);
-  };
+    setSelectedDate(null)
+  }
 
   const goToToday = () => {
-    setYear(today.getFullYear());
-    setMonth(today.getMonth());
-    setSelectedDate(formatDate(today));
-  };
+    setYear(today.getFullYear())
+    setMonth(today.getMonth())
+    setSelectedDate(formatDate(today))
+  }
 
   // Build calendar grid
-  const calendarCells: (number | null)[] = [];
-  for (let i = 0; i < firstDay; i++) calendarCells.push(null);
-  for (let d = 1; d <= daysInMonth; d++) calendarCells.push(d);
+  const calendarCells: (number | null)[] = []
+  for (let i = 0; i < firstDay; i++) calendarCells.push(null)
+  for (let d = 1; d <= daysInMonth; d++) calendarCells.push(d)
 
-  const todayStr = formatDate(today);
+  const todayStr = formatDate(today)
 
   return (
     <div className="space-y-6">
@@ -164,30 +186,35 @@ export default function AdminAttendancePage() {
             Aylık yoklama oturumlarını görüntüleyin
           </p>
         </div>
-        <div className="flex items-center gap-2 rounded border px-3 py-1.5 shadow-sm dark:border-gray-800 bg-white dark:bg-gray-900">
-          <label htmlFor="mock-toggle" className="text-xs font-semibold text-gray-700 dark:text-gray-300 select-none cursor-pointer">
+        <div className="flex items-center gap-2 rounded border bg-white px-3 py-1.5 shadow-sm dark:border-gray-800 dark:bg-gray-900">
+          <label
+            htmlFor="mock-toggle"
+            className="cursor-pointer text-xs font-semibold text-gray-700 select-none dark:text-gray-300"
+          >
             Test Modu (Mock Veri)
           </label>
-          <input 
-            id="mock-toggle" 
-            type="checkbox" 
+          <input
+            id="mock-toggle"
+            type="checkbox"
             className="cursor-pointer rounded accent-indigo-600"
-            checked={useMockData} 
-            onChange={(e) => setUseMockData(e.target.checked)} 
+            checked={useMockData}
+            onChange={(e) => setUseMockData(e.target.checked)}
           />
         </div>
       </div>
 
-      <div className="flex flex-col gap-4 sm:flex-row sm:items-end rounded-lg border bg-white p-4 dark:border-gray-800 dark:bg-gray-900">
+      <div className="flex flex-col gap-4 rounded-lg border bg-white p-4 sm:flex-row sm:items-end dark:border-gray-800 dark:bg-gray-900">
         <div className="grid flex-1 grid-cols-1 gap-4 sm:grid-cols-2">
           <div>
-            <label className="mb-1 block text-sm font-medium text-gray-700 dark:text-gray-300">Fakülte</label>
+            <label className="mb-1 block text-sm font-medium text-gray-700 dark:text-gray-300">
+              Fakülte
+            </label>
             <select
-              className="flex h-10 w-full items-center justify-between rounded-md border border-gray-200 bg-white px-3 py-2 text-sm ring-offset-white placeholder:text-gray-500 focus:outline-none focus:ring-2 focus:ring-gray-950 focus:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50 dark:border-gray-800 dark:bg-gray-950 dark:ring-offset-gray-950 dark:placeholder:text-gray-400 dark:focus:ring-gray-300"
+              className="flex h-10 w-full items-center justify-between rounded-md border border-gray-200 bg-white px-3 py-2 text-sm ring-offset-white placeholder:text-gray-500 focus:ring-2 focus:ring-gray-950 focus:ring-offset-2 focus:outline-none disabled:cursor-not-allowed disabled:opacity-50 dark:border-gray-800 dark:bg-gray-950 dark:ring-offset-gray-950 dark:placeholder:text-gray-400 dark:focus:ring-gray-300"
               value={facultyFilter}
               onChange={(e) => {
-                setFacultyFilter(e.target.value);
-                setDepartmentFilter('');
+                setFacultyFilter(e.target.value)
+                setDepartmentFilter("")
               }}
             >
               <option value="">Tüm Fakülteler</option>
@@ -199,19 +226,23 @@ export default function AdminAttendancePage() {
             </select>
           </div>
           <div>
-            <label className="mb-1 block text-sm font-medium text-gray-700 dark:text-gray-300">Bölüm</label>
+            <label className="mb-1 block text-sm font-medium text-gray-700 dark:text-gray-300">
+              Bölüm
+            </label>
             <select
-              className="flex h-10 w-full items-center justify-between rounded-md border border-gray-200 bg-white px-3 py-2 text-sm ring-offset-white placeholder:text-gray-500 focus:outline-none focus:ring-2 focus:ring-gray-950 focus:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50 dark:border-gray-800 dark:bg-gray-950 dark:ring-offset-gray-950 dark:placeholder:text-gray-400 dark:focus:ring-gray-300"
+              className="flex h-10 w-full items-center justify-between rounded-md border border-gray-200 bg-white px-3 py-2 text-sm ring-offset-white placeholder:text-gray-500 focus:ring-2 focus:ring-gray-950 focus:ring-offset-2 focus:outline-none disabled:cursor-not-allowed disabled:opacity-50 dark:border-gray-800 dark:bg-gray-950 dark:ring-offset-gray-950 dark:placeholder:text-gray-400 dark:focus:ring-gray-300"
               value={departmentFilter}
               onChange={(e) => setDepartmentFilter(e.target.value)}
               disabled={!facultyFilter}
             >
               <option value="">Tüm Bölümler</option>
-              {mockFaculties.find((f) => f.name === facultyFilter)?.departments.map((d) => (
-                <option key={d.id} value={d.name}>
-                  {d.name}
-                </option>
-              ))}
+              {mockFaculties
+                .find((f) => f.name === facultyFilter)
+                ?.departments.map((d) => (
+                  <option key={d.id} value={d.name}>
+                    {d.name}
+                  </option>
+                ))}
             </select>
           </div>
         </div>
@@ -239,11 +270,11 @@ export default function AdminAttendancePage() {
           </CardHeader>
           <CardContent>
             {/* Day headers */}
-            <div className="grid grid-cols-7 mb-1">
+            <div className="mb-1 grid grid-cols-7">
               {DAY_NAMES.map((d) => (
                 <div
                   key={d}
-                  className="text-center text-xs font-medium text-gray-500 dark:text-gray-400 py-2"
+                  className="py-2 text-center text-xs font-medium text-gray-500 dark:text-gray-400"
                 >
                   {d}
                 </div>
@@ -254,14 +285,14 @@ export default function AdminAttendancePage() {
             <div className="grid grid-cols-7 gap-1">
               {calendarCells.map((day, idx) => {
                 if (day === null) {
-                  return <div key={`empty-${idx}`} className="h-20" />;
+                  return <div key={`empty-${idx}`} className="h-20" />
                 }
 
-                const dateStr = `${year}-${String(month + 1).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
-                const sessions = sessionsByDate[dateStr];
-                const count = sessions?.length ?? 0;
-                const isToday = dateStr === todayStr;
-                const isSelected = dateStr === selectedDate;
+                const dateStr = `${year}-${String(month + 1).padStart(2, "0")}-${String(day).padStart(2, "0")}`
+                const sessions = sessionsByDate[dateStr]
+                const count = sessions?.length ?? 0
+                const isToday = dateStr === todayStr
+                const isSelected = dateStr === selectedDate
 
                 return (
                   <button
@@ -269,15 +300,15 @@ export default function AdminAttendancePage() {
                     onClick={() => setSelectedDate(dateStr)}
                     className={`h-20 rounded-lg border p-1.5 text-left transition-colors hover:bg-gray-50 dark:hover:bg-gray-800 ${
                       isSelected
-                        ? 'border-indigo-500 bg-indigo-50 dark:bg-indigo-900/30 dark:border-indigo-400'
-                        : 'border-gray-200 dark:border-gray-700'
-                    } ${isToday ? 'ring-2 ring-indigo-300 dark:ring-indigo-600' : ''}`}
+                        ? "border-indigo-500 bg-indigo-50 dark:border-indigo-400 dark:bg-indigo-900/30"
+                        : "border-gray-200 dark:border-gray-700"
+                    } ${isToday ? "ring-2 ring-indigo-300 dark:ring-indigo-600" : ""}`}
                   >
                     <span
                       className={`text-sm font-medium ${
                         isToday
-                          ? 'text-indigo-600 dark:text-indigo-400'
-                          : 'text-gray-900 dark:text-gray-100'
+                          ? "text-indigo-600 dark:text-indigo-400"
+                          : "text-gray-900 dark:text-gray-100"
                       }`}
                     >
                       {day}
@@ -289,9 +320,9 @@ export default function AdminAttendancePage() {
                             <span
                               key={s.session_id}
                               className={`block h-1.5 w-1.5 rounded-full ${
-                                s.session_type === 'theory'
-                                  ? 'bg-blue-500'
-                                  : 'bg-emerald-500'
+                                s.session_type === "theory"
+                                  ? "bg-blue-500"
+                                  : "bg-emerald-500"
                               }`}
                             />
                           ))
@@ -303,7 +334,7 @@ export default function AdminAttendancePage() {
                       </div>
                     )}
                   </button>
-                );
+                )
               })}
             </div>
 
@@ -319,7 +350,8 @@ export default function AdminAttendancePage() {
                 <span className="h-2 w-2 rounded-full bg-blue-500" /> Teorik
               </span>
               <span className="flex items-center gap-1">
-                <span className="h-2 w-2 rounded-full bg-emerald-500" /> Uygulama
+                <span className="h-2 w-2 rounded-full bg-emerald-500" />{" "}
+                Uygulama
               </span>
             </div>
           </CardContent>
@@ -352,7 +384,7 @@ export default function AdminAttendancePage() {
                   const rate =
                     s.enrolled_count > 0
                       ? Math.round((s.present_count / s.enrolled_count) * 100)
-                      : 0;
+                      : 0
                   return (
                     <TableRow key={s.session_id}>
                       <TableCell className="font-medium">
@@ -362,33 +394,35 @@ export default function AdminAttendancePage() {
                       <TableCell>
                         <Badge
                           variant={
-                            s.session_type === 'theory' ? 'default' : 'secondary'
+                            s.session_type === "theory"
+                              ? "default"
+                              : "secondary"
                           }
                         >
-                          {s.session_type === 'theory' ? 'Teorik' : 'Uygulama'}
+                          {s.session_type === "theory" ? "Teorik" : "Uygulama"}
                         </Badge>
                       </TableCell>
                       <TableCell>{s.week_number}</TableCell>
                       <TableCell>
-                        {new Date(s.started_at).toLocaleTimeString('tr-TR', {
-                          hour: '2-digit',
-                          minute: '2-digit',
+                        {new Date(s.started_at).toLocaleTimeString("tr-TR", {
+                          hour: "2-digit",
+                          minute: "2-digit",
                         })}
                       </TableCell>
                       <TableCell>
-                        {new Date(s.expires_at).toLocaleTimeString('tr-TR', {
-                          hour: '2-digit',
-                          minute: '2-digit',
+                        {new Date(s.expires_at).toLocaleTimeString("tr-TR", {
+                          hour: "2-digit",
+                          minute: "2-digit",
                         })}
                       </TableCell>
                       <TableCell>
                         <span
                           className={
                             rate >= 70
-                              ? 'text-green-600 dark:text-green-400'
+                              ? "text-green-600 dark:text-green-400"
                               : rate >= 50
-                                ? 'text-yellow-600 dark:text-yellow-400'
-                                : 'text-red-600 dark:text-red-400'
+                                ? "text-yellow-600 dark:text-yellow-400"
+                                : "text-red-600 dark:text-red-400"
                           }
                         >
                           {s.present_count}/{s.enrolled_count} (%{rate})
@@ -396,10 +430,7 @@ export default function AdminAttendancePage() {
                       </TableCell>
                       <TableCell>
                         {s.is_active ? (
-                          <Badge
-                            variant="default"
-                            className="bg-green-500"
-                          >
+                          <Badge variant="default" className="bg-green-500">
                             Aktif
                           </Badge>
                         ) : (
@@ -407,16 +438,20 @@ export default function AdminAttendancePage() {
                         )}
                       </TableCell>
                       <TableCell className="text-right">
-                        <Button 
-                          variant="outline" 
+                        <Button
+                          variant="outline"
                           size="sm"
-                          onClick={() => navigate(`/attendance/${s.session_id}`, { state: { session: s } })}
+                          onClick={() =>
+                            navigate(`/attendance/${s.session_id}`, {
+                              state: { session: s },
+                            })
+                          }
                         >
                           Detaylar
                         </Button>
                       </TableCell>
                     </TableRow>
-                  );
+                  )
                 })}
               </TableBody>
             </Table>
@@ -424,5 +459,5 @@ export default function AdminAttendancePage() {
         </Card>
       )}
     </div>
-  );
+  )
 }

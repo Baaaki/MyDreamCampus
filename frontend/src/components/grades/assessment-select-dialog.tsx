@@ -1,16 +1,15 @@
-
-import { useState, useEffect } from 'react';
-import { useNavigate } from 'react-router';
+import { useState, useEffect } from "react"
+import { useNavigate } from "react-router"
 import {
   Dialog,
   DialogContent,
   DialogHeader,
   DialogTitle,
   DialogDescription,
-} from '@/components/ui/dialog';
-import { Badge } from '@/components/ui/badge';
-import { gradesService } from '@/lib/services/grades-service';
-import type { CourseStatusResponse } from '@/lib/types';
+} from "@/components/ui/dialog"
+import { Badge } from "@/components/ui/badge"
+import { gradesService } from "@/lib/services/grades-service"
+import type { CourseStatusResponse } from "@/lib/types"
 import {
   Loader2,
   ChevronRight,
@@ -18,14 +17,14 @@ import {
   Clock,
   FileText,
   Info,
-} from 'lucide-react';
+} from "lucide-react"
 
 interface AssessmentSelectDialogProps {
-  courseId: string | null;
-  courseName: string;
-  courseCode: string;
-  isOpen: boolean;
-  onClose: () => void;
+  courseId: string | null
+  courseName: string
+  courseCode: string
+  isOpen: boolean
+  onClose: () => void
 }
 
 export function AssessmentSelectDialog({
@@ -35,36 +34,38 @@ export function AssessmentSelectDialog({
   isOpen,
   onClose,
 }: AssessmentSelectDialogProps) {
-  const navigate = useNavigate();
-  const [courseStatus, setCourseStatus] = useState<CourseStatusResponse | null>(null);
-  const [loading, setLoading] = useState(false);
-  const [error, setError] = useState('');
+  const navigate = useNavigate()
+  const [courseStatus, setCourseStatus] = useState<CourseStatusResponse | null>(
+    null
+  )
+  const [loading, setLoading] = useState(false)
+  const [error, setError] = useState("")
 
   useEffect(() => {
     if (isOpen && courseId) {
-      setLoading(true);
-      setError('');
-      setCourseStatus(null);
+      setLoading(true)
+      setError("")
+      setCourseStatus(null)
 
       gradesService
         .getCourseStatus(courseId)
         .then((status) => {
-          setCourseStatus(status);
+          setCourseStatus(status)
         })
         .catch(() => {
-          setError('Ders durumu yüklenirken bir hata oluştu.');
+          setError("Ders durumu yüklenirken bir hata oluştu.")
         })
         .finally(() => {
-          setLoading(false);
-        });
+          setLoading(false)
+        })
     }
-  }, [isOpen, courseId]);
+  }, [isOpen, courseId])
 
   const handleAssessmentClick = (slug: string) => {
-    if (!courseId) return;
-    onClose();
-    navigate(`/teacher/grades/${courseId}/${slug}`);
-  };
+    if (!courseId) return
+    onClose()
+    navigate(`/teacher/grades/${courseId}/${slug}`)
+  }
 
   return (
     <Dialog open={isOpen} onOpenChange={(open) => !open && onClose()}>
@@ -75,8 +76,10 @@ export function AssessmentSelectDialog({
             Not Girilecek Sınavı Seçin
           </DialogTitle>
           <DialogDescription>
-            <span className="font-medium text-gray-700 dark:text-gray-300">{courseCode}</span>
-            {' - '}
+            <span className="font-medium text-gray-700 dark:text-gray-300">
+              {courseCode}
+            </span>
+            {" - "}
             {courseName}
           </DialogDescription>
         </DialogHeader>
@@ -111,7 +114,7 @@ export function AssessmentSelectDialog({
                     disabled={courseStatus.is_finalized}
                     className="flex w-full items-center gap-3 rounded-lg border border-gray-200 p-4 text-left transition-colors hover:bg-gray-50 disabled:cursor-not-allowed disabled:opacity-50 dark:border-gray-700 dark:hover:bg-gray-800/50"
                   >
-                    <div className="flex-1 min-w-0">
+                    <div className="min-w-0 flex-1">
                       <div className="flex items-center gap-2">
                         <span className="font-semibold text-gray-900 dark:text-white">
                           {assessment.name}
@@ -122,12 +125,13 @@ export function AssessmentSelectDialog({
                       </div>
                       <div className="mt-1 flex items-center gap-3 text-sm text-gray-500 dark:text-gray-400">
                         <span>
-                          {assessment.graded_count}/{courseStatus.total_students} öğrenci notlandırıldı
+                          {assessment.graded_count}/
+                          {courseStatus.total_students} öğrenci notlandırıldı
                         </span>
                       </div>
                     </div>
 
-                    <div className="flex items-center gap-2 shrink-0">
+                    <div className="flex shrink-0 items-center gap-2">
                       {assessment.is_complete ? (
                         <Badge className="bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400">
                           <CheckCircle2 className="mr-1 h-3 w-3" />
@@ -155,5 +159,5 @@ export function AssessmentSelectDialog({
         </div>
       </DialogContent>
     </Dialog>
-  );
+  )
 }

@@ -17,8 +17,8 @@ export default defineConfig({
       // Caddy, not a service: /api is nine upstreams now and only the gateway
       // knows which prefix goes where. Port follows HTTP_PORT from the
       // infrastructure .env — 80 by default, 8080 on a rootless Docker host.
-      '/api': {
-        target: process.env.DEV_API_TARGET ?? 'http://localhost:80',
+      "/api": {
+        target: process.env.DEV_API_TARGET ?? "http://localhost:80",
         changeOrigin: true,
       },
     },

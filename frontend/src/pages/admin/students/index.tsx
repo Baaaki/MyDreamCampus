@@ -1,6 +1,5 @@
-
-import { useState, useEffect } from 'react'
-import { Button } from '@/components/ui/button'
+import { useState, useEffect } from "react"
+import { Button } from "@/components/ui/button"
 import {
   Table,
   TableBody,
@@ -9,7 +8,7 @@ import {
   TableHead,
   TableHeader,
   TableRow,
-} from '@/components/ui/table'
+} from "@/components/ui/table"
 import {
   Dialog,
   DialogContent,
@@ -17,23 +16,31 @@ import {
   DialogHeader,
   DialogTitle,
   DialogTrigger,
-} from '@/components/ui/dialog'
+} from "@/components/ui/dialog"
 import {
   Select,
   SelectContent,
   SelectItem,
   SelectTrigger,
   SelectValue,
-} from '@/components/ui/select'
-import { Input } from '@/components/ui/input'
-import { Label } from '@/components/ui/label'
-import { Badge } from '@/components/ui/badge'
-import { studentApi } from '@/lib/api-client'
-import { mockFaculties } from '@/mock_data/catalog'
-import { staffApi } from '@/lib/api-client'
-import type { Department, Staff } from '@/lib/types'
-import { ArrowUp, ArrowDown, ArrowUpDown, Plus, Upload, Users, Loader2 } from 'lucide-react'
-import { Link } from 'react-router'
+} from "@/components/ui/select"
+import { Input } from "@/components/ui/input"
+import { Label } from "@/components/ui/label"
+import { Badge } from "@/components/ui/badge"
+import { studentApi } from "@/lib/api-client"
+import { mockFaculties } from "@/mock_data/catalog"
+import { staffApi } from "@/lib/api-client"
+import type { Department, Staff } from "@/lib/types"
+import {
+  ArrowUp,
+  ArrowDown,
+  ArrowUpDown,
+  Plus,
+  Upload,
+  Users,
+  Loader2,
+} from "lucide-react"
+import { Link } from "react-router"
 
 type Student = {
   id: string
@@ -62,8 +69,17 @@ type StudentListResponse = {
   }
 }
 
-type SortField = 'first_name' | 'last_name' | 'email' | 'student_number' | 'department' | 'faculty' | 'enrollment_year' | 'class_level' | 'status'
-type SortDirection = 'asc' | 'desc'
+type SortField =
+  | "first_name"
+  | "last_name"
+  | "email"
+  | "student_number"
+  | "department"
+  | "faculty"
+  | "enrollment_year"
+  | "class_level"
+  | "status"
+type SortDirection = "asc" | "desc"
 
 export default function StudentsPage() {
   const [studentList, setStudentList] = useState<Student[]>([])
@@ -75,11 +91,11 @@ export default function StudentsPage() {
   const [isEditOpen, setIsEditOpen] = useState(false)
   const [isImportOpen, setIsImportOpen] = useState(false)
   const [editingStudent, setEditingStudent] = useState<Student | null>(null)
-  const [sortField, setSortField] = useState<SortField>('first_name')
-  const [sortDirection, setSortDirection] = useState<SortDirection>('asc')
+  const [sortField, setSortField] = useState<SortField>("first_name")
+  const [sortDirection, setSortDirection] = useState<SortDirection>("asc")
   const [selectedFile, setSelectedFile] = useState<File | null>(null)
   const [importing, setImporting] = useState(false)
-  
+
   // Faculty/Department selection
   const [createDepartments, setCreateDepartments] = useState<Department[]>([])
 
@@ -92,33 +108,35 @@ export default function StudentsPage() {
 
   // Create form state
   const [createFormData, setCreateFormData] = useState({
-    student_number: '',
-    first_name: '',
-    last_name: '',
-    email: '',
-    faculty: '',
-    department: '',
+    student_number: "",
+    first_name: "",
+    last_name: "",
+    email: "",
+    faculty: "",
+    department: "",
     enrollment_year: new Date().getFullYear(),
     class_level: 1,
-    advisor_id: '', // Will be selected from dropdown
+    advisor_id: "", // Will be selected from dropdown
   })
 
   // Update form state
   const [updateFormData, setUpdateFormData] = useState({
-    student_number: '',
-    first_name: '',
-    last_name: '',
-    email: '',
-    faculty: '',
-    department: '',
+    student_number: "",
+    first_name: "",
+    last_name: "",
+    email: "",
+    faculty: "",
+    department: "",
     enrollment_year: new Date().getFullYear(),
     class_level: 1,
-    status: 'active',
-    advisor_id: '',
+    status: "active",
+    advisor_id: "",
   })
 
   // Department-specific advisors for edit form
-  const [editDepartmentAdvisors, setEditDepartmentAdvisors] = useState<Staff[]>([])
+  const [editDepartmentAdvisors, setEditDepartmentAdvisors] = useState<Staff[]>(
+    []
+  )
   const [loadingEditAdvisors, setLoadingEditAdvisors] = useState(false)
 
   useEffect(() => {
@@ -129,22 +147,28 @@ export default function StudentsPage() {
   useEffect(() => {
     const fetchAdvisors = async () => {
       try {
-        const response = await staffApi.get('', { searchParams: { role: 'teacher', limit: '100' } }).json() as { data: Staff[] }
+        const response = (await staffApi
+          .get("", { searchParams: { role: "teacher", limit: "100" } })
+          .json()) as { data: Staff[] }
         setAdvisors(response.data || [])
       } catch (error) {
-        console.error('Failed to fetch advisors:', error)
+        console.error("Failed to fetch advisors:", error)
       }
     }
     fetchAdvisors()
   }, [])
 
   // Fetch department-specific advisors when department changes in create form
-  const fetchAdvisorsByDepartment = async (department: string): Promise<Staff[]> => {
+  const fetchAdvisorsByDepartment = async (
+    department: string
+  ): Promise<Staff[]> => {
     try {
-      const response = await staffApi.get('instructors', { searchParams: { department } }).json() as { data: Staff[] }
+      const response = (await staffApi
+        .get("instructors", { searchParams: { department } })
+        .json()) as { data: Staff[] }
       return response.data || []
     } catch (err) {
-      console.error('Error fetching advisors by department:', err)
+      console.error("Error fetching advisors by department:", err)
       // Hata durumunda boş dön - fallback yok
       return []
     }
@@ -154,7 +178,7 @@ export default function StudentsPage() {
   useEffect(() => {
     if (createFormData.department) {
       setLoadingAdvisors(true)
-      setCreateFormData(prev => ({ ...prev, advisor_id: '' })) // Reset advisor when department changes
+      setCreateFormData((prev) => ({ ...prev, advisor_id: "" })) // Reset advisor when department changes
       fetchAdvisorsByDepartment(createFormData.department)
         .then((instructors) => {
           setDepartmentAdvisors(instructors) // Bölümde hoca yoksa boş kalacak
@@ -169,10 +193,15 @@ export default function StudentsPage() {
 
   const fetchStudents = async () => {
     setLoading(true)
-    console.log('[Students Page] Fetching students, page:', currentPage, 'limit:', limit)
+    console.log(
+      "[Students Page] Fetching students, page:",
+      currentPage,
+      "limit:",
+      limit
+    )
     try {
       const response = (await studentApi
-        .get('', {
+        .get("", {
           searchParams: {
             page: currentPage.toString(),
             limit: limit.toString(),
@@ -180,11 +209,11 @@ export default function StudentsPage() {
         })
         .json()) as StudentListResponse
 
-      console.log('[Students Page] Response:', response)
+      console.log("[Students Page] Response:", response)
       setStudentList(response.data)
       setTotalPages(response.pagination.total_pages)
     } catch (error) {
-      console.error('Failed to fetch students:', error)
+      console.error("Failed to fetch students:", error)
     } finally {
       setLoading(false)
     }
@@ -192,29 +221,31 @@ export default function StudentsPage() {
 
   const handleCreateStudent = async (e: React.FormEvent) => {
     e.preventDefault()
-    console.log('[Students Page] handleCreateStudent called')
-    console.log('[Students Page] createFormData:', createFormData)
+    console.log("[Students Page] handleCreateStudent called")
+    console.log("[Students Page] createFormData:", createFormData)
     try {
-      console.log('[Students Page] Calling studentApi.post...')
-      const response = await studentApi.post('', { json: createFormData }).json()
-      console.log('[Students Page] POST Response:', response)
+      console.log("[Students Page] Calling studentApi.post...")
+      const response = await studentApi
+        .post("", { json: createFormData })
+        .json()
+      console.log("[Students Page] POST Response:", response)
       setIsCreateOpen(false)
       setCreateFormData({
-        student_number: '',
-        first_name: '',
-        last_name: '',
-        email: '',
-        faculty: '',
-        department: '',
+        student_number: "",
+        first_name: "",
+        last_name: "",
+        email: "",
+        faculty: "",
+        department: "",
         enrollment_year: new Date().getFullYear(),
         class_level: 1,
-        advisor_id: '',
+        advisor_id: "",
       })
       setCreateDepartments([])
       setDepartmentAdvisors([])
       fetchStudents()
     } catch (error) {
-      console.error('[Students Page] Failed to create student:', error)
+      console.error("[Students Page] Failed to create student:", error)
     }
   }
 
@@ -224,7 +255,11 @@ export default function StudentsPage() {
 
     try {
       // Backend only accepts class_level, advisor_id, status for updates
-      const payload: { class_level: number; status: string; advisor_id?: string } = {
+      const payload: {
+        class_level: number
+        status: string
+        advisor_id?: string
+      } = {
         class_level: updateFormData.class_level,
         status: updateFormData.status,
       }
@@ -240,18 +275,18 @@ export default function StudentsPage() {
       setEditDepartmentAdvisors([])
       fetchStudents()
     } catch (error) {
-      console.error('Failed to update student:', error)
+      console.error("Failed to update student:", error)
     }
   }
 
   const handleDeleteStudent = async (id: string) => {
-    if (!confirm('Are you sure you want to delete this student?')) return
+    if (!confirm("Are you sure you want to delete this student?")) return
 
     try {
       await studentApi.delete(`${id}`)
       fetchStudents()
     } catch (error) {
-      console.error('Failed to delete student:', error)
+      console.error("Failed to delete student:", error)
     }
   }
 
@@ -267,7 +302,7 @@ export default function StudentsPage() {
       enrollment_year: student.enrollment_year,
       class_level: student.class_level,
       status: student.status,
-      advisor_id: student.advisor_id || '',
+      advisor_id: student.advisor_id || "",
     })
     // Fetch advisors for student's department
     if (student.department) {
@@ -290,12 +325,12 @@ export default function StudentsPage() {
     setImporting(true)
     try {
       const formData = new FormData()
-      formData.append('file', selectedFile)
+      formData.append("file", selectedFile)
 
       // studentApi (ky) attaches cookies + CSRF header; raw fetch would 403
       // on the CSRF-protected admin route.
       const result = await studentApi
-        .post('bulk-import', { body: formData })
+        .post("bulk-import", { body: formData })
         .json<{ job_id: string }>()
 
       alert(`Import job created successfully. Job ID: ${result.job_id}`)
@@ -303,8 +338,8 @@ export default function StudentsPage() {
       setSelectedFile(null)
       fetchStudents()
     } catch (error) {
-      console.error('Failed to import students:', error)
-      alert('Import failed: ' + error)
+      console.error("Failed to import students:", error)
+      alert("Import failed: " + error)
     } finally {
       setImporting(false)
     }
@@ -318,10 +353,10 @@ export default function StudentsPage() {
 
   const handleSort = (field: SortField) => {
     if (sortField === field) {
-      setSortDirection(sortDirection === 'asc' ? 'desc' : 'asc')
+      setSortDirection(sortDirection === "asc" ? "desc" : "asc")
     } else {
       setSortField(field)
-      setSortDirection('asc')
+      setSortDirection("asc")
     }
   }
 
@@ -329,7 +364,7 @@ export default function StudentsPage() {
     if (sortField !== field) {
       return <ArrowUpDown className="ml-2 h-4 w-4" />
     }
-    return sortDirection === 'asc' ? (
+    return sortDirection === "asc" ? (
       <ArrowUp className="ml-2 h-4 w-4" />
     ) : (
       <ArrowDown className="ml-2 h-4 w-4" />
@@ -337,15 +372,15 @@ export default function StudentsPage() {
   }
 
   const sortedStudentList = [...studentList].sort((a, b) => {
-    let aValue: string | number = a[sortField] || ''
-    let bValue: string | number = b[sortField] || ''
+    let aValue: string | number = a[sortField] || ""
+    let bValue: string | number = b[sortField] || ""
 
-    if (typeof aValue === 'string') {
+    if (typeof aValue === "string") {
       aValue = aValue.toLowerCase()
       bValue = (bValue as string).toLowerCase()
     }
 
-    if (sortDirection === 'asc') {
+    if (sortDirection === "asc") {
       return aValue > bValue ? 1 : -1
     } else {
       return aValue < bValue ? 1 : -1
@@ -354,7 +389,7 @@ export default function StudentsPage() {
 
   return (
     <div className="container mx-auto py-10">
-      <div className="flex justify-between items-center mb-6">
+      <div className="mb-6 flex items-center justify-between">
         <h1 className="text-3xl font-bold">Student Management</h1>
         <div className="flex gap-2">
           <Link to="/students/advisors">
@@ -385,16 +420,21 @@ export default function StudentsPage() {
                     onChange={handleFileChange}
                     required
                   />
-                  <p className="text-sm text-muted-foreground mt-2">
-                    CSV should include: student_number, first_name, last_name, email, faculty, department, enrollment_year, class_level
+                  <p className="mt-2 text-sm text-muted-foreground">
+                    CSV should include: student_number, first_name, last_name,
+                    email, faculty, department, enrollment_year, class_level
                   </p>
                 </div>
                 <div className="flex justify-end space-x-2">
-                  <Button type="button" variant="outline" onClick={() => setIsImportOpen(false)}>
+                  <Button
+                    type="button"
+                    variant="outline"
+                    onClick={() => setIsImportOpen(false)}
+                  >
                     Cancel
                   </Button>
                   <Button type="submit" disabled={importing || !selectedFile}>
-                    {importing ? 'Importing...' : 'Import'}
+                    {importing ? "Importing..." : "Import"}
                   </Button>
                 </div>
               </form>
@@ -407,184 +447,228 @@ export default function StudentsPage() {
                 <Plus className="mr-2 h-4 w-4" /> Add New Student
               </Button>
             </DialogTrigger>
-          <DialogContent>
-            <DialogHeader>
-              <DialogTitle>Create New Student</DialogTitle>
-              <DialogDescription>
-                Add a new student to the system.
-              </DialogDescription>
-            </DialogHeader>
-            <form onSubmit={handleCreateStudent} className="space-y-4">
-              <div>
-                <Label htmlFor="student_number">Student Number</Label>
-                <Input
-                  id="student_number"
-                  value={createFormData.student_number}
-                  onChange={(e) =>
-                    setCreateFormData({ ...createFormData, student_number: e.target.value })
-                  }
-                  required
-                />
-              </div>
-              <div>
-                <Label htmlFor="first_name">First Name</Label>
-                <Input
-                  id="first_name"
-                  value={createFormData.first_name}
-                  onChange={(e) =>
-                    setCreateFormData({ ...createFormData, first_name: e.target.value })
-                  }
-                  required
-                />
-              </div>
-              <div>
-                <Label htmlFor="last_name">Last Name</Label>
-                <Input
-                  id="last_name"
-                  value={createFormData.last_name}
-                  onChange={(e) =>
-                    setCreateFormData({ ...createFormData, last_name: e.target.value })
-                  }
-                  required
-                />
-              </div>
-              <div>
-                <Label htmlFor="email">Email</Label>
-                <Input
-                  id="email"
-                  type="email"
-                  value={createFormData.email}
-                  onChange={(e) =>
-                    setCreateFormData({ ...createFormData, email: e.target.value })
-                  }
-                  required
-                />
-              </div>
-              <div>
-                <Label htmlFor="faculty">Fakülte</Label>
-                <Select
-                  value={createFormData.faculty}
-                  onValueChange={(value) => {
-                    const selectedFaculty = mockFaculties.find(f => f.name === value)
-                    setCreateFormData({ 
-                      ...createFormData, 
-                      faculty: value,
-                      department: '' // Reset department when faculty changes
-                    })
-                    setCreateDepartments(selectedFaculty?.departments || [])
-                  }}
-                >
-                  <SelectTrigger className="w-full">
-                    <SelectValue placeholder="Fakülte seçin..." />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {mockFaculties.map((faculty) => (
-                      <SelectItem key={faculty.id} value={faculty.name}>
-                        {faculty.name}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </div>
-              <div>
-                <Label htmlFor="department">Bölüm</Label>
-                <Select
-                  value={createFormData.department}
-                  onValueChange={(value) =>
-                    setCreateFormData({ ...createFormData, department: value })
-                  }
-                  disabled={!createFormData.faculty}
-                >
-                  <SelectTrigger className="w-full">
-                    <SelectValue placeholder={createFormData.faculty ? "Bölüm seçin..." : "Önce fakülte seçin"} />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {createDepartments.map((dept) => (
-                      <SelectItem key={dept.id} value={dept.name}>
-                        {dept.name}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </div>
-              <div>
-                <Label htmlFor="advisor">
-                  Danışman
-                  {loadingAdvisors && (
-                    <Loader2 className="ml-2 h-4 w-4 animate-spin inline" />
-                  )}
-                </Label>
-                {loadingAdvisors ? (
-                  <div className="mt-1.5 p-2 border rounded-md text-sm text-muted-foreground">
-                    Danışmanlar yükleniyor...
-                  </div>
-                ) : (
-                  <Select
-                    value={createFormData.advisor_id}
-                    onValueChange={(value) =>
-                      setCreateFormData({ ...createFormData, advisor_id: value })
+            <DialogContent>
+              <DialogHeader>
+                <DialogTitle>Create New Student</DialogTitle>
+                <DialogDescription>
+                  Add a new student to the system.
+                </DialogDescription>
+              </DialogHeader>
+              <form onSubmit={handleCreateStudent} className="space-y-4">
+                <div>
+                  <Label htmlFor="student_number">Student Number</Label>
+                  <Input
+                    id="student_number"
+                    value={createFormData.student_number}
+                    onChange={(e) =>
+                      setCreateFormData({
+                        ...createFormData,
+                        student_number: e.target.value,
+                      })
                     }
-                    disabled={!createFormData.department}
+                    required
+                  />
+                </div>
+                <div>
+                  <Label htmlFor="first_name">First Name</Label>
+                  <Input
+                    id="first_name"
+                    value={createFormData.first_name}
+                    onChange={(e) =>
+                      setCreateFormData({
+                        ...createFormData,
+                        first_name: e.target.value,
+                      })
+                    }
+                    required
+                  />
+                </div>
+                <div>
+                  <Label htmlFor="last_name">Last Name</Label>
+                  <Input
+                    id="last_name"
+                    value={createFormData.last_name}
+                    onChange={(e) =>
+                      setCreateFormData({
+                        ...createFormData,
+                        last_name: e.target.value,
+                      })
+                    }
+                    required
+                  />
+                </div>
+                <div>
+                  <Label htmlFor="email">Email</Label>
+                  <Input
+                    id="email"
+                    type="email"
+                    value={createFormData.email}
+                    onChange={(e) =>
+                      setCreateFormData({
+                        ...createFormData,
+                        email: e.target.value,
+                      })
+                    }
+                    required
+                  />
+                </div>
+                <div>
+                  <Label htmlFor="faculty">Fakülte</Label>
+                  <Select
+                    value={createFormData.faculty}
+                    onValueChange={(value) => {
+                      const selectedFaculty = mockFaculties.find(
+                        (f) => f.name === value
+                      )
+                      setCreateFormData({
+                        ...createFormData,
+                        faculty: value,
+                        department: "", // Reset department when faculty changes
+                      })
+                      setCreateDepartments(selectedFaculty?.departments || [])
+                    }}
                   >
                     <SelectTrigger className="w-full">
-                      <SelectValue placeholder={createFormData.department ? "Danışman seçin..." : "Önce bölüm seçin"} />
+                      <SelectValue placeholder="Fakülte seçin..." />
                     </SelectTrigger>
                     <SelectContent>
-                      {departmentAdvisors.length === 0 ? (
-                        <SelectItem value="no-advisors" disabled>
-                          Bu bölümde danışman bulunamadı
+                      {mockFaculties.map((faculty) => (
+                        <SelectItem key={faculty.id} value={faculty.name}>
+                          {faculty.name}
                         </SelectItem>
-                      ) : (
-                        departmentAdvisors.map((staff) => (
-                          <SelectItem key={staff.id} value={staff.id}>
-                            {staff.first_name} {staff.last_name}
-                          </SelectItem>
-                        ))
-                      )}
+                      ))}
                     </SelectContent>
                   </Select>
-                )}
-                {createFormData.department && !loadingAdvisors && departmentAdvisors.length > 0 && (
-                  <p className="mt-1 text-xs text-green-600">
-                    {departmentAdvisors.length} danışman bulundu
-                  </p>
-                )}
-              </div>
-              <div>
-                <Label htmlFor="enrollment_year">Enrollment Year</Label>
-                <Input
-                  id="enrollment_year"
-                  type="number"
-                  value={createFormData.enrollment_year}
-                  onChange={(e) =>
-                    setCreateFormData({ ...createFormData, enrollment_year: parseInt(e.target.value) })
-                  }
-                  required
-                />
-              </div>
-              <div>
-                <Label htmlFor="class_level">Class Level</Label>
-                <Input
-                  id="class_level"
-                  type="number"
-                  min="1"
-                  max="6"
-                  value={createFormData.class_level}
-                  onChange={(e) =>
-                    setCreateFormData({ ...createFormData, class_level: parseInt(e.target.value) })
-                  }
-                  required
-                />
-              </div>
-              <div className="flex justify-end space-x-2">
-                <Button type="button" variant="outline" onClick={() => setIsCreateOpen(false)}>
-                  Cancel
-                </Button>
-                <Button type="submit">Create</Button>
-              </div>
-            </form>
-          </DialogContent>
-        </Dialog>
+                </div>
+                <div>
+                  <Label htmlFor="department">Bölüm</Label>
+                  <Select
+                    value={createFormData.department}
+                    onValueChange={(value) =>
+                      setCreateFormData({
+                        ...createFormData,
+                        department: value,
+                      })
+                    }
+                    disabled={!createFormData.faculty}
+                  >
+                    <SelectTrigger className="w-full">
+                      <SelectValue
+                        placeholder={
+                          createFormData.faculty
+                            ? "Bölüm seçin..."
+                            : "Önce fakülte seçin"
+                        }
+                      />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {createDepartments.map((dept) => (
+                        <SelectItem key={dept.id} value={dept.name}>
+                          {dept.name}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+                <div>
+                  <Label htmlFor="advisor">
+                    Danışman
+                    {loadingAdvisors && (
+                      <Loader2 className="ml-2 inline h-4 w-4 animate-spin" />
+                    )}
+                  </Label>
+                  {loadingAdvisors ? (
+                    <div className="mt-1.5 rounded-md border p-2 text-sm text-muted-foreground">
+                      Danışmanlar yükleniyor...
+                    </div>
+                  ) : (
+                    <Select
+                      value={createFormData.advisor_id}
+                      onValueChange={(value) =>
+                        setCreateFormData({
+                          ...createFormData,
+                          advisor_id: value,
+                        })
+                      }
+                      disabled={!createFormData.department}
+                    >
+                      <SelectTrigger className="w-full">
+                        <SelectValue
+                          placeholder={
+                            createFormData.department
+                              ? "Danışman seçin..."
+                              : "Önce bölüm seçin"
+                          }
+                        />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {departmentAdvisors.length === 0 ? (
+                          <SelectItem value="no-advisors" disabled>
+                            Bu bölümde danışman bulunamadı
+                          </SelectItem>
+                        ) : (
+                          departmentAdvisors.map((staff) => (
+                            <SelectItem key={staff.id} value={staff.id}>
+                              {staff.first_name} {staff.last_name}
+                            </SelectItem>
+                          ))
+                        )}
+                      </SelectContent>
+                    </Select>
+                  )}
+                  {createFormData.department &&
+                    !loadingAdvisors &&
+                    departmentAdvisors.length > 0 && (
+                      <p className="mt-1 text-xs text-green-600">
+                        {departmentAdvisors.length} danışman bulundu
+                      </p>
+                    )}
+                </div>
+                <div>
+                  <Label htmlFor="enrollment_year">Enrollment Year</Label>
+                  <Input
+                    id="enrollment_year"
+                    type="number"
+                    value={createFormData.enrollment_year}
+                    onChange={(e) =>
+                      setCreateFormData({
+                        ...createFormData,
+                        enrollment_year: parseInt(e.target.value),
+                      })
+                    }
+                    required
+                  />
+                </div>
+                <div>
+                  <Label htmlFor="class_level">Class Level</Label>
+                  <Input
+                    id="class_level"
+                    type="number"
+                    min="1"
+                    max="6"
+                    value={createFormData.class_level}
+                    onChange={(e) =>
+                      setCreateFormData({
+                        ...createFormData,
+                        class_level: parseInt(e.target.value),
+                      })
+                    }
+                    required
+                  />
+                </div>
+                <div className="flex justify-end space-x-2">
+                  <Button
+                    type="button"
+                    variant="outline"
+                    onClick={() => setIsCreateOpen(false)}
+                  >
+                    Cancel
+                  </Button>
+                  <Button type="submit">Create</Button>
+                </div>
+              </form>
+            </DialogContent>
+          </Dialog>
         </div>
       </div>
 
@@ -599,82 +683,82 @@ export default function StudentsPage() {
                 <TableHead>
                   <Button
                     variant="ghost"
-                    onClick={() => handleSort('student_number')}
+                    onClick={() => handleSort("student_number")}
                     className="flex items-center"
                   >
                     Student Number
-                    {getSortIcon('student_number')}
+                    {getSortIcon("student_number")}
                   </Button>
                 </TableHead>
                 <TableHead>
                   <Button
                     variant="ghost"
-                    onClick={() => handleSort('first_name')}
+                    onClick={() => handleSort("first_name")}
                     className="flex items-center"
                   >
                     Name
-                    {getSortIcon('first_name')}
+                    {getSortIcon("first_name")}
                   </Button>
                 </TableHead>
                 <TableHead>
                   <Button
                     variant="ghost"
-                    onClick={() => handleSort('email')}
+                    onClick={() => handleSort("email")}
                     className="flex items-center"
                   >
                     Email
-                    {getSortIcon('email')}
+                    {getSortIcon("email")}
                   </Button>
                 </TableHead>
                 <TableHead>
                   <Button
                     variant="ghost"
-                    onClick={() => handleSort('faculty')}
+                    onClick={() => handleSort("faculty")}
                     className="flex items-center"
                   >
                     Faculty
-                    {getSortIcon('faculty')}
+                    {getSortIcon("faculty")}
                   </Button>
                 </TableHead>
                 <TableHead>
                   <Button
                     variant="ghost"
-                    onClick={() => handleSort('department')}
+                    onClick={() => handleSort("department")}
                     className="flex items-center"
                   >
                     Department
-                    {getSortIcon('department')}
+                    {getSortIcon("department")}
                   </Button>
                 </TableHead>
                 <TableHead>
                   <Button
                     variant="ghost"
-                    onClick={() => handleSort('enrollment_year')}
+                    onClick={() => handleSort("enrollment_year")}
                     className="flex items-center"
                   >
                     Enrollment Year
-                    {getSortIcon('enrollment_year')}
+                    {getSortIcon("enrollment_year")}
                   </Button>
                 </TableHead>
                 <TableHead>
                   <Button
                     variant="ghost"
-                    onClick={() => handleSort('class_level')}
+                    onClick={() => handleSort("class_level")}
                     className="flex items-center"
                   >
                     Class Level
-                    {getSortIcon('class_level')}
+                    {getSortIcon("class_level")}
                   </Button>
                 </TableHead>
                 <TableHead>Advisor</TableHead>
                 <TableHead>
                   <Button
                     variant="ghost"
-                    onClick={() => handleSort('status')}
+                    onClick={() => handleSort("status")}
                     className="flex items-center"
                   >
                     Status
-                    {getSortIcon('status')}
+                    {getSortIcon("status")}
                   </Button>
                 </TableHead>
                 <TableHead>Actions</TableHead>
@@ -683,7 +767,9 @@ export default function StudentsPage() {
             <TableBody>
               {sortedStudentList.map((student) => (
                 <TableRow key={student.id}>
-                  <TableCell className="font-medium">{student.student_number}</TableCell>
+                  <TableCell className="font-medium">
+                    {student.student_number}
+                  </TableCell>
                   <TableCell>
                     {student.first_name} {student.last_name}
                   </TableCell>
@@ -695,20 +781,23 @@ export default function StudentsPage() {
                   <TableCell>
                     {student.advisor_name || (student as any).advisor ? (
                       <span className="text-sm">
-                        {student.advisor_name || `${(student as any).advisor?.first_name} ${(student as any).advisor?.last_name}`}
+                        {student.advisor_name ||
+                          `${(student as any).advisor?.first_name} ${(student as any).advisor?.last_name}`}
                       </span>
                     ) : (
-                      <span className="text-sm text-muted-foreground">No Advisor</span>
+                      <span className="text-sm text-muted-foreground">
+                        No Advisor
+                      </span>
                     )}
                   </TableCell>
                   <TableCell>
                     <Badge
                       variant={
-                        student.status === 'active'
-                          ? 'default'
-                          : student.status === 'graduated'
-                          ? 'secondary'
-                          : 'destructive'
+                        student.status === "active"
+                          ? "default"
+                          : student.status === "graduated"
+                            ? "secondary"
+                            : "destructive"
                       }
                     >
                       {student.status}
@@ -716,7 +805,11 @@ export default function StudentsPage() {
                   </TableCell>
                   <TableCell>
                     <div className="flex space-x-2">
-                      <Button variant="outline" size="sm" onClick={() => openEditModal(student)}>
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={() => openEditModal(student)}
+                      >
                         Edit
                       </Button>
                       <Button
@@ -733,7 +826,7 @@ export default function StudentsPage() {
             </TableBody>
           </Table>
 
-          <div className="flex justify-between items-center mt-4">
+          <div className="mt-4 flex items-center justify-between">
             <Button
               variant="outline"
               onClick={() => setCurrentPage((prev) => Math.max(prev - 1, 1))}
@@ -746,7 +839,9 @@ export default function StudentsPage() {
             </span>
             <Button
               variant="outline"
-              onClick={() => setCurrentPage((prev) => Math.min(prev + 1, totalPages))}
+              onClick={() =>
+                setCurrentPage((prev) => Math.min(prev + 1, totalPages))
+              }
               disabled={currentPage === totalPages}
             >
               Next
@@ -761,7 +856,8 @@ export default function StudentsPage() {
           <DialogHeader>
             <DialogTitle>Edit Student</DialogTitle>
             <DialogDescription>
-              Update student information. Note: Only class level and status can be changed.
+              Update student information. Note: Only class level and status can
+              be changed.
             </DialogDescription>
           </DialogHeader>
           <form onSubmit={handleUpdateStudent} className="space-y-4">
@@ -832,7 +928,10 @@ export default function StudentsPage() {
                 max="6"
                 value={updateFormData.class_level}
                 onChange={(e) =>
-                  setUpdateFormData({ ...updateFormData, class_level: parseInt(e.target.value) })
+                  setUpdateFormData({
+                    ...updateFormData,
+                    class_level: parseInt(e.target.value),
+                  })
                 }
                 required
               />
@@ -843,9 +942,12 @@ export default function StudentsPage() {
                 id="edit_status"
                 value={updateFormData.status}
                 onChange={(e) =>
-                  setUpdateFormData({ ...updateFormData, status: e.target.value })
+                  setUpdateFormData({
+                    ...updateFormData,
+                    status: e.target.value,
+                  })
                 }
-                className="w-full border rounded-md p-2"
+                className="w-full rounded-md border p-2"
                 required
               >
                 <option value="active">Active</option>
@@ -858,11 +960,11 @@ export default function StudentsPage() {
               <Label htmlFor="edit_advisor">
                 Danışman
                 {loadingEditAdvisors && (
-                  <Loader2 className="ml-2 h-4 w-4 animate-spin inline" />
+                  <Loader2 className="ml-2 inline h-4 w-4 animate-spin" />
                 )}
               </Label>
               {loadingEditAdvisors ? (
-                <div className="mt-1.5 p-2 border rounded-md text-sm text-muted-foreground">
+                <div className="mt-1.5 rounded-md border p-2 text-sm text-muted-foreground">
                   Danışmanlar yükleniyor...
                 </div>
               ) : (
@@ -892,12 +994,17 @@ export default function StudentsPage() {
               )}
               {!loadingEditAdvisors && editDepartmentAdvisors.length > 0 && (
                 <p className="mt-1 text-xs text-green-600">
-                  {editDepartmentAdvisors.length} danışman bulundu ({updateFormData.department})
+                  {editDepartmentAdvisors.length} danışman bulundu (
+                  {updateFormData.department})
                 </p>
               )}
             </div>
             <div className="flex justify-end space-x-2">
-              <Button type="button" variant="outline" onClick={() => setIsEditOpen(false)}>
+              <Button
+                type="button"
+                variant="outline"
+                onClick={() => setIsEditOpen(false)}
+              >
                 Cancel
               </Button>
               <Button type="submit">Update</Button>

@@ -1,6 +1,5 @@
-
-import { useState } from 'react';
-import type { EnrollmentProgramResponse } from '@/lib/types';
+import { useState } from "react"
+import type { EnrollmentProgramResponse } from "@/lib/types"
 import {
   Dialog,
   DialogContent,
@@ -8,9 +7,9 @@ import {
   DialogTitle,
   DialogFooter,
   DialogDescription,
-} from '@/components/ui/dialog';
-import { Button } from '@/components/ui/button';
-import { Textarea } from '@/components/ui/textarea';
+} from "@/components/ui/dialog"
+import { Button } from "@/components/ui/button"
+import { Textarea } from "@/components/ui/textarea"
 import {
   Table,
   TableBody,
@@ -18,15 +17,15 @@ import {
   TableHead,
   TableHeader,
   TableRow,
-} from '@/components/ui/table';
-import { AlertCircle, Check, X, BookOpen, User } from 'lucide-react';
+} from "@/components/ui/table"
+import { AlertCircle, Check, X, BookOpen, User } from "lucide-react"
 
 interface EnrollmentReviewDialogProps {
-  program: EnrollmentProgramResponse | null;
-  isOpen: boolean;
-  onClose: () => void;
-  onApprove: (programId: string) => Promise<void>;
-  onReject: (programId: string, reason: string) => Promise<void>;
+  program: EnrollmentProgramResponse | null
+  isOpen: boolean
+  onClose: () => void
+  onApprove: (programId: string) => Promise<void>
+  onReject: (programId: string, reason: string) => Promise<void>
 }
 
 export function EnrollmentReviewDialog({
@@ -36,52 +35,55 @@ export function EnrollmentReviewDialog({
   onApprove,
   onReject,
 }: EnrollmentReviewDialogProps) {
-  const [rejectReason, setRejectReason] = useState('');
-  const [isRejecting, setIsRejecting] = useState(false);
-  const [isSubmitting, setIsSubmitting] = useState(false);
+  const [rejectReason, setRejectReason] = useState("")
+  const [isRejecting, setIsRejecting] = useState(false)
+  const [isSubmitting, setIsSubmitting] = useState(false)
 
-  if (!program) return null;
+  if (!program) return null
 
   const handleApprove = async () => {
     try {
-      setIsSubmitting(true);
-      await onApprove(program.id);
-      onClose();
+      setIsSubmitting(true)
+      await onApprove(program.id)
+      onClose()
     } catch (error) {
-      console.error('Onaylama hatası:', error);
-      alert('Onaylama işlemi başarısız oldu.');
+      console.error("Onaylama hatası:", error)
+      alert("Onaylama işlemi başarısız oldu.")
     } finally {
-      setIsSubmitting(false);
+      setIsSubmitting(false)
     }
-  };
+  }
 
   const handleReject = async () => {
     if (!rejectReason.trim()) {
-      alert('Lütfen ret nedeni giriniz.');
-      return;
+      alert("Lütfen ret nedeni giriniz.")
+      return
     }
 
     try {
-      setIsSubmitting(true);
-      await onReject(program.id, rejectReason);
-      onClose();
+      setIsSubmitting(true)
+      await onReject(program.id, rejectReason)
+      onClose()
     } catch (error) {
-      console.error('Reddetme hatası:', error);
-      alert('Reddetme işlemi başarısız oldu.');
+      console.error("Reddetme hatası:", error)
+      alert("Reddetme işlemi başarısız oldu.")
     } finally {
-      setIsSubmitting(false);
-      setIsRejecting(false);
-      setRejectReason('');
+      setIsSubmitting(false)
+      setIsRejecting(false)
+      setRejectReason("")
     }
-  };
+  }
 
-  const totalCredits = program.courses.reduce((sum, course) => sum + course.credits, 0);
+  const totalCredits = program.courses.reduce(
+    (sum, course) => sum + course.credits,
+    0
+  )
 
   return (
     <Dialog open={isOpen} onOpenChange={(open) => !open && onClose()}>
-      <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto">
+      <DialogContent className="max-h-[90vh] max-w-4xl overflow-y-auto">
         <DialogHeader>
-          <DialogTitle className="text-2xl font-bold flex items-center gap-2">
+          <DialogTitle className="flex items-center gap-2 text-2xl font-bold">
             <BookOpen className="h-6 w-6 text-blue-600" />
             Ders Kaydı İnceleme
           </DialogTitle>
@@ -92,29 +94,41 @@ export function EnrollmentReviewDialog({
 
         <div className="grid gap-6 py-4">
           {/* Student Info */}
-          <div className="flex items-start gap-4 p-4 bg-gray-50 dark:bg-gray-800 rounded-lg border border-gray-100 dark:border-gray-700">
-             <div className="p-2 bg-white dark:bg-gray-700 rounded-full shadow-sm">
-                <User className="h-6 w-6 text-blue-600 dark:text-blue-400" />
-             </div>
-             <div>
-                <h3 className="text-lg font-semibold text-gray-900 dark:text-white">
-                  {program.student_name || 'Öğrenci Adı Yok'}
-                </h3>
-                <div className="flex flex-wrap gap-x-6 gap-y-1 mt-1 text-sm text-gray-500 dark:text-gray-400">
-                  <span className="flex items-center gap-1">
-                     <span className="font-medium text-gray-700 dark:text-gray-300">Numara:</span> {program.student_number}
-                  </span>
-                   <span className="flex items-center gap-1">
-                     <span className="font-medium text-gray-700 dark:text-gray-300">Dönem:</span> {program.semester}
-                  </span>
-                   <span className="flex items-center gap-1">
-                     <span className="font-medium text-gray-700 dark:text-gray-300">Sınıf:</span> {program.class_level}. Sınıf
-                  </span>
-                  <span className="flex items-center gap-1">
-                     <span className="font-medium text-gray-700 dark:text-gray-300">Bölüm:</span> {program.department}
-                  </span>
-                </div>
-             </div>
+          <div className="flex items-start gap-4 rounded-lg border border-gray-100 bg-gray-50 p-4 dark:border-gray-700 dark:bg-gray-800">
+            <div className="rounded-full bg-white p-2 shadow-sm dark:bg-gray-700">
+              <User className="h-6 w-6 text-blue-600 dark:text-blue-400" />
+            </div>
+            <div>
+              <h3 className="text-lg font-semibold text-gray-900 dark:text-white">
+                {program.student_name || "Öğrenci Adı Yok"}
+              </h3>
+              <div className="mt-1 flex flex-wrap gap-x-6 gap-y-1 text-sm text-gray-500 dark:text-gray-400">
+                <span className="flex items-center gap-1">
+                  <span className="font-medium text-gray-700 dark:text-gray-300">
+                    Numara:
+                  </span>{" "}
+                  {program.student_number}
+                </span>
+                <span className="flex items-center gap-1">
+                  <span className="font-medium text-gray-700 dark:text-gray-300">
+                    Dönem:
+                  </span>{" "}
+                  {program.semester}
+                </span>
+                <span className="flex items-center gap-1">
+                  <span className="font-medium text-gray-700 dark:text-gray-300">
+                    Sınıf:
+                  </span>{" "}
+                  {program.class_level}. Sınıf
+                </span>
+                <span className="flex items-center gap-1">
+                  <span className="font-medium text-gray-700 dark:text-gray-300">
+                    Bölüm:
+                  </span>{" "}
+                  {program.department}
+                </span>
+              </div>
+            </div>
           </div>
 
           {/* Courses Table */}
@@ -131,14 +145,18 @@ export function EnrollmentReviewDialog({
               <TableBody>
                 {program.courses.map((course) => (
                   <TableRow key={course.id}>
-                    <TableCell className="font-medium">{course.course_code}</TableCell>
+                    <TableCell className="font-medium">
+                      {course.course_code}
+                    </TableCell>
                     <TableCell>{course.course_name}</TableCell>
                     <TableCell>{course.credits}</TableCell>
-                    <TableCell>{course.instructor || '-'}</TableCell>
+                    <TableCell>{course.instructor || "-"}</TableCell>
                   </TableRow>
                 ))}
-                <TableRow className="bg-gray-50 dark:bg-gray-800/50 font-medium">
-                  <TableCell colSpan={2} className="text-right">Toplam:</TableCell>
+                <TableRow className="bg-gray-50 font-medium dark:bg-gray-800/50">
+                  <TableCell colSpan={2} className="text-right">
+                    Toplam:
+                  </TableCell>
                   <TableCell>{totalCredits}</TableCell>
                   <TableCell></TableCell>
                 </TableRow>
@@ -148,8 +166,8 @@ export function EnrollmentReviewDialog({
 
           {/* Rejection UI */}
           {isRejecting && (
-            <div className="space-y-2 animate-in fade-in slide-in-from-top-2">
-              <div className="flex items-center gap-2 text-red-600 font-medium">
+            <div className="animate-in space-y-2 fade-in slide-in-from-top-2">
+              <div className="flex items-center gap-2 font-medium text-red-600">
                 <AlertCircle className="h-4 w-4" />
                 Ret Nedeni
               </div>
@@ -185,7 +203,7 @@ export function EnrollmentReviewDialog({
               <Button
                 onClick={handleApprove}
                 disabled={isSubmitting}
-                className="bg-green-600 hover:bg-green-700 gap-2"
+                className="gap-2 bg-green-600 hover:bg-green-700"
               >
                 <Check className="h-4 w-4" />
                 Onayla
@@ -196,8 +214,8 @@ export function EnrollmentReviewDialog({
               <Button
                 variant="ghost"
                 onClick={() => {
-                  setIsRejecting(false);
-                  setRejectReason('');
+                  setIsRejecting(false)
+                  setRejectReason("")
                 }}
                 disabled={isSubmitting}
               >
@@ -217,5 +235,5 @@ export function EnrollmentReviewDialog({
         </DialogFooter>
       </DialogContent>
     </Dialog>
-  );
+  )
 }

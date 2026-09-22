@@ -1,35 +1,39 @@
-import { useState } from "react";
-import { Link } from "react-router";
-import { authApi } from "@/lib/api-client";
-import { apiErrorMessage } from "@/lib/api-error";
+import { useState } from "react"
+import { Link } from "react-router"
+import { authApi } from "@/lib/api-client"
+import { apiErrorMessage } from "@/lib/api-error"
 
 export default function ForgotPasswordPage() {
-  const [email, setEmail] = useState("");
-  const [sent, setSent] = useState(false);
-  const [error, setError] = useState("");
-  const [loading, setLoading] = useState(false);
+  const [email, setEmail] = useState("")
+  const [sent, setSent] = useState(false)
+  const [error, setError] = useState("")
+  const [loading, setLoading] = useState(false)
 
   const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-    setError("");
-    setLoading(true);
+    e.preventDefault()
+    setError("")
+    setLoading(true)
     try {
-      await authApi.post("request-password-reset", { json: { email } });
+      await authApi.post("request-password-reset", { json: { email } })
       // Same confirmation whether or not the address has an account — the
       // backend does not tell, and neither may the page.
-      setSent(true);
+      setSent(true)
     } catch (err) {
-      setError(await apiErrorMessage(err, "İstek gönderilemedi, lütfen tekrar deneyin"));
+      setError(
+        await apiErrorMessage(err, "İstek gönderilemedi, lütfen tekrar deneyin")
+      )
     } finally {
-      setLoading(false);
+      setLoading(false)
     }
-  };
+  }
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-gray-50">
-      <div className="max-w-md w-full space-y-8 p-8 bg-white rounded-lg shadow-md">
+    <div className="flex min-h-screen items-center justify-center bg-gray-50">
+      <div className="w-full max-w-md space-y-8 rounded-lg bg-white p-8 shadow-md">
         <div>
-          <h2 className="mt-6 text-center text-3xl font-extrabold text-gray-900">Şifremi Unuttum</h2>
+          <h2 className="mt-6 text-center text-3xl font-extrabold text-gray-900">
+            Şifremi Unuttum
+          </h2>
           <p className="mt-2 text-center text-sm text-gray-600">
             E-posta adresinize bir sıfırlama bağlantısı göndereceğiz
           </p>
@@ -37,8 +41,8 @@ export default function ForgotPasswordPage() {
         {sent ? (
           <div className="rounded-md bg-green-50 p-4">
             <p className="text-sm text-green-800">
-              Bu adrese kayıtlı bir hesap varsa şifre sıfırlama bağlantısı gönderildi. Bağlantı 1 saat
-              geçerlidir.
+              Bu adrese kayıtlı bir hesap varsa şifre sıfırlama bağlantısı
+              gönderildi. Bağlantı 1 saat geçerlidir.
             </p>
           </div>
         ) : (
@@ -49,7 +53,10 @@ export default function ForgotPasswordPage() {
               </div>
             )}
             <div>
-              <label htmlFor="email" className="block text-sm font-medium text-gray-700">
+              <label
+                htmlFor="email"
+                className="block text-sm font-medium text-gray-700"
+              >
                 E-posta
               </label>
               <input
@@ -58,7 +65,7 @@ export default function ForgotPasswordPage() {
                 type="email"
                 autoComplete="email"
                 required
-                className="mt-1 appearance-none relative block w-full px-3 py-2 border border-gray-300 placeholder-gray-500 text-gray-900 rounded-md focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm"
+                className="relative mt-1 block w-full appearance-none rounded-md border border-gray-300 px-3 py-2 text-gray-900 placeholder-gray-500 focus:border-indigo-500 focus:ring-indigo-500 focus:outline-none sm:text-sm"
                 placeholder="E-posta adresi"
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
@@ -68,18 +75,21 @@ export default function ForgotPasswordPage() {
             <button
               type="submit"
               disabled={loading}
-              className="group relative w-full flex justify-center py-2 px-4 border border-transparent text-sm font-medium rounded-md text-white bg-indigo-600 hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 disabled:opacity-50 disabled:cursor-not-allowed"
+              className="group relative flex w-full justify-center rounded-md border border-transparent bg-indigo-600 px-4 py-2 text-sm font-medium text-white hover:bg-indigo-700 focus:ring-2 focus:ring-indigo-500 focus:ring-offset-2 focus:outline-none disabled:cursor-not-allowed disabled:opacity-50"
             >
               {loading ? "Gönderiliyor..." : "Bağlantı Gönder"}
             </button>
           </form>
         )}
         <p className="text-center text-sm">
-          <Link to="/auth/login" className="font-medium text-indigo-600 hover:text-indigo-500">
+          <Link
+            to="/auth/login"
+            className="font-medium text-indigo-600 hover:text-indigo-500"
+          >
             Girişe dön
           </Link>
         </p>
       </div>
     </div>
-  );
+  )
 }

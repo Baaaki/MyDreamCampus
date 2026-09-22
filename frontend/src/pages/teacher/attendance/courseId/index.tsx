@@ -1,8 +1,18 @@
-
-import { useState, useEffect } from 'react';
-import { useParams, useNavigate } from 'react-router';
-import { Link } from 'react-router';
-import { ArrowLeft, Play, Users, Calendar, Clock, MapPin, Loader2, AlertCircle, BookOpen, FlaskConical } from 'lucide-react';
+import { useState, useEffect } from "react"
+import { useParams, useNavigate } from "react-router"
+import { Link } from "react-router"
+import {
+  ArrowLeft,
+  Play,
+  Users,
+  Calendar,
+  Clock,
+  MapPin,
+  Loader2,
+  AlertCircle,
+  BookOpen,
+  FlaskConical,
+} from "lucide-react"
 import {
   Dialog,
   DialogContent,
@@ -10,81 +20,85 @@ import {
   DialogTitle,
   DialogDescription,
   DialogFooter,
-} from '@/components/ui/dialog';
-import { Button } from '@/components/ui/button';
-import { attendanceApi, semesterApi } from '@/lib/api-client';
-import type { TeacherCourse, TeacherCoursesResponse } from '@/lib/types';
+} from "@/components/ui/dialog"
+import { Button } from "@/components/ui/button"
+import { attendanceApi, semesterApi } from "@/lib/api-client"
+import type { TeacherCourse, TeacherCoursesResponse } from "@/lib/types"
 
-const WEEKS = Array.from({ length: 14 }, (_, i) => i + 1);
+const WEEKS = Array.from({ length: 14 }, (_, i) => i + 1)
 
 export default function AttendanceStartPage() {
-  const params = useParams();
-  const navigate = useNavigate();
-  const courseId = params.courseId as string;
+  const params = useParams()
+  const navigate = useNavigate()
+  const courseId = params.courseId as string
 
-  const [course, setCourse] = useState<TeacherCourse | null>(null);
-  const [pageLoading, setPageLoading] = useState(true);
-  const [pageError, setPageError] = useState('');
+  const [course, setCourse] = useState<TeacherCourse | null>(null)
+  const [pageLoading, setPageLoading] = useState(true)
+  const [pageError, setPageError] = useState("")
 
-  const [dialogOpen, setDialogOpen] = useState(false);
-  const [selectedWeek, setSelectedWeek] = useState<number | null>(null);
-  const [sessionType, setSessionType] = useState<'theory' | 'lab'>('theory');
-  const [duration, setDuration] = useState(30);
-  const [loading, setLoading] = useState(false);
-  const [error, setError] = useState('');
+  const [dialogOpen, setDialogOpen] = useState(false)
+  const [selectedWeek, setSelectedWeek] = useState<number | null>(null)
+  const [sessionType, setSessionType] = useState<"theory" | "lab">("theory")
+  const [duration, setDuration] = useState(30)
+  const [loading, setLoading] = useState(false)
+  const [error, setError] = useState("")
 
   useEffect(() => {
     const fetchCourse = async () => {
       try {
-        const response = await semesterApi.get('teacher/courses').json<TeacherCoursesResponse>();
-        const foundCourse = response.courses?.find((c) => c.id === courseId);
+        const response = await semesterApi
+          .get("teacher/courses")
+          .json<TeacherCoursesResponse>()
+        const foundCourse = response.courses?.find((c) => c.id === courseId)
         if (foundCourse) {
-          setCourse(foundCourse);
+          setCourse(foundCourse)
         } else {
-          setPageError('Ders bulunamadı.');
+          setPageError("Ders bulunamadı.")
         }
       } catch (err: any) {
-        console.error('Failed to fetch course:', err);
-        setPageError('Ders bilgileri yüklenirken bir hata oluştu.');
+        console.error("Failed to fetch course:", err)
+        setPageError("Ders bilgileri yüklenirken bir hata oluştu.")
       } finally {
-        setPageLoading(false);
+        setPageLoading(false)
       }
-    };
+    }
 
-    fetchCourse();
-  }, [courseId]);
+    fetchCourse()
+  }, [courseId])
 
   const handleStartAttendance = async () => {
-    if (!selectedWeek) return;
+    if (!selectedWeek) return
 
-    setLoading(true);
-    setError('');
+    setLoading(true)
+    setError("")
 
     try {
-      const response = await attendanceApi.post('sessions', {
-        json: {
-          course_id: courseId,
-          week_number: selectedWeek,
-          duration_minutes: duration,
-          session_type: sessionType,
-        },
-      }).json<{ session_id: string }>();
+      const response = await attendanceApi
+        .post("sessions", {
+          json: {
+            course_id: courseId,
+            week_number: selectedWeek,
+            duration_minutes: duration,
+            session_type: sessionType,
+          },
+        })
+        .json<{ session_id: string }>()
 
-      setDialogOpen(false);
-      navigate(`/teacher/attendance/${courseId}/session/${response.session_id}`);
+      setDialogOpen(false)
+      navigate(`/teacher/attendance/${courseId}/session/${response.session_id}`)
     } catch (err: any) {
-      setError(err.message || 'Yoklama başlatılamadı. Lütfen tekrar deneyin.');
+      setError(err.message || "Yoklama başlatılamadı. Lütfen tekrar deneyin.")
     } finally {
-      setLoading(false);
+      setLoading(false)
     }
-  };
+  }
 
   if (pageLoading) {
     return (
       <div className="flex h-96 items-center justify-center">
         <Loader2 className="h-8 w-8 animate-spin text-blue-600" />
       </div>
-    );
+    )
   }
 
   if (pageError || !course) {
@@ -100,11 +114,11 @@ export default function AttendanceStartPage() {
         <div className="flex flex-col items-center justify-center gap-4 rounded-xl border border-dashed border-gray-300 bg-gray-50 p-12 dark:border-gray-700 dark:bg-gray-900">
           <AlertCircle className="h-12 w-12 text-red-500" />
           <p className="text-red-600 dark:text-red-400">
-            {pageError || 'Ders bulunamadı.'}
+            {pageError || "Ders bulunamadı."}
           </p>
         </div>
       </div>
-    );
+    )
   }
 
   return (
@@ -197,8 +211,8 @@ export default function AttendanceStartPage() {
             <DialogTitle>Yoklama Oturumu Başlat</DialogTitle>
             <DialogDescription>
               {course.lab_hours > 0
-                ? 'Yoklama alınacak haftayı, ders türünü ve süreyi seçin.'
-                : 'Yoklama alınacak haftayı ve süreyi seçin.'}
+                ? "Yoklama alınacak haftayı, ders türünü ve süreyi seçin."
+                : "Yoklama alınacak haftayı ve süreyi seçin."}
             </DialogDescription>
           </DialogHeader>
 
@@ -215,8 +229,8 @@ export default function AttendanceStartPage() {
                     onClick={() => setSelectedWeek(week)}
                     className={`flex h-10 w-10 items-center justify-center rounded-lg text-sm font-medium transition-colors ${
                       selectedWeek === week
-                        ? 'bg-blue-600 text-white'
-                        : 'bg-gray-100 text-gray-700 hover:bg-gray-200 dark:bg-gray-800 dark:text-gray-300 dark:hover:bg-gray-700'
+                        ? "bg-blue-600 text-white"
+                        : "bg-gray-100 text-gray-700 hover:bg-gray-200 dark:bg-gray-800 dark:text-gray-300 dark:hover:bg-gray-700"
                     }`}
                   >
                     {week}
@@ -234,11 +248,11 @@ export default function AttendanceStartPage() {
                 <div className="grid grid-cols-2 gap-3">
                   <button
                     type="button"
-                    onClick={() => setSessionType('theory')}
+                    onClick={() => setSessionType("theory")}
                     className={`flex items-center justify-center gap-2 rounded-lg border-2 px-4 py-3 text-sm font-medium transition-all ${
-                      sessionType === 'theory'
-                        ? 'border-blue-500 bg-blue-50 text-blue-700 dark:border-blue-400 dark:bg-blue-900/30 dark:text-blue-300'
-                        : 'border-gray-200 bg-white text-gray-600 hover:border-gray-300 hover:bg-gray-50 dark:border-gray-700 dark:bg-gray-800 dark:text-gray-400 dark:hover:border-gray-600'
+                      sessionType === "theory"
+                        ? "border-blue-500 bg-blue-50 text-blue-700 dark:border-blue-400 dark:bg-blue-900/30 dark:text-blue-300"
+                        : "border-gray-200 bg-white text-gray-600 hover:border-gray-300 hover:bg-gray-50 dark:border-gray-700 dark:bg-gray-800 dark:text-gray-400 dark:hover:border-gray-600"
                     }`}
                   >
                     <BookOpen className="h-4 w-4" />
@@ -246,11 +260,11 @@ export default function AttendanceStartPage() {
                   </button>
                   <button
                     type="button"
-                    onClick={() => setSessionType('lab')}
+                    onClick={() => setSessionType("lab")}
                     className={`flex items-center justify-center gap-2 rounded-lg border-2 px-4 py-3 text-sm font-medium transition-all ${
-                      sessionType === 'lab'
-                        ? 'border-purple-500 bg-purple-50 text-purple-700 dark:border-purple-400 dark:bg-purple-900/30 dark:text-purple-300'
-                        : 'border-gray-200 bg-white text-gray-600 hover:border-gray-300 hover:bg-gray-50 dark:border-gray-700 dark:bg-gray-800 dark:text-gray-400 dark:hover:border-gray-600'
+                      sessionType === "lab"
+                        ? "border-purple-500 bg-purple-50 text-purple-700 dark:border-purple-400 dark:bg-purple-900/30 dark:text-purple-300"
+                        : "border-gray-200 bg-white text-gray-600 hover:border-gray-300 hover:bg-gray-50 dark:border-gray-700 dark:bg-gray-800 dark:text-gray-400 dark:hover:border-gray-600"
                     }`}
                   >
                     <FlaskConical className="h-4 w-4" />
@@ -310,5 +324,5 @@ export default function AttendanceStartPage() {
         </DialogContent>
       </Dialog>
     </div>
-  );
+  )
 }

@@ -1,14 +1,13 @@
-
-import { useState, useEffect, useMemo } from "react";
-import { staffApi } from "@/lib/api-client";
-import { Button } from "@/components/ui/button";
+import { useState, useEffect, useMemo } from "react"
+import { staffApi } from "@/lib/api-client"
+import { Button } from "@/components/ui/button"
 import {
   Dialog,
   DialogContent,
   DialogHeader,
   DialogTitle,
   DialogTrigger,
-} from "@/components/ui/dialog";
+} from "@/components/ui/dialog"
 import {
   Table,
   TableBody,
@@ -16,18 +15,27 @@ import {
   TableHead,
   TableHeader,
   TableRow,
-} from "@/components/ui/table";
-import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
-import { Badge } from "@/components/ui/badge";
-import { Plus, Pencil, Trash2, ArrowUpDown, ArrowUp, ArrowDown, Check, ChevronsUpDown } from "lucide-react";
+} from "@/components/ui/table"
+import { Input } from "@/components/ui/input"
+import { Label } from "@/components/ui/label"
+import { Badge } from "@/components/ui/badge"
+import {
+  Plus,
+  Pencil,
+  Trash2,
+  ArrowUpDown,
+  ArrowUp,
+  ArrowDown,
+  Check,
+  ChevronsUpDown,
+} from "lucide-react"
 import {
   Select,
   SelectContent,
   SelectItem,
   SelectTrigger,
   SelectValue,
-} from "@/components/ui/select";
+} from "@/components/ui/select"
 import {
   Command,
   CommandEmpty,
@@ -35,73 +43,79 @@ import {
   CommandInput,
   CommandItem,
   CommandList,
-} from "@/components/ui/command";
+} from "@/components/ui/command"
 import {
   Popover,
   PopoverContent,
   PopoverTrigger,
-} from "@/components/ui/popover";
-import { mockFaculties } from "@/mock_data/catalog";
+} from "@/components/ui/popover"
+import { mockFaculties } from "@/mock_data/catalog"
 
 interface Staff {
-  id: string;
-  email: string;
-  first_name: string;
-  last_name: string;
-  role: string;
-  faculty: string;
-  department: string;
-  phone: string;
-  office_location: string;
-  status: string;
-  created_at: string;
-  updated_at: string;
+  id: string
+  email: string
+  first_name: string
+  last_name: string
+  role: string
+  faculty: string
+  department: string
+  phone: string
+  office_location: string
+  status: string
+  created_at: string
+  updated_at: string
 }
 
 interface StaffListResponse {
-  data: Staff[];
+  data: Staff[]
   pagination: {
-    page: number;
-    limit: number;
-    total: number;
-    total_pages: number;
-  };
+    page: number
+    limit: number
+    total: number
+    total_pages: number
+  }
 }
 
-type SortField = 'first_name' | 'last_name' | 'email' | 'role' | 'department' | 'office_location';
-type SortDirection = 'asc' | 'desc';
+type SortField =
+  | "first_name"
+  | "last_name"
+  | "email"
+  | "role"
+  | "department"
+  | "office_location"
+type SortDirection = "asc" | "desc"
 
 // Role options based on backend validation
 const ROLE_OPTIONS = [
-  { value: 'teacher', label: 'Teacher' },
-  { value: 'admin', label: 'Admin' },
-  { value: 'department_head', label: 'Department Head' },
-  { value: 'dean', label: 'Dean' },
-  { value: 'rector', label: 'Rector' },
-  { value: 'advisor', label: 'Advisor' },
-];
+  { value: "teacher", label: "Teacher" },
+  { value: "admin", label: "Admin" },
+  { value: "department_head", label: "Department Head" },
+  { value: "dean", label: "Dean" },
+  { value: "rector", label: "Rector" },
+  { value: "advisor", label: "Advisor" },
+]
 
 export default function StaffPage() {
-  const [staffList, setStaffList] = useState<Staff[]>([]);
-  const [loading, setLoading] = useState(false);
-  const [error, setError] = useState("");
-  const [createDialogOpen, setCreateDialogOpen] = useState(false);
-  const [editDialogOpen, setEditDialogOpen] = useState(false);
-  const [editingStaff, setEditingStaff] = useState<Staff | null>(null);
-  const [page, setPage] = useState(1);
-  const [totalPages, setTotalPages] = useState(1);
-  const [sortField, setSortField] = useState<SortField>('first_name');
-  const [sortDirection, setSortDirection] = useState<SortDirection>('asc');
+  const [staffList, setStaffList] = useState<Staff[]>([])
+  const [loading, setLoading] = useState(false)
+  const [error, setError] = useState("")
+  const [createDialogOpen, setCreateDialogOpen] = useState(false)
+  const [editDialogOpen, setEditDialogOpen] = useState(false)
+  const [editingStaff, setEditingStaff] = useState<Staff | null>(null)
+  const [page, setPage] = useState(1)
+  const [totalPages, setTotalPages] = useState(1)
+  const [sortField, setSortField] = useState<SortField>("first_name")
+  const [sortDirection, setSortDirection] = useState<SortDirection>("asc")
 
   // UI state for faculty/department selection (faculty is only for filtering, not sent to backend)
-  const [selectedFaculty, setSelectedFaculty] = useState("");
-  const [facultyOpen, setFacultyOpen] = useState(false);
-  const [departmentOpen, setDepartmentOpen] = useState(false);
+  const [selectedFaculty, setSelectedFaculty] = useState("")
+  const [facultyOpen, setFacultyOpen] = useState(false)
+  const [departmentOpen, setDepartmentOpen] = useState(false)
 
   // UI state for edit form faculty/department selection
-  const [editSelectedFaculty, setEditSelectedFaculty] = useState("");
-  const [editFacultyOpen, setEditFacultyOpen] = useState(false);
-  const [editDepartmentOpen, setEditDepartmentOpen] = useState(false);
+  const [editSelectedFaculty, setEditSelectedFaculty] = useState("")
+  const [editFacultyOpen, setEditFacultyOpen] = useState(false)
+  const [editDepartmentOpen, setEditDepartmentOpen] = useState(false)
 
   // Form states - Backend DTO'ya uygun alanlar
   const [formData, setFormData] = useState({
@@ -112,21 +126,21 @@ export default function StaffPage() {
     department: "",
     phone: "",
     office_location: "",
-  });
+  })
 
   // Filtered departments based on selected faculty (for create form)
   const filteredDepartments = useMemo(() => {
-    if (!selectedFaculty) return [];
-    const faculty = mockFaculties.find(f => f.name === selectedFaculty);
-    return faculty?.departments || [];
-  }, [selectedFaculty]);
+    if (!selectedFaculty) return []
+    const faculty = mockFaculties.find((f) => f.name === selectedFaculty)
+    return faculty?.departments || []
+  }, [selectedFaculty])
 
   // Filtered departments based on selected faculty (for edit form)
   const editFilteredDepartments = useMemo(() => {
-    if (!editSelectedFaculty) return [];
-    const faculty = mockFaculties.find(f => f.name === editSelectedFaculty);
-    return faculty?.departments || [];
-  }, [editSelectedFaculty]);
+    if (!editSelectedFaculty) return []
+    const faculty = mockFaculties.find((f) => f.name === editSelectedFaculty)
+    return faculty?.departments || []
+  }, [editSelectedFaculty])
 
   // Update form for edit - tüm alanlar düzenlenebilir
   const [updateFormData, setUpdateFormData] = useState({
@@ -137,66 +151,66 @@ export default function StaffPage() {
     phone: "",
     office_location: "",
     status: "active",
-  });
+  })
 
   // Fetch staff list
   const fetchStaff = async (currentPage: number = 1) => {
-    setLoading(true);
-    setError("");
+    setLoading(true)
+    setError("")
     try {
       const response: StaffListResponse = await staffApi
         .get(`?page=${currentPage}&limit=10`)
-        .json();
+        .json()
 
-      setStaffList(response.data);
-      setPage(response.pagination.page);
-      setTotalPages(response.pagination.total_pages);
+      setStaffList(response.data)
+      setPage(response.pagination.page)
+      setTotalPages(response.pagination.total_pages)
     } catch (err: any) {
-      setError(err.message || "Failed to fetch staff");
+      setError(err.message || "Failed to fetch staff")
     } finally {
-      setLoading(false);
+      setLoading(false)
     }
-  };
+  }
 
   useEffect(() => {
-    fetchStaff();
-  }, []);
+    fetchStaff()
+  }, [])
 
   // Sorting fonksiyonu
   const handleSort = (field: SortField) => {
     if (sortField === field) {
       // Aynı sütuna tıklandıysa direction değiştir
-      setSortDirection(sortDirection === 'asc' ? 'desc' : 'asc');
+      setSortDirection(sortDirection === "asc" ? "desc" : "asc")
     } else {
       // Farklı sütuna tıklandıysa yeni field ve asc
-      setSortField(field);
-      setSortDirection('asc');
+      setSortField(field)
+      setSortDirection("asc")
     }
-  };
+  }
 
   // Sıralanmış staff listesi
   const sortedStaffList = [...staffList].sort((a, b) => {
-    let aValue = a[sortField] || '';
-    let bValue = b[sortField] || '';
+    let aValue = a[sortField] || ""
+    let bValue = b[sortField] || ""
 
     // String comparison
-    if (typeof aValue === 'string' && typeof bValue === 'string') {
-      aValue = aValue.toLowerCase();
-      bValue = bValue.toLowerCase();
+    if (typeof aValue === "string" && typeof bValue === "string") {
+      aValue = aValue.toLowerCase()
+      bValue = bValue.toLowerCase()
     }
 
-    if (sortDirection === 'asc') {
-      return aValue > bValue ? 1 : -1;
+    if (sortDirection === "asc") {
+      return aValue > bValue ? 1 : -1
     } else {
-      return aValue < bValue ? 1 : -1;
+      return aValue < bValue ? 1 : -1
     }
-  });
+  })
 
   // Create staff
   const handleCreate = async (e: React.FormEvent) => {
-    e.preventDefault();
-    setLoading(true);
-    setError("");
+    e.preventDefault()
+    setLoading(true)
+    setError("")
 
     try {
       // Backend DTO'ya uygun payload - sadece kabul edilen alanlar
@@ -208,14 +222,14 @@ export default function StaffPage() {
         department: formData.department,
         phone: formData.phone,
         office_location: formData.office_location,
-      };
-      
-      console.log("[Staff] Creating staff with payload:", payload);
-      
-      const response = await staffApi.post("", { json: payload }).json();
-      console.log("[Staff] Create response:", response);
-      
-      setCreateDialogOpen(false);
+      }
+
+      console.log("[Staff] Creating staff with payload:", payload)
+
+      const response = await staffApi.post("", { json: payload }).json()
+      console.log("[Staff] Create response:", response)
+
+      setCreateDialogOpen(false)
       setFormData({
         email: "",
         first_name: "",
@@ -224,36 +238,36 @@ export default function StaffPage() {
         department: "",
         phone: "",
         office_location: "",
-      });
-      setSelectedFaculty("");
-      fetchStaff(page);
+      })
+      setSelectedFaculty("")
+      fetchStaff(page)
     } catch (err: any) {
-      console.error("[Staff] Create error:", err);
+      console.error("[Staff] Create error:", err)
       // Try to get error message from response
-      let errorMessage = "Failed to create staff";
+      let errorMessage = "Failed to create staff"
       if (err.response) {
         try {
-          const errorBody = await err.response.json();
-          errorMessage = errorBody.message || errorBody.error || errorMessage;
+          const errorBody = await err.response.json()
+          errorMessage = errorBody.message || errorBody.error || errorMessage
         } catch {
-          errorMessage = err.message || errorMessage;
+          errorMessage = err.message || errorMessage
         }
       } else {
-        errorMessage = err.message || errorMessage;
+        errorMessage = err.message || errorMessage
       }
-      setError(errorMessage);
+      setError(errorMessage)
     } finally {
-      setLoading(false);
+      setLoading(false)
     }
-  };
+  }
 
   // Update staff
   const handleUpdate = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!editingStaff) return;
+    e.preventDefault()
+    if (!editingStaff) return
 
-    setLoading(true);
-    setError("");
+    setLoading(true)
+    setError("")
 
     try {
       // Backend sadece bu alanları kabul ediyor
@@ -261,15 +275,17 @@ export default function StaffPage() {
         department: updateFormData.department,
         phone: updateFormData.phone,
         office_location: updateFormData.office_location,
-      };
+      }
 
-      console.log("[Staff] Updating staff with payload:", payload);
-      
-      const response = await staffApi.put(editingStaff.id, { json: payload }).json();
-      console.log("[Staff] Update response:", response);
-      
-      setEditDialogOpen(false);
-      setEditingStaff(null);
+      console.log("[Staff] Updating staff with payload:", payload)
+
+      const response = await staffApi
+        .put(editingStaff.id, { json: payload })
+        .json()
+      console.log("[Staff] Update response:", response)
+
+      setEditDialogOpen(false)
+      setEditingStaff(null)
       setUpdateFormData({
         email: "",
         first_name: "",
@@ -278,51 +294,51 @@ export default function StaffPage() {
         phone: "",
         office_location: "",
         status: "active",
-      });
-      setEditSelectedFaculty("");
-      fetchStaff(page);
+      })
+      setEditSelectedFaculty("")
+      fetchStaff(page)
     } catch (err: any) {
-      console.error("[Staff] Update error:", err);
-      let errorMessage = "Failed to update staff";
+      console.error("[Staff] Update error:", err)
+      let errorMessage = "Failed to update staff"
       if (err.response) {
         try {
-          const errorBody = await err.response.json();
-          errorMessage = errorBody.message || errorBody.error || errorMessage;
+          const errorBody = await err.response.json()
+          errorMessage = errorBody.message || errorBody.error || errorMessage
         } catch {
-          errorMessage = err.message || errorMessage;
+          errorMessage = err.message || errorMessage
         }
       } else {
-        errorMessage = err.message || errorMessage;
+        errorMessage = err.message || errorMessage
       }
-      setError(errorMessage);
+      setError(errorMessage)
     } finally {
-      setLoading(false);
+      setLoading(false)
     }
-  };
+  }
 
   // Delete staff
   const handleDelete = async (id: string) => {
-    if (!confirm("Are you sure you want to delete this staff member?")) return;
+    if (!confirm("Are you sure you want to delete this staff member?")) return
 
-    setLoading(true);
-    setError("");
+    setLoading(true)
+    setError("")
 
     try {
-      console.log("[Staff] Deleting staff:", id);
-      await staffApi.delete(id).json();
-      console.log("[Staff] Delete successful");
-      fetchStaff(page);
+      console.log("[Staff] Deleting staff:", id)
+      await staffApi.delete(id).json()
+      console.log("[Staff] Delete successful")
+      fetchStaff(page)
     } catch (err: any) {
-      console.error("[Staff] Delete error:", err);
-      setError(err.message || "Failed to delete staff");
+      console.error("[Staff] Delete error:", err)
+      setError(err.message || "Failed to delete staff")
     } finally {
-      setLoading(false);
+      setLoading(false)
     }
-  };
+  }
 
   // Open edit dialog
   const openEditDialog = (staff: Staff) => {
-    setEditingStaff(staff);
+    setEditingStaff(staff)
     setUpdateFormData({
       email: staff.email,
       first_name: staff.first_name,
@@ -331,29 +347,29 @@ export default function StaffPage() {
       phone: staff.phone || "",
       office_location: staff.office_location || "",
       status: staff.status,
-    });
+    })
 
     // Find the faculty that contains this department
     if (staff.department) {
-      const facultyWithDept = mockFaculties.find(f =>
-        f.departments.some(d => d.name === staff.department)
-      );
-      setEditSelectedFaculty(facultyWithDept?.name || "");
+      const facultyWithDept = mockFaculties.find((f) =>
+        f.departments.some((d) => d.name === staff.department)
+      )
+      setEditSelectedFaculty(facultyWithDept?.name || "")
     } else {
-      setEditSelectedFaculty("");
+      setEditSelectedFaculty("")
     }
 
-    setEditDialogOpen(true);
-  };
+    setEditDialogOpen(true)
+  }
 
   return (
     <div className="min-h-screen bg-background p-8">
-      <div className="max-w-7xl mx-auto space-y-6">
+      <div className="mx-auto max-w-7xl space-y-6">
         {/* Header */}
-        <div className="flex justify-between items-center">
+        <div className="flex items-center justify-between">
           <div>
             <h1 className="text-3xl font-bold">Staff Management</h1>
-            <p className="text-muted-foreground mt-1">
+            <p className="mt-1 text-muted-foreground">
               Manage staff members and their information
             </p>
           </div>
@@ -441,7 +457,10 @@ export default function StaffPage() {
                         <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
                       </Button>
                     </PopoverTrigger>
-                    <PopoverContent className="w-[--radix-popover-trigger-width] p-0" align="start">
+                    <PopoverContent
+                      className="w-[--radix-popover-trigger-width] p-0"
+                      align="start"
+                    >
                       <Command>
                         <CommandInput placeholder="Fakülte ara..." />
                         <CommandList>
@@ -452,9 +471,13 @@ export default function StaffPage() {
                                 key={faculty.id}
                                 value={faculty.name}
                                 onSelect={() => {
-                                  setSelectedFaculty(selectedFaculty === faculty.name ? "" : faculty.name);
-                                  setFormData({ ...formData, department: "" });
-                                  setFacultyOpen(false);
+                                  setSelectedFaculty(
+                                    selectedFaculty === faculty.name
+                                      ? ""
+                                      : faculty.name
+                                  )
+                                  setFormData({ ...formData, department: "" })
+                                  setFacultyOpen(false)
                                 }}
                               >
                                 <Check
@@ -471,7 +494,10 @@ export default function StaffPage() {
                 </div>
                 <div className="space-y-2">
                   <Label htmlFor="department">Bölüm</Label>
-                  <Popover open={departmentOpen} onOpenChange={setDepartmentOpen}>
+                  <Popover
+                    open={departmentOpen}
+                    onOpenChange={setDepartmentOpen}
+                  >
                     <PopoverTrigger asChild>
                       <Button
                         variant="outline"
@@ -480,11 +506,17 @@ export default function StaffPage() {
                         className="w-full justify-between"
                         disabled={!selectedFaculty}
                       >
-                        {formData.department || (selectedFaculty ? "Bölüm seçin..." : "Önce fakülte seçin")}
+                        {formData.department ||
+                          (selectedFaculty
+                            ? "Bölüm seçin..."
+                            : "Önce fakülte seçin")}
                         <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
                       </Button>
                     </PopoverTrigger>
-                    <PopoverContent className="w-[--radix-popover-trigger-width] p-0" align="start">
+                    <PopoverContent
+                      className="w-[--radix-popover-trigger-width] p-0"
+                      align="start"
+                    >
                       <Command>
                         <CommandInput placeholder="Bölüm ara..." />
                         <CommandList>
@@ -497,9 +529,12 @@ export default function StaffPage() {
                                 onSelect={() => {
                                   setFormData({
                                     ...formData,
-                                    department: formData.department === dept.name ? "" : dept.name,
-                                  });
-                                  setDepartmentOpen(false);
+                                    department:
+                                      formData.department === dept.name
+                                        ? ""
+                                        : dept.name,
+                                  })
+                                  setDepartmentOpen(false)
                                 }}
                               >
                                 <Check
@@ -557,13 +592,13 @@ export default function StaffPage() {
 
         {/* Error Alert */}
         {error && (
-          <div className="bg-destructive/10 border border-destructive text-destructive px-4 py-3 rounded-lg">
+          <div className="rounded-lg border border-destructive bg-destructive/10 px-4 py-3 text-destructive">
             {error}
           </div>
         )}
 
         {/* Staff Table */}
-        <div className="border rounded-lg">
+        <div className="rounded-lg border">
           <Table>
             <TableHeader>
               <TableRow>
@@ -571,56 +606,76 @@ export default function StaffPage() {
                   <Button
                     variant="ghost"
                     size="sm"
-                    onClick={() => handleSort('first_name')}
+                    onClick={() => handleSort("first_name")}
                     className="h-8 px-2"
                   >
                     Name
-                    {sortField === 'first_name' && (
-                      sortDirection === 'asc' ? <ArrowUp className="ml-2 h-4 w-4" /> : <ArrowDown className="ml-2 h-4 w-4" />
+                    {sortField === "first_name" &&
+                      (sortDirection === "asc" ? (
+                        <ArrowUp className="ml-2 h-4 w-4" />
+                      ) : (
+                        <ArrowDown className="ml-2 h-4 w-4" />
+                      ))}
+                    {sortField !== "first_name" && (
+                      <ArrowUpDown className="ml-2 h-4 w-4 opacity-50" />
                     )}
-                    {sortField !== 'first_name' && <ArrowUpDown className="ml-2 h-4 w-4 opacity-50" />}
                   </Button>
                 </TableHead>
                 <TableHead>
                   <Button
                     variant="ghost"
                     size="sm"
-                    onClick={() => handleSort('email')}
+                    onClick={() => handleSort("email")}
                     className="h-8 px-2"
                   >
                     Email
-                    {sortField === 'email' && (
-                      sortDirection === 'asc' ? <ArrowUp className="ml-2 h-4 w-4" /> : <ArrowDown className="ml-2 h-4 w-4" />
+                    {sortField === "email" &&
+                      (sortDirection === "asc" ? (
+                        <ArrowUp className="ml-2 h-4 w-4" />
+                      ) : (
+                        <ArrowDown className="ml-2 h-4 w-4" />
+                      ))}
+                    {sortField !== "email" && (
+                      <ArrowUpDown className="ml-2 h-4 w-4 opacity-50" />
                     )}
-                    {sortField !== 'email' && <ArrowUpDown className="ml-2 h-4 w-4 opacity-50" />}
                   </Button>
                 </TableHead>
                 <TableHead>
                   <Button
                     variant="ghost"
                     size="sm"
-                    onClick={() => handleSort('role')}
+                    onClick={() => handleSort("role")}
                     className="h-8 px-2"
                   >
                     Role
-                    {sortField === 'role' && (
-                      sortDirection === 'asc' ? <ArrowUp className="ml-2 h-4 w-4" /> : <ArrowDown className="ml-2 h-4 w-4" />
+                    {sortField === "role" &&
+                      (sortDirection === "asc" ? (
+                        <ArrowUp className="ml-2 h-4 w-4" />
+                      ) : (
+                        <ArrowDown className="ml-2 h-4 w-4" />
+                      ))}
+                    {sortField !== "role" && (
+                      <ArrowUpDown className="ml-2 h-4 w-4 opacity-50" />
                     )}
-                    {sortField !== 'role' && <ArrowUpDown className="ml-2 h-4 w-4 opacity-50" />}
                   </Button>
                 </TableHead>
                 <TableHead>
                   <Button
                     variant="ghost"
                     size="sm"
-                    onClick={() => handleSort('department')}
+                    onClick={() => handleSort("department")}
                     className="h-8 px-2"
                   >
                     Department
-                    {sortField === 'department' && (
-                      sortDirection === 'asc' ? <ArrowUp className="ml-2 h-4 w-4" /> : <ArrowDown className="ml-2 h-4 w-4" />
+                    {sortField === "department" &&
+                      (sortDirection === "asc" ? (
+                        <ArrowUp className="ml-2 h-4 w-4" />
+                      ) : (
+                        <ArrowDown className="ml-2 h-4 w-4" />
+                      ))}
+                    {sortField !== "department" && (
+                      <ArrowUpDown className="ml-2 h-4 w-4 opacity-50" />
                     )}
-                    {sortField !== 'department' && <ArrowUpDown className="ml-2 h-4 w-4 opacity-50" />}
                   </Button>
                 </TableHead>
                 <TableHead>Phone</TableHead>
@@ -628,14 +683,19 @@ export default function StaffPage() {
                   <Button
                     variant="ghost"
                     size="sm"
-                    onClick={() => handleSort('office_location')}
+                    onClick={() => handleSort("office_location")}
                     className="h-8 px-2"
                   >
                     Office
-                    {sortField === 'office_location' && (
-                      sortDirection === 'asc' ? <ArrowUp className="ml-2 h-4 w-4" /> : <ArrowDown className="ml-2 h-4 w-4" />
+                    {sortField === "office_location" &&
+                      (sortDirection === "asc" ? (
+                        <ArrowUp className="ml-2 h-4 w-4" />
+                      ) : (
+                        <ArrowDown className="ml-2 h-4 w-4" />
+                      ))}
+                    {sortField !== "office_location" && (
+                      <ArrowUpDown className="ml-2 h-4 w-4 opacity-50" />
                     )}
-                    {sortField !== 'office_location' && <ArrowUpDown className="ml-2 h-4 w-4 opacity-50" />}
                   </Button>
                 </TableHead>
                 <TableHead>Status</TableHead>
@@ -645,13 +705,19 @@ export default function StaffPage() {
             <TableBody>
               {loading && staffList.length === 0 ? (
                 <TableRow>
-                  <TableCell colSpan={8} className="text-center text-muted-foreground">
+                  <TableCell
+                    colSpan={8}
+                    className="text-center text-muted-foreground"
+                  >
                     Loading...
                   </TableCell>
                 </TableRow>
               ) : staffList.length === 0 ? (
                 <TableRow>
-                  <TableCell colSpan={8} className="text-center text-muted-foreground">
+                  <TableCell
+                    colSpan={8}
+                    className="text-center text-muted-foreground"
+                  >
                     No staff members found
                   </TableCell>
                 </TableRow>
@@ -664,7 +730,8 @@ export default function StaffPage() {
                     <TableCell>{staff.email}</TableCell>
                     <TableCell>
                       <Badge variant="outline">
-                        {ROLE_OPTIONS.find(r => r.value === staff.role)?.label || staff.role}
+                        {ROLE_OPTIONS.find((r) => r.value === staff.role)
+                          ?.label || staff.role}
                       </Badge>
                     </TableCell>
                     <TableCell>{staff.department || "-"}</TableCell>
@@ -672,12 +739,14 @@ export default function StaffPage() {
                     <TableCell>{staff.office_location || "-"}</TableCell>
                     <TableCell>
                       <Badge
-                        variant={staff.status === "active" ? "default" : "destructive"}
+                        variant={
+                          staff.status === "active" ? "default" : "destructive"
+                        }
                       >
                         {staff.status}
                       </Badge>
                     </TableCell>
-                    <TableCell className="text-right space-x-2">
+                    <TableCell className="space-x-2 text-right">
                       <Button
                         variant="ghost"
                         size="sm"
@@ -740,7 +809,10 @@ export default function StaffPage() {
                   required
                   value={updateFormData.email}
                   onChange={(e) =>
-                    setUpdateFormData({ ...updateFormData, email: e.target.value })
+                    setUpdateFormData({
+                      ...updateFormData,
+                      email: e.target.value,
+                    })
                   }
                 />
               </div>
@@ -752,7 +824,10 @@ export default function StaffPage() {
                     required
                     value={updateFormData.first_name}
                     onChange={(e) =>
-                      setUpdateFormData({ ...updateFormData, first_name: e.target.value })
+                      setUpdateFormData({
+                        ...updateFormData,
+                        first_name: e.target.value,
+                      })
                     }
                   />
                 </div>
@@ -763,14 +838,20 @@ export default function StaffPage() {
                     required
                     value={updateFormData.last_name}
                     onChange={(e) =>
-                      setUpdateFormData({ ...updateFormData, last_name: e.target.value })
+                      setUpdateFormData({
+                        ...updateFormData,
+                        last_name: e.target.value,
+                      })
                     }
                   />
                 </div>
               </div>
               <div className="space-y-2">
                 <Label htmlFor="edit_faculty">Fakülte (filtreleme için)</Label>
-                <Popover open={editFacultyOpen} onOpenChange={setEditFacultyOpen}>
+                <Popover
+                  open={editFacultyOpen}
+                  onOpenChange={setEditFacultyOpen}
+                >
                   <PopoverTrigger asChild>
                     <Button
                       variant="outline"
@@ -782,7 +863,10 @@ export default function StaffPage() {
                       <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
                     </Button>
                   </PopoverTrigger>
-                  <PopoverContent className="w-[--radix-popover-trigger-width] p-0" align="start">
+                  <PopoverContent
+                    className="w-[--radix-popover-trigger-width] p-0"
+                    align="start"
+                  >
                     <Command>
                       <CommandInput placeholder="Fakülte ara..." />
                       <CommandList>
@@ -793,9 +877,16 @@ export default function StaffPage() {
                               key={faculty.id}
                               value={faculty.name}
                               onSelect={() => {
-                                setEditSelectedFaculty(editSelectedFaculty === faculty.name ? "" : faculty.name);
-                                setUpdateFormData({ ...updateFormData, department: "" });
-                                setEditFacultyOpen(false);
+                                setEditSelectedFaculty(
+                                  editSelectedFaculty === faculty.name
+                                    ? ""
+                                    : faculty.name
+                                )
+                                setUpdateFormData({
+                                  ...updateFormData,
+                                  department: "",
+                                })
+                                setEditFacultyOpen(false)
                               }}
                             >
                               <Check
@@ -812,7 +903,10 @@ export default function StaffPage() {
               </div>
               <div className="space-y-2">
                 <Label htmlFor="edit_department">Bölüm</Label>
-                <Popover open={editDepartmentOpen} onOpenChange={setEditDepartmentOpen}>
+                <Popover
+                  open={editDepartmentOpen}
+                  onOpenChange={setEditDepartmentOpen}
+                >
                   <PopoverTrigger asChild>
                     <Button
                       variant="outline"
@@ -821,11 +915,17 @@ export default function StaffPage() {
                       className="w-full justify-between"
                       disabled={!editSelectedFaculty}
                     >
-                      {updateFormData.department || (editSelectedFaculty ? "Bölüm seçin..." : "Önce fakülte seçin")}
+                      {updateFormData.department ||
+                        (editSelectedFaculty
+                          ? "Bölüm seçin..."
+                          : "Önce fakülte seçin")}
                       <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
                     </Button>
                   </PopoverTrigger>
-                  <PopoverContent className="w-[--radix-popover-trigger-width] p-0" align="start">
+                  <PopoverContent
+                    className="w-[--radix-popover-trigger-width] p-0"
+                    align="start"
+                  >
                     <Command>
                       <CommandInput placeholder="Bölüm ara..." />
                       <CommandList>
@@ -838,9 +938,12 @@ export default function StaffPage() {
                               onSelect={() => {
                                 setUpdateFormData({
                                   ...updateFormData,
-                                  department: updateFormData.department === dept.name ? "" : dept.name,
-                                });
-                                setEditDepartmentOpen(false);
+                                  department:
+                                    updateFormData.department === dept.name
+                                      ? ""
+                                      : dept.name,
+                                })
+                                setEditDepartmentOpen(false)
                               }}
                             >
                               <Check
@@ -861,7 +964,10 @@ export default function StaffPage() {
                   id="edit_phone"
                   value={updateFormData.phone}
                   onChange={(e) =>
-                    setUpdateFormData({ ...updateFormData, phone: e.target.value })
+                    setUpdateFormData({
+                      ...updateFormData,
+                      phone: e.target.value,
+                    })
                   }
                 />
               </div>
@@ -884,9 +990,12 @@ export default function StaffPage() {
                   id="edit_status"
                   value={updateFormData.status}
                   onChange={(e) =>
-                    setUpdateFormData({ ...updateFormData, status: e.target.value })
+                    setUpdateFormData({
+                      ...updateFormData,
+                      status: e.target.value,
+                    })
                   }
-                  className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background file:border-0 file:bg-transparent file:text-sm file:font-medium placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
+                  className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background file:border-0 file:bg-transparent file:text-sm file:font-medium placeholder:text-muted-foreground focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:outline-none disabled:cursor-not-allowed disabled:opacity-50"
                 >
                   <option value="active">Active</option>
                   <option value="inactive">Inactive</option>
@@ -910,5 +1019,5 @@ export default function StaffPage() {
         </Dialog>
       </div>
     </div>
-  );
+  )
 }

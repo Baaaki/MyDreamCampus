@@ -1,20 +1,19 @@
-
-import { useState } from 'react';
-import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { mealApi } from '@/lib/api-client';
-import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
-import { Label } from '@/components/ui/label';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { Badge } from '@/components/ui/badge';
-import { Checkbox } from '@/components/ui/checkbox';
+import { useState } from "react"
+import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query"
+import { mealApi } from "@/lib/api-client"
+import { Button } from "@/components/ui/button"
+import { Input } from "@/components/ui/input"
+import { Label } from "@/components/ui/label"
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
+import { Badge } from "@/components/ui/badge"
+import { Checkbox } from "@/components/ui/checkbox"
 import {
   Dialog,
   DialogContent,
   DialogHeader,
   DialogTitle,
   DialogFooter,
-} from '@/components/ui/dialog';
+} from "@/components/ui/dialog"
 import {
   Table,
   TableBody,
@@ -22,8 +21,8 @@ import {
   TableHead,
   TableHeader,
   TableRow,
-} from '@/components/ui/table';
-import type { Cafeteria } from '@/lib/types';
+} from "@/components/ui/table"
+import type { Cafeteria } from "@/lib/types"
 import {
   Plus,
   Pencil,
@@ -34,221 +33,241 @@ import {
   Moon,
   Search,
   Loader2,
-} from 'lucide-react';
+} from "lucide-react"
 
 // API Response types
 interface ApiResponse<T> {
-  success: boolean;
-  data: T;
+  success: boolean
+  data: T
 }
 
 interface CafeteriaListData {
-  cafeterias: Cafeteria[];
+  cafeterias: Cafeteria[]
 }
 
 // API functions
 const fetchCafeterias = async (): Promise<Cafeteria[]> => {
-  const response = await mealApi.get('cafeterias').json<ApiResponse<CafeteriaListData>>();
-  return response.data.cafeterias;
-};
+  const response = await mealApi
+    .get("cafeterias")
+    .json<ApiResponse<CafeteriaListData>>()
+  return response.data.cafeterias
+}
 
 const createCafeteria = async (data: CafeteriaFormData): Promise<Cafeteria> => {
-  const response = await mealApi.post('cafeterias', { json: data }).json<ApiResponse<Cafeteria>>();
-  return response.data;
-};
+  const response = await mealApi
+    .post("cafeterias", { json: data })
+    .json<ApiResponse<Cafeteria>>()
+  return response.data
+}
 
-const updateCafeteria = async ({ id, data }: { id: string; data: CafeteriaFormData }): Promise<Cafeteria> => {
-  const response = await mealApi.put(`cafeterias/${id}`, { json: data }).json<ApiResponse<Cafeteria>>();
-  return response.data;
-};
+const updateCafeteria = async ({
+  id,
+  data,
+}: {
+  id: string
+  data: CafeteriaFormData
+}): Promise<Cafeteria> => {
+  const response = await mealApi
+    .put(`cafeterias/${id}`, { json: data })
+    .json<ApiResponse<Cafeteria>>()
+  return response.data
+}
 
 const deleteCafeteria = async (id: string): Promise<void> => {
-  await mealApi.delete(`cafeterias/${id}`);
-};
+  await mealApi.delete(`cafeterias/${id}`)
+}
 
 // Mock data - Backend'den veri gelmezse gösterilir
 const mockCafeterias: Cafeteria[] = [
   {
-    id: '1',
-    name: 'Merkez Yemekhane',
-    location: 'Ana Kampüs, A Blok',
+    id: "1",
+    name: "Merkez Yemekhane",
+    location: "Ana Kampüs, A Blok",
     has_vegan_menu: true,
     serves_dinner: true,
     is_active: true,
-    created_at: '2024-01-01T00:00:00Z',
-    updated_at: '2024-01-01T00:00:00Z',
+    created_at: "2024-01-01T00:00:00Z",
+    updated_at: "2024-01-01T00:00:00Z",
   },
   {
-    id: '2',
-    name: 'Mühendislik Yemekhanesi',
-    location: 'Mühendislik Fakültesi, Zemin Kat',
+    id: "2",
+    name: "Mühendislik Yemekhanesi",
+    location: "Mühendislik Fakültesi, Zemin Kat",
     has_vegan_menu: true,
     serves_dinner: false,
     is_active: true,
-    created_at: '2024-01-01T00:00:00Z',
-    updated_at: '2024-01-01T00:00:00Z',
+    created_at: "2024-01-01T00:00:00Z",
+    updated_at: "2024-01-01T00:00:00Z",
   },
   {
-    id: '3',
-    name: 'Fen Fakültesi Kafeteryası',
-    location: 'Fen Fakültesi, B Blok',
+    id: "3",
+    name: "Fen Fakültesi Kafeteryası",
+    location: "Fen Fakültesi, B Blok",
     has_vegan_menu: false,
     serves_dinner: false,
     is_active: true,
-    created_at: '2024-01-01T00:00:00Z',
-    updated_at: '2024-01-01T00:00:00Z',
+    created_at: "2024-01-01T00:00:00Z",
+    updated_at: "2024-01-01T00:00:00Z",
   },
   {
-    id: '4',
-    name: 'Güney Kampüs Yemekhanesi',
-    location: 'Güney Kampüs',
+    id: "4",
+    name: "Güney Kampüs Yemekhanesi",
+    location: "Güney Kampüs",
     has_vegan_menu: true,
     serves_dinner: true,
     is_active: false,
-    created_at: '2024-01-01T00:00:00Z',
-    updated_at: '2024-01-01T00:00:00Z',
+    created_at: "2024-01-01T00:00:00Z",
+    updated_at: "2024-01-01T00:00:00Z",
   },
-];
+]
 
 interface CafeteriaFormData {
-  name: string;
-  location: string;
-  has_vegan_menu: boolean;
-  serves_dinner: boolean;
-  is_active: boolean;
+  name: string
+  location: string
+  has_vegan_menu: boolean
+  serves_dinner: boolean
+  is_active: boolean
 }
 
 const initialFormData: CafeteriaFormData = {
-  name: '',
-  location: '',
+  name: "",
+  location: "",
   has_vegan_menu: false,
   serves_dinner: false,
   is_active: true,
-};
+}
 
 export default function CafeteriasPage() {
-  const queryClient = useQueryClient();
-  const [searchTerm, setSearchTerm] = useState('');
-  const [isDialogOpen, setIsDialogOpen] = useState(false);
-  const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false);
-  const [editingCafeteria, setEditingCafeteria] = useState<Cafeteria | null>(null);
-  const [deletingCafeteria, setDeletingCafeteria] = useState<Cafeteria | null>(null);
-  const [formData, setFormData] = useState<CafeteriaFormData>(initialFormData);
+  const queryClient = useQueryClient()
+  const [searchTerm, setSearchTerm] = useState("")
+  const [isDialogOpen, setIsDialogOpen] = useState(false)
+  const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false)
+  const [editingCafeteria, setEditingCafeteria] = useState<Cafeteria | null>(
+    null
+  )
+  const [deletingCafeteria, setDeletingCafeteria] = useState<Cafeteria | null>(
+    null
+  )
+  const [formData, setFormData] = useState<CafeteriaFormData>(initialFormData)
 
   // Fetch cafeterias - backend'den veri gelmezse mock kullan
   const { data: apiCafeterias, isLoading } = useQuery({
-    queryKey: ['cafeterias'],
+    queryKey: ["cafeterias"],
     queryFn: fetchCafeterias,
     retry: 1,
-  });
+  })
 
   // Backend'den veri varsa onu kullan, yoksa mock veri
-  const cafeterias = apiCafeterias && apiCafeterias.length > 0 ? apiCafeterias : mockCafeterias;
-  const isUsingMockData = !apiCafeterias || apiCafeterias.length === 0;
+  const cafeterias =
+    apiCafeterias && apiCafeterias.length > 0 ? apiCafeterias : mockCafeterias
+  const isUsingMockData = !apiCafeterias || apiCafeterias.length === 0
 
   // Create mutation
   const createMutation = useMutation({
     mutationFn: createCafeteria,
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['cafeterias'] });
-      setIsDialogOpen(false);
-      setFormData(initialFormData);
+      queryClient.invalidateQueries({ queryKey: ["cafeterias"] })
+      setIsDialogOpen(false)
+      setFormData(initialFormData)
     },
     onError: (error) => {
-      console.error('Create failed:', error);
+      console.error("Create failed:", error)
     },
-  });
+  })
 
   // Update mutation
   const updateMutation = useMutation({
     mutationFn: updateCafeteria,
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['cafeterias'] });
-      setIsDialogOpen(false);
-      setFormData(initialFormData);
-      setEditingCafeteria(null);
+      queryClient.invalidateQueries({ queryKey: ["cafeterias"] })
+      setIsDialogOpen(false)
+      setFormData(initialFormData)
+      setEditingCafeteria(null)
     },
     onError: (error) => {
-      console.error('Update failed:', error);
+      console.error("Update failed:", error)
     },
-  });
+  })
 
   // Delete mutation
   const deleteMutation = useMutation({
     mutationFn: deleteCafeteria,
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['cafeterias'] });
-      setIsDeleteDialogOpen(false);
-      setDeletingCafeteria(null);
+      queryClient.invalidateQueries({ queryKey: ["cafeterias"] })
+      setIsDeleteDialogOpen(false)
+      setDeletingCafeteria(null)
     },
     onError: (error) => {
-      console.error('Delete failed:', error);
+      console.error("Delete failed:", error)
     },
-  });
+  })
 
-  const isSubmitting = createMutation.isPending || updateMutation.isPending || deleteMutation.isPending;
+  const isSubmitting =
+    createMutation.isPending ||
+    updateMutation.isPending ||
+    deleteMutation.isPending
 
   // Filtreleme
   const filteredCafeterias = cafeterias.filter(
     (c) =>
       c.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
       c.location.toLowerCase().includes(searchTerm.toLowerCase())
-  );
+  )
 
   // Yeni ekleme dialogunu aç
   const handleAddClick = () => {
-    setEditingCafeteria(null);
-    setFormData(initialFormData);
-    setIsDialogOpen(true);
-  };
+    setEditingCafeteria(null)
+    setFormData(initialFormData)
+    setIsDialogOpen(true)
+  }
 
   // Düzenleme dialogunu aç
   const handleEditClick = (cafeteria: Cafeteria) => {
-    setEditingCafeteria(cafeteria);
+    setEditingCafeteria(cafeteria)
     setFormData({
       name: cafeteria.name,
       location: cafeteria.location,
       has_vegan_menu: cafeteria.has_vegan_menu,
       serves_dinner: cafeteria.serves_dinner,
       is_active: cafeteria.is_active,
-    });
-    setIsDialogOpen(true);
-  };
+    })
+    setIsDialogOpen(true)
+  }
 
   // Silme dialogunu aç
   const handleDeleteClick = (cafeteria: Cafeteria) => {
-    setDeletingCafeteria(cafeteria);
-    setIsDeleteDialogOpen(true);
-  };
+    setDeletingCafeteria(cafeteria)
+    setIsDeleteDialogOpen(true)
+  }
 
   // Form gönderimi
   const handleSubmit = async () => {
     if (editingCafeteria) {
-      updateMutation.mutate({ id: editingCafeteria.id, data: formData });
+      updateMutation.mutate({ id: editingCafeteria.id, data: formData })
     } else {
-      createMutation.mutate(formData);
+      createMutation.mutate(formData)
     }
-  };
+  }
 
   // Silme işlemi
   const handleDelete = async () => {
-    if (!deletingCafeteria) return;
-    deleteMutation.mutate(deletingCafeteria.id);
-  };
+    if (!deletingCafeteria) return
+    deleteMutation.mutate(deletingCafeteria.id)
+  }
 
   if (isLoading) {
     return (
-      <div className="flex items-center justify-center h-64">
+      <div className="flex h-64 items-center justify-center">
         <Loader2 className="h-8 w-8 animate-spin text-indigo-500" />
       </div>
-    );
+    )
   }
 
   return (
     <div className="space-y-6">
       {/* Mock data uyarısı */}
       {isUsingMockData && (
-        <div className="rounded-md bg-yellow-50 border border-yellow-200 p-4">
+        <div className="rounded-md border border-yellow-200 bg-yellow-50 p-4">
           <p className="text-sm text-yellow-800">
             ⚠️ Backend'e bağlanılamadı, örnek veriler gösteriliyor.
           </p>
@@ -258,29 +277,35 @@ export default function CafeteriasPage() {
       {/* Header */}
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-2xl font-bold dark:text-white">Yemekhane Yönetimi</h1>
-          <p className="text-muted-foreground">Yemekhaneleri ekleyin, düzenleyin veya silin</p>
+          <h1 className="text-2xl font-bold dark:text-white">
+            Yemekhane Yönetimi
+          </h1>
+          <p className="text-muted-foreground">
+            Yemekhaneleri ekleyin, düzenleyin veya silin
+          </p>
         </div>
         <Button onClick={handleAddClick}>
-          <Plus className="h-4 w-4 mr-2" />
+          <Plus className="mr-2 h-4 w-4" />
           Yemekhane Ekle
         </Button>
       </div>
 
       {/* İstatistikler */}
-      <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-        <Card className="dark:bg-gray-900 dark:border-gray-800">
+      <div className="grid grid-cols-1 gap-4 md:grid-cols-4">
+        <Card className="dark:border-gray-800 dark:bg-gray-900">
           <CardContent className="pt-6">
             <div className="flex items-center justify-between">
               <div>
                 <p className="text-sm text-muted-foreground">Toplam</p>
-                <p className="text-2xl font-bold dark:text-white">{cafeterias.length}</p>
+                <p className="text-2xl font-bold dark:text-white">
+                  {cafeterias.length}
+                </p>
               </div>
               <UtensilsCrossed className="h-8 w-8 text-indigo-500" />
             </div>
           </CardContent>
         </Card>
-        <Card className="dark:bg-gray-900 dark:border-gray-800">
+        <Card className="dark:border-gray-800 dark:bg-gray-900">
           <CardContent className="pt-6">
             <div className="flex items-center justify-between">
               <div>
@@ -289,13 +314,13 @@ export default function CafeteriasPage() {
                   {cafeterias.filter((c) => c.is_active).length}
                 </p>
               </div>
-              <div className="h-8 w-8 rounded-full bg-green-100 dark:bg-green-900/30 flex items-center justify-center">
+              <div className="flex h-8 w-8 items-center justify-center rounded-full bg-green-100 dark:bg-green-900/30">
                 <div className="h-3 w-3 rounded-full bg-green-500" />
               </div>
             </div>
           </CardContent>
         </Card>
-        <Card className="dark:bg-gray-900 dark:border-gray-800">
+        <Card className="dark:border-gray-800 dark:bg-gray-900">
           <CardContent className="pt-6">
             <div className="flex items-center justify-between">
               <div>
@@ -308,7 +333,7 @@ export default function CafeteriasPage() {
             </div>
           </CardContent>
         </Card>
-        <Card className="dark:bg-gray-900 dark:border-gray-800">
+        <Card className="dark:border-gray-800 dark:bg-gray-900">
           <CardContent className="pt-6">
             <div className="flex items-center justify-between">
               <div>
@@ -324,12 +349,12 @@ export default function CafeteriasPage() {
       </div>
 
       {/* Arama ve Liste */}
-      <Card className="dark:bg-gray-900 dark:border-gray-800">
+      <Card className="dark:border-gray-800 dark:bg-gray-900">
         <CardHeader>
           <div className="flex items-center justify-between">
             <CardTitle className="dark:text-white">Yemekhaneler</CardTitle>
             <div className="relative w-64">
-              <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-400" />
+              <Search className="absolute top-1/2 left-3 h-4 w-4 -translate-y-1/2 text-gray-400" />
               <Input
                 placeholder="Ara..."
                 value={searchTerm}
@@ -354,7 +379,10 @@ export default function CafeteriasPage() {
             <TableBody>
               {filteredCafeterias.length === 0 ? (
                 <TableRow>
-                  <TableCell colSpan={6} className="text-center text-muted-foreground py-8">
+                  <TableCell
+                    colSpan={6}
+                    className="py-8 text-center text-muted-foreground"
+                  >
                     Yemekhane bulunamadı
                   </TableCell>
                 </TableRow>
@@ -375,22 +403,28 @@ export default function CafeteriasPage() {
                     </TableCell>
                     <TableCell className="text-center">
                       {cafeteria.has_vegan_menu ? (
-                        <Badge variant="secondary" className="bg-emerald-100 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-400">
-                          <Leaf className="h-3 w-3 mr-1" />
+                        <Badge
+                          variant="secondary"
+                          className="bg-emerald-100 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-400"
+                        >
+                          <Leaf className="mr-1 h-3 w-3" />
                           Var
                         </Badge>
                       ) : (
-                        <span className="text-muted-foreground text-sm">-</span>
+                        <span className="text-sm text-muted-foreground">-</span>
                       )}
                     </TableCell>
                     <TableCell className="text-center">
                       {cafeteria.serves_dinner ? (
-                        <Badge variant="secondary" className="bg-purple-100 text-purple-700 dark:bg-purple-900/30 dark:text-purple-400">
-                          <Moon className="h-3 w-3 mr-1" />
+                        <Badge
+                          variant="secondary"
+                          className="bg-purple-100 text-purple-700 dark:bg-purple-900/30 dark:text-purple-400"
+                        >
+                          <Moon className="mr-1 h-3 w-3" />
                           Var
                         </Badge>
                       ) : (
-                        <span className="text-muted-foreground text-sm">-</span>
+                        <span className="text-sm text-muted-foreground">-</span>
                       )}
                     </TableCell>
                     <TableCell className="text-center">
@@ -399,7 +433,10 @@ export default function CafeteriasPage() {
                           Aktif
                         </Badge>
                       ) : (
-                        <Badge variant="secondary" className="bg-gray-100 text-gray-600 dark:bg-gray-800 dark:text-gray-400">
+                        <Badge
+                          variant="secondary"
+                          className="bg-gray-100 text-gray-600 dark:bg-gray-800 dark:text-gray-400"
+                        >
                           Pasif
                         </Badge>
                       )}
@@ -436,7 +473,7 @@ export default function CafeteriasPage() {
         <DialogContent className="sm:max-w-md">
           <DialogHeader>
             <DialogTitle>
-              {editingCafeteria ? 'Yemekhane Düzenle' : 'Yeni Yemekhane Ekle'}
+              {editingCafeteria ? "Yemekhane Düzenle" : "Yeni Yemekhane Ekle"}
             </DialogTitle>
           </DialogHeader>
           <div className="space-y-4 py-4">
@@ -446,7 +483,9 @@ export default function CafeteriasPage() {
                 id="name"
                 placeholder="Örn: Merkez Yemekhane"
                 value={formData.name}
-                onChange={(e) => setFormData({ ...formData, name: e.target.value })}
+                onChange={(e) =>
+                  setFormData({ ...formData, name: e.target.value })
+                }
               />
             </div>
             <div className="space-y-2">
@@ -455,7 +494,9 @@ export default function CafeteriasPage() {
                 id="location"
                 placeholder="Örn: Ana Kampüs, A Blok"
                 value={formData.location}
-                onChange={(e) => setFormData({ ...formData, location: e.target.value })}
+                onChange={(e) =>
+                  setFormData({ ...formData, location: e.target.value })
+                }
               />
             </div>
             <div className="space-y-4">
@@ -464,10 +505,16 @@ export default function CafeteriasPage() {
                   id="has_vegan_menu"
                   checked={formData.has_vegan_menu}
                   onCheckedChange={(checked) =>
-                    setFormData({ ...formData, has_vegan_menu: checked as boolean })
+                    setFormData({
+                      ...formData,
+                      has_vegan_menu: checked as boolean,
+                    })
                   }
                 />
-                <Label htmlFor="has_vegan_menu" className="flex items-center gap-2 cursor-pointer">
+                <Label
+                  htmlFor="has_vegan_menu"
+                  className="flex cursor-pointer items-center gap-2"
+                >
                   <Leaf className="h-4 w-4 text-emerald-500" />
                   Vegan menü mevcut
                 </Label>
@@ -477,10 +524,16 @@ export default function CafeteriasPage() {
                   id="serves_dinner"
                   checked={formData.serves_dinner}
                   onCheckedChange={(checked) =>
-                    setFormData({ ...formData, serves_dinner: checked as boolean })
+                    setFormData({
+                      ...formData,
+                      serves_dinner: checked as boolean,
+                    })
                   }
                 />
-                <Label htmlFor="serves_dinner" className="flex items-center gap-2 cursor-pointer">
+                <Label
+                  htmlFor="serves_dinner"
+                  className="flex cursor-pointer items-center gap-2"
+                >
                   <Moon className="h-4 w-4 text-purple-500" />
                   Akşam yemeği servisi var
                 </Label>
@@ -507,7 +560,11 @@ export default function CafeteriasPage() {
               onClick={handleSubmit}
               disabled={!formData.name || !formData.location || isSubmitting}
             >
-              {isSubmitting ? 'Kaydediliyor...' : editingCafeteria ? 'Güncelle' : 'Ekle'}
+              {isSubmitting
+                ? "Kaydediliyor..."
+                : editingCafeteria
+                  ? "Güncelle"
+                  : "Ekle"}
             </Button>
           </DialogFooter>
         </DialogContent>
@@ -521,20 +578,30 @@ export default function CafeteriasPage() {
           </DialogHeader>
           <div className="py-4">
             <p className="text-muted-foreground">
-              <strong className="text-foreground">{deletingCafeteria?.name}</strong> yemekhanesini
-              silmek istediğinizden emin misiniz? Bu işlem geri alınamaz.
+              <strong className="text-foreground">
+                {deletingCafeteria?.name}
+              </strong>{" "}
+              yemekhanesini silmek istediğinizden emin misiniz? Bu işlem geri
+              alınamaz.
             </p>
           </div>
           <DialogFooter>
-            <Button variant="outline" onClick={() => setIsDeleteDialogOpen(false)}>
+            <Button
+              variant="outline"
+              onClick={() => setIsDeleteDialogOpen(false)}
+            >
               İptal
             </Button>
-            <Button variant="destructive" onClick={handleDelete} disabled={isSubmitting}>
-              {isSubmitting ? 'Siliniyor...' : 'Sil'}
+            <Button
+              variant="destructive"
+              onClick={handleDelete}
+              disabled={isSubmitting}
+            >
+              {isSubmitting ? "Siliniyor..." : "Sil"}
             </Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>
     </div>
-  );
+  )
 }

@@ -1,24 +1,36 @@
 // Export all mock data
-export * from './auth';
-export * from './staff';
-export * from './staff-profile';
-export * from './admin-staff';
-export * from './students';
-export * from './catalog';
-export * from './attendance';
-export * from './grades';
-export * from './meal';
+export * from "./auth"
+export * from "./staff"
+export * from "./staff-profile"
+export * from "./admin-staff"
+export * from "./students"
+export * from "./catalog"
+export * from "./attendance"
+export * from "./grades"
+export * from "./meal"
 
 // Combined exports for convenience
-import { mockUsers, mockSessions, mockAuthResponse } from './auth';
-import { mockStaff } from './staff';
-import { mockStaffProfile, mockStaffProfiles } from './staff-profile';
-import { mockAdminStaff, mockAdminStaffProfiles } from './admin-staff';
-import { mockStudents } from './students';
-import { mockCourseCatalog, mockAvailableCourses, mockEnrollmentPrograms, mockFaculties } from './catalog';
-import { mockMyAttendanceResponse, mockCourseAttendanceDetails } from './attendance';
-import { mockMyGradesResponse, mockTranscriptResponse } from './grades';
-import { mockCafeterias, mockMyReservationsResponse, mockQRResponses } from './meal';
+import { mockUsers, mockSessions, mockAuthResponse } from "./auth"
+import { mockStaff } from "./staff"
+import { mockStaffProfile, mockStaffProfiles } from "./staff-profile"
+import { mockAdminStaff, mockAdminStaffProfiles } from "./admin-staff"
+import { mockStudents } from "./students"
+import {
+  mockCourseCatalog,
+  mockAvailableCourses,
+  mockEnrollmentPrograms,
+  mockFaculties,
+} from "./catalog"
+import {
+  mockMyAttendanceResponse,
+  mockCourseAttendanceDetails,
+} from "./attendance"
+import { mockMyGradesResponse, mockTranscriptResponse } from "./grades"
+import {
+  mockCafeterias,
+  mockMyReservationsResponse,
+  mockQRResponses,
+} from "./meal"
 
 export const MockData = {
   // Auth
@@ -52,4 +64,4 @@ export const MockData = {
   cafeterias: mockCafeterias,
   myReservationsResponse: mockMyReservationsResponse,
   qrResponses: mockQRResponses,
-};
+}
