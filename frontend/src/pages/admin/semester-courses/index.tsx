@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from "react"
 import { useNavigate, useSearchParams } from "react-router"
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query"
+import { HTTPError } from "ky"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
@@ -177,6 +178,20 @@ const timeSlots = [
   { slot: 9, time: "15:45 - 16:30" },
 ]
 
+// Course colors for preview
+const PREVIEW_COLORS = [
+  "bg-blue-100 border-blue-300 text-blue-800",
+  "bg-green-100 border-green-300 text-green-800",
+  "bg-purple-100 border-purple-300 text-purple-800",
+  "bg-yellow-100 border-yellow-300 text-yellow-800",
+  "bg-red-100 border-red-300 text-red-800",
+  "bg-indigo-100 border-indigo-300 text-indigo-800",
+  "bg-teal-100 border-teal-300 text-teal-800",
+  "bg-orange-100 border-orange-300 text-orange-800",
+  "bg-pink-100 border-pink-300 text-pink-800",
+  "bg-cyan-100 border-cyan-300 text-cyan-800",
+]
+
 interface FormData {
   faculty_id: string
   department_id: string
@@ -319,20 +334,6 @@ export default function SemesterCoursesPage() {
     friday: "Cuma",
   }
 
-  // Course colors for preview
-  const previewColors = [
-    "bg-blue-100 border-blue-300 text-blue-800",
-    "bg-green-100 border-green-300 text-green-800",
-    "bg-purple-100 border-purple-300 text-purple-800",
-    "bg-yellow-100 border-yellow-300 text-yellow-800",
-    "bg-red-100 border-red-300 text-red-800",
-    "bg-indigo-100 border-indigo-300 text-indigo-800",
-    "bg-teal-100 border-teal-300 text-teal-800",
-    "bg-orange-100 border-orange-300 text-orange-800",
-    "bg-pink-100 border-pink-300 text-pink-800",
-    "bg-cyan-100 border-cyan-300 text-cyan-800",
-  ]
-
   // Build preview schedule grid from existing semester courses
   const previewSchedule = React.useMemo(() => {
     const grid: Record<
@@ -358,7 +359,7 @@ export default function SemesterCoursesPage() {
       if (!colorMap.has(course.course_code)) {
         colorMap.set(
           course.course_code,
-          previewColors[colorIdx % previewColors.length]
+          PREVIEW_COLORS[colorIdx % PREVIEW_COLORS.length]
         )
         colorIdx++
       }
@@ -393,7 +394,7 @@ export default function SemesterCoursesPage() {
       setFormData(initialFormData)
       setSelectedCourse(null)
     },
-    onError: async (error: any) => {
+    onError: async (error: Error) => {
       console.error("Ders açılırken hata:", error)
       let code = ""
       let message = error.message
@@ -403,13 +404,24 @@ export default function SemesterCoursesPage() {
         day_of_week?: string
         slot_number?: number
       } | null = null
-      try {
-        const body = await error.response?.json()
-        if (body?.error) message = body.error
-        if (body?.code) code = body.code
-        if (body?.details) details = body.details
-      } catch {
-        /* ignore parse errors */
+      if (error instanceof HTTPError) {
+        try {
+          const body = await error.response.json<{
+            error?: string
+            code?: string
+            details?: {
+              course_code?: string
+              department?: string
+              day_of_week?: string
+              slot_number?: number
+            }
+          }>()
+          if (body?.error) message = body.error
+          if (body?.code) code = body.code
+          if (body?.details) details = body.details
+        } catch {
+          /* ignore parse errors */
+        }
       }
 
       if (code === "INSTRUCTOR_SCHEDULE_CONFLICT" && details?.department) {

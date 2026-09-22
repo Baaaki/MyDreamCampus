@@ -592,7 +592,7 @@ export default function MenusPage() {
   const [activeTab, setActiveTab] = useState<string>("normal")
 
   // Bilgisayar tarihinden ay ve yılı otomatik belirle
-  const currentDate = new Date()
+  const currentDate = useMemo(() => new Date(), [])
   const systemMonth = String(currentDate.getMonth() + 1).padStart(2, "0")
   const systemYear = String(currentDate.getFullYear())
 

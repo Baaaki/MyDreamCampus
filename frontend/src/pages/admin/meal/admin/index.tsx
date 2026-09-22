@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react"
+import { useEffect, useState, useCallback } from "react"
 import { mealApi } from "@/lib/api-client"
 import type { QRResponse, Cafeteria } from "@/lib/types"
 import { QRCodeSVG } from "qrcode.react"
@@ -16,26 +16,7 @@ export default function MealAdminQRPage() {
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState("")
 
-  useEffect(() => {
-    fetchCafeterias()
-  }, [])
-
-  useEffect(() => {
-    if (selectedCafeteria && selectedDate) {
-      fetchQRCodes()
-    }
-  }, [selectedCafeteria, selectedDate])
-
-  const fetchCafeterias = async () => {
-    try {
-      const data = await mealApi.get("cafeterias").json<Cafeteria[]>()
-      setCafeterias(data.filter((c) => c.is_active))
-    } catch (err: any) {
-      setError(err.message || "Yemekhaneler yüklenemedi")
-    }
-  }
-
-  const fetchQRCodes = async () => {
+  const fetchQRCodes = useCallback(async () => {
     try {
       setLoading(true)
       setError("")
@@ -58,10 +39,33 @@ export default function MealAdminQRPage() {
 
       setLunchQR(lunch)
       setDinnerQR(dinner)
-    } catch (err: any) {
-      setError(err.message || "QR kodları yüklenemedi")
+    } catch (err: unknown) {
+      setError(
+        err instanceof Error ? err.message : "QR kodları yüklenemedi"
+      )
     } finally {
       setLoading(false)
+    }
+  }, [selectedCafeteria, selectedDate])
+
+  useEffect(() => {
+    fetchCafeterias()
+  }, [])
+
+  useEffect(() => {
+    if (selectedCafeteria && selectedDate) {
+      fetchQRCodes()
+    }
+  }, [selectedCafeteria, selectedDate, fetchQRCodes])
+
+  const fetchCafeterias = async () => {
+    try {
+      const data = await mealApi.get("cafeterias").json<Cafeteria[]>()
+      setCafeterias(data.filter((c) => c.is_active))
+    } catch (err: unknown) {
+      setError(
+        err instanceof Error ? err.message : "Yemekhaneler yüklenemedi"
+      )
     }
   }
 

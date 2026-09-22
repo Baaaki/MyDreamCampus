@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react"
+import { useState, useEffect, useCallback } from "react"
 import { Button } from "@/components/ui/button"
 import {
   Table,
@@ -54,6 +54,7 @@ type Student = {
   class_level: number
   advisor_id?: string
   advisor_name?: string
+  advisor?: { first_name: string; last_name: string }
   status: string
   created_at: string
   updated_at: string
@@ -139,9 +140,37 @@ export default function StudentsPage() {
   )
   const [loadingEditAdvisors, setLoadingEditAdvisors] = useState(false)
 
+  const fetchStudents = useCallback(async () => {
+    setLoading(true)
+    console.log(
+      "[Students Page] Fetching students, page:",
+      currentPage,
+      "limit:",
+      limit
+    )
+    try {
+      const response = (await studentApi
+        .get("", {
+          searchParams: {
+            page: currentPage.toString(),
+            limit: limit.toString(),
+          },
+        })
+        .json()) as StudentListResponse
+
+      console.log("[Students Page] Response:", response)
+      setStudentList(response.data)
+      setTotalPages(response.pagination.total_pages)
+    } catch (error) {
+      console.error("Failed to fetch students:", error)
+    } finally {
+      setLoading(false)
+    }
+  }, [currentPage, limit])
+
   useEffect(() => {
     fetchStudents()
-  }, [currentPage, limit])
+  }, [fetchStudents])
 
   // Fetch all advisors (teachers) from staff API
   useEffect(() => {
@@ -190,34 +219,6 @@ export default function StudentsPage() {
       setDepartmentAdvisors([])
     }
   }, [createFormData.department])
-
-  const fetchStudents = async () => {
-    setLoading(true)
-    console.log(
-      "[Students Page] Fetching students, page:",
-      currentPage,
-      "limit:",
-      limit
-    )
-    try {
-      const response = (await studentApi
-        .get("", {
-          searchParams: {
-            page: currentPage.toString(),
-            limit: limit.toString(),
-          },
-        })
-        .json()) as StudentListResponse
-
-      console.log("[Students Page] Response:", response)
-      setStudentList(response.data)
-      setTotalPages(response.pagination.total_pages)
-    } catch (error) {
-      console.error("Failed to fetch students:", error)
-    } finally {
-      setLoading(false)
-    }
-  }
 
   const handleCreateStudent = async (e: React.FormEvent) => {
     e.preventDefault()
@@ -779,10 +780,10 @@ export default function StudentsPage() {
                   <TableCell>{student.enrollment_year}</TableCell>
                   <TableCell>{student.class_level}</TableCell>
                   <TableCell>
-                    {student.advisor_name || (student as any).advisor ? (
+                    {student.advisor_name || student.advisor ? (
                       <span className="text-sm">
                         {student.advisor_name ||
-                          `${(student as any).advisor?.first_name} ${(student as any).advisor?.last_name}`}
+                          `${student.advisor?.first_name} ${student.advisor?.last_name}`}
                       </span>
                     ) : (
                       <span className="text-sm text-muted-foreground">

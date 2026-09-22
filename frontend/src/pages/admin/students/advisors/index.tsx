@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react"
+import { useState, useEffect, useCallback } from "react"
 import { Button } from "@/components/ui/button"
 import {
   Table,
@@ -149,18 +149,7 @@ export default function AdvisorManagementPage() {
     "asc" | "desc"
   >("asc")
 
-  useEffect(() => {
-    fetchStaffList()
-    fetchOrphanedStudents()
-  }, [orphanedPage])
-
-  useEffect(() => {
-    if (selectedAdvisor) {
-      fetchAdvisorStudents()
-    }
-  }, [selectedAdvisor, advisorPage])
-
-  const fetchStaffList = async () => {
+  const fetchStaffList = useCallback(async () => {
     try {
       const response = (await staffApi
         .get("", {
@@ -176,9 +165,9 @@ export default function AdvisorManagementPage() {
     } catch (error) {
       console.error("Failed to fetch staff list:", error)
     }
-  }
+  }, [])
 
-  const fetchOrphanedStudents = async () => {
+  const fetchOrphanedStudents = useCallback(async () => {
     setLoading(true)
     try {
       const response = (await studentApi
@@ -213,9 +202,10 @@ export default function AdvisorManagementPage() {
     } finally {
       setLoading(false)
     }
-  }
+  }, [orphanedPage, limit])
 
-  const fetchAdvisorStudents = async () => {
+  const fetchAdvisorStudents = useCallback(async () => {
+    if (!selectedAdvisor) return
     setLoading(true)
     try {
       const response = (await studentApi
@@ -250,7 +240,18 @@ export default function AdvisorManagementPage() {
     } finally {
       setLoading(false)
     }
-  }
+  }, [selectedAdvisor, advisorPage, limit])
+
+  useEffect(() => {
+    fetchStaffList()
+    fetchOrphanedStudents()
+  }, [fetchStaffList, fetchOrphanedStudents])
+
+  useEffect(() => {
+    if (selectedAdvisor) {
+      fetchAdvisorStudents()
+    }
+  }, [selectedAdvisor, fetchAdvisorStudents])
 
   const handleAssignAdvisor = async (e: React.FormEvent) => {
     e.preventDefault()
@@ -418,55 +419,45 @@ export default function AdvisorManagementPage() {
   }
 
   // Fetch instructors by department from API (with Turkish-English normalization on backend)
-  const fetchInstructorsByDepartment = async (
-    department: string
-  ): Promise<Staff[]> => {
-    try {
-      const response = (await staffApi
-        .get("instructors", { searchParams: { department } })
-        .json()) as { data: Staff[] }
-      return response.data || []
-    } catch (err) {
-      console.error("Error fetching instructors by department:", err)
-      // Fallback to client-side filtering
-      return staffList.filter((staff) => staff.department === department)
-    }
-  }
+  const fetchInstructorsByDepartment = useCallback(
+    async (department: string): Promise<Staff[]> => {
+      try {
+        const response = (await staffApi
+          .get("instructors", { searchParams: { department } })
+          .json()) as { data: Staff[] }
+        return response.data || []
+      } catch (err) {
+        console.error("Error fetching instructors by department:", err)
+        // Fallback to client-side filtering
+        return staffList.filter((staff) => staff.department === department)
+      }
+    },
+    [staffList]
+  )
 
   // No longer returning all staff fallback. We rely solely on departmentInstructors
   // which is fetched precisely for the selected department.
 
-  // Load instructors when assigning student changes
+  // Load instructors when assigning student or bulk department changes
   useEffect(() => {
-    if (assigningStudent?.department) {
+    const department = assigningStudent?.department || bulkSelectedDepartment
+    if (department) {
       setLoadingInstructors(true)
-      fetchInstructorsByDepartment(assigningStudent.department)
+      fetchInstructorsByDepartment(department)
         .then((instructors) => {
           setDepartmentInstructors(instructors)
         })
         .finally(() => {
           setLoadingInstructors(false)
         })
-    } else if (!bulkSelectedDepartment) {
+    } else {
       setDepartmentInstructors([])
     }
-  }, [assigningStudent])
-
-  // Load instructors when bulk department changes
-  useEffect(() => {
-    if (bulkSelectedDepartment) {
-      setLoadingInstructors(true)
-      fetchInstructorsByDepartment(bulkSelectedDepartment)
-        .then((instructors) => {
-          setDepartmentInstructors(instructors)
-        })
-        .finally(() => {
-          setLoadingInstructors(false)
-        })
-    } else if (!assigningStudent) {
-      setDepartmentInstructors([])
-    }
-  }, [bulkSelectedDepartment])
+  }, [
+    assigningStudent?.department,
+    bulkSelectedDepartment,
+    fetchInstructorsByDepartment,
+  ])
 
   return (
     <div className="container mx-auto py-10">
