@@ -18,6 +18,7 @@ import {
   useMonthlyMenu,
   useMyReservations,
 } from '@/hooks/useMeals';
+import { apiErrorCode, apiErrorMessage } from '@/lib/api-error';
 import { COLORS } from '@/lib/theme';
 import type { Cafeteria, DailyMenu, MealTime, MenuType, Reservation } from '@/types/meal.types';
 
@@ -277,13 +278,12 @@ function ReservationWizard({
           haptic.success();
           close();
         },
-        onError: (err: any) => {
+        onError: (err) => {
           haptic.error();
-          const code = err?.response?.data?.error?.code;
-          if (code === 'RESERVATION_CONFLICTS') {
+          if (apiErrorCode(err) === 'RESERVATION_CONFLICTS') {
             setError('Seçtiğin bazı gün/öğünler için zaten randevun var. Onları çıkar ve tekrar dene.');
           } else {
-            setError(err?.response?.data?.error?.message ?? 'Randevu alınamadı. Tekrar dene.');
+            setError(apiErrorMessage(err, 'Randevu alınamadı. Tekrar dene.'));
           }
         },
       }

@@ -21,6 +21,7 @@ import { SESSION_TYPE_LABEL } from '@/constants/schedule';
 import { useTheme } from '@/contexts/ThemeContext';
 import { useScanQR } from '@/hooks/useAttendance';
 import { useHaptic } from '@/hooks/useHaptic';
+import { apiErrorMessage } from '@/lib/api-error';
 import { createScanGate, parseQRPayload } from '@/lib/qr-payload';
 import { COLORS } from '@/lib/theme';
 import type { ScanQRResponse } from '@/types/attendance.types';
@@ -108,12 +109,11 @@ export default function ScanScreen() {
             haptic.success();
             setResult({ type: 'success', data });
           },
-          onError: (error: any) => {
+          onError: (error) => {
             haptic.error();
-            const errorData = error.response?.data;
             setResult({
               type: 'error',
-              message: errorData?.message ?? 'Yoklama alinamadi. Tekrar dene.',
+              message: apiErrorMessage(error, 'Yoklama alinamadi. Tekrar dene.'),
             });
           },
         }

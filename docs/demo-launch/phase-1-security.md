@@ -137,7 +137,7 @@
     - `.env.example`'a yorumlu satır ekle.
   - **Commit:** `fix(shared): cap database pool size`
 
-- [ ] **1.8 Meal'de ortak hata biçimi**
+- [x] **1.8 Meal'de ortak hata biçimi**
   - **Sorun:** Hata yanıtları servislere göre farklı:
     - meal `{success:false, error:{code, message}}` sarmalayıcısını kullanıyor
       (`services/meal-service/internal/handler/meal_handler.go` ≈508
