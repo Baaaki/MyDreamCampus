@@ -214,8 +214,9 @@ type AppealScoreRequest struct {
 	StudentID uuid.UUID `json:"student_id" binding:"required"`
 	CourseID  uuid.UUID `json:"course_id" binding:"required"`
 	Slug      string    `json:"slug" binding:"required"`
-	NewScore  float64   `json:"new_score" binding:"required,min=0,max=100"`
-	Reason    string    `json:"reason" binding:"required,min=10"`
+	// Pointer: on a plain float64 `required` rejects 0, and 0 is a valid score.
+	NewScore *float64 `json:"new_score" binding:"required,min=0,max=100"`
+	Reason   string   `json:"reason" binding:"required,min=10"`
 }
 
 type AppealScoreResponse struct {

@@ -534,7 +534,7 @@ func (h *GradeHandler) ProcessAppeal(c *gin.Context) {
 		zap.String("student_id", req.StudentID.String()),
 		zap.String("course_id", req.CourseID.String()),
 		zap.String("slug", req.Slug),
-		zap.Float64("new_score", req.NewScore),
+		zap.Float64p("new_score", req.NewScore),
 	)
 
 	// Add user_id to context for audit logging

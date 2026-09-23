@@ -125,9 +125,8 @@ func (s *GradeService) SubmitScore(ctx context.Context, instructorID uuid.UUID, 
 	// 7. Upsert score + outbox event atomically
 	var scoreValue pgtype.Numeric
 	if req.Score != nil {
-		// Convert to string for pgtype.Numeric - it accepts string format
-		scoreStr := fmt.Sprintf("%d", int(*req.Score))
-		if err := scoreValue.Scan(scoreStr); err != nil {
+		scoreValue, err = scoreToNumeric(*req.Score)
+		if err != nil {
 			logger.Error("failed to scan score", zap.Error(err))
 			return nil, err
 		}
@@ -267,8 +266,9 @@ func (s *GradeService) BulkSubmitScores(ctx context.Context, instructorID uuid.U
 
 		var scoreValue pgtype.Numeric
 		if e.Score != nil {
-			scoreStr := fmt.Sprintf("%d", int(*e.Score))
-			if err := scoreValue.Scan(scoreStr); err != nil {
+			var err error
+			scoreValue, err = scoreToNumeric(*e.Score)
+			if err != nil {
 				logger.Error("bulk: failed to scan score", zap.Error(err), zap.String("registration_id", e.RegistrationID.String()))
 				continue
 			}
@@ -888,6 +888,12 @@ func buildGradeSubmittedEventParams(ctx context.Context, studentID uuid.UUID, co
 // ============================================
 
 func (s *GradeService) ProcessAppeal(ctx context.Context, req dto.AppealScoreRequest) (*dto.AppealScoreResponse, error) {
+	// A pointer so that 0 is a real score; binding guarantees it over HTTP.
+	if req.NewScore == nil {
+		return nil, errors.ErrInvalidScore
+	}
+	newScore := *req.NewScore
+
 	// 1. Get the student's completed course record (contains frozen statistics)
 	completedCourse, err := s.completedRepo.GetCompletedCourseByStudentAndCourse(ctx, req.StudentID, req.CourseID)
 	if err != nil {
@@ -944,7 +950,7 @@ func (s *GradeService) ProcessAppeal(ctx context.Context, req dto.AppealScoreReq
 	}
 
 	// 6. Update the score
-	scores[req.Slug] = req.NewScore
+	scores[req.Slug] = newScore
 
 	// 7. Recalculate weighted average
 	oldWeightedAvg, _ := utils.PgNumericToFloat64(completedCourse.WeightedAverage)
@@ -1056,7 +1062,7 @@ func (s *GradeService) ProcessAppeal(ctx context.Context, req dto.AppealScoreReq
 				"course_code":     completedCourse.CourseCode,
 				"slug":            req.Slug,
 				"old_score":       oldScore,
-				"new_score":       req.NewScore,
+				"new_score":       newScore,
 				"old_grade_point": string(completedCourse.GradePoint),
 				"new_grade_point": string(newGradePoint),
 				"reason":          req.Reason,
@@ -1072,7 +1078,7 @@ func (s *GradeService) ProcessAppeal(ctx context.Context, req dto.AppealScoreReq
 		zap.String("course_code", completedCourse.CourseCode),
 		zap.String("slug", req.Slug),
 		zap.Float64("old_score", oldScore),
-		zap.Float64("new_score", req.NewScore),
+		zap.Float64("new_score", newScore),
 		zap.String("old_grade", string(completedCourse.GradePoint)),
 		zap.String("new_grade", string(newGradePoint)),
 	)
@@ -1082,7 +1088,7 @@ func (s *GradeService) ProcessAppeal(ctx context.Context, req dto.AppealScoreReq
 		CourseCode:         completedCourse.CourseCode,
 		Slug:               req.Slug,
 		OldScore:           oldScore,
-		NewScore:           req.NewScore,
+		NewScore:           newScore,
 		OldWeightedAverage: oldWeightedAvg,
 		NewWeightedAverage: newWeightedAvg,
 		OldGradePoint:      string(completedCourse.GradePoint),

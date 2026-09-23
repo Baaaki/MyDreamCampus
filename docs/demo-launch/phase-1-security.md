@@ -93,7 +93,7 @@
   - **Commit:** `fix(auth): rotate refresh tokens atomically`,
     `fix(frontend): retry once before redirecting after a failed refresh`
 
-- [ ] **1.5 Ondalıklı not ve itirazda 0 puan**
+- [x] **1.5 Ondalıklı not ve itirazda 0 puan**
   - **Sorun:**
     - `services/grades-service/internal/service/grade_service.go:129` ve
       `:270` `fmt.Sprintf("%d", int(*score))` kullanıyor; kolon `DECIMAL(5,2)`.

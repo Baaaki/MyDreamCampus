@@ -162,3 +162,27 @@ func copyMap(m map[string]any) map[string]any {
 	}
 	return out
 }
+
+func TestAppealScoreRequest_NewScore_ZeroAcceptedMissingRejected(t *testing.T) {
+	base := func(score any) map[string]any {
+		body := map[string]any{
+			"student_id": uuid.NewString(),
+			"course_id":  uuid.NewString(),
+			"slug":       "final",
+			"reason":     "Kagit yeniden okundu, cevaplar bos",
+		}
+		if score != nil {
+			body["new_score"] = score
+		}
+		return body
+	}
+
+	code, body := validateBinding[AppealScoreRequest](t, base(0))
+	assert.Equal(t, 200, code, body)
+
+	code, _ = validateBinding[AppealScoreRequest](t, base(nil))
+	assert.Equal(t, 400, code, "new_score is required")
+
+	code, _ = validateBinding[AppealScoreRequest](t, base(100.5))
+	assert.Equal(t, 400, code)
+}

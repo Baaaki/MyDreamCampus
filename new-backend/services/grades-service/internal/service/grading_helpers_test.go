@@ -6,6 +6,7 @@ import (
 
 	"github.com/baaaki/mydreamcampus/grades/internal/db"
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
 
 func TestDetermineGradingType(t *testing.T) {
@@ -186,4 +187,19 @@ func TestCalculateWeightedAverage(t *testing.T) {
 		got := calculateWeightedAverage(scores, eqSchema)
 		assert.Equal(t, 33.33, got)
 	})
+}
+
+func TestScoreToNumeric_DecimalScore_KeepsTwoDecimals(t *testing.T) {
+	for score, want := range map[float64]string{87.5: "87.50", 0: "0.00", 100: "100.00", 72.25: "72.25"} {
+		n, err := scoreToNumeric(score)
+		require.NoError(t, err)
+
+		stored, err := n.Value()
+		require.NoError(t, err)
+		assert.Equal(t, want, stored, "score %v", score)
+
+		back, err := n.Float64Value()
+		require.NoError(t, err)
+		assert.InDelta(t, score, back.Float64, 1e-9)
+	}
 }

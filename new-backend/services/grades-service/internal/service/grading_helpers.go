@@ -3,9 +3,20 @@ package service
 import (
 	"math"
 	"slices"
+	"strconv"
 
 	"github.com/baaaki/mydreamcampus/grades/internal/db"
+	"github.com/jackc/pgx/v5/pgtype"
 )
+
+// scoreToNumeric converts a score for the DECIMAL(5,2) score columns. Two
+// decimals, not an int: truncating stored 87.5 as 87 while the event said
+// 87.5.
+func scoreToNumeric(score float64) (pgtype.Numeric, error) {
+	var n pgtype.Numeric
+	err := n.Scan(strconv.FormatFloat(score, 'f', 2, 64))
+	return n, err
+}
 
 // Grading type decision based on class mean
 func determineGradingType(classMean float64) db.GradesGradingTypeEnum {
