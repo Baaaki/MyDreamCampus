@@ -10,7 +10,7 @@
 
 ## Görevler
 
-- [ ] **1.1 İlk giriş şifre değişimi sunucuda zorunlu**
+- [x] **1.1 İlk giriş şifre değişimi sunucuda zorunlu**
   - **Sorun:** `force_password_change` yalnız context'e yazılıyor
     (`new-backend/shared/platform/middleware/auth.go` ≈178) ama hiçbir yerde
     kontrol edilmiyor. `ErrForcePasswordChange`

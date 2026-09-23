@@ -172,6 +172,41 @@ describe("api.ts response interceptor (401 + refresh)", () => {
     expect(refreshCall[2].headers["X-Client-Type"]).toBe("mobile");
   });
 
+  it("invokes onForcePasswordChange on 403 FORCE_PASSWORD_CHANGE without refreshing", async () => {
+    await SecureStore.setItemAsync("jwt_token", "flagged");
+    const { api, mod } = loadApi();
+    let forced = 0;
+    mod.setOnForcePasswordChange(() => {
+      forced++;
+    });
+
+    const err = {
+      response: { status: 403, data: { error: "Devam etmek için şifrenizi değiştirmeniz gerekiyor", code: "FORCE_PASSWORD_CHANGE" } },
+      config: { url: "/students/me" },
+    };
+    await expect(getErrHandler(api)(err)).rejects.toBe(err);
+
+    expect(forced).toBe(1);
+    expect(axiosMock.post).not.toHaveBeenCalled();
+    expect(await SecureStore.getItemAsync("jwt_token")).toBe("flagged");
+  });
+
+  it("does not treat other 403s as a forced password change", async () => {
+    const { api, mod } = loadApi();
+    let forced = 0;
+    mod.setOnForcePasswordChange(() => {
+      forced++;
+    });
+
+    const err = {
+      response: { status: 403, data: { error: "Yetkiniz yok", code: "FORBIDDEN" } },
+      config: { url: "/students/me" },
+    };
+    await expect(getErrHandler(api)(err)).rejects.toBe(err);
+
+    expect(forced).toBe(0);
+  });
+
   it("identifies itself as the mobile client on every request", () => {
     loadApi();
     const createArgs = axiosMock.create.mock.calls[axiosMock.create.mock.calls.length - 1][0] as {

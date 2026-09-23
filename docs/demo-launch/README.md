@@ -159,7 +159,7 @@ Başlangıç durumu (24.09.2026, Faz 0 sonu): 11 Go modülünde `go vet` temiz,
 | Faz | Dosya | Konu | Durum |
 |---|---|---|---|
 | 0 | [phase-0-setup.md](phase-0-setup.md) | Hazırlık: onay, kararlar, dal | Bitti |
-| 1 | [phase-1-security.md](phase-1-security.md) | Güvenlik ve doğruluk düzeltmeleri | Bekliyor |
+| 1 | [phase-1-security.md](phase-1-security.md) | Güvenlik ve doğruluk düzeltmeleri | Devam ediyor |
 | 2 | [phase-2-time-machine.md](phase-2-time-machine.md) | Tüm servislerde zaman makinesi | Bekliyor |
 | 3 | [phase-3-payment.md](phase-3-payment.md) | Sahte kartla ödeme | Bekliyor |
 | 4 | [phase-4-seed.md](phase-4-seed.md) | Referans veri ve seed'in yeniden yazımı | Bekliyor |

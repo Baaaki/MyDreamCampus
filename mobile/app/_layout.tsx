@@ -13,6 +13,7 @@ import 'react-native-reanimated';
 import { AuthProvider, useAuthContext } from '@/contexts/AuthContext';
 import { ThemeProvider, useTheme } from '@/contexts/ThemeContext';
 import { NAV_THEME } from '@/lib/theme';
+import { setOnForcePasswordChange } from '@/services/api';
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -76,6 +77,14 @@ function AuthGuard({ children }: { children: React.ReactNode }) {
       router.replace('/(tabs)');
     }
   }, [isAuthenticated, isLoading, segments]);
+
+  useEffect(() => {
+    setOnForcePasswordChange(() => {
+      if (segments[0] !== 'change-password') {
+        router.replace('/change-password');
+      }
+    });
+  }, [segments, router]);
 
   return <>{children}</>;
 }

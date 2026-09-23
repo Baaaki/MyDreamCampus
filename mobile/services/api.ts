@@ -70,6 +70,24 @@ export const setOnUnauthorized = (callback: () => void) => {
   onUnauthorized = callback;
 };
 
+// Every service answers 403 + FORCE_PASSWORD_CHANGE while the user still
+// holds the first-login password; the screen layer decides where to go.
+let onForcePasswordChange: (() => void) | null = null;
+export const setOnForcePasswordChange = (callback: () => void) => {
+  onForcePasswordChange = callback;
+};
+
+function isForcedPasswordChange(error: AxiosError): boolean {
+  const data = error.response?.data;
+  return (
+    error.response?.status === 403 &&
+    typeof data === 'object' &&
+    data !== null &&
+    'code' in data &&
+    data.code === 'FORCE_PASSWORD_CHANGE'
+  );
+}
+
 // Single-flight refresh: avoid stampeding /auth/refresh when many requests
 // hit 401 simultaneously. All concurrent 401s wait on the same promise.
 let refreshInFlight: Promise<string | null> | null = null;
@@ -107,6 +125,11 @@ api.interceptors.response.use(
   async (error: AxiosError) => {
     const original = error.config as (InternalAxiosRequestConfig & { _retried?: boolean }) | undefined;
     const status = error.response?.status;
+
+    if (isForcedPasswordChange(error)) {
+      onForcePasswordChange?.();
+      return Promise.reject(error);
+    }
 
     if (status !== 401 || !original) {
       return Promise.reject(error);
