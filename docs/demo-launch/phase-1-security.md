@@ -10,7 +10,7 @@
 
 ## Görevler
 
-- [x] **1.1 İlk giriş şifre değişimi sunucuda zorunlu**
+- [x] **1.1 İlk giriş şifre değişimi sunucuda zorunlu** — `8009d65`, `3147ff7`, `d28cab4`
   - **Sorun:** `force_password_change` yalnız context'e yazılıyor
     (`new-backend/shared/platform/middleware/auth.go` ≈178) ama hiçbir yerde
     kontrol edilmiyor. `ErrForcePasswordChange`
@@ -33,7 +33,7 @@
   - **Commit:** `fix(shared): enforce forced password change on the server`
     (+ `fix(frontend): ...`, `fix(mobile): ...`)
 
-- [x] **1.2 Yemekhane: çift kullanım ve çift iade**
+- [x] **1.2 Yemekhane: çift kullanım ve çift iade** — `4f063ef`, `70e7a9d`
   - **Sorun:** Kullanım ve iptal UPDATE'lerinde durum koşulu yok; kontrol Go
     tarafında UPDATE'ten önce yapılıyor. Aynı QR ile eşzamanlı iki tarama ikisi
     de başarılı oluyor; kullanım ve iptal aynı anda gelirse hem yemek hem iade
@@ -57,7 +57,7 @@
   - **Commit:** `fix(meal): make reservation use and cancel atomic`,
     `fix(shared): apply idempotency to DELETE requests`
 
-- [x] **1.3 Kapatılan veya e-postası değişen kullanıcının token'ları**
+- [x] **1.3 Kapatılan veya e-postası değişen kullanıcının token'ları** — `6a1d845`
   - **Sorun:** `HandleUserDeactivated` (`auth-service/internal/service/event_service.go`
     ≈402) ve `HandleUserUpdated`'in e-posta dalı (≈336) DB'de `token_version`'ı
     artırıyor ama Redis'teki minimum versiyonu yazmıyor. `JWTAuth` yalnız
@@ -75,7 +75,11 @@
   - **Kabul:** Sahte cache ile birim testi: çağrı doğru versiyonla yapılıyor.
   - **Commit:** `fix(auth): revoke access tokens on deactivation and email change`
 
-- [x] **1.4 Refresh token rotasyonu atomik**
+  > Not (24.09): `HandleUserUpdated` e-postayı güncelledikten sonra
+  > `CheckEmailVersionSync` çalıştırıyordu; sorgu hiç satır bulamadığı için
+  > e-posta değişim event'i her seferinde hata veriyordu. Sıra düzeltildi.
+
+- [x] **1.4 Refresh token rotasyonu atomik** — `f17c3c7`, `9479fb1`
   - **Sorun:** `RefreshAccessToken` (`auth_service.go` ≈466)
     `_ = s.sessionRepo.DeleteSession(ctx, jti)` ile hatayı yutuyor; oturum
     kontrolü ile silme arasında kilit yok. Aynı refresh token eşzamanlı iki
@@ -93,7 +97,11 @@
   - **Commit:** `fix(auth): rotate refresh tokens atomically`,
     `fix(frontend): retry once before redirecting after a failed refresh`
 
-- [x] **1.5 Ondalıklı not ve itirazda 0 puan**
+  > Not (24.09): Refresh 401 `SESSION_NOT_FOUND` iken cookie'ler artık
+  > silinmiyor; yoksa yarışı kaybeden sekmenin `Set-Cookie`'si kazananın yeni
+  > cookie'lerini siliyor ve web'deki "bir kez daha dene" işe yaramıyordu.
+
+- [x] **1.5 Ondalıklı not ve itirazda 0 puan** — `ad18010`
   - **Sorun:**
     - `services/grades-service/internal/service/grade_service.go:129` ve
       `:270` `fmt.Sprintf("%d", int(*score))` kullanıyor; kolon `DECIMAL(5,2)`.
@@ -107,7 +115,7 @@
   - **Kabul:** Test: 87.5 kaydedilip 87.50 okunuyor; itirazda 0 kabul ediliyor.
   - **Commit:** `fix(grades): keep decimal scores and allow zero on appeal`
 
-- [x] **1.6 Danışman onayında 403 ve kilit**
+- [x] **1.6 Danışman onayında 403 ve kilit** — `0fea6af`
   - **Sorun:**
     - `services/enrollment-service/internal/service/enrollment_service_advisor.go:53`
       ve `:140` yetki hatasında `ErrUnauthorized` (401) dönüyor. Frontend
@@ -127,7 +135,7 @@
     alır.
   - **Commit:** `fix(enrollment): return 403 for advisor mismatch and lock program on approve`
 
-- [x] **1.7 DB bağlantı havuzu**
+- [x] **1.7 DB bağlantı havuzu** — `5350e01`
   - **Sorun:** `new-backend/shared/platform/database/database.go:20` servis
     başına `MaxConns = 25`. 8 DB'li servisle toplam 200 bağlantı ediyor,
     Postgres'in varsayılan `max_connections` değeri ise 100.
@@ -137,7 +145,7 @@
     - `.env.example`'a yorumlu satır ekle.
   - **Commit:** `fix(shared): cap database pool size`
 
-- [x] **1.8 Meal'de ortak hata biçimi**
+- [x] **1.8 Meal'de ortak hata biçimi** — `4778279`, `bc71ef5`
   - **Sorun:** Hata yanıtları servislere göre farklı:
     - meal `{success:false, error:{code, message}}` sarmalayıcısını kullanıyor
       (`services/meal-service/internal/handler/meal_handler.go` ≈508
@@ -154,7 +162,11 @@
     gösteriyor.
   - **Commit:** `fix(meal): use the common error response shape`
 
-- [x] **1.9 JWT ve CSRF sertleştirme**
+  > Not (24.09): Mobile `lib/api-error.ts` eklendi (web'deki
+  > `apiErrorMessage` karşılığı). QR yoklama ekranı da attendance'ın gönderdiği
+  > hata metnini hiç göstermiyordu; o da buna bağlandı.
+
+- [x] **1.9 JWT ve CSRF sertleştirme** — `83457e0`
   - **Yapılacak:**
     - `jwt.WithValidMethods([]string{"HS256"})` ekle:
       - `shared/platform/utils/jwt.go` (≈144 ve ≈196'daki parse çağrıları);
@@ -169,7 +181,7 @@
     cookie'yle gelen POST, CSRF token'ı olmadan 403 alıyor.
   - **Commit:** `refactor(shared): harden JWT and CSRF checks`
 
-- [x] **1.10 Refresh geçici hata alınca oturum silinmesin**
+- [x] **1.10 Refresh geçici hata alınca oturum silinmesin** — `800e6dd`, `ffb0079`
   - **Sorun:** Web ve mobil, refresh isteği ağ hatası veya 5xx alınca da
     oturumu siliyor. Backend ise bu durumları bilerek "tekrar dene" diye
     ayırıyor.

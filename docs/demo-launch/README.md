@@ -159,7 +159,7 @@ Başlangıç durumu (24.09.2026, Faz 0 sonu): 11 Go modülünde `go vet` temiz,
 | Faz | Dosya | Konu | Durum |
 |---|---|---|---|
 | 0 | [phase-0-setup.md](phase-0-setup.md) | Hazırlık: onay, kararlar, dal | Bitti |
-| 1 | [phase-1-security.md](phase-1-security.md) | Güvenlik ve doğruluk düzeltmeleri | Devam ediyor |
+| 1 | [phase-1-security.md](phase-1-security.md) | Güvenlik ve doğruluk düzeltmeleri | Bitti |
 | 2 | [phase-2-time-machine.md](phase-2-time-machine.md) | Tüm servislerde zaman makinesi | Bekliyor |
 | 3 | [phase-3-payment.md](phase-3-payment.md) | Sahte kartla ödeme | Bekliyor |
 | 4 | [phase-4-seed.md](phase-4-seed.md) | Referans veri ve seed'in yeniden yazımı | Bekliyor |
@@ -188,3 +188,4 @@ Durum değerleri: **Bekliyor**, **Devam ediyor**, **Bitti**, **Engelli**.
 |---|---|---|---|
 | 23.09.2026 | — | Plan yazıldı (inceleme oturumu) | Faz 0 bekliyor |
 | 23–24.09.2026 | Faz 0 (0.1–0.5) | Plan onayı, K1–K5, dal; Go 1.27, Docker/CI, frontend (vite 8, react-router 8, lint 92→0) ve mobil (Expo SDK 57) güncellemeleri. 0.5: backend 11 modül vet temiz / 972 test; frontend typecheck+lint+build temiz / 68 test; mobil tsc temiz / 67 test — hepsi yeşil | Faz 1 bekliyor |
+| 24.09.2026 | Faz 1 (1.1–1.10) | Güvenlik ve doğruluk düzeltmeleri, 16 commit. Planda olmayan ek düzeltmeler: e-posta değişim event'i hiç işlenemiyordu (1.3), iki sekme refresh yarışında cookie'ler siliniyordu (1.4), mobil yoklama ekranı hata metnini göstermiyordu (1.8). Backend 11 modül vet temiz / 997 test; frontend typecheck+lint+build temiz / 73 test; mobil tsc temiz / 76 test | Faz 2 bekliyor |
