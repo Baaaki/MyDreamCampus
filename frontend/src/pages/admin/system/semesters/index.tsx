@@ -1,4 +1,5 @@
-import { useCallback, useEffect, useState } from "react"
+import { useCallback, useState } from "react"
+import { useQuery } from "@tanstack/react-query"
 import { useNavigate } from "react-router"
 import { format } from "date-fns"
 import { tr } from "date-fns/locale"
@@ -174,22 +175,11 @@ function buildMockData() {
 
 export default function SemestersPage() {
   const navigate = useNavigate()
-  const [semesters, setSemesters] = useState<Semester[]>([])
-  const [loading, setLoading] = useState(false)
-
-  // Period data (read-only)
-  const [gradesPeriods, setGradesPeriods] = useState<AcademicPeriod[]>([])
-  const [enrollmentPeriods, setEnrollmentPeriods] = useState<SimplePeriod[]>([])
-  const [catalogPeriods, setCatalogPeriods] = useState<SimplePeriod[]>([])
-  const [attendancePeriods, setAttendancePeriods] = useState<SimplePeriod[]>([])
-  const [closedDays, setClosedDays] = useState<ClosedDay[]>([])
-  const [periodsLoading, setPeriodsLoading] = useState(false)
-  const [mockMode, setMockMode] = useState(false)
-  const [mockAttendance, setMockAttendance] = useState<{
-    start: string
-    end: string
-    active: boolean
-  } | null>(null)
+  // Preview data replaces the live queries while it is set
+  const [mockData, setMockData] = useState<ReturnType<
+    typeof buildMockData
+  > | null>(null)
+  const mockMode = mockData !== null
 
   const [toast, setToast] = useState<{
     message: string
@@ -204,21 +194,17 @@ export default function SemestersPage() {
     []
   )
 
-  const fetchSemesters = useCallback(async () => {
-    if (mockMode) return
-    setLoading(true)
-    try {
-      setSemesters(await listSemesters())
-    } catch {
-      showToast("Dönemler yüklenemedi", "error")
-    } finally {
-      setLoading(false)
-    }
-  }, [showToast, mockMode])
-
-  useEffect(() => {
-    fetchSemesters()
-  }, [fetchSemesters])
+  const {
+    data: liveSemesters = [],
+    isFetching: loading,
+    isError: semestersError,
+    refetch: fetchSemesters,
+  } = useQuery({
+    queryKey: ["system", "semesters"],
+    queryFn: listSemesters,
+    enabled: !mockMode,
+  })
+  const semesters: Semester[] = mockData?.semesters ?? liveSemesters
 
   const activeSemester = semesters.find(
     (s) => s.status === "active" && new Date() < new Date(s.hard_deadline)
@@ -230,74 +216,56 @@ export default function SemestersPage() {
     (s) => s.status !== "completed" && new Date() < new Date(s.hard_deadline)
   )
 
-  // Fetch periods when active semester changes
-  const fetchPeriods = useCallback(async () => {
-    if (mockMode) return
-    if (!activeSemester) {
-      setGradesPeriods([])
-      setEnrollmentPeriods([])
-      setCatalogPeriods([])
-      setAttendancePeriods([])
-      setClosedDays([])
-      setMockAttendance(null)
-      return
-    }
-    setPeriodsLoading(true)
-    try {
+  // Each service is read independently; one that fails shows as empty
+  const activeSemesterName = activeSemester?.name
+  const {
+    data: livePeriods,
+    isFetching: periodsLoading,
+    refetch: fetchPeriods,
+  } = useQuery({
+    queryKey: ["system", "semester-periods", activeSemesterName],
+    queryFn: async () => {
+      const name = activeSemesterName!
       const [grades, enrollment, catalog, attendance, meals] =
         await Promise.allSettled([
-          listGradesPeriods(activeSemester.name),
-          listSimplePeriods("enrollment", activeSemester.name),
-          listSimplePeriods("catalog", activeSemester.name),
-          listSimplePeriods("attendance", activeSemester.name),
+          listGradesPeriods(name),
+          listSimplePeriods("enrollment", name),
+          listSimplePeriods("catalog", name),
+          listSimplePeriods("attendance", name),
           listClosedDays(),
         ])
-      if (grades.status === "fulfilled") setGradesPeriods(grades.value)
-      if (enrollment.status === "fulfilled")
-        setEnrollmentPeriods(enrollment.value)
-      if (catalog.status === "fulfilled") setCatalogPeriods(catalog.value)
-      if (attendance.status === "fulfilled")
-        setAttendancePeriods(attendance.value)
-      if (meals.status === "fulfilled") setClosedDays(meals.value)
-    } finally {
-      setPeriodsLoading(false)
-    }
-  }, [activeSemester, mockMode])
+      const valueOr = <T,>(r: PromiseSettledResult<T[]>): T[] =>
+        r.status === "fulfilled" ? r.value : []
+      return {
+        grades: valueOr(grades),
+        enrollment: valueOr(enrollment),
+        catalog: valueOr(catalog),
+        attendance: valueOr(attendance),
+        closedDays: valueOr(meals),
+      }
+    },
+    enabled: !mockMode && !!activeSemesterName,
+  })
+  const periodSource = mockData ?? livePeriods
+  const gradesPeriods: AcademicPeriod[] = periodSource?.grades ?? []
+  const enrollmentPeriods: SimplePeriod[] = periodSource?.enrollment ?? []
+  const catalogPeriods: SimplePeriod[] = periodSource?.catalog ?? []
+  // Preview attendance is a single range, not a period list
+  const attendancePeriods: SimplePeriod[] = mockData
+    ? []
+    : (livePeriods?.attendance ?? [])
+  const closedDays: ClosedDay[] = periodSource?.closedDays ?? []
+  const mockAttendance = mockData?.attendance ?? null
 
-  useEffect(() => {
-    fetchPeriods()
-  }, [fetchPeriods])
-
-  const toggleMockMode = useCallback(() => {
-    if (!mockMode) {
-      const mock = buildMockData()
-      setSemesters(mock.semesters)
-      setGradesPeriods(mock.grades)
-      setEnrollmentPeriods(mock.enrollment)
-      setCatalogPeriods(mock.catalog)
-      setMockAttendance(mock.attendance)
-      setClosedDays(mock.closedDays)
-      setMockMode(true)
-    } else {
-      setMockMode(false)
-      setMockAttendance(null)
-      // Real fetch will trigger via useEffect
-    }
-  }, [mockMode])
-
-  // Reset real data when exiting mock mode
-  useEffect(() => {
-    if (!mockMode) {
-      fetchSemesters()
-      fetchPeriods()
-    }
-  }, [mockMode]) // eslint-disable-line react-hooks/exhaustive-deps
+  const toggleMockMode = () => {
+    setMockData(mockMode ? null : buildMockData())
+  }
 
   // Delete planned semester
   const [deleteTarget, setDeleteTarget] = useState<Semester | null>(null)
   const [deleting, setDeleting] = useState(false)
 
-  const handleDeleteSemester = useCallback(async () => {
+  const handleDeleteSemester = async () => {
     if (!deleteTarget) return
     setDeleting(true)
     try {
@@ -310,7 +278,7 @@ export default function SemestersPage() {
     } finally {
       setDeleting(false)
     }
-  }, [deleteTarget, fetchSemesters, showToast])
+  }
 
   // Helper: get the first (main) period for a simple period list
   const mainGradesPeriod =
@@ -416,7 +384,8 @@ export default function SemestersPage() {
                 size="sm"
                 onClick={() => {
                   fetchSemesters()
-                  fetchPeriods()
+                  // refetch ignores `enabled`; without a name there is nothing to load
+                  if (activeSemesterName) fetchPeriods()
                 }}
                 disabled={loading || mockMode}
               >
@@ -452,6 +421,15 @@ export default function SemestersPage() {
                   <TableRow>
                     <TableCell colSpan={6} className="py-6 text-center">
                       <Loader2 className="mx-auto h-5 w-5 animate-spin text-gray-400" />
+                    </TableCell>
+                  </TableRow>
+                ) : semestersError && !mockMode ? (
+                  <TableRow>
+                    <TableCell
+                      colSpan={6}
+                      className="py-6 text-center text-destructive"
+                    >
+                      Dönemler yüklenemedi
                     </TableCell>
                   </TableRow>
                 ) : visibleSemesters.length === 0 && !expiredActiveSemester ? (

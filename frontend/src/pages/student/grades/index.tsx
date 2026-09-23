@@ -1,4 +1,5 @@
-import { useState, useEffect, useMemo } from "react"
+import { useState, useMemo } from "react"
+import { useQuery } from "@tanstack/react-query"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
 import {
@@ -17,6 +18,7 @@ import {
   TableRow,
 } from "@/components/ui/table"
 import { gradesApi } from "@/lib/api-client"
+import { apiErrorMessage } from "@/lib/api-error"
 import { mockMyGradesResponse } from "@/mock_data/grades"
 import type {
   MyGradesResponse,
@@ -149,42 +151,30 @@ function gpFloat(gp: string): number {
 }
 
 export default function StudentGradesPage() {
-  const [data, setData] = useState<MyGradesResponse | null>(null)
-  const [loading, setLoading] = useState(true)
-  const [error, setError] = useState<string | null>(null)
-  const [selectedSemester, setSelectedSemester] = useState<string>("")
+  const [pickedSemester, setPickedSemester] = useState<string>("")
   const [showLegend, setShowLegend] = useState(false)
 
-  useEffect(() => {
-    let cancelled = false
-    ;(async () => {
-      try {
-        setLoading(true)
-        const res = USE_MOCK
-          ? mockMyGradesResponse
-          : await gradesApi.get("my/grades").json<MyGradesResponse>()
-        if (!cancelled) {
-          // Backend ders listesi boşsa null dönüyor — array'e normalize et
-          setData({
-            ...res,
-            active_courses: res.active_courses ?? [],
-            completed_courses: res.completed_courses ?? [],
-          })
-          setError(null)
-        }
-      } catch (err) {
-        if (!cancelled) {
-          const msg = err instanceof Error ? err.message : "Notlar yüklenemedi"
-          setError(msg)
-        }
-      } finally {
-        if (!cancelled) setLoading(false)
+  const {
+    data = null,
+    isLoading: loading,
+    error: queryError,
+  } = useQuery({
+    queryKey: ["grades", "my"],
+    queryFn: async (): Promise<MyGradesResponse> => {
+      const res = USE_MOCK
+        ? mockMyGradesResponse
+        : await gradesApi.get("my/grades").json<MyGradesResponse>()
+      // Backend ders listesi boşsa null dönüyor — array'e normalize et
+      return {
+        ...res,
+        active_courses: res.active_courses ?? [],
+        completed_courses: res.completed_courses ?? [],
       }
-    })()
-    return () => {
-      cancelled = true
-    }
-  }, [])
+    },
+  })
+  const error = queryError
+    ? apiErrorMessage(queryError, "Notlar yüklenemedi")
+    : null
 
   // Tüm dönemleri (aktif + tamamlanan) topla, en yeniden eskiye sırala
   const semesterList = useMemo<SemesterMeta[]>(() => {
@@ -202,14 +192,11 @@ export default function StudentGradesPage() {
   }, [data])
 
   // Default seçim: aktif dönem varsa ilk aktif, yoksa en yeni dönem
-  useEffect(() => {
-    if (!data || selectedSemester) return
-    if (data.active_courses.length > 0) {
-      setSelectedSemester(data.active_courses[0].semester)
-    } else if (semesterList.length > 0) {
-      setSelectedSemester(semesterList[0].key)
-    }
-  }, [data, semesterList, selectedSemester])
+  const selectedSemester =
+    pickedSemester ||
+    data?.active_courses[0]?.semester ||
+    semesterList[0]?.key ||
+    ""
 
   // Seçilen dönemin dersleri
   const semesterView = useMemo(() => {
@@ -415,7 +402,7 @@ export default function StudentGradesPage() {
                 </label>
                 <Select
                   value={selectedSemester}
-                  onValueChange={setSelectedSemester}
+                  onValueChange={setPickedSemester}
                 >
                   <SelectTrigger id="semester-select" className="min-w-[260px]">
                     <SelectValue placeholder="Bir dönem seçin..." />

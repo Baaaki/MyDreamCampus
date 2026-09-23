@@ -1,4 +1,5 @@
-import { useState, useEffect, useCallback } from "react"
+import { useState } from "react"
+import { keepPreviousData, useQuery } from "@tanstack/react-query"
 import { Button } from "@/components/ui/button"
 import {
   Table,
@@ -83,10 +84,7 @@ type SortField =
 type SortDirection = "asc" | "desc"
 
 export default function StudentsPage() {
-  const [studentList, setStudentList] = useState<Student[]>([])
-  const [loading, setLoading] = useState(false)
   const [currentPage, setCurrentPage] = useState(1)
-  const [totalPages, setTotalPages] = useState(1)
   const [limit] = useState(10)
   const [isCreateOpen, setIsCreateOpen] = useState(false)
   const [isEditOpen, setIsEditOpen] = useState(false)
@@ -99,13 +97,6 @@ export default function StudentsPage() {
 
   // Faculty/Department selection
   const [createDepartments, setCreateDepartments] = useState<Department[]>([])
-
-  // Advisors from staff API
-  const [, setAdvisors] = useState<Staff[]>([])
-
-  // Department-specific advisors for create form
-  const [departmentAdvisors, setDepartmentAdvisors] = useState<Staff[]>([])
-  const [loadingAdvisors, setLoadingAdvisors] = useState(false)
 
   // Create form state
   const [createFormData, setCreateFormData] = useState({
@@ -140,52 +131,25 @@ export default function StudentsPage() {
   )
   const [loadingEditAdvisors, setLoadingEditAdvisors] = useState(false)
 
-  const fetchStudents = useCallback(async () => {
-    setLoading(true)
-    console.log(
-      "[Students Page] Fetching students, page:",
-      currentPage,
-      "limit:",
-      limit
-    )
-    try {
-      const response = (await studentApi
+  const {
+    data: studentPage,
+    isFetching: loading,
+    refetch: fetchStudents,
+  } = useQuery({
+    queryKey: ["students", "list", currentPage, limit],
+    queryFn: () =>
+      studentApi
         .get("", {
           searchParams: {
             page: currentPage.toString(),
             limit: limit.toString(),
           },
         })
-        .json()) as StudentListResponse
-
-      console.log("[Students Page] Response:", response)
-      setStudentList(response.data)
-      setTotalPages(response.pagination.total_pages)
-    } catch (error) {
-      console.error("Failed to fetch students:", error)
-    } finally {
-      setLoading(false)
-    }
-  }, [currentPage, limit])
-
-  useEffect(() => {
-    fetchStudents()
-  }, [fetchStudents])
-
-  // Fetch all advisors (teachers) from staff API
-  useEffect(() => {
-    const fetchAdvisors = async () => {
-      try {
-        const response = (await staffApi
-          .get("", { searchParams: { role: "teacher", limit: "100" } })
-          .json()) as { data: Staff[] }
-        setAdvisors(response.data || [])
-      } catch (error) {
-        console.error("Failed to fetch advisors:", error)
-      }
-    }
-    fetchAdvisors()
-  }, [])
+        .json<StudentListResponse>(),
+    placeholderData: keepPreviousData,
+  })
+  const studentList = studentPage?.data ?? []
+  const totalPages = studentPage?.pagination.total_pages ?? 1
 
   // Fetch department-specific advisors when department changes in create form
   const fetchAdvisorsByDepartment = async (
@@ -203,22 +167,13 @@ export default function StudentsPage() {
     }
   }
 
-  // Effect to load advisors when department is selected in create form
-  useEffect(() => {
-    if (createFormData.department) {
-      setLoadingAdvisors(true)
-      setCreateFormData((prev) => ({ ...prev, advisor_id: "" })) // Reset advisor when department changes
-      fetchAdvisorsByDepartment(createFormData.department)
-        .then((instructors) => {
-          setDepartmentAdvisors(instructors) // Bölümde hoca yoksa boş kalacak
-        })
-        .finally(() => {
-          setLoadingAdvisors(false)
-        })
-    } else {
-      setDepartmentAdvisors([])
-    }
-  }, [createFormData.department])
+  // Department-specific advisors for create form; empty when the department has none
+  const { data: departmentAdvisors = [], isFetching: loadingAdvisors } =
+    useQuery({
+      queryKey: ["staff", "instructors", createFormData.department],
+      queryFn: () => fetchAdvisorsByDepartment(createFormData.department),
+      enabled: !!createFormData.department,
+    })
 
   const handleCreateStudent = async (e: React.FormEvent) => {
     e.preventDefault()
@@ -243,7 +198,6 @@ export default function StudentsPage() {
         advisor_id: "",
       })
       setCreateDepartments([])
-      setDepartmentAdvisors([])
       fetchStudents()
     } catch (error) {
       console.error("[Students Page] Failed to create student:", error)
@@ -549,6 +503,7 @@ export default function StudentsPage() {
                       setCreateFormData({
                         ...createFormData,
                         department: value,
+                        advisor_id: "", // Advisors are per department
                       })
                     }
                     disabled={!createFormData.faculty}

@@ -1,4 +1,5 @@
-import { useCallback, useEffect, useState } from "react"
+import { useCallback, useState } from "react"
+import { useQuery } from "@tanstack/react-query"
 import { format } from "date-fns"
 import { tr } from "date-fns/locale"
 import { Clock, Play, RotateCcw, RefreshCw, Loader2 } from "lucide-react"
@@ -18,7 +19,6 @@ import {
 } from "@/components/ui/table"
 import Toast from "@/components/enrollment/Toast"
 
-import type { ServiceTimeStatus } from "@/lib/types"
 import {
   getAllTimeStatuses,
   simulateTimeAll,
@@ -39,26 +39,17 @@ export default function TimeMachinePage() {
     []
   )
 
-  const [statuses, setStatuses] = useState<ServiceTimeStatus[]>([])
-  const [loading, setLoading] = useState(true)
+  const {
+    data: statuses = [],
+    isFetching: loading,
+    isError,
+    refetch: fetchStatuses,
+  } = useQuery({
+    queryKey: ["system", "time-statuses"],
+    queryFn: getAllTimeStatuses,
+  })
   const [simulateTime, setSimulateTime] = useState("")
   const [actionLoading, setActionLoading] = useState(false)
-
-  const fetchStatuses = useCallback(async () => {
-    setLoading(true)
-    try {
-      const results = await getAllTimeStatuses()
-      setStatuses(results)
-    } catch {
-      showToast("Servis durumları alınamadı", "error")
-    } finally {
-      setLoading(false)
-    }
-  }, [showToast])
-
-  useEffect(() => {
-    fetchStatuses()
-  }, [fetchStatuses])
 
   const handleSimulate = async () => {
     if (!simulateTime) {
@@ -147,7 +138,7 @@ export default function TimeMachinePage() {
               <Button
                 variant="ghost"
                 size="sm"
-                onClick={fetchStatuses}
+                onClick={() => fetchStatuses()}
                 disabled={loading}
               >
                 <RefreshCw
@@ -172,6 +163,15 @@ export default function TimeMachinePage() {
                   <TableRow>
                     <TableCell colSpan={3} className="py-4 text-center">
                       <Loader2 className="mx-auto h-5 w-5 animate-spin text-gray-400" />
+                    </TableCell>
+                  </TableRow>
+                ) : isError ? (
+                  <TableRow>
+                    <TableCell
+                      colSpan={3}
+                      className="py-4 text-center text-destructive"
+                    >
+                      Servis durumları alınamadı
                     </TableCell>
                   </TableRow>
                 ) : (

@@ -1,4 +1,5 @@
-import { useCallback, useEffect, useState } from "react"
+import { useState } from "react"
+import { keepPreviousData, useQuery } from "@tanstack/react-query"
 import { format } from "date-fns"
 import { tr } from "date-fns/locale"
 import {
@@ -29,7 +30,6 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog"
-import Toast from "@/components/enrollment/Toast"
 
 import type { AuditLogEntry } from "@/lib/types"
 import { listAuditLog } from "@/lib/services/system-service"
@@ -47,9 +47,6 @@ const SERVICE_COLORS: Record<string, string> = {
 }
 
 export default function AuditLogPage() {
-  const [entries, setEntries] = useState<AuditLogEntry[]>([])
-  const [total, setTotal] = useState(0)
-  const [loading, setLoading] = useState(false)
   const [page, setPage] = useState(0)
 
   // Filters
@@ -59,42 +56,26 @@ export default function AuditLogPage() {
   // Detail modal
   const [selectedEntry, setSelectedEntry] = useState<AuditLogEntry | null>(null)
 
-  const [toast, setToast] = useState<{
-    message: string
-    type: "error" | "warning" | "success" | "info"
-    isVisible: boolean
-  }>({ message: "", type: "info", isVisible: false })
-
-  const showToast = useCallback(
-    (message: string, type: "error" | "warning" | "success" | "info") => {
-      setToast({ message, type, isVisible: true })
-    },
-    []
-  )
-
-  const fetchLogs = useCallback(async () => {
-    setLoading(true)
-    try {
+  const {
+    data,
+    isFetching: loading,
+    isError,
+    refetch: fetchLogs,
+  } = useQuery({
+    queryKey: ["system", "audit-log", page, filterService, filterAction],
+    queryFn: () => {
       const filters: AuditLogFilters = {
         limit: PAGE_SIZE,
         offset: page * PAGE_SIZE,
       }
       if (filterService) filters.service = filterService
       if (filterAction) filters.action = filterAction
-
-      const result = await listAuditLog(filters)
-      setEntries(result.entries || [])
-      setTotal(result.total || 0)
-    } catch {
-      showToast("Audit log yuklenemedi", "error")
-    } finally {
-      setLoading(false)
-    }
-  }, [page, filterService, filterAction, showToast])
-
-  useEffect(() => {
-    fetchLogs()
-  }, [fetchLogs])
+      return listAuditLog(filters)
+    },
+    placeholderData: keepPreviousData,
+  })
+  const entries: AuditLogEntry[] = data?.entries || []
+  const total = data?.total || 0
 
   const totalPages = Math.max(1, Math.ceil(total / PAGE_SIZE))
 
@@ -156,7 +137,7 @@ export default function AuditLogPage() {
             <Button
               variant="outline"
               size="sm"
-              onClick={fetchLogs}
+              onClick={() => fetchLogs()}
               disabled={loading}
             >
               <RefreshCw
@@ -183,6 +164,15 @@ export default function AuditLogPage() {
                   <TableRow>
                     <TableCell colSpan={6} className="py-6 text-center">
                       <Loader2 className="mx-auto h-5 w-5 animate-spin text-gray-400" />
+                    </TableCell>
+                  </TableRow>
+                ) : isError ? (
+                  <TableRow>
+                    <TableCell
+                      colSpan={6}
+                      className="py-6 text-center text-destructive"
+                    >
+                      Audit log yuklenemedi
                     </TableCell>
                   </TableRow>
                 ) : entries.length === 0 ? (
@@ -358,14 +348,6 @@ export default function AuditLogPage() {
           )}
         </DialogContent>
       </Dialog>
-
-      <Toast
-        message={toast.message}
-        type={toast.type}
-        isVisible={toast.isVisible}
-        onClose={() => setToast((prev) => ({ ...prev, isVisible: false }))}
-        duration={5000}
-      />
     </div>
   )
 }
