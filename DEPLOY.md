@@ -628,8 +628,10 @@ Kalıcı olsun istersen `~/.bashrc`'ye ekle.
 ### RabbitMQ sürüm yükseltmesi
 
 RabbitMQ, mevcut veri dizinini yeni bir sürüm serisinde açmadan önce eski
-sürümün tüm *stable* feature flag'lerinin açık olmasını ister. 3.13 → 4.2
-geçişi de bu kurala tabi. 4.3 ise yalnızca 4.2'den yükseltilebiliyor.
+sürümün tüm *stable* feature flag'lerinin açık olmasını ister. Compose'daki
+imaj 4.3 ve 4.3 yalnızca 4.2'den yükseltilebiliyor: broker hâlâ 3.13
+verisindeyse önce imajı `rabbitmq:4.2-management` yapıp bir kez `make deploy`
+çalıştır, sonra 4.3'e dön ve tekrar `make deploy`.
 
 `make deploy` ve `make deploy-update` bunu zaten yapar: `up`'tan önce çalışan
 broker'da `rabbitmqctl enable_feature_flag all` çalıştırır (işlem idempotent,
@@ -643,8 +645,8 @@ docker exec mydreamcampus-rabbitmq rabbitmqctl enable_feature_flag all
 docker compose up -d rabbitmq
 ```
 
-Bu adımı atlayıp broker açılmıyorsa: imajı geçici olarak eski sürüme
-(`rabbitmq:3.13-management`) döndür, broker'ı başlat, yukarıdaki komutu
+Bu adımı atlayıp broker açılmıyorsa: imajı geçici olarak önceki sürüme
+(ör. `rabbitmq:4.2-management`) döndür, broker'ı başlat, yukarıdaki komutu
 çalıştır, sonra yeni imaja geç. Kuyruktaki mesajlar volume'da durduğu için
 bu sırada kaybolmaz.
 

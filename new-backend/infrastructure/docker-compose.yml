@@ -92,10 +92,11 @@ services:
       retries: 10
 
   rabbitmq:
-    # 4.2 is the newest series a 3.13 data directory can upgrade to directly
-    # (4.3 only accepts 4.2). `make deploy` enables the old broker's feature
-    # flags first, which that upgrade requires — see DEPLOY.md.
-    image: rabbitmq:4.2-management
+    # 4.3 only upgrades from a 4.2 data directory — a broker still on 3.13 has
+    # to boot 4.2 once first. `make deploy` enables the old broker's feature
+    # flags before swapping images, which every upgrade requires — see
+    # DEPLOY.md.
+    image: rabbitmq:4.3-management
     container_name: mydreamcampus-rabbitmq
     restart: unless-stopped
     mem_limit: 384m
@@ -130,7 +131,7 @@ services:
       retries: 10
 
   redis:
-    image: redis:7.4-alpine
+    image: redis:8.10-alpine
     container_name: mydreamcampus-redis
     restart: unless-stopped
     # Headroom above redis.conf's maxmemory (96mb) for the AOF-rewrite fork.
