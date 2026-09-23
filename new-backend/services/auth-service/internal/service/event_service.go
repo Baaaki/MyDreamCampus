@@ -15,16 +15,36 @@ import (
 	"github.com/baaaki/mydreamcampus/shared/events"
 	sharedErrors "github.com/baaaki/mydreamcampus/shared/platform/errors"
 	"github.com/baaaki/mydreamcampus/shared/platform/logger"
+	"github.com/baaaki/mydreamcampus/shared/platform/redis"
 	"github.com/baaaki/mydreamcampus/shared/platform/utils"
 	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5/pgxpool"
 	"go.uber.org/zap"
 )
 
+// TokenRevoker is the slice of Redis the event handlers need: raising the
+// minimum access-token version JWTAuth accepts for a user.
+type TokenRevoker interface {
+	BlacklistAllUserTokens(ctx context.Context, userID string, tokenVersion int) error
+}
+
+var _ TokenRevoker = (*redis.ClientWrapper)(nil)
+
+// processedEventChecker and txBeginner are what the handlers use of the
+// event repository and the pool; interfaces so tests can stand in for both.
+type processedEventChecker interface {
+	IsEventProcessed(ctx context.Context, eventID string) (bool, error)
+}
+
+type txBeginner interface {
+	Begin(ctx context.Context) (pgx.Tx, error)
+}
+
 type EventService struct {
 	authRepo  *repository.AuthRepository
-	eventRepo *repository.EventRepository
-	pool      *pgxpool.Pool
+	eventRepo processedEventChecker
+	pool      txBeginner
+	cache     TokenRevoker
 }
 
 // isDuplicateUser classifies CreateUser failures that mean "the user is
@@ -51,11 +71,26 @@ func NewEventService(
 	authRepo *repository.AuthRepository,
 	eventRepo *repository.EventRepository,
 	pool *pgxpool.Pool,
+	cache TokenRevoker,
 ) *EventService {
 	return &EventService{
 		authRepo:  authRepo,
 		eventRepo: eventRepo,
 		pool:      pool,
+		cache:     cache,
+	}
+}
+
+// revokeAccessTokens makes JWTAuth refuse the user's already-issued access
+// tokens; bumping token_version alone does not, since JWTAuth only asks
+// Redis. Runs after commit, so a Redis failure is logged, not returned: a
+// redelivery would be skipped as processed and could not retry it anyway.
+func (s *EventService) revokeAccessTokens(ctx context.Context, userID string, tokenVersion int) {
+	if err := s.cache.BlacklistAllUserTokens(ctx, userID, tokenVersion); err != nil {
+		logger.Error("failed to revoke outstanding access tokens",
+			zap.Error(err),
+			zap.String("user_id", userID),
+		)
 	}
 }
 
@@ -313,6 +348,27 @@ func (s *EventService) HandleUserUpdated(ctx context.Context, event dto.UserUpda
 
 	queries := db.New(tx)
 
+	// The version bump has to run before UpdateUser: it only matches while
+	// the stored email still differs from the new one.
+	revokeVersion := 0
+	if email, ok := event.Data.ChangedFields["email"]; ok {
+		version, err := queries.CheckEmailVersionSync(ctx, db.CheckEmailVersionSyncParams{
+			ID:    utils.UUIDToPgtype(userID),
+			Email: email,
+		})
+		switch {
+		case errors.Is(err, pgx.ErrNoRows):
+			// Stored email already equals the new one; nothing to revoke.
+		case err != nil:
+			// Token version bump is the thing that revokes sessions issued
+			// for the old email. Failing silently would leave them valid, so
+			// roll the whole event back and let the broker retry.
+			return fmt.Errorf("%w: failed to sync token version on email change: %v", sharedErrors.ErrQueryFailed, err)
+		default:
+			revokeVersion = int(utils.DerefInt32(version, 0))
+		}
+	}
+
 	// Update user fields
 	updateParams := db.UpdateUserParams{
 		ID: utils.UUIDToPgtype(userID),
@@ -331,20 +387,6 @@ func (s *EventService) HandleUserUpdated(ctx context.Context, event dto.UserUpda
 		return fmt.Errorf("%w: failed to update user: %v", sharedErrors.ErrQueryFailed, err)
 	}
 
-	// If email changed, increment token version for security
-	if email, ok := event.Data.ChangedFields["email"]; ok {
-		_, err = queries.CheckEmailVersionSync(ctx, db.CheckEmailVersionSyncParams{
-			ID:    utils.UUIDToPgtype(userID),
-			Email: email,
-		})
-		if err != nil {
-			// Token version bump is the thing that revokes sessions issued
-			// for the old email. Failing silently would leave them valid, so
-			// roll the whole event back and let the broker retry.
-			return fmt.Errorf("%w: failed to sync token version on email change: %v", sharedErrors.ErrQueryFailed, err)
-		}
-	}
-
 	// Mark event as processed
 	err = queries.MarkEventProcessed(ctx, db.MarkEventProcessedParams{
 		EventID:   event.EventID,
@@ -357,6 +399,10 @@ func (s *EventService) HandleUserUpdated(ctx context.Context, event dto.UserUpda
 	// Commit transaction
 	if err := tx.Commit(ctx); err != nil {
 		return fmt.Errorf("%w: failed to commit transaction: %v", sharedErrors.ErrTransactionFailed, err)
+	}
+
+	if revokeVersion > 0 {
+		s.revokeAccessTokens(ctx, userID.String(), revokeVersion)
 	}
 
 	logger.Info("user.updated event processed",
@@ -399,9 +445,19 @@ func (s *EventService) HandleUserDeactivated(ctx context.Context, event dto.User
 	queries := db.New(tx)
 
 	// Deactivate user
-	err = queries.DeactivateUser(ctx, utils.UUIDToPgtype(userID))
-	if err != nil {
+	revokeVersion := 0
+	version, err := queries.DeactivateUser(ctx, utils.UUIDToPgtype(userID))
+	switch {
+	case errors.Is(err, pgx.ErrNoRows):
+		// No login for this id; the event still completes so it is not
+		// redelivered forever.
+		logger.Warn("deactivated user has no auth record",
+			zap.String("user_id", userID.String()),
+		)
+	case err != nil:
 		return fmt.Errorf("%w: failed to deactivate user: %v", sharedErrors.ErrQueryFailed, err)
+	default:
+		revokeVersion = int(utils.DerefInt32(version, 0))
 	}
 
 	// Delete all sessions
@@ -425,6 +481,10 @@ func (s *EventService) HandleUserDeactivated(ctx context.Context, event dto.User
 	// Commit transaction
 	if err := tx.Commit(ctx); err != nil {
 		return fmt.Errorf("%w: failed to commit transaction: %v", sharedErrors.ErrTransactionFailed, err)
+	}
+
+	if revokeVersion > 0 {
+		s.revokeAccessTokens(ctx, userID.String(), revokeVersion)
 	}
 
 	logger.Info("user.deactivated event processed",

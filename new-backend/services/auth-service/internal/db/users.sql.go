@@ -96,18 +96,21 @@ func (q *Queries) CreateUser(ctx context.Context, arg CreateUserParams) (CreateU
 	return i, err
 }
 
-const deactivateUser = `-- name: DeactivateUser :exec
+const deactivateUser = `-- name: DeactivateUser :one
 UPDATE auth.users
 SET is_active = false,
     deleted_at = NOW(),
     token_version = token_version + 1,
     updated_at = NOW()
 WHERE id = $1
+RETURNING token_version
 `
 
-func (q *Queries) DeactivateUser(ctx context.Context, id pgtype.UUID) error {
-	_, err := q.db.Exec(ctx, deactivateUser, id)
-	return err
+func (q *Queries) DeactivateUser(ctx context.Context, id pgtype.UUID) (*int32, error) {
+	row := q.db.QueryRow(ctx, deactivateUser, id)
+	var token_version *int32
+	err := row.Scan(&token_version)
+	return token_version, err
 }
 
 const getUserByEmail = `-- name: GetUserByEmail :one

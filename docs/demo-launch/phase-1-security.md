@@ -57,7 +57,7 @@
   - **Commit:** `fix(meal): make reservation use and cancel atomic`,
     `fix(shared): apply idempotency to DELETE requests`
 
-- [ ] **1.3 Kapatılan veya e-postası değişen kullanıcının token'ları**
+- [x] **1.3 Kapatılan veya e-postası değişen kullanıcının token'ları**
   - **Sorun:** `HandleUserDeactivated` (`auth-service/internal/service/event_service.go`
     ≈402) ve `HandleUserUpdated`'in e-posta dalı (≈336) DB'de `token_version`'ı
     artırıyor ama Redis'teki minimum versiyonu yazmıyor. `JWTAuth` yalnız

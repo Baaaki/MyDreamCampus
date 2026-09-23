@@ -42,13 +42,14 @@ SET token_version = token_version + 1,
 WHERE id = $1
 RETURNING token_version;
 
--- name: DeactivateUser :exec
+-- name: DeactivateUser :one
 UPDATE auth.users
 SET is_active = false,
     deleted_at = NOW(),
     token_version = token_version + 1,
     updated_at = NOW()
-WHERE id = $1;
+WHERE id = $1
+RETURNING token_version;
 
 -- name: AdminExists :one
 SELECT EXISTS(SELECT 1 FROM auth.users WHERE role = 'admin' AND is_active = true) AS exists;

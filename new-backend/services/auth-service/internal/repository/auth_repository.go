@@ -122,7 +122,7 @@ func (r *AuthRepository) IncrementTokenVersion(ctx context.Context, userID uuid.
 
 // DeactivateUser soft deletes a user
 func (r *AuthRepository) DeactivateUser(ctx context.Context, userID uuid.UUID) error {
-	err := r.queries.DeactivateUser(ctx, utils.UUIDToPgtype(userID))
+	_, err := r.queries.DeactivateUser(ctx, utils.UUIDToPgtype(userID))
 	if err != nil {
 		if errors.Is(err, pgx.ErrNoRows) {
 			return fmt.Errorf("%w: user not found for deactivation", serviceErrors.ErrUserNotFoundRepo)
