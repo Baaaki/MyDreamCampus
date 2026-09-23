@@ -1,6 +1,6 @@
 # Frontend — React + Vite (AI Talimati)
 
-React 19 + Vite + react-router v7 + TanStack Query + ky + shadcn/ui + Tailwind 4. `frontend/src/**` icinde calisirken bu dosya zorunlu okumadir.
+React 19 + Vite + react-router v8 + TanStack Query + ky + shadcn/ui + Tailwind 4. `frontend/src/**` icinde calisirken bu dosya zorunlu okumadir.
 
 > **Onemli:** Bu Next.js DEGIL. Vite. `'use client'` yok, `next/*` yok.
 
@@ -9,7 +9,7 @@ React 19 + Vite + react-router v7 + TanStack Query + ky + shadcn/ui + Tailwind 4
 ## 1. Sert Kurallar (asla ihlal etme)
 
 - **Paket yoneticisi**: `bun` — `npm`, `npx`, `yarn` YAPMA. Tip kontrolu icin `bun tsc --noEmit`.
-- **Routing**: `react-router` v7 — `next/navigation`, `next/link` import etme.
+- **Routing**: `react-router` v8 — `next/navigation`, `next/link` import etme.
 - **HTTP**: `ky` (`src/lib/api-client.ts`) — `fetch` direkt veya `axios` kullanma.
 - **Server state**: `@tanstack/react-query` — `useEffect` icinde fetch YAPMA.
 - **'use client' direktifi YOK** — Vite SSR yapmiyor.

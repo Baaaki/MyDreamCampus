@@ -227,7 +227,7 @@ Bu kararlar verilmis — yeniden sorma:
 | Migration | goose |
 | HTTP framework (Go) | Gin v1.11 |
 | Auth | JWT HS256 + Argon2id + Redis blacklist |
-| Frontend routing | react-router v7 (Next.js YOK) |
+| Frontend routing | react-router v8 (Next.js YOK) |
 | Mobile routing | Expo Router v6 (file-based) |
 | Frontend HTTP | ky |
 | Mobile HTTP | axios |
@@ -311,5 +311,5 @@ veya calisma mekanizmasinin parcasi degil. Projeyi yansitir, belirlemez.
 - [goose Docs](https://pressly.github.io/goose/)
 - [Caddy Docs](https://caddyserver.com/docs/)
 - [Expo Router Docs](https://docs.expo.dev/router/introduction/)
-- [React Router v7 Docs](https://reactrouter.com/)
+- [React Router v8 Docs](https://reactrouter.com/)
 - [TanStack Query Docs](https://tanstack.com/query/latest)
