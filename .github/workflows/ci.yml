@@ -15,7 +15,7 @@ env:
   NODE_VERSION: "24"
   # Tool versions are pinned: a "latest" that moves under an unchanged commit
   # turns CI red (or green) for reasons that are not in the diff.
-  BUN_VERSION: "1.3.10"
+  BUN_VERSION: "1.4.2"
   GOLANGCI_LINT_VERSION: "v2.13.2"
   FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: "true"
 
