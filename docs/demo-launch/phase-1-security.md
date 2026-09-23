@@ -127,7 +127,7 @@
     alır.
   - **Commit:** `fix(enrollment): return 403 for advisor mismatch and lock program on approve`
 
-- [ ] **1.7 DB bağlantı havuzu**
+- [x] **1.7 DB bağlantı havuzu**
   - **Sorun:** `new-backend/shared/platform/database/database.go:20` servis
     başına `MaxConns = 25`. 8 DB'li servisle toplam 200 bağlantı ediyor,
     Postgres'in varsayılan `max_connections` değeri ise 100.

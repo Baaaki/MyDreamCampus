@@ -80,3 +80,13 @@ func TestValidateQRSecret_Development_AllowsDefault(t *testing.T) {
 	require.NoError(t, err)
 	assert.NoError(t, cfg.ValidateQRSecret())
 }
+
+func TestLoad_DBMaxConns_DefaultAndOverride(t *testing.T) {
+	cfg, err := loadWithEnv(t, nil)
+	require.NoError(t, err)
+	assert.Equal(t, 10, cfg.Database.MaxConns)
+
+	cfg, err = loadWithEnv(t, map[string]string{"DB_MAX_CONNS": "6"})
+	require.NoError(t, err)
+	assert.Equal(t, 6, cfg.Database.MaxConns)
+}

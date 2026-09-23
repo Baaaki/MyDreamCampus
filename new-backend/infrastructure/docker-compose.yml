@@ -57,6 +57,7 @@ x-service-env: &service-env
   # server 20s > internal client 10s. An inner timeout that outlives its caller
   # only turns one slow hop into two.
   REQUEST_TIMEOUT_SECONDS: ${REQUEST_TIMEOUT_SECONDS:-20}
+  DB_MAX_CONNS: ${DB_MAX_CONNS:-10}
 
 x-service: &service
   restart: unless-stopped

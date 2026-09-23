@@ -124,7 +124,7 @@ func Init(opts Options) *Runtime {
 		if cfg.Database.URL == "" {
 			logger.Fatal("DB_URL is required")
 		}
-		pool, err := database.NewPostgresPool(cfg.Database.URL)
+		pool, err := database.NewPostgresPool(cfg.Database.URL, cfg.Database.MaxConns)
 		if err != nil {
 			logger.Fatal("failed to connect to database", zap.Error(err))
 		}

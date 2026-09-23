@@ -57,6 +57,9 @@ type CircuitBreakerConfig struct {
 
 type DatabaseConfig struct {
 	URL string `mapstructure:"DB_URL"`
+	// MaxConns is per service. All of them share one Postgres, whose default
+	// max_connections is 100, so the sum across services has to fit in it.
+	MaxConns int `mapstructure:"DB_MAX_CONNS"`
 }
 
 type RabbitMQConfig struct {
@@ -155,7 +158,10 @@ func Load() (*Config, error) {
 			InternalSecret: viper.GetString("INTERNAL_SERVICE_SECRET"),
 			TrustedProxies: splitList(viper.GetString("TRUSTED_PROXIES")),
 		},
-		Database: DatabaseConfig{URL: viper.GetString("DB_URL")},
+		Database: DatabaseConfig{
+			URL:      viper.GetString("DB_URL"),
+			MaxConns: viper.GetInt("DB_MAX_CONNS"),
+		},
 		RabbitMQ: RabbitMQConfig{URL: viper.GetString("RABBITMQ_URL")},
 		Redis: RedisConfig{
 			Addr:     viper.GetString("REDIS_ADDR"),
@@ -250,6 +256,7 @@ func setDefaults() {
 	// No DB_URL default: every service owns a different database, so any value
 	// here would be wrong for eight of the nine. Services that need a pool
 	// fail loudly in bootstrap when it is unset.
+	viper.SetDefault("DB_MAX_CONNS", 10)
 	viper.SetDefault("RABBITMQ_URL", "amqp://rabbitmq:rabbitmq@localhost:5672/")
 	viper.SetDefault("REDIS_ADDR", "localhost:6379")
 	viper.SetDefault("REDIS_PASSWORD", "changeme_redis_secret")
