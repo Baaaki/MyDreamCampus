@@ -50,7 +50,9 @@ func (s *EnrollmentService) ApproveEnrollmentProgram(ctx context.Context, progra
 		serviceLogger.Warn("advisor mismatch",
 			zap.String("requesting_advisor", advisorID.String()),
 		)
-		return dto.EnrollmentProgramResponse{}, sharedErrors.ErrUnauthorized
+		// 403, not 401: the caller is signed in. A 401 makes the web client
+		// refresh and then log the user out.
+		return dto.EnrollmentProgramResponse{}, sharedErrors.ErrForbidden
 	}
 
 	// Get courses
@@ -75,6 +77,10 @@ func (s *EnrollmentService) ApproveEnrollmentProgram(ctx context.Context, progra
 	// Approve program (with event)
 	approvedProgram, err := s.enrollmentRepo.ApproveProgramWithEvent(ctx, programID, eventPayload)
 	if err != nil {
+		if sharedErrors.Is(err, serviceErrors.ErrProgramNotPending) {
+			serviceLogger.Warn("program no longer pending")
+			return dto.EnrollmentProgramResponse{}, err
+		}
 		return dto.EnrollmentProgramResponse{}, sharedErrors.Wrap(sharedErrors.ErrInternal, err)
 	}
 
@@ -137,7 +143,7 @@ func (s *EnrollmentService) RejectEnrollmentProgram(ctx context.Context, program
 		serviceLogger.Warn("advisor mismatch",
 			zap.String("requesting_advisor", advisorID.String()),
 		)
-		return sharedErrors.ErrUnauthorized
+		return sharedErrors.ErrForbidden
 	}
 
 	// Get courses

@@ -8,6 +8,7 @@ import (
 	"hash/crc64"
 
 	"github.com/baaaki/mydreamcampus/enrollment/internal/db"
+	serviceErrors "github.com/baaaki/mydreamcampus/enrollment/internal/errors"
 	"github.com/baaaki/mydreamcampus/shared/events"
 	sharedErrors "github.com/baaaki/mydreamcampus/shared/platform/errors"
 	"github.com/baaaki/mydreamcampus/shared/platform/logger"
@@ -209,6 +210,15 @@ func (r *EnrollmentRepository) ApproveProgramWithEvent(
 	defer func() { _ = tx.Rollback(ctx) }()
 
 	qtx := r.queries.WithTx(tx)
+
+	// Row lock + status check: of two concurrent approvals only the first
+	// finds the program pending, so the approved event is written once.
+	if _, err := qtx.LockPendingProgram(ctx, utils.UUIDToPgtype(programID)); err != nil {
+		if errors.Is(err, pgx.ErrNoRows) {
+			return db.EnrollmentProgram{}, serviceErrors.ErrProgramNotPending
+		}
+		return db.EnrollmentProgram{}, fmt.Errorf("%w: failed to lock program: %v", sharedErrors.ErrQueryFailed, err)
+	}
 
 	program, err := qtx.UpdateProgramStatus(ctx, db.UpdateProgramStatusParams{
 		ID: utils.UUIDToPgtype(programID),

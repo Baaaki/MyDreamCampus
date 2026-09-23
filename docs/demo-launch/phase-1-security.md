@@ -107,7 +107,7 @@
   - **Kabul:** Test: 87.5 kaydedilip 87.50 okunuyor; itirazda 0 kabul ediliyor.
   - **Commit:** `fix(grades): keep decimal scores and allow zero on appeal`
 
-- [ ] **1.6 Danışman onayında 403 ve kilit**
+- [x] **1.6 Danışman onayında 403 ve kilit**
   - **Sorun:**
     - `services/enrollment-service/internal/service/enrollment_service_advisor.go:53`
       ve `:140` yetki hatasında `ErrUnauthorized` (401) dönüyor. Frontend

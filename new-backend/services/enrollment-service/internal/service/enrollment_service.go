@@ -19,8 +19,28 @@ import (
 	"go.uber.org/zap"
 )
 
+// EnrollmentStore is the slice of EnrollmentRepository the service uses —
+// an interface so the service can be tested without a database.
+type EnrollmentStore interface {
+	CreateProgramWithCoursesAndEvent(ctx context.Context, programParams db.CreateEnrollmentProgramParams, courses []repository.ProgramCourseSnapshot, eventPayload map[string]any) (db.EnrollmentProgram, error)
+	GetEnrollmentProgramByID(ctx context.Context, id uuid.UUID) (db.EnrollmentProgram, error)
+	GetEnrollmentProgramByStudentAndSemester(ctx context.Context, studentID uuid.UUID, semester string) (db.EnrollmentProgram, error)
+	GetEnrollmentProgramsByStudent(ctx context.Context, studentID uuid.UUID, semester *string, status *string) ([]db.EnrollmentProgram, error)
+	GetCoursesByProgramID(ctx context.Context, programID uuid.UUID) ([]db.EnrollmentProgramCourse, error)
+	GetPendingProgramsByStudentIDs(ctx context.Context, studentIDs []uuid.UUID) ([]db.EnrollmentProgram, error)
+	ApproveProgramWithEvent(ctx context.Context, programID uuid.UUID, eventPayload map[string]any) (db.EnrollmentProgram, error)
+	RejectProgramWithEventAndLog(ctx context.Context, programID uuid.UUID, rejectionLogParams db.CreateRejectionLogParams, eventPayload map[string]any) error
+	GetLatestRejectionByStudentAndSemester(ctx context.Context, studentID uuid.UUID, semester string) (db.EnrollmentRejectionLog, error)
+	GetRejectionsByStudentAndSemester(ctx context.Context, studentID uuid.UUID, semester *string) ([]db.EnrollmentRejectionLog, error)
+	CountRejectionsByStudentAndSemester(ctx context.Context, studentID uuid.UUID, semester string) (int64, error)
+	CancelProgramWithEvent(ctx context.Context, programID uuid.UUID, eventPayload map[string]any) error
+	CountEnrollmentForCourse(ctx context.Context, courseID uuid.UUID) (int, error)
+}
+
+var _ EnrollmentStore = (*repository.EnrollmentRepository)(nil)
+
 type EnrollmentService struct {
-	enrollmentRepo      *repository.EnrollmentRepository
+	enrollmentRepo      EnrollmentStore
 	passedPrereqRepo    *repository.PassedPrerequisitesRepository
 	studentClient       StudentClient
 	courseCatalogClient CourseCatalogClient
@@ -28,7 +48,7 @@ type EnrollmentService struct {
 }
 
 func NewEnrollmentService(
-	enrollmentRepo *repository.EnrollmentRepository,
+	enrollmentRepo EnrollmentStore,
 	passedPrereqRepo *repository.PassedPrerequisitesRepository,
 	studentClient StudentClient,
 	courseCatalogClient CourseCatalogClient,

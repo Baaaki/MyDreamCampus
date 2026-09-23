@@ -24,6 +24,7 @@ var (
 	ErrProgramNotFound      = errors.New("enrollment program not found")
 	ErrInvalidStatus        = errors.New("invalid enrollment status")
 	ErrCannotModifyApproved = errors.New("cannot modify approved enrollment program")
+	ErrProgramNotPending    = errors.New("enrollment program is not pending")
 
 	// Course errors
 	ErrCourseFull        = errors.New("course capacity is full")
@@ -65,6 +66,7 @@ var sentinelMapping = []struct {
 	{ErrProgramNotFound, sharedErrors.New("PROGRAM_NOT_FOUND", "Ders kayıt programı bulunamadı", http.StatusNotFound)},
 	{ErrInvalidStatus, sharedErrors.New("INVALID_STATUS", "Geçersiz kayıt durumu", http.StatusBadRequest)},
 	{ErrCannotModifyApproved, sharedErrors.New("CANNOT_MODIFY_APPROVED", "Onaylanmış ders kaydı değiştirilemez", http.StatusForbidden)},
+	{ErrProgramNotPending, sharedErrors.New("PROGRAM_NOT_PENDING", "Ders kayıt programı artık onay beklemiyor", http.StatusConflict)},
 	{ErrCourseFull, sharedErrors.New("COURSE_FULL", "Ders kontenjanı dolu", http.StatusConflict)},
 	{ErrCourseNotFound, sharedErrors.New("COURSE_NOT_FOUND", "Ders bulunamadı", http.StatusNotFound)},
 	{ErrInvalidDepartment, sharedErrors.New("INVALID_DEPARTMENT", "Ders öğrencinin bölümüne ait değil", http.StatusUnprocessableEntity)},

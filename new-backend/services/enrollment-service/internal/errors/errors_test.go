@@ -22,7 +22,7 @@ func TestEnrollmentAppErrors(t *testing.T) {
 func TestEnrollmentSentinelErrors_DistinctMessages(t *testing.T) {
 	all := []error{
 		ErrStudentDeactivated, ErrStudentNotFound,
-		ErrAlreadySubmitted, ErrProgramNotFound, ErrInvalidStatus, ErrCannotModifyApproved,
+		ErrAlreadySubmitted, ErrProgramNotFound, ErrInvalidStatus, ErrCannotModifyApproved, ErrProgramNotPending,
 		ErrCourseFull, ErrCourseNotFound, ErrInvalidDepartment, ErrInvalidClassLevel,
 		ErrPrerequisitesNotMet, ErrPrerequisiteNotFound,
 		ErrScheduleConflict,
