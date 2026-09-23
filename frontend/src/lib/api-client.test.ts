@@ -1,3 +1,4 @@
+import { HTTPError } from "ky"
 import { describe, it, expect, beforeEach, afterEach, vi } from "vitest"
 
 // Helper that re-imports the module fresh after manipulating cookies/fetch
@@ -152,6 +153,34 @@ describe("api-client - 401 refresh logic", () => {
     expect(localStorage.getItem("user")).not.toBeNull()
     expect(window.location.href).not.toContain("/auth/login")
   })
+
+  it.each([
+    ["a 503", async () => new Response("{}", { status: 503 })],
+    [
+      "a network error",
+      async () => {
+        throw new TypeError("Failed to fetch")
+      },
+    ],
+  ])(
+    "keeps the session when the refresh gets %s",
+    async (_label, refreshReply) => {
+      const fetchSpy = vi.fn(async (input: Request | string) => {
+        const url = typeof input === "string" ? input : (input as Request).url
+        if (url.includes("/auth/refresh")) return refreshReply()
+        return new Response("{}", { status: 401 })
+      })
+      vi.stubGlobal("fetch", fetchSpy)
+
+      const { studentApi } = await loadClient()
+      const err = await studentApi.get("me").catch((e: unknown) => e)
+
+      expect(err).toBeInstanceOf(HTTPError)
+      expect((err as HTTPError).response.status).toBe(401)
+      expect(localStorage.getItem("user")).not.toBeNull()
+      expect(window.location.href).not.toContain("/auth/login")
+    }
+  )
 
   it("does not loop: a request marked X-Refresh-Retry won't refresh again", async () => {
     let refreshCalls = 0

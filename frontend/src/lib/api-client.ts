@@ -46,21 +46,30 @@ function attachIdempotencyKey(request: Request): void {
   }
 }
 
+/**
+ * - refreshed: new cookies are set.
+ * - ended: the backend refused the refresh token (401/403); the session is over.
+ * - unavailable: network error or 5xx. Says nothing about the session, so it
+ *   must not log the user out.
+ */
+type RefreshOutcome = "refreshed" | "ended" | "unavailable"
+
 // Single-flight refresh: if multiple in-flight requests hit 401 concurrently,
 // they should all wait on one /auth/refresh call rather than racing.
-let refreshInFlight: Promise<boolean> | null = null
+let refreshInFlight: Promise<RefreshOutcome> | null = null
 
-async function refreshAccessToken(): Promise<boolean> {
+async function refreshAccessToken(): Promise<RefreshOutcome> {
   if (refreshInFlight) return refreshInFlight
-  refreshInFlight = (async () => {
+  refreshInFlight = (async (): Promise<RefreshOutcome> => {
     try {
       const res = await fetch(`${API_BASE_URL}/api/auth/refresh`, {
         method: "POST",
         credentials: "include",
       })
-      return res.ok
+      if (res.ok) return "refreshed"
+      return res.status === 401 || res.status === 403 ? "ended" : "unavailable"
     } catch {
-      return false
+      return "unavailable"
     } finally {
       // Reset on next tick so concurrent callers in the same microtask batch share this result.
       setTimeout(() => {
@@ -169,7 +178,10 @@ const apiClient = ky.create({
           return response
         }
 
-        const refreshed = await refreshAccessToken()
+        const outcome = await refreshAccessToken()
+        // The refresh endpoint is unreachable, not refusing: keep the session
+        // and let the caller see the original error.
+        if (outcome === "unavailable") return response
 
         // Replay the original request with a marker so afterResponse won't
         // loop. Replayed even when this tab's refresh lost: another tab
@@ -179,7 +191,7 @@ const apiClient = ky.create({
         retryRequest.headers.set("X-Refresh-Retry", "1")
         attachCSRFToken(retryRequest)
         const retried = await fetch(retryRequest)
-        if (!refreshed && retried.status === 401) {
+        if (outcome === "ended" && retried.status === 401) {
           redirectToLogin()
         }
         return retried
