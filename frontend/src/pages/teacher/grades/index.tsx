@@ -20,7 +20,7 @@ export default function GradesPage() {
           .get("teacher/courses")
           .json<TeacherCoursesResponse>()
         setCourses(response.courses || [])
-      } catch (err: any) {
+      } catch (err) {
         console.error("Failed to fetch courses:", err)
         setError("Dersler yüklenirken bir hata oluştu.")
       } finally {

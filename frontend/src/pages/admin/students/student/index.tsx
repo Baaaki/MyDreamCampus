@@ -133,7 +133,10 @@ export default function StudentPage() {
   }
 
   // Handle profile changes
-  const handleProfileChange = (field: keyof Student, value: any) => {
+  const handleProfileChange = <K extends keyof Student>(
+    field: K,
+    value: Student[K]
+  ) => {
     setProfile((prev) => (prev ? { ...prev, [field]: value } : null))
   }
 

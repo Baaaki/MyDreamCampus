@@ -202,6 +202,16 @@ export async function deleteClosedDay(id: string): Promise<void> {
 }
 
 // Semesters
+
+// Backend returns { semester, period_errors } when period distribution partially fails,
+// but returns the Semester directly when everything succeeds.
+type SemesterWriteResponse =
+  Semester | { semester: Semester; period_errors: string[] }
+
+function unwrapSemester(body: SemesterWriteResponse): Semester {
+  return "semester" in body ? body.semester : body
+}
+
 export async function listSemesters(): Promise<Semester[]> {
   return catalogApiSafe.get("admin/semesters").json<Semester[]>()
 }
@@ -211,11 +221,8 @@ export async function createSemester(
 ): Promise<Semester> {
   const body = await catalogApiSafe
     .post("admin/semesters", { json: data })
-    .json<any>()
-  // Backend returns { semester, period_errors } when period distribution partially fails,
-  // but returns the Semester directly when everything succeeds.
-  if (body.semester) return body.semester as Semester
-  return body as Semester
+    .json<SemesterWriteResponse>()
+  return unwrapSemester(body)
 }
 
 export async function getActiveSemester(): Promise<Semester | null> {
@@ -244,9 +251,8 @@ export async function updateSemester(
 ): Promise<Semester> {
   const body = await catalogApiSafe
     .put(`admin/semesters/${id}`, { json: data })
-    .json<any>()
-  if (body.semester) return body.semester as Semester
-  return body as Semester
+    .json<SemesterWriteResponse>()
+  return unwrapSemester(body)
 }
 
 // Audit Log Filters

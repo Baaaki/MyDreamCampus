@@ -26,6 +26,7 @@ import {
   DialogFooter,
 } from "@/components/ui/dialog"
 import { attendanceApi } from "@/lib/api-client"
+import { apiErrorMessage } from "@/lib/api-error"
 import type {
   SessionDetailsResponse,
   QRCodeResponse,
@@ -75,7 +76,7 @@ export default function AttendanceSessionPage() {
         .get(`sessions/${sessionId}/qr`)
         .json<QRCodeResponse>()
       setQrPayload(response.qr_payload)
-    } catch (err: any) {
+    } catch (err) {
       console.error("Failed to fetch QR code:", err)
     }
   }, [sessionId])
@@ -87,7 +88,7 @@ export default function AttendanceSessionPage() {
         .get(`sessions/${sessionId}/records`)
         .json<SessionRecordsResponse>()
       setAttendanceRecords(response.records || [])
-    } catch (err: any) {
+    } catch (err) {
       console.error("Failed to fetch attendance records:", err)
     }
   }, [sessionId])
@@ -99,7 +100,7 @@ export default function AttendanceSessionPage() {
         .get(`sessions/${sessionId}/students`)
         .json<SessionStudentsResponse>()
       setEnrolledStudents(response.students || [])
-    } catch (err: any) {
+    } catch (err) {
       console.error("Failed to fetch students:", err)
     }
   }, [sessionId])
@@ -115,9 +116,9 @@ export default function AttendanceSessionPage() {
 
         await Promise.all([fetchQRCode(), fetchRecords(), fetchStudents()])
         setLoading(false)
-      } catch (err: any) {
+      } catch (err) {
         console.error("Failed to fetch session:", err)
-        setError(err.message || "Oturum bilgileri yüklenemedi.")
+        setError(apiErrorMessage(err, "Oturum bilgileri yüklenemedi."))
         setLoading(false)
       }
     }
@@ -209,7 +210,7 @@ export default function AttendanceSessionPage() {
           s.student_id === student.student_id ? { ...s, is_marked: true } : s
         )
       )
-    } catch (err: any) {
+    } catch (err) {
       console.error("Failed to add attendance:", err)
     } finally {
       setAddingStudent(null)
@@ -223,7 +224,7 @@ export default function AttendanceSessionPage() {
       await attendanceApi.post(`sessions/${sessionId}/close`).json()
       setCloseDialogOpen(false)
       navigate(`/teacher/attendance/${courseId}`)
-    } catch (err: any) {
+    } catch (err) {
       console.error("Failed to close session:", err)
     } finally {
       setClosing(false)

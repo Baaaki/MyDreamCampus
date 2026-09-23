@@ -23,6 +23,7 @@ import {
 } from "@/components/ui/dialog"
 import { Button } from "@/components/ui/button"
 import { attendanceApi, semesterApi } from "@/lib/api-client"
+import { apiErrorMessage } from "@/lib/api-error"
 import type { TeacherCourse, TeacherCoursesResponse } from "@/lib/types"
 
 const WEEKS = Array.from({ length: 14 }, (_, i) => i + 1)
@@ -55,7 +56,7 @@ export default function AttendanceStartPage() {
         } else {
           setPageError("Ders bulunamadı.")
         }
-      } catch (err: any) {
+      } catch (err) {
         console.error("Failed to fetch course:", err)
         setPageError("Ders bilgileri yüklenirken bir hata oluştu.")
       } finally {
@@ -86,8 +87,10 @@ export default function AttendanceStartPage() {
 
       setDialogOpen(false)
       navigate(`/teacher/attendance/${courseId}/session/${response.session_id}`)
-    } catch (err: any) {
-      setError(err.message || "Yoklama başlatılamadı. Lütfen tekrar deneyin.")
+    } catch (err) {
+      setError(
+        apiErrorMessage(err, "Yoklama başlatılamadı. Lütfen tekrar deneyin.")
+      )
     } finally {
       setLoading(false)
     }

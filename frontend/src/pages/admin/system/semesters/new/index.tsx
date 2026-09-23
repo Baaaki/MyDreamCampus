@@ -98,6 +98,10 @@ const PERIOD_SERVICES = [
   },
 ]
 
+type PeriodKey = (typeof PERIOD_SERVICES)[number]["key"]
+type PeriodRange = { start: string; end: string }
+type PeriodRanges = Record<PeriodKey, PeriodRange>
+
 // Wizard executes 3 separate API calls (not one atomic call):
 // 1. POST /semesters — create semester + distribute periods
 // 2. POST /semesters/:s/courses — add each course (existing page handles this)
@@ -121,12 +125,7 @@ export default function SemesterWizardPage() {
   const [hardDeadline, setHardDeadline] = useState("")
 
   // Step 2: Periods
-  const [periods, setPeriods] = useState<{
-    catalog: { start: string; end: string }
-    enrollment: { start: string; end: string }
-    grading: { start: string; end: string }
-    attendance: { start: string; end: string }
-  }>({
+  const [periods, setPeriods] = useState<PeriodRanges>({
     catalog: { start: "", end: "" },
     enrollment: { start: "", end: "" },
     grading: { start: "", end: "" },
@@ -185,10 +184,18 @@ export default function SemesterWizardPage() {
             listClosedDays(),
           ])
 
-        const getPeriod = (res: any) => {
+        // Grades periods carry course_id; the others never do.
+        const getPeriod = (
+          res: PromiseSettledResult<
+            Array<{
+              course_id?: string | null
+              period_start: string
+              period_end: string
+            }>
+          >
+        ): PeriodRange => {
           if (res.status === "fulfilled" && res.value && res.value.length > 0) {
-            const main =
-              res.value.find((x: any) => !x.course_id) || res.value[0]
+            const main = res.value.find((x) => !x.course_id) || res.value[0]
             if (main && main.period_start && main.period_end) {
               return {
                 start: new Date(main.period_start).toISOString().slice(0, 16),
@@ -208,11 +215,11 @@ export default function SemesterWizardPage() {
 
         if (meals.status === "fulfilled" && meals.value) {
           let days = meals.value
-          if (days.some((d: any) => d.semester)) {
-            days = days.filter((d: any) => d.semester === sem.name)
+          if (days.some((d) => d.semester)) {
+            days = days.filter((d) => d.semester === sem.name)
           }
           setClosedDays(
-            days.map((d: any) => ({
+            days.map((d) => ({
               date: new Date(d.date).toISOString().split("T")[0],
               reason: d.reason,
             }))
@@ -686,8 +693,8 @@ function StepPeriods({
   closedDays,
   setClosedDays,
 }: {
-  periods: Record<string, { start: string; end: string }>
-  setPeriods: (v: any) => void
+  periods: PeriodRanges
+  setPeriods: React.Dispatch<React.SetStateAction<PeriodRanges>>
   hardDeadline: string
   closedDays: Array<{ date: string; reason: string }>
   setClosedDays: React.Dispatch<
@@ -696,8 +703,12 @@ function StepPeriods({
 }) {
   const deadline = hardDeadline ? new Date(hardDeadline) : null
 
-  const updatePeriod = (key: string, field: "start" | "end", value: string) => {
-    setPeriods((prev: any) => ({
+  const updatePeriod = (
+    key: PeriodKey,
+    field: "start" | "end",
+    value: string
+  ) => {
+    setPeriods((prev) => ({
       ...prev,
       [key]: { ...prev[key], [field]: value },
     }))
