@@ -95,3 +95,8 @@ temp/
 docker/volumes/
 docker-compose.override.yml
 .aider*
+
+############################
+# PROJECT OUT-OF-SCOPE
+############################
+landingpage/

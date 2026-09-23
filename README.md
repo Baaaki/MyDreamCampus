@@ -135,3 +135,9 @@ cd frontend && bun install && bun dev
 - API: doğrudan servis portu yoktur — hepsi Caddy üzerinden `/<origin>/api/<önek>`
 
 Sunucuya kurulum ve dağıtım için: [`DEPLOY.md`](DEPLOY.md).
+
+## Lisans ve İletişim
+
+Bu proje **GNU General Public License v3.0 (GPL-3.0)** altında lisanslanmıştır. Detaylar için [LICENSE](LICENSE) dosyasına bakabilirsiniz.
+
+İletişim ve destek: [contact@madebybaki.com](mailto:contact@madebybaki.com)
