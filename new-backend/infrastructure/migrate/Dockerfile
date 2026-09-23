@@ -2,7 +2,7 @@
 # One-shot migrator: goose CLI + every module's migration files. Build context
 # is the REPO ROOT — one shared context serves every image, see .dockerignore.
 
-FROM golang:1.26 AS build
+FROM golang:1.27 AS build
 ENV CGO_ENABLED=0
 # Pinned instead of @latest, so a goose release reaches the migrator only
 # through a commit. v3.26.0 is the goose used locally for `make migrate-*`.

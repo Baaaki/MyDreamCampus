@@ -62,7 +62,7 @@ kesici, idempotency anahtarları ve outbox bunun için var.
 
 Sistem tamamen sektör standartlarında, güncel ve yüksek performanslı araçlarla inşa edilmiştir:
 
-*   **Arka Uç (Backend):** Go 1.26, Gin, PostgreSQL 18, RabbitMQ 4.2, Redis 7.4
+*   **Arka Uç (Backend):** Go 1.27, Gin, PostgreSQL 18, RabbitMQ 4.2, Redis 7.4
 *   **Ön Yüz (Web):** React 19, Vite, Tailwind CSS v4, shadcn/ui
 *   **Mobil Uygulama:** React Native 0.81, Expo 54
 *   **Bildirim Sistemi:** Ayrı bir servis olayları asenkron tüketip e-posta gönderir (geliştirmede MailHog, üretimde `.env`'deki SMTP). Mobil push gönderimi henüz iskelet: çağrılar yalnızca loglanır.
@@ -94,7 +94,7 @@ Sistem, OWASP tavsiyeleri temel alınarak katmanlı savunma (defense in depth) p
 
 ## Yerel Ortamda Çalıştırma (Geliştiriciler İçin)
 
-**Gereksinimler:** Docker, Go 1.26+, Bun (web), Node 20+ (mobil)
+**Gereksinimler:** Docker, Go 1.27+, Bun (web), Node 20+ (mobil)
 
 ### Tümü container'da (önerilen)
 

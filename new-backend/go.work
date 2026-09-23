@@ -1,6 +1,6 @@
-go 1.26
+go 1.27
 
-toolchain go1.26.4
+toolchain go1.27.0
 
 // One module per service plus shared. Adding a service means adding it here,
 // otherwise it builds against the published shared module rather than the

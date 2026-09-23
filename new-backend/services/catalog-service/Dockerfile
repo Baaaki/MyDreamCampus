@@ -4,7 +4,7 @@
 # unreachable from a per-service context. COPY sources therefore carry the
 # new-backend/ prefix while destinations keep the old layout.
 
-FROM golang:1.26 AS build
+FROM golang:1.27 AS build
 ENV GOWORK=off CGO_ENABLED=0
 WORKDIR /src
 
