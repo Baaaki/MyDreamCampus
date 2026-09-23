@@ -6,10 +6,12 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"testing"
+	"time"
 
 	"github.com/baaaki/mydreamcampus/shared/platform/logger"
 	"github.com/baaaki/mydreamcampus/shared/platform/utils"
 	"github.com/gin-gonic/gin"
+	"github.com/golang-jwt/jwt/v5"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -235,4 +237,76 @@ func TestJWTAuth_RefreshToken_Rejected(t *testing.T) {
 
 	assert.Equal(t, http.StatusUnauthorized, w.Code,
 		"a refresh token must not authenticate an API request")
+}
+
+func issueForcedChangeToken(t *testing.T, userID string, force bool) string {
+	t.Helper()
+	now := time.Now()
+	claims := &utils.Claims{
+		UserID:              userID,
+		Role:                "student",
+		TokenVersion:        1,
+		TokenType:           string(utils.AccessToken),
+		JTI:                 "jti-" + userID,
+		ForcePasswordChange: force,
+		RegisteredClaims: jwt.RegisteredClaims{
+			ExpiresAt: jwt.NewNumericDate(now.Add(15 * time.Minute)),
+			IssuedAt:  jwt.NewNumericDate(now),
+		},
+	}
+	tok, err := jwt.NewWithClaims(jwt.SigningMethodHS256, claims).SignedString([]byte(authTestSecret))
+	require.NoError(t, err)
+	return tok
+}
+
+func setupForcedChangeRouter(t *testing.T) *gin.Engine {
+	t.Helper()
+	r := setupAuthTest(t, nil)
+	ok := func(c *gin.Context) { c.Status(http.StatusNoContent) }
+	r.POST("/api/auth/change-password", JWTAuth(), ok)
+	r.POST("/api/auth/logout", JWTAuth(), ok)
+	r.GET("/api/auth/sessions", JWTAuth(), ok)
+	r.GET("/api/staff/me", JWTAuth(), ok)
+	return r
+}
+
+func TestJWTAuth_ForcePasswordChange_AllowedRoutes_Pass(t *testing.T) {
+	r := setupForcedChangeRouter(t)
+	tok := issueForcedChangeToken(t, "user-new", true)
+
+	for _, path := range []string{"/api/auth/change-password", "/api/auth/logout"} {
+		req := httptest.NewRequest(http.MethodPost, path, nil)
+		req.Header.Set("Authorization", "Bearer "+tok)
+		w := httptest.NewRecorder()
+		r.ServeHTTP(w, req)
+
+		assert.Equal(t, http.StatusNoContent, w.Code, path)
+	}
+}
+
+func TestJWTAuth_ForcePasswordChange_OtherRoutes_Forbidden(t *testing.T) {
+	r := setupForcedChangeRouter(t)
+	tok := issueForcedChangeToken(t, "user-new", true)
+
+	for _, path := range []string{"/api/auth/sessions", "/api/staff/me"} {
+		req := httptest.NewRequest(http.MethodGet, path, nil)
+		req.Header.Set("Authorization", "Bearer "+tok)
+		w := httptest.NewRecorder()
+		r.ServeHTTP(w, req)
+
+		assert.Equal(t, http.StatusForbidden, w.Code, path)
+		assert.Contains(t, w.Body.String(), `"code":"FORCE_PASSWORD_CHANGE"`, path)
+	}
+}
+
+func TestJWTAuth_WithoutForcePasswordChange_Unaffected(t *testing.T) {
+	r := setupForcedChangeRouter(t)
+	tok := issueForcedChangeToken(t, "user-old", false)
+
+	req := httptest.NewRequest(http.MethodGet, "/api/staff/me", nil)
+	req.Header.Set("Authorization", "Bearer "+tok)
+	w := httptest.NewRecorder()
+	r.ServeHTTP(w, req)
+
+	assert.Equal(t, http.StatusNoContent, w.Code)
 }

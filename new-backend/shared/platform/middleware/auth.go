@@ -28,6 +28,23 @@ func SetBlacklistChecker(checker TokenBlacklistChecker) {
 	blacklistChecker = checker
 }
 
+// ForcePasswordChangeCode is the error code clients branch on to send the
+// user to the password change screen.
+const ForcePasswordChangeCode = "FORCE_PASSWORD_CHANGE"
+
+// passwordChangeAllowlist holds the only routes a token flagged with
+// force_password_change may reach. Matched on the route template, not the
+// raw URL, so path tricks cannot widen it.
+var passwordChangeAllowlist = map[string]string{
+	"/api/auth/change-password": http.MethodPost,
+	"/api/auth/logout":          http.MethodPost,
+}
+
+func passwordChangeAllowed(c *gin.Context) bool {
+	method, ok := passwordChangeAllowlist[c.FullPath()]
+	return ok && method == c.Request.Method
+}
+
 // AuthOption configures JWT auth middleware behavior.
 type AuthOption func(*authConfig)
 
@@ -167,6 +184,22 @@ func JWTAuth(opts ...AuthOption) gin.HandlerFunc {
 				c.Abort()
 				return
 			}
+		}
+
+		// The first password is the user's e-mail address, which is not a
+		// secret. Until it is changed the token may only change it or end
+		// the session; every other route in every service refuses it.
+		if claims.ForcePasswordChange && !passwordChangeAllowed(c) {
+			logger.Warn("request blocked until password is changed",
+				zap.String("user_id", claims.UserID),
+				zap.String("path", c.FullPath()),
+			)
+			c.JSON(http.StatusForbidden, gin.H{
+				"error": "Devam etmek için şifrenizi değiştirmeniz gerekiyor",
+				"code":  ForcePasswordChangeCode,
+			})
+			c.Abort()
+			return
 		}
 
 		// Set claims in context for downstream handlers
