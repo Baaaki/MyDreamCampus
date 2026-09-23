@@ -1,4 +1,5 @@
-import { useState, useEffect, useCallback } from "react"
+import { useState } from "react"
+import { keepPreviousData, useQuery } from "@tanstack/react-query"
 import { Button } from "@/components/ui/button"
 import {
   Table,
@@ -102,12 +103,27 @@ type StaffListResponse = {
   }
 }
 
+function SortIcon({
+  field,
+  currentField,
+  direction,
+}: {
+  field: string
+  currentField: string
+  direction: "asc" | "desc"
+}) {
+  if (field !== currentField) {
+    return <ArrowUpDown className="ml-2 inline h-4 w-4" />
+  }
+  return direction === "asc" ? (
+    <ArrowUp className="ml-2 inline h-4 w-4" />
+  ) : (
+    <ArrowDown className="ml-2 inline h-4 w-4" />
+  )
+}
+
 export default function AdvisorManagementPage() {
-  const [orphanedStudents, setOrphanedStudents] = useState<Student[]>([])
-  const [advisorStudents, setAdvisorStudents] = useState<Student[]>([])
-  const [staffList, setStaffList] = useState<Staff[]>([])
   const [selectedAdvisor, setSelectedAdvisor] = useState<string>("")
-  const [loading, setLoading] = useState(false)
   const [isAssignOpen, setIsAssignOpen] = useState(false)
   const [isBulkAssignOpen, setIsBulkAssignOpen] = useState(false)
   const [assigningStudent, setAssigningStudent] = useState<Student | null>(null)
@@ -120,19 +136,9 @@ export default function AdvisorManagementPage() {
   const [bulkSelectedDepartment, setBulkSelectedDepartment] =
     useState<string>("")
 
-  // Department-specific instructors (fetched from API)
-  const [departmentInstructors, setDepartmentInstructors] = useState<Staff[]>(
-    []
-  )
-  const [loadingInstructors, setLoadingInstructors] = useState(false)
-
   // Pagination states
   const [orphanedPage, setOrphanedPage] = useState(1)
-  const [orphanedTotalPages, setOrphanedTotalPages] = useState(1)
-  const [orphanedTotal, setOrphanedTotal] = useState(0)
   const [advisorPage, setAdvisorPage] = useState(1)
-  const [advisorTotalPages, setAdvisorTotalPages] = useState(1)
-  const [advisorTotal, setAdvisorTotal] = useState(0)
   const [limit] = useState(10)
 
   // Sort states for orphaned students
@@ -149,109 +155,62 @@ export default function AdvisorManagementPage() {
     "asc" | "desc"
   >("asc")
 
-  const fetchStaffList = useCallback(async () => {
-    try {
-      const response = (await staffApi
-        .get("", {
-          searchParams: {
-            page: "1",
-            limit: "100",
-          },
-        })
-        .json()) as StaffListResponse
+  const { data: staffList = [] } = useQuery({
+    queryKey: ["staff", "list", "all"],
+    queryFn: async () => {
+      const response = await staffApi
+        .get("", { searchParams: { page: "1", limit: "100" } })
+        .json<StaffListResponse>()
+      return response.data
+    },
+  })
 
-      setStaffList(response.data)
-      console.log("Staff list loaded:", response.data.length, "staff members")
-    } catch (error) {
-      console.error("Failed to fetch staff list:", error)
-    }
-  }, [])
-
-  const fetchOrphanedStudents = useCallback(async () => {
-    setLoading(true)
-    try {
-      const response = (await studentApi
+  const {
+    data: orphanedPageData,
+    isFetching: orphanedLoading,
+    refetch: fetchOrphanedStudents,
+  } = useQuery({
+    queryKey: ["students", "orphaned", orphanedPage, limit],
+    queryFn: () =>
+      studentApi
         .get("orphaned", {
           searchParams: {
             page: orphanedPage.toString(),
             limit: limit.toString(),
           },
         })
-        .json()) as StudentListResponse
+        .json<StudentListResponse>(),
+    placeholderData: keepPreviousData,
+  })
+  const orphanedStudents = orphanedPageData?.data ?? []
+  const orphanedTotalPages = orphanedPageData?.pagination.total_pages ?? 1
+  const orphanedTotal = orphanedPageData?.pagination.total ?? 0
 
-      if (response && response.data) {
-        setOrphanedStudents(response.data)
-        setOrphanedTotalPages(response.pagination.total_pages)
-        setOrphanedTotal(response.pagination.total)
-        console.log(
-          "Orphaned students loaded:",
-          response.data.length,
-          "students"
-        )
-      } else {
-        console.warn("No data received for orphaned students")
-        setOrphanedStudents([])
-        setOrphanedTotalPages(1)
-        setOrphanedTotal(0)
-      }
-    } catch (error) {
-      console.error("Failed to fetch orphaned students:", error)
-      setOrphanedStudents([])
-      setOrphanedTotalPages(1)
-      setOrphanedTotal(0)
-    } finally {
-      setLoading(false)
-    }
-  }, [orphanedPage, limit])
-
-  const fetchAdvisorStudents = useCallback(async () => {
-    if (!selectedAdvisor) return
-    setLoading(true)
-    try {
-      const response = (await studentApi
+  const {
+    data: advisorPageData,
+    isFetching: advisorLoading,
+    refetch: refetchAdvisorStudents,
+  } = useQuery({
+    queryKey: ["students", "advisees", selectedAdvisor, advisorPage, limit],
+    queryFn: () =>
+      studentApi
         .get(`advisors/${selectedAdvisor}/advisees`, {
           searchParams: {
             page: advisorPage.toString(),
             limit: limit.toString(),
           },
         })
-        .json()) as StudentListResponse
-
-      if (response && response.data) {
-        setAdvisorStudents(response.data)
-        setAdvisorTotalPages(response.pagination.total_pages)
-        setAdvisorTotal(response.pagination.total)
-        console.log(
-          "Advisor students loaded:",
-          response.data.length,
-          "students"
-        )
-      } else {
-        console.warn("No data received for advisor students")
-        setAdvisorStudents([])
-        setAdvisorTotalPages(1)
-        setAdvisorTotal(0)
-      }
-    } catch (error) {
-      console.error("Failed to fetch advisor students:", error)
-      setAdvisorStudents([])
-      setAdvisorTotalPages(1)
-      setAdvisorTotal(0)
-    } finally {
-      setLoading(false)
-    }
-  }, [selectedAdvisor, advisorPage, limit])
-
-  useEffect(() => {
-    fetchStaffList()
-    fetchOrphanedStudents()
-  }, [fetchStaffList, fetchOrphanedStudents])
-
-  useEffect(() => {
-    if (selectedAdvisor) {
-      fetchAdvisorStudents()
-    }
-  }, [selectedAdvisor, fetchAdvisorStudents])
+        .json<StudentListResponse>(),
+    enabled: !!selectedAdvisor,
+    placeholderData: keepPreviousData,
+  })
+  const advisorStudents = advisorPageData?.data ?? []
+  const advisorTotalPages = advisorPageData?.pagination.total_pages ?? 1
+  const advisorTotal = advisorPageData?.pagination.total ?? 0
+  // refetch ignores `enabled`, so guard it for the no-advisor case
+  const fetchAdvisorStudents = () => {
+    if (selectedAdvisor) refetchAdvisorStudents()
+  }
 
   const handleAssignAdvisor = async (e: React.FormEvent) => {
     e.preventDefault()
@@ -344,26 +303,6 @@ export default function AdvisorManagementPage() {
     }
   }
 
-  // Sort icon component
-  const SortIcon = ({
-    field,
-    currentField,
-    direction,
-  }: {
-    field: string
-    currentField: string
-    direction: "asc" | "desc"
-  }) => {
-    if (field !== currentField) {
-      return <ArrowUpDown className="ml-2 inline h-4 w-4" />
-    }
-    return direction === "asc" ? (
-      <ArrowUp className="ml-2 inline h-4 w-4" />
-    ) : (
-      <ArrowDown className="ml-2 inline h-4 w-4" />
-    )
-  }
-
   // Apply sorting to orphaned students
   const sortedOrphanedStudents = [...orphanedStudents].sort((a, b) => {
     const aValue = a[orphanedSortField]
@@ -418,46 +357,31 @@ export default function AdvisorManagementPage() {
     return faculty.departments.map((d) => d.name).sort()
   }
 
-  // Fetch instructors by department from API (with Turkish-English normalization on backend)
-  const fetchInstructorsByDepartment = useCallback(
-    async (department: string): Promise<Staff[]> => {
-      try {
-        const response = (await staffApi
-          .get("instructors", { searchParams: { department } })
-          .json()) as { data: Staff[] }
-        return response.data || []
-      } catch (err) {
-        console.error("Error fetching instructors by department:", err)
-        // Fallback to client-side filtering
-        return staffList.filter((staff) => staff.department === department)
-      }
-    },
-    [staffList]
-  )
-
-  // No longer returning all staff fallback. We rely solely on departmentInstructors
-  // which is fetched precisely for the selected department.
-
-  // Load instructors when assigning student or bulk department changes
-  useEffect(() => {
-    const department = assigningStudent?.department || bulkSelectedDepartment
-    if (department) {
-      setLoadingInstructors(true)
-      fetchInstructorsByDepartment(department)
-        .then((instructors) => {
-          setDepartmentInstructors(instructors)
-        })
-        .finally(() => {
-          setLoadingInstructors(false)
-        })
-    } else {
-      setDepartmentInstructors([])
-    }
-  }, [
-    assigningStudent?.department,
-    bulkSelectedDepartment,
-    fetchInstructorsByDepartment,
-  ])
+  // Instructors for the student being assigned or the bulk department
+  // (the backend normalises Turkish and English department names)
+  const instructorDepartment =
+    assigningStudent?.department || bulkSelectedDepartment
+  const { data: departmentInstructors = [], isFetching: loadingInstructors } =
+    useQuery({
+      queryKey: ["staff", "instructors", instructorDepartment],
+      queryFn: async () => {
+        try {
+          const response = await staffApi
+            .get("instructors", {
+              searchParams: { department: instructorDepartment },
+            })
+            .json<{ data: Staff[] }>()
+          return response.data || []
+        } catch (err) {
+          console.error("Error fetching instructors by department:", err)
+          // Fallback to client-side filtering
+          return staffList.filter(
+            (staff) => staff.department === instructorDepartment
+          )
+        }
+      },
+      enabled: !!instructorDepartment,
+    })
 
   return (
     <div className="container mx-auto py-10">
@@ -631,7 +555,7 @@ export default function AdvisorManagementPage() {
           </div>
         </CardHeader>
         <CardContent>
-          {loading ? (
+          {orphanedLoading ? (
             <div className="py-4 text-center">Yükleniyor...</div>
           ) : orphanedStudents.length === 0 ? (
             <div className="py-4 text-center text-muted-foreground">
@@ -886,7 +810,7 @@ export default function AdvisorManagementPage() {
           )}
 
           {/* Pagination for Orphaned Students */}
-          {!loading && orphanedStudents.length > 0 && (
+          {!orphanedLoading && orphanedStudents.length > 0 && (
             <div className="mt-4 flex items-center justify-between">
               <div className="text-sm text-muted-foreground">
                 Showing {orphanedStudents.length} of {orphanedTotal} students
@@ -958,7 +882,7 @@ export default function AdvisorManagementPage() {
 
           {selectedAdvisor && (
             <>
-              {loading ? (
+              {advisorLoading ? (
                 <div className="py-4 text-center">Yükleniyor...</div>
               ) : advisorStudents.length === 0 ? (
                 <div className="py-4 text-center text-muted-foreground">
