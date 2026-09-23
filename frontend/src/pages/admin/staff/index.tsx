@@ -1,4 +1,5 @@
-import { useState, useEffect, useMemo } from "react"
+import { useState, useMemo } from "react"
+import { keepPreviousData, useQuery } from "@tanstack/react-query"
 import { staffApi } from "@/lib/api-client"
 import { Button } from "@/components/ui/button"
 import {
@@ -97,14 +98,12 @@ const ROLE_OPTIONS = [
 ]
 
 export default function StaffPage() {
-  const [staffList, setStaffList] = useState<Staff[]>([])
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState("")
   const [createDialogOpen, setCreateDialogOpen] = useState(false)
   const [editDialogOpen, setEditDialogOpen] = useState(false)
   const [editingStaff, setEditingStaff] = useState<Staff | null>(null)
   const [page, setPage] = useState(1)
-  const [totalPages, setTotalPages] = useState(1)
   const [sortField, setSortField] = useState<SortField>("first_name")
   const [sortDirection, setSortDirection] = useState<SortDirection>("asc")
 
@@ -154,28 +153,23 @@ export default function StaffPage() {
     status: "active",
   })
 
-  // Fetch staff list
-  const fetchStaff = async (currentPage: number = 1) => {
-    setLoading(true)
-    setError("")
-    try {
-      const response: StaffListResponse = await staffApi
-        .get(`?page=${currentPage}&limit=10`)
-        .json()
-
-      setStaffList(response.data)
-      setPage(response.pagination.page)
-      setTotalPages(response.pagination.total_pages)
-    } catch (err: any) {
-      setError(err.message || "Failed to fetch staff")
-    } finally {
-      setLoading(false)
-    }
-  }
-
-  useEffect(() => {
-    fetchStaff()
-  }, [])
+  // Staff list — the previous page stays on screen while the next loads
+  const {
+    data: staffPage,
+    isFetching: listLoading,
+    error: listError,
+    refetch: refetchStaff,
+  } = useQuery({
+    queryKey: ["staff", "list", page],
+    queryFn: () =>
+      staffApi.get(`?page=${page}&limit=10`).json<StaffListResponse>(),
+    placeholderData: keepPreviousData,
+  })
+  const staffList: Staff[] = staffPage?.data ?? []
+  const totalPages = staffPage?.pagination.total_pages ?? 1
+  const displayError =
+    error ||
+    (listError ? apiErrorMessage(listError, "Personel listesi yüklenemedi") : "")
 
   // Sorting fonksiyonu
   const handleSort = (field: SortField) => {
@@ -241,7 +235,7 @@ export default function StaffPage() {
         office_location: "",
       })
       setSelectedFaculty("")
-      fetchStaff(page)
+      refetchStaff()
     } catch (err) {
       console.error("[Staff] Create error:", err)
       setError(apiErrorMessage(err, "Personel oluşturulamadı"))
@@ -285,7 +279,7 @@ export default function StaffPage() {
         status: "active",
       })
       setEditSelectedFaculty("")
-      fetchStaff(page)
+      refetchStaff()
     } catch (err) {
       console.error("[Staff] Update error:", err)
       setError(apiErrorMessage(err, "Personel güncellenemedi"))
@@ -305,10 +299,10 @@ export default function StaffPage() {
       console.log("[Staff] Deleting staff:", id)
       await staffApi.delete(id).json()
       console.log("[Staff] Delete successful")
-      fetchStaff(page)
-    } catch (err: any) {
+      refetchStaff()
+    } catch (err) {
       console.error("[Staff] Delete error:", err)
-      setError(err.message || "Failed to delete staff")
+      setError(apiErrorMessage(err, "Personel silinemedi"))
     } finally {
       setLoading(false)
     }
@@ -569,9 +563,9 @@ export default function StaffPage() {
         </div>
 
         {/* Error Alert */}
-        {error && (
+        {displayError && (
           <div className="rounded-lg border border-destructive bg-destructive/10 px-4 py-3 text-destructive">
-            {error}
+            {displayError}
           </div>
         )}
 
@@ -681,7 +675,7 @@ export default function StaffPage() {
               </TableRow>
             </TableHeader>
             <TableBody>
-              {loading && staffList.length === 0 ? (
+              {(loading || listLoading) && staffList.length === 0 ? (
                 <TableRow>
                   <TableCell
                     colSpan={8}
@@ -752,7 +746,7 @@ export default function StaffPage() {
           <div className="flex justify-center gap-2">
             <Button
               variant="outline"
-              onClick={() => fetchStaff(page - 1)}
+              onClick={() => setPage(page - 1)}
               disabled={page === 1}
             >
               Previous
@@ -762,7 +756,7 @@ export default function StaffPage() {
             </span>
             <Button
               variant="outline"
-              onClick={() => fetchStaff(page + 1)}
+              onClick={() => setPage(page + 1)}
               disabled={page === totalPages}
             >
               Next
