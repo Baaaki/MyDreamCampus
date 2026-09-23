@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react"
+import { useState } from "react"
 import { useTheme } from "@/components/providers/theme-context"
 import { Button } from "@/components/ui/button"
 import {
@@ -10,6 +10,7 @@ import {
 } from "@/components/ui/dropdown-menu"
 import { Moon, Sun, LogOut, User, Settings, Bell } from "lucide-react"
 import { useNavigate } from "react-router"
+import { authApi } from "@/lib/api-client"
 
 const roleTitles: Record<string, string> = {
   admin: "Admin Panel",
@@ -26,23 +27,19 @@ const roleLabels: Record<string, string> = {
 export function Header() {
   const { theme, toggleTheme } = useTheme()
   const navigate = useNavigate()
-  const [user, setUser] = useState<{ email: string; role: string } | null>(null)
-
-  useEffect(() => {
+  const [user] = useState<{ email: string; role: string } | null>(() => {
     const stored = localStorage.getItem("user")
-    if (stored) {
-      try {
-        setUser(JSON.parse(stored))
-      } catch {
-        // ignore parse errors
-      }
+    if (!stored) return null
+    try {
+      return JSON.parse(stored)
+    } catch {
+      return null
     }
-  }, [])
+  })
 
   const handleLogout = async () => {
     try {
       // Call backend logout to clear httpOnly cookies and invalidate session
-      const { authApi } = await import("@/lib/api-client")
       await authApi.post("logout")
     } catch {
       // Even if the API call fails, clear local state

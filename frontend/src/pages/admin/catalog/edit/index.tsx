@@ -1,6 +1,6 @@
-import { useState, useEffect, useCallback, useMemo } from "react"
+import { useState, useMemo } from "react"
 import { useNavigate } from "react-router"
-import { useMutation } from "@tanstack/react-query"
+import { useMutation, useQuery } from "@tanstack/react-query"
 import { mockFaculties } from "@/mock_data/catalog"
 import type {
   CourseCatalog,
@@ -151,13 +151,31 @@ export default function EditCourseCatalogPage() {
     faculty: Faculty
   } | null>(null)
 
-  // API state
-  const [departmentCourses, setDepartmentCourses] = useState<CourseCatalog[]>(
-    []
-  )
-  const [isLoading, setIsLoading] = useState(false)
-  const [error, setError] = useState<string | null>(null)
-  const [courseCounts, setCourseCounts] = useState<Record<string, number>>({})
+  const selectedDepartmentName = selectedDepartment?.dept.name
+  const {
+    data: departmentCourses = [],
+    isLoading,
+    isError,
+    refetch: refetchDepartmentCourses,
+  } = useQuery({
+    queryKey: ["catalog", "department-courses", selectedDepartmentName],
+    queryFn: () =>
+      catalogService.getCoursesByDepartment(selectedDepartmentName!),
+    enabled: !!selectedDepartmentName,
+  })
+  const error = isError ? "Dersler yüklenirken bir hata oluştu." : null
+
+  const { data: courseCounts = {} } = useQuery({
+    queryKey: ["catalog", "course-counts"],
+    queryFn: async () => {
+      const { courses } = await catalogService.listCourses({ limit: 100 })
+      const counts: Record<string, number> = {}
+      courses.forEach((course) => {
+        counts[course.department] = (counts[course.department] || 0) + 1
+      })
+      return counts
+    },
+  })
 
   // Edit state
   const [editingCourse, setEditingCourse] = useState<CourseCatalog | null>(null)
@@ -175,47 +193,6 @@ export default function EditCourseCatalogPage() {
         : [...prev, facultyId]
     )
   }
-
-  // Fetch courses when department is selected
-  const fetchDepartmentCourses = useCallback(async (departmentName: string) => {
-    setIsLoading(true)
-    setError(null)
-    try {
-      const courses =
-        await catalogService.getCoursesByDepartment(departmentName)
-      setDepartmentCourses(courses)
-    } catch (err) {
-      console.error("Failed to fetch courses:", err)
-      setError("Dersler yüklenirken bir hata oluştu.")
-      setDepartmentCourses([])
-    } finally {
-      setIsLoading(false)
-    }
-  }, [])
-
-  // Fetch course counts
-  const fetchCourseCounts = useCallback(async () => {
-    try {
-      const { courses } = await catalogService.listCourses({ limit: 100 })
-      const counts: Record<string, number> = {}
-      courses.forEach((course) => {
-        counts[course.department] = (counts[course.department] || 0) + 1
-      })
-      setCourseCounts(counts)
-    } catch (err) {
-      console.error("Failed to fetch course counts:", err)
-    }
-  }, [])
-
-  useEffect(() => {
-    fetchCourseCounts()
-  }, [fetchCourseCounts])
-
-  useEffect(() => {
-    if (selectedDepartment) {
-      fetchDepartmentCourses(selectedDepartment.dept.name)
-    }
-  }, [selectedDepartment, fetchDepartmentCourses])
 
   // Group courses by semester
   const groupCoursesBySemester = (courses: CourseCatalog[]) => {
@@ -430,9 +407,7 @@ export default function EditCourseCatalogPage() {
       setFormData(null)
       setOriginalFormData(null)
       // Refresh courses
-      if (selectedDepartment) {
-        fetchDepartmentCourses(selectedDepartment.dept.name)
-      }
+      refetchDepartmentCourses()
     },
     onError: (error: Error) => {
       console.error("Failed to update course:", error)
@@ -646,9 +621,7 @@ export default function EditCourseCatalogPage() {
               </h2>
               <p className="mb-4 text-gray-500">{error}</p>
               <Button
-                onClick={() =>
-                  fetchDepartmentCourses(selectedDepartment.dept.name)
-                }
+                onClick={() => refetchDepartmentCourses()}
                 variant="outline"
               >
                 Tekrar Dene

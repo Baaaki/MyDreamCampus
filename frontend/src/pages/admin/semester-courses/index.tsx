@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from "react"
+import React, { useState } from "react"
 import { useNavigate, useSearchParams } from "react-router"
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query"
 import { HTTPError } from "ky"
@@ -39,7 +39,6 @@ import type {
   CourseCatalog,
   CreateSemesterCourseRequest,
   SemesterCourse,
-  Semester,
 } from "@/lib/types"
 import { catalogApi, staffApi, semesterApi } from "@/lib/api-client"
 import { listSemesters } from "@/lib/services/system-service"
@@ -250,48 +249,30 @@ export default function SemesterCoursesPage() {
     ...(facultyFromUrl ? { faculty_id: facultyFromUrl } : {}),
     ...(departmentFromUrl ? { department_id: departmentFromUrl } : {}),
   }))
-  const [departments, setDepartments] = useState<Department[]>(() => {
-    if (facultyFromUrl) {
-      const faculty = mockFaculties.find((f) => f.id === facultyFromUrl)
-      return faculty?.departments || []
-    }
-    return []
-  })
-  const [selectedCourse, setSelectedCourse] = useState<CourseCatalog | null>(
-    null
-  )
+  const departments: Department[] =
+    mockFaculties.find((f) => f.id === formData.faculty_id)?.departments ?? []
   const [activeSessionType, setActiveSessionType] = useState<"theory" | "lab">(
     "theory"
   )
 
-  const [semester, setSemester] = useState(semesterFromUrl || "")
-  const [availableSemesters, setAvailableSemesters] = useState<Semester[]>([])
-  const [semestersLoading, setSemestersLoading] = useState(!semesterFromUrl)
-
+  const [pickedSemester, setSemester] = useState(semesterFromUrl || "")
   // URL'de semester yoksa API'den çek
-  useEffect(() => {
-    if (semesterFromUrl) return
-    let cancelled = false
-    setSemestersLoading(true)
-    listSemesters()
-      .then((all) => {
-        if (cancelled) return
-        const eligible = all.filter(
+  const { data: availableSemesters = [], isLoading: semestersLoading } =
+    useQuery({
+      queryKey: ["semesters", "open"],
+      queryFn: async () =>
+        (await listSemesters()).filter(
           (s) => s.status === "active" || s.status === "planned"
-        )
-        setAvailableSemesters(eligible)
-        // Aktif olan varsa onu seç, yoksa ilk planned'ı seç
-        const active = eligible.find((s) => s.status === "active")
-        const fallback = active || eligible[0]
-        if (fallback) setSemester(fallback.name)
-      })
-      .finally(() => {
-        if (!cancelled) setSemestersLoading(false)
-      })
-    return () => {
-      cancelled = true
-    }
-  }, [semesterFromUrl])
+        ),
+      enabled: !semesterFromUrl,
+    })
+  // Aktif olan varsa onu seç, yoksa ilk planned'ı seç
+  const defaultSemester =
+    (
+      availableSemesters.find((s) => s.status === "active") ??
+      availableSemesters[0]
+    )?.name ?? ""
+  const semester = pickedSemester || defaultSemester
   const [errorDialog, setErrorDialog] = useState<{
     open: boolean
     title: string
@@ -328,6 +309,9 @@ export default function SemesterCoursesPage() {
     enabled: !!formData.department_id,
     staleTime: 10 * 60 * 1000,
   })
+
+  const selectedCourse =
+    courses.find((c) => c.id === formData.course_id) ?? null
 
   // TanStack Query - Fetch existing semester courses for the department
   const { data: existingSemesterCourses = [] } = useQuery({
@@ -405,7 +389,6 @@ export default function SemesterCoursesPage() {
       queryClient.invalidateQueries({ queryKey: ["semesterCourses", semester] })
       setSuccessDialog(true)
       setFormData(initialFormData)
-      setSelectedCourse(null)
     },
     onError: (error: Error) => {
       console.error("Ders açılırken hata:", error)
@@ -481,52 +464,34 @@ export default function SemesterCoursesPage() {
     return null
   }
 
-  // Update departments list when faculty changes
-  useEffect(() => {
-    if (formData.faculty_id) {
-      const faculty = mockFaculties.find((f) => f.id === formData.faculty_id)
-      setDepartments(faculty?.departments || [])
-    } else {
-      setDepartments([])
+  // Picking a course carries its class level over and starts the schedule
+  // afresh on a session type the course actually has.
+  const handleCourseChange = (courseId: string) => {
+    const course = courses.find((c) => c.id === courseId)
+    if (!course) {
+      setFormData((prev) => ({ ...prev, course_id: courseId }))
+      return
     }
-  }, [formData.faculty_id])
+    setFormData((prev) => ({
+      ...prev,
+      course_id: courseId,
+      class_level: course.class_level,
+      schedule_sessions: [],
+    }))
+    if ((course.theoretical_hours ?? 0) > 0) setActiveSessionType("theory")
+    else if ((course.lab_hours ?? 0) > 0) setActiveSessionType("lab")
+  }
 
-  // Update selected course info
-  useEffect(() => {
-    if (formData.course_id) {
-      const course = courses.find((c) => c.id === formData.course_id)
-      if (course) {
-        setSelectedCourse(course)
-        setFormData((prev) => ({
-          ...prev,
-          class_level: course.class_level,
-          schedule_sessions: [],
-        }))
-        // Auto-select available session type
-        const hasLab = (course.lab_hours ?? 0) > 0
-        const hasTheory = (course.theoretical_hours ?? 0) > 0
-        if (hasTheory) setActiveSessionType("theory")
-        else if (hasLab) setActiveSessionType("lab")
-      }
-    } else {
-      setSelectedCourse(null)
-    }
-  }, [formData.course_id, courses])
-
-  // Update instructor fullname when instructor is selected
-  useEffect(() => {
-    if (formData.instructor_id) {
-      const instructor = instructors.find(
-        (i: Instructor) => i.id === formData.instructor_id
-      )
-      if (instructor) {
-        setFormData((prev) => ({
-          ...prev,
-          instructor_fullname: instructor.fullname,
-        }))
-      }
-    }
-  }, [formData.instructor_id, instructors])
+  const handleInstructorChange = (instructorId: string) => {
+    const instructor = instructors.find(
+      (i: Instructor) => i.id === instructorId
+    )
+    setFormData((prev) => ({
+      ...prev,
+      instructor_id: instructorId,
+      ...(instructor ? { instructor_fullname: instructor.fullname } : {}),
+    }))
+  }
 
   const handleInputChange = (field: keyof FormData, value: string | number) => {
     setFormData((prev) => ({ ...prev, [field]: value }))
@@ -853,7 +818,6 @@ export default function SemesterCoursesPage() {
                       instructor_id: "",
                       instructor_fullname: "",
                     }))
-                    setSelectedCourse(null)
                   }}
                 >
                   <SelectTrigger>
@@ -886,7 +850,6 @@ export default function SemesterCoursesPage() {
                       instructor_id: "",
                       instructor_fullname: "",
                     }))
-                    setSelectedCourse(null)
                   }}
                   disabled={!formData.faculty_id}
                 >
@@ -936,9 +899,7 @@ export default function SemesterCoursesPage() {
                 </Label>
                 <Select
                   value={formData.course_id}
-                  onValueChange={(value) =>
-                    handleInputChange("course_id", value)
-                  }
+                  onValueChange={handleCourseChange}
                   disabled={!formData.department_id || isLoadingDepartmentData}
                 >
                   <SelectTrigger>
@@ -969,9 +930,7 @@ export default function SemesterCoursesPage() {
                 </Label>
                 <Select
                   value={formData.instructor_id}
-                  onValueChange={(value) =>
-                    handleInputChange("instructor_id", value)
-                  }
+                  onValueChange={handleInstructorChange}
                   disabled={!formData.department_id || isLoadingDepartmentData}
                 >
                   <SelectTrigger>
@@ -1364,10 +1323,7 @@ export default function SemesterCoursesPage() {
           <Button
             type="button"
             variant="outline"
-            onClick={() => {
-              setFormData(initialFormData)
-              setSelectedCourse(null)
-            }}
+            onClick={() => setFormData(initialFormData)}
           >
             Temizle
           </Button>

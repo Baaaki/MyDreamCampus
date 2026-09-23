@@ -45,11 +45,13 @@ function MealAutocomplete({
 }: MealAutocompleteProps) {
   const [isOpen, setIsOpen] = useState(false)
   const [searchTerm, setSearchTerm] = useState(value)
+  const [prevValue, setPrevValue] = useState(value)
   const containerRef = useRef<HTMLDivElement>(null)
 
-  useEffect(() => {
+  if (value !== prevValue) {
+    setPrevValue(value)
     setSearchTerm(value)
-  }, [value])
+  }
 
   useEffect(() => {
     const handleClickOutside = (event: MouseEvent) => {
@@ -145,11 +147,13 @@ function VeganMealAutocomplete({
 }: MealAutocompleteProps) {
   const [isOpen, setIsOpen] = useState(false)
   const [searchTerm, setSearchTerm] = useState(value)
+  const [prevValue, setPrevValue] = useState(value)
   const containerRef = useRef<HTMLDivElement>(null)
 
-  useEffect(() => {
+  if (value !== prevValue) {
+    setPrevValue(value)
     setSearchTerm(value)
-  }, [value])
+  }
 
   useEffect(() => {
     const handleClickOutside = (event: MouseEvent) => {

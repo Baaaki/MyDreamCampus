@@ -1,4 +1,6 @@
-import { useState, useEffect } from "react"
+import { useState } from "react"
+import { useQuery } from "@tanstack/react-query"
+import { HTTPError } from "ky"
 import {
   Search,
   Loader2,
@@ -89,19 +91,12 @@ export default function AdminGradesPage() {
   const [useMockData, setUseMockData] = useState(false)
 
   // Active Semester State
-  const [activeSemester, setActiveSemester] = useState<string>("")
-
-  useEffect(() => {
-    if (!useMockData) {
-      getActiveSemester()
-        .then((res) => {
-          if (res) setActiveSemester(res.name)
-        })
-        .catch(console.error)
-    } else {
-      setActiveSemester("2025-2026 Güz")
-    }
-  }, [useMockData])
+  const { data: liveActiveSemester = "" } = useQuery({
+    queryKey: ["semesters", "active", "name"],
+    queryFn: async () => (await getActiveSemester())?.name ?? "",
+    enabled: !useMockData,
+  })
+  const activeSemester = useMockData ? "2025-2026 Güz" : liveActiveSemester
 
   // Removed auto-fetching of courses on mount
 
@@ -168,8 +163,8 @@ export default function AdminGradesPage() {
           }))
         )
       }
-    } catch (err: any) {
-      if (err.response?.status === 404) {
+    } catch (err) {
+      if (err instanceof HTTPError && err.response.status === 404) {
         setCourses([])
       } else {
         setError("Arama yapılırken hata oluştu.")
