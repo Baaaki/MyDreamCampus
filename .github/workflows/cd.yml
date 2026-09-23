@@ -23,8 +23,8 @@ jobs:
     outputs:
       services: ${{ steps.filter.outputs.changes }}
     steps:
-      - uses: actions/checkout@v4
-      - uses: dorny/paths-filter@v3
+      - uses: actions/checkout@v7
+      - uses: dorny/paths-filter@v4
         id: filter
         with:
           # shared/ is in every filter on purpose: it is compiled INTO each
@@ -77,13 +77,13 @@ jobs:
       matrix:
         service: ${{ fromJSON(needs.changes.outputs.services) }}
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
 
       - name: Set up Docker Buildx
-        uses: docker/setup-buildx-action@v3
+        uses: docker/setup-buildx-action@v4
 
       - name: Log in to GHCR
-        uses: docker/login-action@v3
+        uses: docker/login-action@v4
         with:
           registry: ${{ env.REGISTRY }}
           username: ${{ github.actor }}
@@ -91,7 +91,7 @@ jobs:
 
       - name: Extract metadata
         id: meta
-        uses: docker/metadata-action@v5
+        uses: docker/metadata-action@v6
         with:
           images: ${{ env.REGISTRY }}/${{ env.IMAGE_OWNER }}/mydreamcampus-${{ matrix.service }}
           tags: |
@@ -105,7 +105,7 @@ jobs:
       # Build, scan, then push: scanning after the push only reports on an
       # image that is already in the registry under :latest.
       - name: Build for scanning
-        uses: docker/build-push-action@v6
+        uses: docker/build-push-action@v7
         with:
           # Repo root, matching compose: every service Dockerfile copies both
           # its own directory and new-backend/shared, so a context rooted at
@@ -134,7 +134,7 @@ jobs:
 
       - name: Upload Trivy results to GitHub Security
         if: always() && hashFiles(format('trivy-{0}.sarif', matrix.service)) != ''
-        uses: github/codeql-action/upload-sarif@v3
+        uses: github/codeql-action/upload-sarif@v4
         with:
           sarif_file: trivy-${{ matrix.service }}.sarif
           category: trivy-${{ matrix.service }}
@@ -151,7 +151,7 @@ jobs:
           ignore-unfixed: true
 
       - name: Push
-        uses: docker/build-push-action@v6
+        uses: docker/build-push-action@v7
         with:
           context: .
           file: ./new-backend/services/${{ matrix.service }}/Dockerfile

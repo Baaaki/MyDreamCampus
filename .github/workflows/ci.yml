@@ -12,7 +12,7 @@ concurrency:
 
 env:
   GO_VERSION: "1.27"
-  NODE_VERSION: "22"
+  NODE_VERSION: "24"
   # Tool versions are pinned: a "latest" that moves under an unchanged commit
   # turns CI red (or green) for reasons that are not in the diff.
   BUN_VERSION: "1.3.10"
@@ -28,8 +28,8 @@ jobs:
       mobile: ${{ steps.filter.outputs.mobile }}
       infra: ${{ steps.filter.outputs.infra }}
     steps:
-      - uses: actions/checkout@v4
-      - uses: dorny/paths-filter@v3
+      - uses: actions/checkout@v7
+      - uses: dorny/paths-filter@v4
         id: filter
         with:
           filters: |
@@ -69,9 +69,9 @@ jobs:
       run:
         working-directory: new-backend/${{ matrix.module }}
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
 
-      - uses: actions/setup-go@v5
+      - uses: actions/setup-go@v7
         with:
           go-version: ${{ env.GO_VERSION }}
           cache-dependency-path: new-backend/**/go.sum
@@ -118,7 +118,7 @@ jobs:
       run:
         working-directory: new-backend/infrastructure
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
 
       - name: Write .env
         # http:// on PUBLIC_HOST keeps Caddy's automatic HTTPS off — with a
@@ -245,7 +245,7 @@ jobs:
 
       - name: Upload logs
         if: failure()
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: compose-logs
           path: new-backend/infrastructure/compose-logs.txt
@@ -265,13 +265,13 @@ jobs:
       run:
         working-directory: frontend
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
 
       - uses: oven-sh/setup-bun@v2
         with:
           bun-version: ${{ env.BUN_VERSION }}
 
-      - uses: actions/setup-node@v4
+      - uses: actions/setup-node@v7
         with:
           node-version: ${{ env.NODE_VERSION }}
 
@@ -301,9 +301,9 @@ jobs:
       run:
         working-directory: mobile
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
 
-      - uses: actions/setup-node@v4
+      - uses: actions/setup-node@v7
         with:
           node-version: ${{ env.NODE_VERSION }}
 
