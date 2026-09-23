@@ -50,6 +50,7 @@ import {
   PopoverTrigger,
 } from "@/components/ui/popover"
 import { mockFaculties } from "@/mock_data/catalog"
+import { apiErrorMessage } from "@/lib/api-error"
 
 interface Staff {
   id: string
@@ -241,21 +242,9 @@ export default function StaffPage() {
       })
       setSelectedFaculty("")
       fetchStaff(page)
-    } catch (err: any) {
+    } catch (err) {
       console.error("[Staff] Create error:", err)
-      // Try to get error message from response
-      let errorMessage = "Failed to create staff"
-      if (err.response) {
-        try {
-          const errorBody = await err.response.json()
-          errorMessage = errorBody.message || errorBody.error || errorMessage
-        } catch {
-          errorMessage = err.message || errorMessage
-        }
-      } else {
-        errorMessage = err.message || errorMessage
-      }
-      setError(errorMessage)
+      setError(await apiErrorMessage(err, "Personel oluşturulamadı"))
     } finally {
       setLoading(false)
     }
@@ -297,20 +286,9 @@ export default function StaffPage() {
       })
       setEditSelectedFaculty("")
       fetchStaff(page)
-    } catch (err: any) {
+    } catch (err) {
       console.error("[Staff] Update error:", err)
-      let errorMessage = "Failed to update staff"
-      if (err.response) {
-        try {
-          const errorBody = await err.response.json()
-          errorMessage = errorBody.message || errorBody.error || errorMessage
-        } catch {
-          errorMessage = err.message || errorMessage
-        }
-      } else {
-        errorMessage = err.message || errorMessage
-      }
-      setError(errorMessage)
+      setError(await apiErrorMessage(err, "Personel güncellenemedi"))
     } finally {
       setLoading(false)
     }

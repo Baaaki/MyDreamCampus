@@ -47,6 +47,7 @@ import {
   CheckCircle2,
   Shield,
 } from "lucide-react"
+import { apiErrorMessage } from "@/lib/api-error"
 
 // ─── Constants ───────────────────────────────────────────────────────────────
 
@@ -286,14 +287,8 @@ export default function SemesterReviewPage() {
       await activateSemester(semester.id)
       showToast("Dönem başarıyla aktifleştirildi!", "success")
       setTimeout(() => navigate("/system/semesters"), 1500)
-    } catch (err: any) {
-      let message = "Dönem aktifleştirilemedi"
-      try {
-        const body = await err.response?.json()
-        if (body?.error) message = body.error
-      } catch {
-        /* ignore */
-      }
+    } catch (err) {
+      const message = await apiErrorMessage(err, "Dönem aktifleştirilemedi")
       showToast(message, "error")
     } finally {
       setActivating(false)

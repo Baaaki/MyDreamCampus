@@ -1,7 +1,6 @@
 import { useState } from "react"
 import { useNavigate } from "react-router"
 import { useMutation } from "@tanstack/react-query"
-import { HTTPError } from "ky"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Textarea } from "@/components/ui/textarea"
@@ -41,6 +40,7 @@ import {
   Save,
   Loader2,
 } from "lucide-react"
+import { apiErrorMessage } from "@/lib/api-error"
 
 // API request type
 interface CreateCourseRequest {
@@ -146,15 +146,7 @@ export default function AddCoursePage() {
     },
     onError: async (error: Error) => {
       console.error("Ders eklenirken hata:", error)
-      let message = error.message
-      if (error instanceof HTTPError) {
-        try {
-          const body = await error.response.json<{ error?: string }>()
-          if (body?.error) message = body.error
-        } catch {
-          /* ignore parse errors */
-        }
-      }
+      const message = await apiErrorMessage(error, error.message)
       alert(`Hata: ${message}`)
     },
   })

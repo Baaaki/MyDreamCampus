@@ -14,19 +14,19 @@ export async function apiErrorMessage(
   fallback: string
 ): Promise<string> {
   if (!(err instanceof HTTPError)) return fallback
-  try {
-    const body = (await err.response.clone().json()) as ErrorBody
-    for (const candidate of [body.message, body.error]) {
-      if (
-        typeof candidate === "string" &&
-        candidate !== "" &&
-        !MACHINE_CODE.test(candidate)
-      ) {
-        return candidate
-      }
+  // ky has already consumed the body into `data`; a non-JSON body arrives as
+  // a string and has no message fields to offer.
+  const body = err.data
+  if (typeof body !== "object" || body === null) return fallback
+  const { message, error } = body as ErrorBody
+  for (const candidate of [message, error]) {
+    if (
+      typeof candidate === "string" &&
+      candidate !== "" &&
+      !MACHINE_CODE.test(candidate)
+    ) {
+      return candidate
     }
-  } catch {
-    // Not JSON — fall through to the generic message.
   }
   return fallback
 }

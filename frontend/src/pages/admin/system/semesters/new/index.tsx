@@ -65,6 +65,8 @@ import {
   listClosedDays,
   updateSemester,
 } from "@/lib/services/system-service"
+import { HTTPError } from "ky"
+import { apiErrorMessage } from "@/lib/api-error"
 
 const STEPS = [
   { label: "Dönem Bilgileri", icon: CalendarRange },
@@ -282,9 +284,8 @@ export default function SemesterWizardPage() {
       setCreatedSemester(semester)
       showToast("Dönem ve servis tarihleri başarıyla oluşturuldu", "success")
       setStep(2)
-    } catch (err: any) {
-      const status = err.response?.status
-      if (status === 409) {
+    } catch (err) {
+      if (err instanceof HTTPError && err.response.status === 409) {
         // Dönem zaten var — mevcut semester'ı bul ve devam et
         try {
           const semesters = await listSemesters()
@@ -299,13 +300,7 @@ export default function SemesterWizardPage() {
           /* listSemesters failed, fall through to generic error */
         }
       }
-      let message = "Dönem oluşturulamadı"
-      try {
-        const body = await err.response?.json()
-        if (body?.error) message = body.error
-      } catch {
-        /* ignore */
-      }
+      const message = await apiErrorMessage(err, "Dönem oluşturulamadı")
       showToast(message, "error")
     } finally {
       setLoading(false)
@@ -337,14 +332,8 @@ export default function SemesterWizardPage() {
       setCreatedSemester(updated)
       showToast("Dönem başarıyla güncellendi", "success")
       setStep(2)
-    } catch (err: any) {
-      let message = "Dönem güncellenemedi"
-      try {
-        const body = await err.response?.json()
-        if (body?.error) message = body.error
-      } catch {
-        /* ignore */
-      }
+    } catch (err) {
+      const message = await apiErrorMessage(err, "Dönem güncellenemedi")
       showToast(message, "error")
     } finally {
       setLoading(false)
@@ -362,14 +351,8 @@ export default function SemesterWizardPage() {
       await activateSemester(createdSemester.id)
       showToast("Dönem başarıyla aktifleştirildi!", "success")
       setTimeout(() => navigate("/system/semesters"), 1500)
-    } catch (err: any) {
-      let message = "Dönem aktifleştirilemedi"
-      try {
-        const body = await err.response?.json()
-        if (body?.error) message = body.error
-      } catch {
-        /* ignore */
-      }
+    } catch (err) {
+      const message = await apiErrorMessage(err, "Dönem aktifleştirilemedi")
       showToast(message, "error")
     } finally {
       setLoading(false)

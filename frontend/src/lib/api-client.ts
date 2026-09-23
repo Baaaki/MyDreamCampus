@@ -73,7 +73,7 @@ async function refreshAccessToken(): Promise<boolean> {
 
 // Create ky instance with default configuration
 const apiClient = ky.create({
-  prefixUrl: API_BASE_URL,
+  prefix: API_BASE_URL,
   timeout: 30000,
   credentials: "include",
   // POST is not retried: a timed-out POST may well have succeeded, and only
@@ -86,7 +86,7 @@ const apiClient = ky.create({
   },
   hooks: {
     beforeRequest: [
-      async (request) => {
+      async ({ request }) => {
         // Attach CSRF token for state-changing requests
         attachCSRFToken(request)
         attachIdempotencyKey(request)
@@ -111,7 +111,7 @@ const apiClient = ky.create({
       },
     ],
     afterResponse: [
-      async (request, _options, response) => {
+      async ({ request, response }) => {
         if (response.status !== 401) return response
 
         // Don't try to refresh on the auth endpoints themselves —
@@ -154,47 +154,47 @@ const apiClient = ky.create({
 
 // API clients — one per module; prefixes must match the monolith's route mounts.
 export const authApi = apiClient.extend({
-  prefixUrl: `${API_BASE_URL}/api/auth`,
+  prefix: `${API_BASE_URL}/api/auth`,
 })
 export const staffApi = apiClient.extend({
-  prefixUrl: `${API_BASE_URL}/api/staff`,
+  prefix: `${API_BASE_URL}/api/staff`,
 })
 export const adminStaffApi = apiClient.extend({
-  prefixUrl: `${API_BASE_URL}/api/admin-staff`,
+  prefix: `${API_BASE_URL}/api/admin-staff`,
 })
 export const studentApi = apiClient.extend({
-  prefixUrl: `${API_BASE_URL}/api/students`,
+  prefix: `${API_BASE_URL}/api/students`,
 })
 export const catalogApi = apiClient.extend({
-  prefixUrl: `${API_BASE_URL}/api/catalog`,
+  prefix: `${API_BASE_URL}/api/catalog`,
 })
 export const semesterApi = apiClient.extend({
-  prefixUrl: `${API_BASE_URL}/api/semesters`,
+  prefix: `${API_BASE_URL}/api/semesters`,
 })
 export const enrollmentApi = apiClient.extend({
-  prefixUrl: `${API_BASE_URL}/api/enrollment`,
+  prefix: `${API_BASE_URL}/api/enrollment`,
 })
 export const attendanceApi = apiClient.extend({
-  prefixUrl: `${API_BASE_URL}/api/attendance`,
+  prefix: `${API_BASE_URL}/api/attendance`,
 })
 export const gradesApi = apiClient.extend({
-  prefixUrl: `${API_BASE_URL}/api/grades`,
+  prefix: `${API_BASE_URL}/api/grades`,
 })
 export const mealApi = apiClient.extend({
-  prefixUrl: `${API_BASE_URL}/api/meals`,
+  prefix: `${API_BASE_URL}/api/meals`,
 })
 
 // API clients without 401 auto-redirect — for admin pages that call
 // multiple services in parallel (e.g. system page). The global 401 hook
 // would redirect before Promise.allSettled can catch individual failures.
 const noRedirectClient = ky.create({
-  prefixUrl: API_BASE_URL,
+  prefix: API_BASE_URL,
   timeout: 30000,
   credentials: "include",
   retry: { limit: 0 },
   hooks: {
     beforeRequest: [
-      (request) => {
+      ({ request }) => {
         attachCSRFToken(request)
         attachIdempotencyKey(request)
       },
@@ -203,28 +203,28 @@ const noRedirectClient = ky.create({
 })
 
 export const gradesApiSafe = noRedirectClient.extend({
-  prefixUrl: `${API_BASE_URL}/api/grades`,
+  prefix: `${API_BASE_URL}/api/grades`,
 })
 export const enrollmentApiSafe = noRedirectClient.extend({
-  prefixUrl: `${API_BASE_URL}/api/enrollment`,
+  prefix: `${API_BASE_URL}/api/enrollment`,
 })
 export const mealApiSafe = noRedirectClient.extend({
-  prefixUrl: `${API_BASE_URL}/api/meals`,
+  prefix: `${API_BASE_URL}/api/meals`,
 })
 export const catalogApiSafe = noRedirectClient.extend({
-  prefixUrl: `${API_BASE_URL}/api/catalog`,
+  prefix: `${API_BASE_URL}/api/catalog`,
 })
 export const authApiSafe = noRedirectClient.extend({
-  prefixUrl: `${API_BASE_URL}/api/auth`,
+  prefix: `${API_BASE_URL}/api/auth`,
 })
 export const attendanceApiSafe = noRedirectClient.extend({
-  prefixUrl: `${API_BASE_URL}/api/attendance`,
+  prefix: `${API_BASE_URL}/api/attendance`,
 })
 export const studentApiSafe = noRedirectClient.extend({
-  prefixUrl: `${API_BASE_URL}/api/students`,
+  prefix: `${API_BASE_URL}/api/students`,
 })
 export const staffApiSafe = noRedirectClient.extend({
-  prefixUrl: `${API_BASE_URL}/api/staff`,
+  prefix: `${API_BASE_URL}/api/staff`,
 })
 
 // Export the raw ky client for direct use if needed

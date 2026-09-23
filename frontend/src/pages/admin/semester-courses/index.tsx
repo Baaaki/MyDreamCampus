@@ -63,6 +63,19 @@ import {
   Wand2,
 } from "lucide-react"
 
+type ScheduleConflictDetails = {
+  course_code?: string
+  department?: string
+  day_of_week?: string
+  slot_number?: number
+}
+
+type OpenCourseErrorBody = {
+  error?: string
+  code?: string
+  details?: ScheduleConflictDetails
+}
+
 // Types for API responses
 interface Instructor {
   id: string
@@ -394,33 +407,17 @@ export default function SemesterCoursesPage() {
       setFormData(initialFormData)
       setSelectedCourse(null)
     },
-    onError: async (error: Error) => {
+    onError: (error: Error) => {
       console.error("Ders açılırken hata:", error)
       let code = ""
       let message = error.message
-      let details: {
-        course_code?: string
-        department?: string
-        day_of_week?: string
-        slot_number?: number
-      } | null = null
+      let details: ScheduleConflictDetails | null = null
       if (error instanceof HTTPError) {
-        try {
-          const body = await error.response.json<{
-            error?: string
-            code?: string
-            details?: {
-              course_code?: string
-              department?: string
-              day_of_week?: string
-              slot_number?: number
-            }
-          }>()
-          if (body?.error) message = body.error
-          if (body?.code) code = body.code
-          if (body?.details) details = body.details
-        } catch {
-          /* ignore parse errors */
+        const body = (error as HTTPError<OpenCourseErrorBody>).data
+        if (typeof body === "object" && body !== null) {
+          if (body.error) message = body.error
+          if (body.code) code = body.code
+          if (body.details) details = body.details
         }
       }
 
