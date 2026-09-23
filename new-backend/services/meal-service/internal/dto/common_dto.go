@@ -1,22 +1,16 @@
 package dto
 
-// ErrorResponse represents error response
+// ErrorResponse is the error body every service answers with: the Turkish
+// message to show and the code clients branch on.
 type ErrorResponse struct {
-	Code    string `json:"code"`
-	Message string `json:"message"`
-	Details any    `json:"details,omitempty"`
+	Error string `json:"error"`
+	Code  string `json:"code,omitempty"`
 }
 
 // SuccessResponse represents generic success response
 type SuccessResponse struct {
 	Success bool `json:"success"`
 	Data    any  `json:"data"`
-}
-
-// ErrorResponseWrapper wraps error response
-type ErrorResponseWrapper struct {
-	Success bool          `json:"success"`
-	Error   ErrorResponse `json:"error"`
 }
 
 // MessageResponse represents success message response

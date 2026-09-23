@@ -512,42 +512,26 @@ func (h *MealHandler) handleError(c *gin.Context, err error) {
 	// Map error to HTTP response
 	var appErr *sharedErrors.AppError
 	if errors.As(err, &appErr) {
-		c.JSON(appErr.HTTPStatus, dto.ErrorResponseWrapper{
-			Success: false,
-			Error: dto.ErrorResponse{
-				Code:    appErr.Code,
-				Message: appErr.Message,
-			},
-		})
+		c.JSON(appErr.HTTPStatus, dto.ErrorResponse{Error: appErr.Message, Code: appErr.Code})
 		return
 	}
 
 	// Handle custom service errors
 	switch {
 	case errors.Is(err, serviceErrors.ErrValidationErrors):
-		c.JSON(http.StatusBadRequest, dto.ErrorResponseWrapper{
-			Success: false,
-			Error: dto.ErrorResponse{
-				Code:    "VALIDATION_ERRORS",
-				Message: "Bazı rezervasyonlar geçersiz",
-			},
+		c.JSON(http.StatusBadRequest, dto.ErrorResponse{
+			Error: "Bazı rezervasyonlar geçersiz",
+			Code:  "VALIDATION_ERRORS",
 		})
 	case errors.Is(err, serviceErrors.ErrReservationConflicts):
-		c.JSON(http.StatusConflict, dto.ErrorResponseWrapper{
-			Success: false,
-			Error: dto.ErrorResponse{
-				Code:    "RESERVATION_CONFLICTS",
-				Message: "Bazı gün ve öğünler için zaten rezervasyonunuz var",
-			},
+		c.JSON(http.StatusConflict, dto.ErrorResponse{
+			Error: "Bazı gün ve öğünler için zaten rezervasyonunuz var",
+			Code:  "RESERVATION_CONFLICTS",
 		})
 	default:
-		// Unknown error
-		c.JSON(http.StatusInternalServerError, dto.ErrorResponseWrapper{
-			Success: false,
-			Error: dto.ErrorResponse{
-				Code:    "INTERNAL_ERROR",
-				Message: "Beklenmeyen bir hata oluştu, lütfen tekrar deneyin",
-			},
+		c.JSON(http.StatusInternalServerError, dto.ErrorResponse{
+			Error: "Beklenmeyen bir hata oluştu, lütfen tekrar deneyin",
+			Code:  "INTERNAL_ERROR",
 		})
 	}
 }
