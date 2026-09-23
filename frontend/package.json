@@ -25,7 +25,7 @@
     "cmdk": "^1.1.1",
     "date-fns": "^4.4.0",
     "ky": "^2",
-    "lucide-react": "^0.577.0",
+    "lucide-react": "^1",
     "qrcode.react": "^4.2.0",
     "radix-ui": "^1.6.7",
     "react": "^19.3.0",
