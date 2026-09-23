@@ -1,6 +1,6 @@
 # Mobile — React Native + Expo (AI Talimati)
 
-React Native 0.81 + Expo 54 + Expo Router v6 + TanStack Query + axios. `mobile/app/**`, `mobile/services/**`, `mobile/hooks/**` icinde calisirken bu dosya zorunlu okumadir.
+React Native 0.86 + Expo SDK 57 + Expo Router + TanStack Query + axios. `mobile/app/**`, `mobile/services/**`, `mobile/hooks/**` icinde calisirken bu dosya zorunlu okumadir.
 
 > **Onemli:** Bu web frontend DEGIL. React Router YOK, ky YOK, shadcn YOK.
 
@@ -9,7 +9,7 @@ React Native 0.81 + Expo 54 + Expo Router v6 + TanStack Query + axios. `mobile/a
 ## 1. Sert Kurallar (asla ihlal etme)
 
 - **Paket yoneticisi**: `npm` — `bun` YAPMA (eskiden vardi, kaldirildi). Tip kontrolu icin `npx tsc --noEmit`.
-- **Routing**: `expo-router` v6 file-based — `react-router`, `next/navigation` YAPMA.
+- **Routing**: `expo-router` file-based — `react-router`, `next/navigation` YAPMA. React Navigation API'lari (`ThemeProvider`, `DarkTheme`, `useIsFocused`, `Theme` tipi) `expo-router/react-navigation`'dan import edilir; `@react-navigation/*` paketi YOK (SDK 56'dan beri expo-router ona bagli degil, ayri kopya ikinci bir navigation context'i yaratir).
 - **HTTP**: `axios` (`mobile/services/api.ts`) — `fetch` direkt veya `ky` YAPMA.
 - **Server state**: `@tanstack/react-query` — manuel `useEffect`+`useState` ile fetch YAPMA.
 - **Token storage**: `expo-secure-store` — `AsyncStorage`, `localStorage` YAPMA (token icin).
@@ -519,15 +519,9 @@ npx eas-cli build --profile preview --platform android
 
 ---
 
-## 13. Type Generation
+## 13. Tipler
 
-```bash
-# Backend OpenAPI -> TypeScript
-npm run gen:api-types
-# uretir: types/api-types.ts (DOKUNMA)
-```
-
-Manuel tipler `types/{feature}.types.ts` icinde.
+OpenAPI'den tip uretimi yok; tipler elle `types/{feature}.types.ts` icinde yazilir.
 
 ---
 

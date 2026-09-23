@@ -24,7 +24,7 @@
   > "önce her şeyi güncelle, commit'le, sonra işe başla" dedi; değişiklikler
   > dala taşındı ve 0.4'te commit'lendi.
 
-- [ ] **0.4 Bağımlılık ve imaj güncellemesi** (kullanıcı isteği, 23.09)
+- [x] **0.4 Bağımlılık ve imaj güncellemesi** (kullanıcı isteği, 23.09)
   Plana başlamadan önce projedeki her şey en güncel sürüme çekilir; her alan
   ayrı `chore` commit'i:
   - Go: toolchain + tüm modüllerin bağımlılıkları (`go get -u`, `go mod tidy`),
@@ -36,6 +36,14 @@
   Her commit öncesi ilgili §5 doğrulaması yeşil olmalı. Kod değişikliği
   gerektiren büyük sürüm atlamalarında kullanıcıya sor. İmajları çekmek
   (`sudo docker compose pull` / `build`) kullanıcıya ait.
+  > Not (24.09): Bilerek geride kalanlar — postgres 18 (19 beta),
+  > frontend TypeScript 6.0 (typescript-eslint 7'yi desteklemiyor), mobilde
+  > Expo SDK 57'nin pin'lediği native paketler, tailwindcss 3 (NativeWind 4),
+  > TypeScript 6.0 (Expo araçları TS'nin JS API'sini kullanıyor), Babel 7
+  > preset'leri (Expo zinciri Babel 7) ve `@testing-library/react-native` 13
+  > (14 yeni `test-renderer` paketini istiyor; kütüphane kodda kullanılmıyor).
+  > Mobilde jest 30 kalsın diye `expo.install.exclude`'a jest eklendi.
+  > Kullanılmayan `openapi-typescript` (mobil) ve `period-tabs.tsx` silindi.
 
 - [ ] **0.5 Başlangıç doğrulaması**
   README §5'teki backend, frontend ve mobil komutlarını çalıştır. Sonucu

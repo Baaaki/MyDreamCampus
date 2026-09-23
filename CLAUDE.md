@@ -228,7 +228,7 @@ Bu kararlar verilmis — yeniden sorma:
 | HTTP framework (Go) | Gin v1.11 |
 | Auth | JWT HS256 + Argon2id + Redis blacklist |
 | Frontend routing | react-router v8 (Next.js YOK) |
-| Mobile routing | Expo Router v6 (file-based) |
+| Mobile routing | Expo Router (Expo SDK 57, file-based) |
 | Frontend HTTP | ky |
 | Mobile HTTP | axios |
 | State (web+mobile) | TanStack Query (server state), Context (UI state) |

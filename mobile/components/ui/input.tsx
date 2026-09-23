@@ -6,7 +6,8 @@ import { cn } from '@/lib/utils';
 type InputProps = React.ComponentProps<typeof TextInput>;
 
 function Input({ className, editable, ...props }: InputProps) {
-  const scheme = useColorScheme() ?? 'light';
+  // RN 0.86 adds 'unspecified' to ColorSchemeName; COLORS has only light/dark
+  const scheme = useColorScheme() === 'dark' ? 'dark' : 'light';
   return (
     <TextInput
       className={cn(

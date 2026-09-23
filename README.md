@@ -64,7 +64,7 @@ Sistem tamamen sektör standartlarında, güncel ve yüksek performanslı araçl
 
 *   **Arka Uç (Backend):** Go 1.27, Gin, PostgreSQL 18, RabbitMQ 4.3, Redis 8.10
 *   **Ön Yüz (Web):** React 19, Vite, Tailwind CSS v4, shadcn/ui
-*   **Mobil Uygulama:** React Native 0.81, Expo 54
+*   **Mobil Uygulama:** React Native 0.86, Expo 57
 *   **Bildirim Sistemi:** Ayrı bir servis olayları asenkron tüketip e-posta gönderir (geliştirmede MailHog, üretimde `.env`'deki SMTP). Mobil push gönderimi henüz iskelet: çağrılar yalnızca loglanır.
 
 ## Güvenlik (Security by Design)
