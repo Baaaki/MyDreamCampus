@@ -71,6 +71,28 @@ async function refreshAccessToken(): Promise<boolean> {
   return refreshInFlight
 }
 
+const CHANGE_PASSWORD_PATH = "/auth/change-password"
+
+/**
+ * Whether the backend refused the request because the user still holds the
+ * first-login password. Every service answers that with 403 +
+ * FORCE_PASSWORD_CHANGE until the password is changed.
+ */
+async function isForcedPasswordChange(response: Response): Promise<boolean> {
+  if (response.status !== 403) return false
+  try {
+    const body: unknown = await response.clone().json()
+    return (
+      typeof body === "object" &&
+      body !== null &&
+      "code" in body &&
+      body.code === "FORCE_PASSWORD_CHANGE"
+    )
+  } catch {
+    return false
+  }
+}
+
 // Create ky instance with default configuration
 const apiClient = ky.create({
   prefix: API_BASE_URL,
@@ -112,6 +134,16 @@ const apiClient = ky.create({
     ],
     afterResponse: [
       async ({ request, response }) => {
+        if (await isForcedPasswordChange(response)) {
+          if (
+            typeof window !== "undefined" &&
+            window.location.pathname !== CHANGE_PASSWORD_PATH
+          ) {
+            window.location.href = CHANGE_PASSWORD_PATH
+          }
+          return response
+        }
+
         if (response.status !== 401) return response
 
         // Don't try to refresh on the auth endpoints themselves —

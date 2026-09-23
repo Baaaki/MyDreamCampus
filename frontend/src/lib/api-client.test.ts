@@ -151,6 +151,60 @@ describe("api-client - 401 refresh logic", () => {
   })
 })
 
+describe("api-client - forced password change", () => {
+  beforeEach(() => {
+    Object.defineProperty(window, "location", {
+      writable: true,
+      value: {
+        ...window.location,
+        pathname: "/dashboard",
+        href: "http://localhost/dashboard",
+      },
+    })
+  })
+
+  afterEach(() => {
+    vi.unstubAllGlobals()
+    vi.resetAllMocks()
+  })
+
+  it("redirects to the change-password page on 403 FORCE_PASSWORD_CHANGE", async () => {
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(
+        async () =>
+          new Response(
+            '{"error":"Devam etmek için şifrenizi değiştirmeniz gerekiyor","code":"FORCE_PASSWORD_CHANGE"}',
+            { status: 403, headers: { "Content-Type": "application/json" } }
+          )
+      )
+    )
+
+    const { studentApi } = await loadClient()
+    await studentApi.get("me").catch(() => {})
+
+    expect(window.location.href).toBe("/auth/change-password")
+  })
+
+  it("leaves other 403 responses alone", async () => {
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(
+        async () =>
+          new Response('{"error":"Yetkiniz yok","code":"FORBIDDEN"}', {
+            status: 403,
+            headers: { "Content-Type": "application/json" },
+          })
+      )
+    )
+
+    const { studentApi } = await loadClient()
+    await studentApi.get("me").catch(() => {})
+
+    expect(window.location.href).toBe("http://localhost/dashboard")
+  })
+})
+
 describe("api-client - idempotency and retries", () => {
   afterEach(() => {
     vi.unstubAllGlobals()
