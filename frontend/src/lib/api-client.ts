@@ -71,6 +71,13 @@ async function refreshAccessToken(): Promise<boolean> {
   return refreshInFlight
 }
 
+function redirectToLogin(): void {
+  if (typeof window !== "undefined") {
+    localStorage.removeItem("user")
+    window.location.href = "/auth/login"
+  }
+}
+
 const CHANGE_PASSWORD_PATH = "/auth/change-password"
 
 /**
@@ -158,27 +165,24 @@ const apiClient = ky.create({
 
         // Avoid infinite retry loops: if we already retried this request, give up.
         if (request.headers.get("X-Refresh-Retry") === "1") {
-          if (typeof window !== "undefined") {
-            localStorage.removeItem("user")
-            window.location.href = "/auth/login"
-          }
+          redirectToLogin()
           return response
         }
 
         const refreshed = await refreshAccessToken()
-        if (!refreshed) {
-          if (typeof window !== "undefined") {
-            localStorage.removeItem("user")
-            window.location.href = "/auth/login"
-          }
-          return response
-        }
 
-        // Replay the original request with a marker so afterResponse won't loop.
+        // Replay the original request with a marker so afterResponse won't
+        // loop. Replayed even when this tab's refresh lost: another tab
+        // refreshing at the same moment may already hold the new cookies,
+        // and the browser sends them with the replay.
         const retryRequest = request.clone()
         retryRequest.headers.set("X-Refresh-Retry", "1")
         attachCSRFToken(retryRequest)
-        return fetch(retryRequest)
+        const retried = await fetch(retryRequest)
+        if (!refreshed && retried.status === 401) {
+          redirectToLogin()
+        }
+        return retried
       },
     ],
   },

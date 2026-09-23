@@ -131,6 +131,28 @@ describe("api-client - 401 refresh logic", () => {
     expect(window.location.href).toContain("/auth/login")
   })
 
+  it("replays once after a lost refresh and keeps the session if another tab rotated the cookies", async () => {
+    let originalCall = 0
+    const fetchSpy = vi.fn(async (input: Request | string) => {
+      const url = typeof input === "string" ? input : (input as Request).url
+      if (url.includes("/auth/refresh")) {
+        return new Response("{}", { status: 401 })
+      }
+      originalCall++
+      if (originalCall === 1) return new Response("{}", { status: 401 })
+      return new Response('{"data":"ok"}', { status: 200 })
+    })
+    vi.stubGlobal("fetch", fetchSpy)
+
+    const { studentApi } = await loadClient()
+    const res = await studentApi.get("me")
+
+    expect(res.status).toBe(200)
+    expect(originalCall).toBe(2)
+    expect(localStorage.getItem("user")).not.toBeNull()
+    expect(window.location.href).not.toContain("/auth/login")
+  })
+
   it("does not loop: a request marked X-Refresh-Retry won't refresh again", async () => {
     let refreshCalls = 0
     const fetchSpy = vi.fn(async (input: Request | string) => {

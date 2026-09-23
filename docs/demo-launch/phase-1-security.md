@@ -75,7 +75,7 @@
   - **Kabul:** Sahte cache ile birim testi: çağrı doğru versiyonla yapılıyor.
   - **Commit:** `fix(auth): revoke access tokens on deactivation and email change`
 
-- [ ] **1.4 Refresh token rotasyonu atomik**
+- [x] **1.4 Refresh token rotasyonu atomik**
   - **Sorun:** `RefreshAccessToken` (`auth_service.go` ≈466)
     `_ = s.sessionRepo.DeleteSession(ctx, jti)` ile hatayı yutuyor; oturum
     kontrolü ile silme arasında kilit yok. Aynı refresh token eşzamanlı iki
