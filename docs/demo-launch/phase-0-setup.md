@@ -5,16 +5,16 @@
 
 ## Görevler
 
-- [x] **0.1 Plan onayı**
+- [x] **0.1 Plan onayı** — `cfbf0de`
   README'deki "Plan durumu" `ONAYLANDI` değilse kullanıcıya planı onaylayıp
   onaylamadığını sor. Onaylayınca README'de durumu tarihle güncelle.
 
-- [x] **0.2 Açık kararlar**
+- [x] **0.2 Açık kararlar** — `cfbf0de`
   README §4'teki K1–K5'i kullanıcıya sor (hepsini birden sormak tercih edilir;
   kullanıcı isterse ilgili faza bırakılabilir). Cevapları tablonun "Cevap"
   sütununa yaz.
 
-- [x] **0.3 Çalışma dalı**
+- [x] **0.3 Çalışma dalı** — `cfbf0de`
   - Çalışma ağacı temiz olmalı (`landingpage/` hariç izlenmeyen dosya
     olmamalı; varsa kullanıcıya sor).
   - `git switch -c demo-readiness` (main'den).
@@ -24,7 +24,8 @@
   > "önce her şeyi güncelle, commit'le, sonra işe başla" dedi; değişiklikler
   > dala taşındı ve 0.4'te commit'lendi.
 
-- [x] **0.4 Bağımlılık ve imaj güncellemesi** (kullanıcı isteği, 23.09)
+- [x] **0.4 Bağımlılık ve imaj güncellemesi** (kullanıcı isteği, 23.09) —
+  `1fcc2b8`…`e2bebd7` (18 commit)
   Plana başlamadan önce projedeki her şey en güncel sürüme çekilir; her alan
   ayrı `chore` commit'i:
   - Go: toolchain + tüm modüllerin bağımlılıkları (`go get -u`, `go mod tidy`),
@@ -45,7 +46,7 @@
   > Mobilde jest 30 kalsın diye `expo.install.exclude`'a jest eklendi.
   > Kullanılmayan `openapi-typescript` (mobil) ve `period-tabs.tsx` silindi.
 
-- [ ] **0.5 Başlangıç doğrulaması**
+- [x] **0.5 Başlangıç doğrulaması** — kod değişikliği yok; sonuç §7 günlükte
   README §5'teki backend, frontend ve mobil komutlarını çalıştır. Sonucu
   (geçen/kalan) Oturum günlüğüne yaz. Kırmızı bir şey varsa önce kullanıcıya
   bildir; plan yeşil bir başlangıç varsayıyor.

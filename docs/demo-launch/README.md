@@ -147,8 +147,10 @@ cd frontend && bun run typecheck && bun run lint && bun run test && bun run buil
 cd mobile && npx tsc --noEmit && npx jest --ci
 ```
 
-Başlangıç durumu (23.09.2026): 11 Go modülünde `go vet` temiz, 972 Go testi
-geçiyor (notification ve payment'ta test yok), frontend `typecheck` temiz.
+Başlangıç durumu (24.09.2026, Faz 0 sonu): 11 Go modülünde `go vet` temiz,
+972 Go testi geçiyor (notification ve payment'ta test yok); frontend
+`typecheck`, `lint` ve `build` temiz, 68 test geçiyor; mobil `tsc` temiz,
+67 test geçiyor.
 
 ---
 
@@ -156,7 +158,7 @@ geçiyor (notification ve payment'ta test yok), frontend `typecheck` temiz.
 
 | Faz | Dosya | Konu | Durum |
 |---|---|---|---|
-| 0 | [phase-0-setup.md](phase-0-setup.md) | Hazırlık: onay, kararlar, dal | Devam ediyor |
+| 0 | [phase-0-setup.md](phase-0-setup.md) | Hazırlık: onay, kararlar, dal | Bitti |
 | 1 | [phase-1-security.md](phase-1-security.md) | Güvenlik ve doğruluk düzeltmeleri | Bekliyor |
 | 2 | [phase-2-time-machine.md](phase-2-time-machine.md) | Tüm servislerde zaman makinesi | Bekliyor |
 | 3 | [phase-3-payment.md](phase-3-payment.md) | Sahte kartla ödeme | Bekliyor |
@@ -185,3 +187,4 @@ Durum değerleri: **Bekliyor**, **Devam ediyor**, **Bitti**, **Engelli**.
 | Tarih | Faz / görev | Ne yapıldı | Kaldığı yer |
 |---|---|---|---|
 | 23.09.2026 | — | Plan yazıldı (inceleme oturumu) | Faz 0 bekliyor |
+| 23–24.09.2026 | Faz 0 (0.1–0.5) | Plan onayı, K1–K5, dal; Go 1.27, Docker/CI, frontend (vite 8, react-router 8, lint 92→0) ve mobil (Expo SDK 57) güncellemeleri. 0.5: backend 11 modül vet temiz / 972 test; frontend typecheck+lint+build temiz / 68 test; mobil tsc temiz / 67 test — hepsi yeşil | Faz 1 bekliyor |
