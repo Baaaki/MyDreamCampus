@@ -207,6 +207,47 @@ describe("api.ts response interceptor (401 + refresh)", () => {
     expect(forced).toBe(0);
   });
 
+  it.each([
+    ["a 503", { response: { status: 503 } }],
+    ["a network error", new Error("Network Error")],
+  ])("keeps the tokens when the refresh gets %s", async (_label, refreshErr) => {
+    await SecureStore.setItemAsync("jwt_token", "expired-at");
+    await SecureStore.setItemAsync("refresh_token", "rt-1");
+    axiosMock.post.mockRejectedValueOnce(refreshErr);
+
+    const { api, mod } = loadApi();
+    let unauthorized = 0;
+    mod.setOnUnauthorized(() => {
+      unauthorized++;
+    });
+
+    const err = { response: { status: 401 }, config: { url: "/students/me", headers: {} } };
+    await expect(getErrHandler(api)(err)).rejects.toBe(err);
+
+    expect(unauthorized).toBe(0);
+    expect(await SecureStore.getItemAsync("jwt_token")).toBe("expired-at");
+    expect(await SecureStore.getItemAsync("refresh_token")).toBe("rt-1");
+  });
+
+  it("clears the tokens when the refresh gets a 401", async () => {
+    await SecureStore.setItemAsync("jwt_token", "expired-at");
+    await SecureStore.setItemAsync("refresh_token", "revoked");
+    axiosMock.post.mockRejectedValueOnce({ response: { status: 401 } });
+
+    const { api, mod } = loadApi();
+    let unauthorized = 0;
+    mod.setOnUnauthorized(() => {
+      unauthorized++;
+    });
+
+    const err = { response: { status: 401 }, config: { url: "/students/me", headers: {} } };
+    await expect(getErrHandler(api)(err)).rejects.toBe(err);
+
+    expect(unauthorized).toBe(1);
+    expect(await SecureStore.getItemAsync("jwt_token")).toBeNull();
+    expect(await SecureStore.getItemAsync("refresh_token")).toBeNull();
+  });
+
   it("identifies itself as the mobile client on every request", () => {
     loadApi();
     const createArgs = axiosMock.create.mock.calls[axiosMock.create.mock.calls.length - 1][0] as {

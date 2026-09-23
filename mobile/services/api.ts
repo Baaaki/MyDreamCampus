@@ -88,16 +88,31 @@ function isForcedPasswordChange(error: AxiosError): boolean {
   );
 }
 
+// 'ended' only when the backend refused the refresh token (401). A network
+// error, a timeout or a 5xx says nothing about the session, and dropping the
+// tokens then would log the user out over a blip.
+type RefreshOutcome =
+  | { status: 'refreshed'; accessToken: string }
+  | { status: 'ended' }
+  | { status: 'unavailable' };
+
+function httpStatus(err: unknown): number | undefined {
+  if (typeof err !== 'object' || err === null || !('response' in err)) return undefined;
+  const { response } = err;
+  if (typeof response !== 'object' || response === null || !('status' in response)) return undefined;
+  return typeof response.status === 'number' ? response.status : undefined;
+}
+
 // Single-flight refresh: avoid stampeding /auth/refresh when many requests
 // hit 401 simultaneously. All concurrent 401s wait on the same promise.
-let refreshInFlight: Promise<string | null> | null = null;
+let refreshInFlight: Promise<RefreshOutcome> | null = null;
 
-async function refreshOnce(): Promise<string | null> {
+async function refreshOnce(): Promise<RefreshOutcome> {
   if (refreshInFlight) return refreshInFlight;
-  refreshInFlight = (async () => {
+  refreshInFlight = (async (): Promise<RefreshOutcome> => {
     try {
       const refreshToken = await SecureStore.getItemAsync('refresh_token');
-      if (!refreshToken) return null;
+      if (!refreshToken) return { status: 'ended' };
       // Bypass the configured `api` instance to avoid the 401 interceptor
       // running recursively if /auth/refresh itself returns 401.
       const res = await axios.post<{ access_token: string; refresh_token: string }>(
@@ -107,9 +122,9 @@ async function refreshOnce(): Promise<string | null> {
       );
       await SecureStore.setItemAsync('jwt_token', res.data.access_token);
       await SecureStore.setItemAsync('refresh_token', res.data.refresh_token);
-      return res.data.access_token;
-    } catch {
-      return null;
+      return { status: 'refreshed', accessToken: res.data.access_token };
+    } catch (err) {
+      return httpStatus(err) === 401 ? { status: 'ended' } : { status: 'unavailable' };
     } finally {
       // Reset on next tick so callers in the same batch share this result.
       setTimeout(() => {
@@ -150,8 +165,11 @@ api.interceptors.response.use(
       return Promise.reject(error);
     }
 
-    const newAccess = await refreshOnce();
-    if (!newAccess) {
+    const outcome = await refreshOnce();
+    if (outcome.status === 'unavailable') {
+      return Promise.reject(error);
+    }
+    if (outcome.status === 'ended') {
       await SecureStore.deleteItemAsync('jwt_token');
       await SecureStore.deleteItemAsync('refresh_token');
       await SecureStore.deleteItemAsync('user_data');
@@ -161,7 +179,7 @@ api.interceptors.response.use(
 
     original._retried = true;
     original.headers = original.headers ?? {};
-    original.headers.Authorization = `Bearer ${newAccess}`;
+    original.headers.Authorization = `Bearer ${outcome.accessToken}`;
     return api.request(original);
   }
 );

@@ -169,7 +169,7 @@
     cookie'yle gelen POST, CSRF token'ı olmadan 403 alıyor.
   - **Commit:** `refactor(shared): harden JWT and CSRF checks`
 
-- [ ] **1.10 Refresh geçici hata alınca oturum silinmesin**
+- [x] **1.10 Refresh geçici hata alınca oturum silinmesin**
   - **Sorun:** Web ve mobil, refresh isteği ağ hatası veya 5xx alınca da
     oturumu siliyor. Backend ise bu durumları bilerek "tekrar dene" diye
     ayırıyor.
