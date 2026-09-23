@@ -288,7 +288,7 @@ export default function SemesterReviewPage() {
       showToast("Dönem başarıyla aktifleştirildi!", "success")
       setTimeout(() => navigate("/system/semesters"), 1500)
     } catch (err) {
-      const message = await apiErrorMessage(err, "Dönem aktifleştirilemedi")
+      const message = apiErrorMessage(err, "Dönem aktifleştirilemedi")
       showToast(message, "error")
     } finally {
       setActivating(false)

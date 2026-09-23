@@ -9,10 +9,7 @@ type ErrorBody = { error?: unknown; message?: unknown }
 const MACHINE_CODE = /^[A-Z][A-Z0-9_]+$/
 
 /** The backend's user-facing message for a failed request, or `fallback`. */
-export async function apiErrorMessage(
-  err: unknown,
-  fallback: string
-): Promise<string> {
+export function apiErrorMessage(err: unknown, fallback: string): string {
   if (!(err instanceof HTTPError)) return fallback
   // ky has already consumed the body into `data`; a non-JSON body arrives as
   // a string and has no message fields to offer.

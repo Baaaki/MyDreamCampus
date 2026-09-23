@@ -41,7 +41,7 @@ export default function ChangePasswordPage() {
       localStorage.removeItem("user")
       navigate("/auth/login")
     } catch (err) {
-      setError(await apiErrorMessage(err, "Şifre değiştirme başarısız"))
+      setError(apiErrorMessage(err, "Şifre değiştirme başarısız"))
     } finally {
       setLoading(false)
     }

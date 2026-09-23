@@ -244,7 +244,7 @@ export default function StaffPage() {
       fetchStaff(page)
     } catch (err) {
       console.error("[Staff] Create error:", err)
-      setError(await apiErrorMessage(err, "Personel oluşturulamadı"))
+      setError(apiErrorMessage(err, "Personel oluşturulamadı"))
     } finally {
       setLoading(false)
     }
@@ -288,7 +288,7 @@ export default function StaffPage() {
       fetchStaff(page)
     } catch (err) {
       console.error("[Staff] Update error:", err)
-      setError(await apiErrorMessage(err, "Personel güncellenemedi"))
+      setError(apiErrorMessage(err, "Personel güncellenemedi"))
     } finally {
       setLoading(false)
     }

@@ -400,7 +400,7 @@ export default function StaffProfilePage() {
       } catch (error) {
         console.error("[Personel Details] Failed to fetch admin staff:", error)
         setAdminStaffList([])
-        alert(await apiErrorMessage(error, "İdari personel listesi alınamadı"))
+        alert(apiErrorMessage(error, "İdari personel listesi alınamadı"))
       } finally {
         setIsLoadingStaff(false)
       }
@@ -447,7 +447,7 @@ export default function StaffProfilePage() {
       setViewMode("profile")
     } catch (error) {
       console.error("Failed to fetch admin profile:", error)
-      alert(await apiErrorMessage(error, "İdari personel profili alınamadı"))
+      alert(apiErrorMessage(error, "İdari personel profili alınamadı"))
     } finally {
       setIsLoading(false)
     }
@@ -858,9 +858,7 @@ export default function StaffProfilePage() {
         console.error("Failed to save admin profile:", error)
         // The backend's Turkish text says which field it refused (a taken
         // e-mail, an invalid image URL); a generic message hides that.
-        alert(
-          await apiErrorMessage(error, "Profil kaydedilirken bir hata oluştu!")
-        )
+        alert(apiErrorMessage(error, "Profil kaydedilirken bir hata oluştu!"))
       } finally {
         setIsSaving(false)
       }
@@ -977,7 +975,7 @@ export default function StaffProfilePage() {
       setCreateFormData(initialCreateFormData)
     } catch (err: unknown) {
       console.error("Failed to create admin staff:", err)
-      const errorMsg = await apiErrorMessage(
+      const errorMsg = apiErrorMessage(
         err,
         "İdari personel kaydı oluşturulurken bir hata oluştu"
       )

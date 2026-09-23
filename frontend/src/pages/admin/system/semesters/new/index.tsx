@@ -300,7 +300,7 @@ export default function SemesterWizardPage() {
           /* listSemesters failed, fall through to generic error */
         }
       }
-      const message = await apiErrorMessage(err, "Dönem oluşturulamadı")
+      const message = apiErrorMessage(err, "Dönem oluşturulamadı")
       showToast(message, "error")
     } finally {
       setLoading(false)
@@ -333,7 +333,7 @@ export default function SemesterWizardPage() {
       showToast("Dönem başarıyla güncellendi", "success")
       setStep(2)
     } catch (err) {
-      const message = await apiErrorMessage(err, "Dönem güncellenemedi")
+      const message = apiErrorMessage(err, "Dönem güncellenemedi")
       showToast(message, "error")
     } finally {
       setLoading(false)
@@ -352,7 +352,7 @@ export default function SemesterWizardPage() {
       showToast("Dönem başarıyla aktifleştirildi!", "success")
       setTimeout(() => navigate("/system/semesters"), 1500)
     } catch (err) {
-      const message = await apiErrorMessage(err, "Dönem aktifleştirilemedi")
+      const message = apiErrorMessage(err, "Dönem aktifleştirilemedi")
       showToast(message, "error")
     } finally {
       setLoading(false)

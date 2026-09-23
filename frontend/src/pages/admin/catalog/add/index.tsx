@@ -146,7 +146,7 @@ export default function AddCoursePage() {
     },
     onError: async (error: Error) => {
       console.error("Ders eklenirken hata:", error)
-      const message = await apiErrorMessage(error, error.message)
+      const message = apiErrorMessage(error, error.message)
       alert(`Hata: ${message}`)
     },
   })

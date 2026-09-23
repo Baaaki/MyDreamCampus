@@ -27,27 +27,23 @@ describe("apiErrorMessage", () => {
         message: "Geçersiz e-posta veya şifre",
       })
     )
-    expect(await apiErrorMessage(err, "x")).toBe("Geçersiz e-posta veya şifre")
+    expect(apiErrorMessage(err, "x")).toBe("Geçersiz e-posta veya şifre")
   })
 
   it("uses the error field when it is prose (service shape)", async () => {
     const err = await httpError(
       JSON.stringify({ error: "Ders bulunamadı", code: "COURSE_NOT_FOUND" })
     )
-    expect(await apiErrorMessage(err, "x")).toBe("Ders bulunamadı")
+    expect(apiErrorMessage(err, "x")).toBe("Ders bulunamadı")
   })
 
   it("never shows a bare machine code", async () => {
     const err = await httpError(JSON.stringify({ error: "CSRF_ERROR" }), 403)
-    expect(await apiErrorMessage(err, "İşlem başarısız")).toBe(
-      "İşlem başarısız"
-    )
+    expect(apiErrorMessage(err, "İşlem başarısız")).toBe("İşlem başarısız")
   })
 
   it("falls back on a non-JSON body and on non-HTTP errors", async () => {
-    expect(await apiErrorMessage(await httpError("<html>"), "Hata")).toBe(
-      "Hata"
-    )
-    expect(await apiErrorMessage(new TypeError("offline"), "Hata")).toBe("Hata")
+    expect(apiErrorMessage(await httpError("<html>"), "Hata")).toBe("Hata")
+    expect(apiErrorMessage(new TypeError("offline"), "Hata")).toBe("Hata")
   })
 })

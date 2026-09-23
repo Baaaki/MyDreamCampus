@@ -62,7 +62,7 @@ export default function LoginPage() {
       }
     } catch (err) {
       setError(
-        await apiErrorMessage(
+        apiErrorMessage(
           err,
           "Giriş başarısız. Lütfen bilgilerinizi kontrol edin."
         )

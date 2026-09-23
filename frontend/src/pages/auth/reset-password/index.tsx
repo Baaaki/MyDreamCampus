@@ -45,7 +45,7 @@ export default function ResetPasswordPage() {
       setDone(true)
     } catch (err) {
       setError(
-        await apiErrorMessage(err, "Şifre sıfırlanamadı, lütfen tekrar deneyin")
+        apiErrorMessage(err, "Şifre sıfırlanamadı, lütfen tekrar deneyin")
       )
     } finally {
       setLoading(false)

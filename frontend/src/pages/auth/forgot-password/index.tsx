@@ -20,7 +20,7 @@ export default function ForgotPasswordPage() {
       setSent(true)
     } catch (err) {
       setError(
-        await apiErrorMessage(err, "İstek gönderilemedi, lütfen tekrar deneyin")
+        apiErrorMessage(err, "İstek gönderilemedi, lütfen tekrar deneyin")
       )
     } finally {
       setLoading(false)
