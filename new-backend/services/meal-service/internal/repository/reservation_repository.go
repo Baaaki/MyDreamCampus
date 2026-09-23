@@ -213,8 +213,10 @@ func (r *ReservationRepository) CancelReservationWithRefund(ctx context.Context,
 	// Cancel reservation
 	reservation, err := qtx.CancelReservation(ctx, utils.UUIDToPgtype(reservationID))
 	if err != nil {
+		// No row: it was used or cancelled after the caller read it. The
+		// deferred rollback drops the tx, so no refund event is written.
 		if errors.Is(err, pgx.ErrNoRows) {
-			return db.Reservation{}, fmt.Errorf("%w", serviceErrors.ErrReservationNotFoundRepo)
+			return db.Reservation{}, serviceErrors.ErrInvalidStatusForCancel
 		}
 		return db.Reservation{}, fmt.Errorf("%w: failed to cancel reservation: %v", sharedErrors.ErrQueryFailed, err)
 	}

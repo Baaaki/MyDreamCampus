@@ -38,10 +38,36 @@ type ClosedDaysReader interface {
 	IsDateClosed(ctx context.Context, date pgtype.Date) (bool, error)
 }
 
+// ReservationStore is the slice of ReservationRepository the service uses.
+type ReservationStore interface {
+	CreateReservation(ctx context.Context, params db.CreateReservationParams) (db.Reservation, error)
+	CreateBatchReservations(ctx context.Context, reservations []db.CreateReservationParams) ([]db.Reservation, error)
+	GetReservationByID(ctx context.Context, id uuid.UUID) (db.GetReservationByIDRow, error)
+	CheckActiveReservation(ctx context.Context, params db.CheckActiveReservationParams) (*db.CheckActiveReservationRow, error)
+	CheckActiveReservationsForSlots(ctx context.Context, params db.CheckActiveReservationsForSlotsParams) ([]db.CheckActiveReservationsForSlotsRow, error)
+	GetStudentReservationsFiltered(ctx context.Context, params db.GetStudentReservationsFilteredParams) ([]db.GetStudentReservationsFilteredRow, error)
+	CountStudentReservationsFiltered(ctx context.Context, params db.CountStudentReservationsFilteredParams) (int64, error)
+	UpdateReservationByID(ctx context.Context, params db.UpdateReservationByIDParams) (db.Reservation, error)
+	UpdateReservationsByBatchID(ctx context.Context, params db.UpdateReservationsByBatchIDParams) error
+	MarkReservationUsed(ctx context.Context, id uuid.UUID) (db.Reservation, error)
+	FindReservationForQR(ctx context.Context, params db.FindReservationForQRParams) (db.FindReservationForQRRow, error)
+	CancelReservationWithRefund(ctx context.Context, reservationID uuid.UUID, eventPayload map[string]any) (db.Reservation, error)
+}
+
+// StudentCacheReader is the slice of StudentCacheRepository the service uses.
+type StudentCacheReader interface {
+	GetStudentCacheByID(ctx context.Context, id uuid.UUID) (db.StudentView, error)
+}
+
+var (
+	_ ReservationStore   = (*repository.ReservationRepository)(nil)
+	_ StudentCacheReader = (*repository.StudentCacheRepository)(nil)
+)
+
 type ReservationService struct {
-	reservationRepo  *repository.ReservationRepository
+	reservationRepo  ReservationStore
 	cafeteriaRepo    *repository.CafeteriaRepository
-	studentCacheRepo *repository.StudentCacheRepository
+	studentCacheRepo StudentCacheReader
 	closedDaysRepo   ClosedDaysReader
 	paymentClient    PaymentClient
 	cfg              *config.Config
@@ -49,9 +75,9 @@ type ReservationService struct {
 }
 
 func NewReservationService(
-	reservationRepo *repository.ReservationRepository,
+	reservationRepo ReservationStore,
 	cafeteriaRepo *repository.CafeteriaRepository,
-	studentCacheRepo *repository.StudentCacheRepository,
+	studentCacheRepo StudentCacheReader,
 	closedDaysRepo ClosedDaysReader,
 	paymentClient PaymentClient,
 	cfg *config.Config,
@@ -727,6 +753,11 @@ func (s *ReservationService) UseReservation(ctx context.Context, studentID uuid.
 	// 7. Mark as used
 	_, err = s.reservationRepo.MarkReservationUsed(ctx, utils.PgtypeToUUID(reservation.ID))
 	if err != nil {
+		// The row was found above, so no row now means a concurrent scan
+		// or cancel got there first.
+		if errors.Is(err, serviceErrors.ErrReservationNotFoundRepo) {
+			return nil, serviceErrors.ErrReservationAlreadyUsed
+		}
 		s.logger.Error("failed to mark reservation as used", zap.Error(err))
 		return nil, err
 	}

@@ -69,9 +69,11 @@ SET status = $2, expires_at = $3, updated_at = NOW()
 WHERE batch_id = $1;
 
 -- name: MarkReservationUsed :one
+-- The state check lives in the UPDATE so two concurrent scans of the same QR
+-- cannot both succeed: the second one matches no row.
 UPDATE meal.reservations
 SET is_used = true, used_at = NOW(), updated_at = NOW()
-WHERE id = $1
+WHERE id = $1 AND status = 'confirmed' AND is_used = false
 RETURNING id, batch_id, student_id, cafeteria_id, reservation_date, meal_time, menu_type, status, is_used, used_at, expires_at, created_at, updated_at;
 
 -- name: FindReservationForQR :one
@@ -109,7 +111,9 @@ DELETE FROM meal.reservations
 WHERE id IN (SELECT id FROM cleanup_batch);
 
 -- name: CancelReservation :one
+-- Same guard as MarkReservationUsed: a cancel racing a scan or another
+-- cancel matches no row, so the meal cannot be both eaten and refunded.
 UPDATE meal.reservations
 SET status = 'cancelled', updated_at = NOW()
-WHERE id = $1
+WHERE id = $1 AND status = 'confirmed' AND is_used = false
 RETURNING id, batch_id, student_id, cafeteria_id, reservation_date, meal_time, menu_type, status, is_used, used_at, expires_at, created_at, updated_at;
