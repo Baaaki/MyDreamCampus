@@ -24,6 +24,12 @@ WHERE refresh_token_jti = $1;
 DELETE FROM auth.sessions
 WHERE refresh_token_jti = $1;
 
+-- name: DeleteSessionByJTI :execrows
+-- Refresh rotation: of two requests racing with the same refresh token,
+-- only the one that deletes the row may create the next session.
+DELETE FROM auth.sessions
+WHERE refresh_token_jti = $1;
+
 -- name: DeleteSessionByID :exec
 DELETE FROM auth.sessions
 WHERE id = $1 AND user_id = $2;

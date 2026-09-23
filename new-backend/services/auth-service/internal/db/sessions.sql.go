@@ -92,6 +92,21 @@ func (q *Queries) DeleteSessionByID(ctx context.Context, arg DeleteSessionByIDPa
 	return err
 }
 
+const deleteSessionByJTI = `-- name: DeleteSessionByJTI :execrows
+DELETE FROM auth.sessions
+WHERE refresh_token_jti = $1
+`
+
+// Refresh rotation: of two requests racing with the same refresh token,
+// only the one that deletes the row may create the next session.
+func (q *Queries) DeleteSessionByJTI(ctx context.Context, refreshTokenJti string) (int64, error) {
+	result, err := q.db.Exec(ctx, deleteSessionByJTI, refreshTokenJti)
+	if err != nil {
+		return 0, err
+	}
+	return result.RowsAffected(), nil
+}
+
 const getSessionByJTI = `-- name: GetSessionByJTI :one
 SELECT id, user_id, refresh_token_jti, device_info, ip_address, created_at, expires_at, last_used_at
 FROM auth.sessions

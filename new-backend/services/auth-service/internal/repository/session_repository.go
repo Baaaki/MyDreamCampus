@@ -80,6 +80,40 @@ func (r *SessionRepository) DeleteSession(ctx context.Context, jti string) error
 	return nil
 }
 
+// RotateSession replaces the session behind oldJTI with a new one in a
+// single transaction. When oldJTI is already gone — a concurrent refresh
+// with the same token won — it returns ErrSessionNotFoundRepo and creates
+// nothing. A failed insert rolls the delete back, so the old refresh token
+// stays usable for a retry.
+func (r *SessionRepository) RotateSession(ctx context.Context, oldJTI string, params db.CreateSessionParams) (db.Session, error) {
+	tx, err := r.pool.Begin(ctx)
+	if err != nil {
+		return db.Session{}, fmt.Errorf("%w: failed to begin transaction: %v", sharedErrors.ErrTransactionFailed, err)
+	}
+	// Rollback after successful commit is a no-op returning ErrTxClosed — safe to discard.
+	defer func() { _ = tx.Rollback(ctx) }()
+
+	qtx := r.queries.WithTx(tx)
+
+	deleted, err := qtx.DeleteSessionByJTI(ctx, oldJTI)
+	if err != nil {
+		return db.Session{}, fmt.Errorf("%w: failed to delete session: %v", sharedErrors.ErrQueryFailed, err)
+	}
+	if deleted == 0 {
+		return db.Session{}, fmt.Errorf("%w: session with jti %s already rotated", serviceErrors.ErrSessionNotFoundRepo, oldJTI)
+	}
+
+	session, err := qtx.CreateSession(ctx, params)
+	if err != nil {
+		return db.Session{}, fmt.Errorf("%w: failed to create session: %v", sharedErrors.ErrQueryFailed, err)
+	}
+
+	if err := tx.Commit(ctx); err != nil {
+		return db.Session{}, fmt.Errorf("%w: failed to commit transaction: %v", sharedErrors.ErrTransactionFailed, err)
+	}
+	return session, nil
+}
+
 // DeleteSessionByID deletes a session by ID (for user-initiated deletion)
 func (r *SessionRepository) DeleteSessionByID(ctx context.Context, sessionID, userID uuid.UUID) error {
 	err := r.queries.DeleteSessionByID(ctx, db.DeleteSessionByIDParams{

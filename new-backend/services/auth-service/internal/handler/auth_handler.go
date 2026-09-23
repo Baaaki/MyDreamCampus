@@ -296,8 +296,12 @@ func (h *AuthHandler) RefreshToken(c *gin.Context) {
 		if isSessionEnded(err) {
 			reqLogger.Warn("refresh rejected", zap.Error(err))
 			// The cookie is dead; clearing it stops the browser from
-			// replaying it on every page load.
-			h.endSession(c)
+			// replaying it on every page load. Not on SESSION_NOT_FOUND:
+			// the losing tab of two refreshing at once gets it, and its
+			// Set-Cookie would wipe the cookies the winner has just set.
+			if !sharedErrors.Is(err, authErrors.ErrSessionNotFound) {
+				h.endSession(c)
+			}
 			c.JSON(http.StatusUnauthorized, dto.ErrorResponse{
 				Error:   authErrors.ErrInvalidToken.Code,
 				Message: authErrors.ErrInvalidToken.Message,

@@ -40,9 +40,38 @@ type authCache interface {
 
 var _ authCache = (*redis.ClientWrapper)(nil)
 
+// userStore and sessionStore are the slices of the repositories the auth
+// service uses — interfaces so the session paths can be tested without a
+// database.
+type userStore interface {
+	GetUserByEmail(ctx context.Context, email string) (db.User, error)
+	GetUserByID(ctx context.Context, id uuid.UUID) (db.User, error)
+	CreateUser(ctx context.Context, params db.CreateUserParams) (db.CreateUserRow, error)
+	CreateOutboxEvent(ctx context.Context, params db.CreateOutboxEventParams) (db.CreateOutboxEventRow, error)
+	UpdatePassword(ctx context.Context, userID uuid.UUID, passwordHash string, forcePasswordChange bool) error
+	IncrementTokenVersion(ctx context.Context, userID uuid.UUID) (int32, error)
+	AdminExists(ctx context.Context) (bool, error)
+}
+
+type sessionStore interface {
+	CreateSession(ctx context.Context, params db.CreateSessionParams) (db.Session, error)
+	GetSessionByJTI(ctx context.Context, jti string) (db.Session, error)
+	GetSessionsByUserID(ctx context.Context, userID uuid.UUID) ([]db.Session, error)
+	RotateSession(ctx context.Context, oldJTI string, params db.CreateSessionParams) (db.Session, error)
+	DeleteSession(ctx context.Context, jti string) error
+	DeleteSessionByID(ctx context.Context, sessionID, userID uuid.UUID) error
+	DeleteAllUserSessions(ctx context.Context, userID uuid.UUID) error
+	CleanupExpiredSessions(ctx context.Context) error
+}
+
+var (
+	_ userStore    = (*repository.AuthRepository)(nil)
+	_ sessionStore = (*repository.SessionRepository)(nil)
+)
+
 type AuthService struct {
-	authRepo    *repository.AuthRepository
-	sessionRepo *repository.SessionRepository
+	authRepo    userStore
+	sessionRepo sessionStore
 	eventRepo   *repository.EventRepository
 	redisClient authCache
 	config      *config.Config
@@ -462,12 +491,11 @@ func (s *AuthService) RefreshAccessToken(ctx context.Context, refreshToken strin
 		return dto.RefreshResponse{}, "", sharedErrors.Wrap(sharedErrors.ErrInternal, err)
 	}
 
-	// Delete old session
-	_ = s.sessionRepo.DeleteSession(ctx, jti)
-
-	// Create new session
+	// Replace the old session atomically. A lost race does not revoke the
+	// user's other sessions: two tabs refreshing at once is normal, and
+	// that would log the user out everywhere.
 	expiresAt := clock.Now().Add(time.Duration(s.config.JWT.RefreshTokenExpiry) * time.Hour)
-	_, err = s.sessionRepo.CreateSession(ctx, db.CreateSessionParams{
+	_, err = s.sessionRepo.RotateSession(ctx, jti, db.CreateSessionParams{
 		UserID:          user.ID,
 		RefreshTokenJti: newJTI,
 		DeviceInfo:      session.DeviceInfo,
@@ -475,6 +503,12 @@ func (s *AuthService) RefreshAccessToken(ctx context.Context, refreshToken strin
 		ExpiresAt:       pgtype.Timestamp{Time: expiresAt, Valid: true},
 	})
 	if err != nil {
+		if sharedErrors.Is(err, serviceErrors.ErrSessionNotFoundRepo) {
+			logger.Warn("refresh token already rotated",
+				zap.String("jti", jti),
+			)
+			return dto.RefreshResponse{}, "", serviceErrors.ErrSessionNotFound
+		}
 		// Check for query failures - wrap and return, handler will log
 		if sharedErrors.Is(err, sharedErrors.ErrQueryFailed) {
 			return dto.RefreshResponse{}, "", sharedErrors.Wrap(sharedErrors.ErrInternal, err)

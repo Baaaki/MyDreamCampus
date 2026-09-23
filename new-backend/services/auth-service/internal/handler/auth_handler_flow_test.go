@@ -157,8 +157,7 @@ func TestLogin_LockedOut_AnswersLikeWrongPassword(t *testing.T) {
 
 func TestRefresh_InvalidToken_Returns401AndClearsCookies(t *testing.T) {
 	for _, err := range []error{
-		authErrors.ErrInvalidToken, authErrors.ErrSessionNotFound,
-		authErrors.ErrUserNotFound, authErrors.ErrTokenVersionMismatch,
+		authErrors.ErrInvalidToken, authErrors.ErrUserNotFound, authErrors.ErrTokenVersionMismatch,
 	} {
 		w := do(newFlowRouter(t, &fakeAuthService{refreshErr: err}), "POST", "/api/auth/refresh", "", nil,
 			&http.Cookie{Name: refreshCookie, Value: "stale"})
@@ -166,6 +165,15 @@ func TestRefresh_InvalidToken_Returns401AndClearsCookies(t *testing.T) {
 		assert.Equal(t, http.StatusUnauthorized, w.Code, "error %v", err)
 		assert.Contains(t, strings.Join(w.Header().Values("Set-Cookie"), ";"), "refresh_token=;")
 	}
+}
+
+func TestRefresh_SessionAlreadyRotated_Returns401WithoutClearingCookies(t *testing.T) {
+	w := do(newFlowRouter(t, &fakeAuthService{refreshErr: authErrors.ErrSessionNotFound}), "POST", "/api/auth/refresh", "", nil,
+		&http.Cookie{Name: refreshCookie, Value: "rotated-by-another-tab"})
+
+	assert.Equal(t, http.StatusUnauthorized, w.Code)
+	assert.Empty(t, w.Header().Values("Set-Cookie"),
+		"clearing here would delete the cookies the winning tab just received")
 }
 
 func TestRefresh_ServerFailure_StaysA500(t *testing.T) {
