@@ -45,8 +45,7 @@ export default function AdminAttendanceSessionPage() {
 
   // Read session item from router state if available
   const sessionItemState = location.state?.session as
-    | AdminSessionItem
-    | undefined
+    AdminSessionItem | undefined
 
   // If directly navigated, fallback to finding it in mock data (if mock is enabled)
   const sessionItem =

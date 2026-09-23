@@ -80,11 +80,7 @@ export interface ListCoursesParams {
   department?: string
   course_type?: "mandatory" | "elective"
   course_category?:
-    | "theoretical"
-    | "practical"
-    | "internship"
-    | "project"
-    | "seminar"
+    "theoretical" | "practical" | "internship" | "project" | "seminar"
   education_level?: "undergraduate" | "graduate" | "doctorate"
   status?:
     | "active"

@@ -40,9 +40,7 @@ export default function MealAdminQRPage() {
       setLunchQR(lunch)
       setDinnerQR(dinner)
     } catch (err: unknown) {
-      setError(
-        err instanceof Error ? err.message : "QR kodları yüklenemedi"
-      )
+      setError(err instanceof Error ? err.message : "QR kodları yüklenemedi")
     } finally {
       setLoading(false)
     }
@@ -63,9 +61,7 @@ export default function MealAdminQRPage() {
       const data = await mealApi.get("cafeterias").json<Cafeteria[]>()
       setCafeterias(data.filter((c) => c.is_active))
     } catch (err: unknown) {
-      setError(
-        err instanceof Error ? err.message : "Yemekhaneler yüklenemedi"
-      )
+      setError(err instanceof Error ? err.message : "Yemekhaneler yüklenemedi")
     }
   }
 
