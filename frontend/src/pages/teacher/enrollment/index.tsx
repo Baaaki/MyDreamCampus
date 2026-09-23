@@ -1,4 +1,5 @@
-import { useEffect, useState } from "react"
+import { useState } from "react"
+import { useQuery, useQueryClient } from "@tanstack/react-query"
 import { enrollmentService } from "@/lib/services/enrollment-service"
 import type { EnrollmentProgramResponse } from "@/lib/types"
 import { EnrollmentReviewDialog } from "@/components/enrollment/enrollment-review-dialog"
@@ -15,29 +16,22 @@ import { Badge } from "@/components/ui/badge"
 import { Calendar, User, BookOpen, Clock } from "lucide-react"
 
 export default function EnrollmentPage() {
-  const [enrollments, setEnrollments] = useState<EnrollmentProgramResponse[]>(
-    []
-  )
-  const [loading, setLoading] = useState(true)
+  const queryClient = useQueryClient()
+  const pendingKey = ["enrollment", "pending"]
+  const { data: enrollments = [], isLoading: loading } = useQuery({
+    queryKey: pendingKey,
+    queryFn: async () =>
+      (await enrollmentService.getPendingEnrollments()).programs,
+  })
   const [selectedEnrollment, setSelectedEnrollment] =
     useState<EnrollmentProgramResponse | null>(null)
   const [isDialogOpen, setIsDialogOpen] = useState(false)
 
-  useEffect(() => {
-    fetchEnrollments()
-  }, [])
-
-  const fetchEnrollments = async () => {
-    try {
-      setLoading(true)
-      const response = await enrollmentService.getPendingEnrollments()
-      setEnrollments(response.programs)
-    } catch (error) {
-      console.error("Failed to fetch enrollments:", error)
-    } finally {
-      setLoading(false)
-    }
-  }
+  // A reviewed program leaves the pending list; no refetch needed.
+  const dropFromPending = (programId: string) =>
+    queryClient.setQueryData<EnrollmentProgramResponse[]>(pendingKey, (prev) =>
+      prev?.filter((p) => p.id !== programId)
+    )
 
   const handleReview = (enrollment: EnrollmentProgramResponse) => {
     setSelectedEnrollment(enrollment)
@@ -46,12 +40,12 @@ export default function EnrollmentPage() {
 
   const handleApprove = async (programId: string) => {
     await enrollmentService.approveEnrollment(programId)
-    setEnrollments((prev) => prev.filter((p) => p.id !== programId))
+    dropFromPending(programId)
   }
 
   const handleReject = async (programId: string, reason: string) => {
     await enrollmentService.rejectEnrollment(programId, reason)
-    setEnrollments((prev) => prev.filter((p) => p.id !== programId))
+    dropFromPending(programId)
   }
 
   if (loading) {

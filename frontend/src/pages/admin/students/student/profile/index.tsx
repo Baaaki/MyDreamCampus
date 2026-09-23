@@ -1,31 +1,30 @@
-import { useEffect, useState } from "react"
+import { useQuery } from "@tanstack/react-query"
 import { studentApi } from "@/lib/api-client"
+import { apiErrorMessage } from "@/lib/api-error"
 import type { Student } from "@/lib/types"
 
 export default function StudentProfilePage() {
-  const [profile, setProfile] = useState<Student | null>(null)
-  const [loading, setLoading] = useState(true)
-  const [error, setError] = useState("")
+  // Backend has no /me route; own record is fetched by the auth user id,
+  // same pattern as the student dashboard.
+  const userStr = localStorage.getItem("user")
+  const userId: string | undefined = userStr
+    ? (JSON.parse(userStr) as { id?: string }).id
+    : undefined
 
-  useEffect(() => {
-    fetchProfile()
-  }, [])
-
-  const fetchProfile = async () => {
-    try {
-      // Backend has no /me route; own record is fetched by the auth user id,
-      // same pattern as the student dashboard.
-      const userStr = localStorage.getItem("user")
-      if (!userStr) throw new Error("Oturum bilgisi bulunamadı")
-      const user = JSON.parse(userStr)
-      const data = await studentApi.get(`${user.id}`).json<Student>()
-      setProfile(data)
-    } catch (err: any) {
-      setError(err.message || "Profil bilgileri yüklenemedi")
-    } finally {
-      setLoading(false)
-    }
-  }
+  const {
+    data: profile,
+    isLoading: loading,
+    error: queryError,
+  } = useQuery({
+    queryKey: ["students", userId],
+    queryFn: () => studentApi.get(`${userId}`).json<Student>(),
+    enabled: !!userId,
+  })
+  const error = !userId
+    ? "Oturum bilgisi bulunamadı"
+    : queryError
+      ? apiErrorMessage(queryError, "Profil bilgileri yüklenemedi")
+      : ""
 
   if (loading) {
     return (

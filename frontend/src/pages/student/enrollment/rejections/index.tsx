@@ -1,30 +1,25 @@
-import { useState, useEffect } from "react"
+import { useQuery } from "@tanstack/react-query"
 import { enrollmentApi } from "@/lib/api-client"
+import { apiErrorMessage } from "@/lib/api-error"
 import type { MyRejectionsResponse, RejectionDetail } from "@/lib/types"
 
 export default function RejectionsPage() {
-  const [rejections, setRejections] = useState<RejectionDetail[]>([])
-  const [loading, setLoading] = useState(true)
-  const [error, setError] = useState<string | null>(null)
-
-  useEffect(() => {
-    fetchRejections()
-  }, [])
-
-  const fetchRejections = async () => {
-    try {
-      setLoading(true)
+  const {
+    data: rejections = [],
+    isLoading: loading,
+    error: queryError,
+  } = useQuery({
+    queryKey: ["enrollment", "my-rejections"],
+    queryFn: async (): Promise<RejectionDetail[]> => {
       const response = await enrollmentApi
         .get("my-rejections")
         .json<MyRejectionsResponse>()
-
-      setRejections(response.rejections || [])
-    } catch (err: any) {
-      setError(err.message || "Reddedilmeler yüklenemedi")
-    } finally {
-      setLoading(false)
-    }
-  }
+      return response.rejections || []
+    },
+  })
+  const error = queryError
+    ? apiErrorMessage(queryError, "Reddedilmeler yüklenemedi")
+    : null
 
   const formatDate = (dateString: string) => {
     return new Date(dateString).toLocaleDateString("tr-TR", {

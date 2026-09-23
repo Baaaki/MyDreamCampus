@@ -1,16 +1,12 @@
-import { useEffect, useState } from "react"
+import { useState } from "react"
+import { useQuery } from "@tanstack/react-query"
 import { mealApi } from "@/lib/api-client"
-import type {
-  MyReservationsResponse,
-  ReservationResponse,
-  Cafeteria,
-} from "@/lib/types"
+import { apiErrorMessage } from "@/lib/api-error"
+import type { MyReservationsResponse, Cafeteria } from "@/lib/types"
 import { format, addDays, startOfWeek } from "date-fns"
 import { tr } from "date-fns/locale"
 
 export default function StudentMealReservationPage() {
-  const [reservations, setReservations] = useState<ReservationResponse[]>([])
-  const [cafeterias, setCafeterias] = useState<Cafeteria[]>([])
   const [selectedCafeteria, setSelectedCafeteria] = useState("")
   const [selectedDate, setSelectedDate] = useState("")
   const [selectedMealTime, setSelectedMealTime] = useState<"lunch" | "dinner">(
@@ -23,24 +19,27 @@ export default function StudentMealReservationPage() {
   const [error, setError] = useState("")
   const [success, setSuccess] = useState("")
 
-  useEffect(() => {
-    fetchData()
-  }, [])
-
-  const fetchData = async () => {
-    try {
+  const {
+    data: reservations = [],
+    error: reservationsError,
+    refetch: refetchReservations,
+  } = useQuery({
+    queryKey: ["meal", "reservations", "my"],
+    queryFn: async () =>
       // reservations/my returns {reservations, summary}, not a bare array.
-      const [reservationsData, cafeteriasData] = await Promise.all([
-        mealApi.get("reservations/my").json<MyReservationsResponse>(),
-        mealApi.get("cafeterias").json<Cafeteria[]>(),
-      ])
-
-      setReservations(reservationsData.reservations ?? [])
-      setCafeterias(cafeteriasData.filter((c) => c.is_active))
-    } catch (err: any) {
-      setError(err.message || "Veri yüklenemedi")
-    }
-  }
+      (await mealApi.get("reservations/my").json<MyReservationsResponse>())
+        .reservations ?? [],
+  })
+  const { data: cafeterias = [], error: cafeteriasError } = useQuery({
+    queryKey: ["meal", "cafeterias", "active"],
+    queryFn: async () =>
+      (await mealApi.get("cafeterias").json<Cafeteria[]>()).filter(
+        (c) => c.is_active
+      ),
+  })
+  const loadError = reservationsError ?? cafeteriasError
+  const displayError =
+    error || (loadError ? apiErrorMessage(loadError, "Veri yüklenemedi") : "")
 
   const isReservationWindowOpen = () => {
     const now = new Date()
@@ -87,13 +86,13 @@ export default function StudentMealReservationPage() {
       )
 
       // Refresh reservations
-      fetchData()
+      refetchReservations()
 
       // Reset form
       setSelectedCafeteria("")
       setSelectedDate("")
-    } catch (err: any) {
-      setError(err.message || "Rezervasyon oluşturulamadı")
+    } catch (err) {
+      setError(apiErrorMessage(err, "Rezervasyon oluşturulamadı"))
     } finally {
       setLoading(false)
     }
@@ -114,9 +113,9 @@ export default function StudentMealReservationPage() {
     try {
       await mealApi.delete(`reservations/${reservationId}`)
       alert("Rezervasyon başarıyla iptal edildi")
-      fetchData()
-    } catch (err: any) {
-      alert(err.message || "Rezervasyon iptal edilemedi")
+      refetchReservations()
+    } catch (err) {
+      alert(apiErrorMessage(err, "Rezervasyon iptal edilemedi"))
     }
   }
 
@@ -154,9 +153,9 @@ export default function StudentMealReservationPage() {
             Yeni Rezervasyon
           </h2>
 
-          {error && (
+          {displayError && (
             <div className="mb-4 rounded-md bg-red-50 p-4">
-              <p className="text-sm text-red-800">{error}</p>
+              <p className="text-sm text-red-800">{displayError}</p>
             </div>
           )}
 

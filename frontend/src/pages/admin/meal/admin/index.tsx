@@ -1,26 +1,33 @@
-import { useEffect, useState, useCallback } from "react"
+import { useState } from "react"
+import { useQuery } from "@tanstack/react-query"
 import { mealApi } from "@/lib/api-client"
+import { apiErrorMessage } from "@/lib/api-error"
 import type { QRResponse, Cafeteria } from "@/lib/types"
 import { QRCodeSVG } from "qrcode.react"
 import { format } from "date-fns"
 import { tr } from "date-fns/locale"
 
 export default function MealAdminQRPage() {
-  const [cafeterias, setCafeterias] = useState<Cafeteria[]>([])
   const [selectedCafeteria, setSelectedCafeteria] = useState("")
   const [selectedDate, setSelectedDate] = useState(
     format(new Date(), "yyyy-MM-dd")
   )
-  const [lunchQR, setLunchQR] = useState<QRResponse | null>(null)
-  const [dinnerQR, setDinnerQR] = useState<QRResponse | null>(null)
-  const [loading, setLoading] = useState(false)
-  const [error, setError] = useState("")
 
-  const fetchQRCodes = useCallback(async () => {
-    try {
-      setLoading(true)
-      setError("")
+  const { data: cafeterias = [], error: cafeteriasError } = useQuery({
+    queryKey: ["meal", "cafeterias", "active"],
+    queryFn: async () =>
+      (await mealApi.get("cafeterias").json<Cafeteria[]>()).filter(
+        (c) => c.is_active
+      ),
+  })
 
+  const {
+    data: qrCodes,
+    isLoading: loading,
+    error: qrError,
+  } = useQuery({
+    queryKey: ["meal", "qr", selectedCafeteria, selectedDate],
+    queryFn: async () => {
       // Backend route: GET cafeterias/:id/qr?date=&meal_time= — payload
       // comes wrapped in SuccessResponse{data}.
       const fetchQR = (mealTime: "lunch" | "dinner") =>
@@ -36,34 +43,18 @@ export default function MealAdminQRPage() {
         fetchQR("lunch"),
         fetchQR("dinner"),
       ])
+      return { lunch, dinner }
+    },
+    enabled: !!selectedCafeteria && !!selectedDate,
+  })
+  const lunchQR = qrCodes?.lunch ?? null
+  const dinnerQR = qrCodes?.dinner ?? null
 
-      setLunchQR(lunch)
-      setDinnerQR(dinner)
-    } catch (err: unknown) {
-      setError(err instanceof Error ? err.message : "QR kodları yüklenemedi")
-    } finally {
-      setLoading(false)
-    }
-  }, [selectedCafeteria, selectedDate])
-
-  useEffect(() => {
-    fetchCafeterias()
-  }, [])
-
-  useEffect(() => {
-    if (selectedCafeteria && selectedDate) {
-      fetchQRCodes()
-    }
-  }, [selectedCafeteria, selectedDate, fetchQRCodes])
-
-  const fetchCafeterias = async () => {
-    try {
-      const data = await mealApi.get("cafeterias").json<Cafeteria[]>()
-      setCafeterias(data.filter((c) => c.is_active))
-    } catch (err: unknown) {
-      setError(err instanceof Error ? err.message : "Yemekhaneler yüklenemedi")
-    }
-  }
+  const error = cafeteriasError
+    ? apiErrorMessage(cafeteriasError, "Yemekhaneler yüklenemedi")
+    : qrError
+      ? apiErrorMessage(qrError, "QR kodları yüklenemedi")
+      : ""
 
   return (
     <div className="min-h-screen bg-gray-50 py-8">

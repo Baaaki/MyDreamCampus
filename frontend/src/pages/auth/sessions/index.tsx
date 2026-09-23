@@ -1,30 +1,25 @@
-import { useEffect, useState } from "react"
+import { useQuery } from "@tanstack/react-query"
 import { useNavigate } from "react-router"
 import { authApi } from "@/lib/api-client"
+import { apiErrorMessage } from "@/lib/api-error"
 import type { Session } from "@/lib/types"
 import { format } from "date-fns"
 import { tr } from "date-fns/locale"
 
 export default function SessionsPage() {
   const navigate = useNavigate()
-  const [sessions, setSessions] = useState<Session[]>([])
-  const [loading, setLoading] = useState(true)
-  const [error, setError] = useState("")
-
-  useEffect(() => {
-    fetchSessions()
-  }, [])
-
-  const fetchSessions = async () => {
-    try {
-      const data = await authApi.get("sessions").json<Session[]>()
-      setSessions(data)
-    } catch (err: any) {
-      setError(err.message || "Oturumlar yüklenemedi")
-    } finally {
-      setLoading(false)
-    }
-  }
+  const {
+    data: sessions = [],
+    isLoading: loading,
+    error: queryError,
+    refetch: refetchSessions,
+  } = useQuery({
+    queryKey: ["auth", "sessions"],
+    queryFn: () => authApi.get("sessions").json<Session[]>(),
+  })
+  const error = queryError
+    ? apiErrorMessage(queryError, "Oturumlar yüklenemedi")
+    : ""
 
   const handleRevokeSession = async (sessionId: string) => {
     if (!confirm("Bu oturumu sonlandırmak istediğinize emin misiniz?")) {
@@ -42,10 +37,10 @@ export default function SessionsPage() {
         navigate("/auth/login")
       } else {
         // Refresh sessions list
-        fetchSessions()
+        refetchSessions()
       }
-    } catch (err: any) {
-      alert(err.message || "Oturum sonlandırılamadı")
+    } catch (err) {
+      alert(apiErrorMessage(err, "Oturum sonlandırılamadı"))
     }
   }
 

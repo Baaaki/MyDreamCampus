@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback, useRef } from "react"
+import { useState, useEffect, useCallback, useMemo, useRef } from "react"
 import { useParams } from "react-router"
 import { Link } from "react-router"
 import {
@@ -81,7 +81,7 @@ export default function GradeEntryPage() {
           }
         }
         setLocalScores(initial)
-      } catch (err: any) {
+      } catch (err) {
         console.error("Failed to fetch grade data:", err)
         setError("Veriler yüklenirken bir hata oluştu.")
       } finally {
@@ -140,6 +140,20 @@ export default function GradeEntryPage() {
     []
   )
 
+  const filteredStudents = useMemo(() => {
+    if (!searchQuery) return students
+    const query = searchQuery.toLowerCase()
+    return students.filter(
+      (student) =>
+        student.student_number.toLowerCase().includes(query) ||
+        student.first_name.toLowerCase().includes(query) ||
+        student.last_name.toLowerCase().includes(query) ||
+        `${student.first_name} ${student.last_name}`
+          .toLowerCase()
+          .includes(query)
+    )
+  }, [students, searchQuery])
+
   const handleKeyDown = useCallback(
     (e: React.KeyboardEvent<HTMLInputElement>, currentIndex: number) => {
       if (e.key === "Enter") {
@@ -150,8 +164,7 @@ export default function GradeEntryPage() {
         }
       }
     },
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-    [searchQuery, students]
+    [filteredStudents]
   )
 
   const isScoreValid = (value: string): boolean => {
@@ -226,7 +239,7 @@ export default function GradeEntryPage() {
         }
       }
       setLocalScores(updated)
-    } catch (err: any) {
+    } catch (err) {
       console.error("Failed to save scores:", err)
       setSaveMessage({
         type: "error",
@@ -236,18 +249,6 @@ export default function GradeEntryPage() {
       setSaving(false)
     }
   }
-
-  // Filter students
-  const filteredStudents = students.filter((student) => {
-    if (!searchQuery) return true
-    const query = searchQuery.toLowerCase()
-    return (
-      student.student_number.toLowerCase().includes(query) ||
-      student.first_name.toLowerCase().includes(query) ||
-      student.last_name.toLowerCase().includes(query) ||
-      `${student.first_name} ${student.last_name}`.toLowerCase().includes(query)
-    )
-  })
 
   // Count graded
   const gradedCount = students.filter((s) => {

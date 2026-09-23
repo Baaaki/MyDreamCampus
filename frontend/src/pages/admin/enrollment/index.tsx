@@ -1,5 +1,7 @@
-import { useState, useEffect, useCallback } from "react"
+import { useState, useCallback } from "react"
+import { useQuery } from "@tanstack/react-query"
 import { enrollmentApi } from "@/lib/api-client"
+import { apiErrorMessage } from "@/lib/api-error"
 import type { AvailableCourse } from "@/lib/types"
 import CourseList from "@/components/enrollment/CourseList"
 import WeeklyScheduleGrid from "@/components/enrollment/WeeklyScheduleGrid"
@@ -11,10 +13,6 @@ export default function EnrollmentPage() {
     {}
   )
   const [nextColorIndex, setNextColorIndex] = useState(0)
-  const [availableCourses, setAvailableCourses] = useState<AvailableCourse[]>(
-    []
-  )
-  const [loading, setLoading] = useState(true)
   const [toast, setToast] = useState<{
     message: string
     type: "error" | "warning" | "success" | "info"
@@ -25,29 +23,29 @@ export default function EnrollmentPage() {
     isVisible: false,
   })
 
-  useEffect(() => {
-    fetchCourses()
-  }, [])
-
-  const fetchCourses = async () => {
-    try {
-      setLoading(true)
-      const currentSemester = "fall"
-
-      const coursesData = await enrollmentApi
+  const currentSemester = "fall"
+  const {
+    data: availableCourses = [],
+    isLoading: loading,
+    error: coursesError,
+  } = useQuery({
+    queryKey: ["enrollment", "available", currentSemester],
+    queryFn: async () =>
+      (await enrollmentApi
         .get(`available?semester=${currentSemester}`)
-        .json<AvailableCourse[]>()
+        .json<AvailableCourse[] | null>()) ?? [],
+  })
 
-      setAvailableCourses(coursesData || [])
-    } catch (err: any) {
-      setAvailableCourses([])
+  // Surface a load failure through the page's toast once per error.
+  const [prevCoursesError, setPrevCoursesError] = useState(coursesError)
+  if (coursesError !== prevCoursesError) {
+    setPrevCoursesError(coursesError)
+    if (coursesError) {
       setToast({
-        message: err.message || "Dersler yüklenemedi",
+        message: apiErrorMessage(coursesError, "Dersler yüklenemedi"),
         type: "error",
         isVisible: true,
       })
-    } finally {
-      setLoading(false)
     }
   }
 

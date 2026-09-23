@@ -1,27 +1,21 @@
-import { useEffect, useState } from "react"
+import { useQuery } from "@tanstack/react-query"
 import { catalogApi } from "@/lib/api-client"
+import { apiErrorMessage } from "@/lib/api-error"
 import type { CourseOffering } from "@/lib/types"
 import { TIME_SLOTS, DAYS_OF_WEEK } from "@/lib/constants"
 
 export default function SchedulePage() {
-  const [courses, setCourses] = useState<CourseOffering[]>([])
-  const [loading, setLoading] = useState(true)
-  const [error, setError] = useState("")
-
-  useEffect(() => {
-    fetchSchedule()
-  }, [])
-
-  const fetchSchedule = async () => {
-    try {
-      const data = await catalogApi.get("schedule/my").json<CourseOffering[]>()
-      setCourses(data)
-    } catch (err: any) {
-      setError(err.message || "Ders programı yüklenemedi")
-    } finally {
-      setLoading(false)
-    }
-  }
+  const {
+    data: courses = [],
+    isLoading: loading,
+    error: queryError,
+  } = useQuery({
+    queryKey: ["schedule", "my"],
+    queryFn: () => catalogApi.get("schedule/my").json<CourseOffering[]>(),
+  })
+  const error = queryError
+    ? apiErrorMessage(queryError, "Ders programı yüklenemedi")
+    : ""
 
   // Create a schedule grid
   const createScheduleGrid = () => {
