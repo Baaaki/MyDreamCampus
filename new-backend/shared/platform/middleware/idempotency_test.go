@@ -205,6 +205,35 @@ func TestIdempotency_GetRequest_Ignored(t *testing.T) {
 	assert.Empty(t, store.records, "reads are idempotent already; no Redis round-trip for them")
 }
 
+func TestIdempotency_DeleteSameKey_ReplaysStoredResponse(t *testing.T) {
+	require.NoError(t, logger.Init("test"))
+	gin.SetMode(gin.TestMode)
+	SetIdempotencyStore(newFakeIdempotencyStore(), "meal")
+	t.Cleanup(func() { globalIdempotency = nil })
+
+	calls := 0
+	r := gin.New()
+	r.DELETE("/reservations/:id", Idempotency(), func(c *gin.Context) {
+		calls++
+		c.JSON(http.StatusOK, gin.H{"refund_status": "completed", "call": calls})
+	})
+
+	del := func() *httptest.ResponseRecorder {
+		req := httptest.NewRequest(http.MethodDelete, "/reservations/res_1", nil)
+		req.Header.Set(IdempotencyHeader, "key-del")
+		w := httptest.NewRecorder()
+		r.ServeHTTP(w, req)
+		return w
+	}
+	first := del()
+	second := del()
+
+	assert.Equal(t, http.StatusOK, first.Code)
+	assert.Equal(t, http.StatusOK, second.Code)
+	assert.JSONEq(t, first.Body.String(), second.Body.String())
+	assert.Equal(t, 1, calls, "a retried cancel must not refund twice")
+}
+
 // ctxAwareStore fails writes whose context is already cancelled, the way a
 // real Redis client does.
 type ctxAwareStore struct {

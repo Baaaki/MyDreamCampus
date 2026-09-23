@@ -33,7 +33,7 @@
   - **Commit:** `fix(shared): enforce forced password change on the server`
     (+ `fix(frontend): ...`, `fix(mobile): ...`)
 
-- [ ] **1.2 Yemekhane: çift kullanım ve çift iade**
+- [x] **1.2 Yemekhane: çift kullanım ve çift iade**
   - **Sorun:** Kullanım ve iptal UPDATE'lerinde durum koşulu yok; kontrol Go
     tarafında UPDATE'ten önce yapılıyor. Aynı QR ile eşzamanlı iki tarama ikisi
     de başarılı oluyor; kullanım ve iptal aynı anda gelirse hem yemek hem iade

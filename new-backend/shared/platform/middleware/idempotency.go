@@ -85,9 +85,10 @@ func Idempotency() gin.HandlerFunc {
 			c.Next()
 			return
 		}
-		// GET and DELETE are already idempotent by definition.
+		// DELETE is idempotent on the resource but not on its side effects:
+		// cancelling a reservation twice must not refund it twice.
 		switch c.Request.Method {
-		case http.MethodPost, http.MethodPut, http.MethodPatch:
+		case http.MethodPost, http.MethodPut, http.MethodPatch, http.MethodDelete:
 		default:
 			c.Next()
 			return
