@@ -159,3 +159,22 @@ func TestValidateAccessTokenWithSecret_UntypedToken_Rejected(t *testing.T) {
 	_, err = ValidateAccessTokenWithSecret(signed, testSecret)
 	assert.ErrorIs(t, err, ErrWrongTokenType)
 }
+
+func TestValidateToken_HS512Signed_Rejected(t *testing.T) {
+	claims := &Claims{
+		UserID:    "user-1",
+		Role:      "admin",
+		TokenType: string(AccessToken),
+		RegisteredClaims: jwt.RegisteredClaims{
+			ExpiresAt: jwt.NewNumericDate(time.Now().Add(time.Minute)),
+		},
+	}
+	token, err := jwt.NewWithClaims(jwt.SigningMethodHS512, claims).SignedString(testSecret)
+	require.NoError(t, err)
+
+	_, err = ValidateTokenWithSecret(token, testSecret)
+	assert.ErrorIs(t, err, ErrInvalidToken)
+
+	_, err = ValidateTokenIgnoreExpiryWithSecret(token, testSecret)
+	assert.ErrorIs(t, err, ErrInvalidToken)
+}

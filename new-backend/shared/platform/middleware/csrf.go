@@ -4,6 +4,7 @@ import (
 	"crypto/rand"
 	"encoding/hex"
 	"net/http"
+	"strings"
 
 	"github.com/gin-gonic/gin"
 )
@@ -20,8 +21,11 @@ func CSRFProtection() gin.HandlerFunc {
 			return
 		}
 
-		// Skip CSRF if request uses Authorization header (API/mobile clients)
-		if c.GetHeader("Authorization") != "" {
+		// Skip CSRF only for bearer-token clients (mobile, API). JWTAuth
+		// authenticates those from the header, not a cookie the browser
+		// attaches on its own. Any other Authorization value — Basic, an
+		// empty Bearer — still lets JWTAuth fall back to the cookie.
+		if token, ok := strings.CutPrefix(c.GetHeader("Authorization"), "Bearer "); ok && token != "" {
 			c.Next()
 			return
 		}

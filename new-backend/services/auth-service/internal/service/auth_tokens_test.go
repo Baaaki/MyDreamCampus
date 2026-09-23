@@ -1,11 +1,14 @@
 package service
 
 import (
+	"context"
 	"testing"
+	"time"
 
 	"github.com/baaaki/mydreamcampus/auth/internal/db"
 	"github.com/baaaki/mydreamcampus/shared/config"
 	"github.com/baaaki/mydreamcampus/shared/platform/utils"
+	"github.com/golang-jwt/jwt/v5"
 	"github.com/google/uuid"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -74,4 +77,24 @@ func TestParseRefreshToken_RefreshToken_Accepted(t *testing.T) {
 	require.NoError(t, err)
 	assert.Equal(t, jti, claims["jti"])
 	assert.Equal(t, utils.PgtypeToUUID(user.ID).String(), claims["user_id"])
+}
+
+func TestTokenParsers_HS512Signed_Rejected(t *testing.T) {
+	s := newTokenTestService()
+	s.redisClient = newFakeAuthCache()
+	token, err := jwt.NewWithClaims(jwt.SigningMethodHS512, jwt.MapClaims{
+		"user_id":    uuid.NewString(),
+		"jti":        uuid.NewString(),
+		"token_type": string(utils.RefreshToken),
+		"exp":        time.Now().Add(time.Hour).Unix(),
+	}).SignedString([]byte(tokenTestSecret))
+	require.NoError(t, err)
+
+	_, err = s.parseRefreshToken(token)
+	assert.Error(t, err)
+
+	_, err = s.parseRefreshTokenWithoutValidation(token)
+	assert.Error(t, err)
+
+	assert.Error(t, s.blacklistAccessToken(context.Background(), token))
 }

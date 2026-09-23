@@ -154,7 +154,7 @@
     gösteriyor.
   - **Commit:** `fix(meal): use the common error response shape`
 
-- [ ] **1.9 JWT ve CSRF sertleştirme**
+- [x] **1.9 JWT ve CSRF sertleştirme**
   - **Yapılacak:**
     - `jwt.WithValidMethods([]string{"HS256"})` ekle:
       - `shared/platform/utils/jwt.go` (≈144 ve ≈196'daki parse çağrıları);

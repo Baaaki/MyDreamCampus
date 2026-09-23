@@ -145,7 +145,7 @@ func ValidateTokenWithSecret(tokenString string, secret []byte) (*Claims, error)
 			return nil, errors.New("unexpected signing method")
 		}
 		return secret, nil
-	})
+	}, jwt.WithValidMethods([]string{jwt.SigningMethodHS256.Alg()}))
 
 	if err != nil {
 		if errors.Is(err, jwt.ErrTokenExpired) {
@@ -197,7 +197,7 @@ func ValidateTokenIgnoreExpiryWithSecret(tokenString string, secret []byte) (*Cl
 			return nil, errors.New("unexpected signing method")
 		}
 		return secret, nil
-	}, jwt.WithoutClaimsValidation())
+	}, jwt.WithoutClaimsValidation(), jwt.WithValidMethods([]string{jwt.SigningMethodHS256.Alg()}))
 
 	if err != nil {
 		return nil, ErrInvalidToken

@@ -77,6 +77,10 @@ type AuthService struct {
 	config      *config.Config
 }
 
+// signingMethods pins parsing to the one algorithm tokens are minted with,
+// so a token signed some other way is refused rather than trusted.
+var signingMethods = []string{jwt.SigningMethodHS256.Alg()}
+
 // maxLoginFailures is how many wrong passwords one address may try against
 // one account before it is locked out for ACCOUNT_LOCK_DURATION_MINUTES.
 const maxLoginFailures = 5
@@ -281,7 +285,7 @@ func (s *AuthService) blacklistAccessToken(ctx context.Context, tokenString stri
 	// Parse the access token to get JTI and expiry
 	token, err := jwt.Parse(tokenString, func(token *jwt.Token) (any, error) {
 		return []byte(s.config.JWT.Secret), nil
-	})
+	}, jwt.WithValidMethods(signingMethods))
 	if err != nil {
 		return err
 	}
@@ -900,7 +904,7 @@ func (s *AuthService) parseRefreshToken(tokenString string) (jwt.MapClaims, erro
 			return nil, fmt.Errorf("unexpected signing method")
 		}
 		return []byte(s.config.JWT.Secret), nil
-	})
+	}, jwt.WithValidMethods(signingMethods))
 
 	if err != nil {
 		return nil, err
@@ -933,7 +937,7 @@ func (s *AuthService) parseRefreshTokenWithoutValidation(tokenString string) (jw
 			return nil, fmt.Errorf("unexpected signing method")
 		}
 		return []byte(s.config.JWT.Secret), nil
-	}, jwt.WithoutClaimsValidation())
+	}, jwt.WithoutClaimsValidation(), jwt.WithValidMethods(signingMethods))
 
 	if err != nil {
 		return nil, err

@@ -124,3 +124,22 @@ func TestSetCSRFToken_SkipsIfPresent(t *testing.T) {
 			"existing CSRF cookie must not be overwritten")
 	}
 }
+
+func TestCSRFProtection_NonBearerAuthorization_StillChecked(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+	r := gin.New()
+	r.Use(CSRFProtection())
+	r.POST("/", func(c *gin.Context) { c.Status(200) })
+
+	// JWTAuth falls back to the access_token cookie for each of these, so
+	// the request is cookie-authenticated and needs the CSRF token.
+	for _, header := range []string{"Basic dXNlcjpwYXNz", "Bearer ", "bearer token"} {
+		req := httptest.NewRequest("POST", "/", nil)
+		req.Header.Set("Authorization", header)
+		req.AddCookie(&http.Cookie{Name: "access_token", Value: "cookie-session"})
+		w := httptest.NewRecorder()
+		r.ServeHTTP(w, req)
+
+		assert.Equal(t, http.StatusForbidden, w.Code, "Authorization %q", header)
+	}
+}

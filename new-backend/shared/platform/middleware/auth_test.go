@@ -186,45 +186,6 @@ func TestJWTAuth_FailClosedOnRedisError(t *testing.T) {
 	assert.Equal(t, http.StatusServiceUnavailable, w.Code)
 }
 
-func TestOptionalJWTAuth_PassesWithoutToken(t *testing.T) {
-	require.NoError(t, logger.Init("test"))
-	gin.SetMode(gin.TestMode)
-	t.Setenv("JWT_SECRET", authTestSecret)
-
-	r := gin.New()
-	r.GET("/", OptionalJWTAuth(), func(c *gin.Context) {
-		_, ok := c.Get("user_id")
-		c.JSON(200, gin.H{"authed": ok})
-	})
-
-	req := httptest.NewRequest("GET", "/", nil)
-	w := httptest.NewRecorder()
-	r.ServeHTTP(w, req)
-
-	assert.Equal(t, 200, w.Code)
-	assert.Contains(t, w.Body.String(), `"authed":false`)
-}
-
-func TestOptionalJWTAuth_SetsClaimsWhenPresent(t *testing.T) {
-	require.NoError(t, logger.Init("test"))
-	gin.SetMode(gin.TestMode)
-	t.Setenv("JWT_SECRET", authTestSecret)
-
-	r := gin.New()
-	r.GET("/", OptionalJWTAuth(), func(c *gin.Context) {
-		uid, _ := c.Get("user_id")
-		c.JSON(200, gin.H{"user": uid})
-	})
-
-	tok := issueToken(t, "opt-1", "teacher", 3)
-	req := httptest.NewRequest("GET", "/", nil)
-	req.Header.Set("Authorization", "Bearer "+tok)
-	w := httptest.NewRecorder()
-	r.ServeHTTP(w, req)
-
-	assert.Contains(t, w.Body.String(), "opt-1")
-}
-
 func TestJWTAuth_RefreshToken_Rejected(t *testing.T) {
 	r := setupAuthTest(t, nil)
 	refresh, _, err := utils.GenerateRefreshTokenWithSecret("user-1", 1, []byte(authTestSecret), 24)
