@@ -62,7 +62,7 @@
     - Şifre "şifre = e-posta" kuralından hesaplanır, DB'den okunmaz.
   - **Commit:** `feat(auth): provision public demo accounts`
 
-- [ ] **6.3 Sistem hesaplarını koruma**
+- [x] **6.3 Sistem hesaplarını koruma** (gemini ile yapıldı)
   Admin paneli ziyaretçilere tamamen açık olduğu için bu korumalar şart. Aksi
   halde bir ziyaretçi:
   - demo öğrenciyi silip herkesi sabaha kadar dışarıda bırakabilir,
