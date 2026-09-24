@@ -22,7 +22,7 @@ konteyner ve **kendi veritabanı**:
 | `auth` | Kimlik doğrulama, oturum, token | `attendance` | Yoklama oturumları, QR okutma |
 | `staff` | Öğretim üyeleri, profiller, idari personel rehberi | `grades` | Not girişi, finalizasyon |
 | `student` | Öğrenci kayıtları, danışman | `meal` | Yemekhane rezervasyonu |
-| `catalog` | Ders kataloğu, dönemler | `payment` | Ödeme (mock) |
+| `catalog` | Ders kataloğu, dönemler | `payment` | Yemekhane ödemesi (test kartı, gerçek para yok) |
 | `enrollment` | Ders seçimi, danışman onayı | `notification` | E-posta bildirimi (push iskelet) |
 
 **Servisler birbirini nasıl görür**
