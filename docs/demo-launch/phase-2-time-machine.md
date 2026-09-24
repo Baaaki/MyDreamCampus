@@ -32,7 +32,7 @@
 
 ## Görevler
 
-- [x] **2.1 clock paketini ofset modeline çevir**
+- [x] **2.1 clock paketini ofset modeline çevir** — `e39cabb`
   - `shared/platform/clock/clock.go` API'si:
     - `SetOffset(offset time.Duration, until time.Time)`
     - `Reset()`
@@ -48,7 +48,7 @@
   > tutuyor; üretim kodu onu değiştiremez. `State()` bir `clock.Snapshot`
   > döner. `time_handler.go` 2.5'e kadar yeni API'ye geçici olarak uyarlandı.
 
-- [x] **2.2 Redis ile servisler arası senkron**
+- [x] **2.2 Redis ile servisler arası senkron** — `d9f580e`
   - Yeni paket `shared/platform/clocksync`:
     - Redis anahtarı `clock:state` (JSON: `offset_seconds`, `until`, `set_at`,
       `set_by`), pub/sub kanalı `clock:changed`.
@@ -71,7 +71,7 @@
   > son tarihler gidip gelmesin); geçersiz JSON'da gerçek saate döner.
   > Yerelde gerçek redis-server'la elle doğrulandı.
 
-- [x] **2.3 Gerçek saatte kalması gerekenler**
+- [x] **2.3 Gerçek saatte kalması gerekenler** — `a4a18f0`, `cd38529`, `7fe3557`, `fe74a7c`, `691005b`
   - Şunlarda `clock.Now()` → `time.Now()`:
     - `shared/platform/utils/jwt.go:77`, `:112`
     - `services/auth-service/internal/service/auth_service.go`:
@@ -106,7 +106,7 @@
   > - Kabul testi: `auth/internal/service/time_machine_test.go` (±1 yıl ofsette
   >   login, token doğrulama, refresh).
 
-- [x] **2.4 SQL'deki iş saati karşılaştırmaları**
+- [x] **2.4 SQL'deki iş saati karşılaştırmaları** — `603936d`, `75cd9a4`, `7335730`
   - Aşağıdaki sorgularda `NOW()` → sqlc parametresi (`sqlc.arg(now)`); Go
     tarafı `clock.Now()` geçer:
     - `services/attendance-service/internal/sql/queries/attendance_sessions.sql:16`
@@ -126,7 +126,7 @@
   > tiplendi. sqlc v1.31.1 (üretilmiş dosyalardaki sürüm) ile üretildi;
   > değişiklik öncesi `make sqlc` fark üretmedi.
 
-- [x] **2.5 Uçlar**
+- [x] **2.5 Uçlar** — `7e35920`
   - **Durum:** her servis
     `GET /api/<prefix>/admin/time/status` (JWT + admin) sunar. Prefix'ler:
     `auth, staff, students, catalog, enrollment, attendance, grades, meals, payments`.
@@ -170,7 +170,7 @@
   > için başlık, CORS expose, web ve mobil şerit yapılmadı. Durum yalnız
   > Zaman Makinesi sayfasında görünür.
 
-- [x] **2.7 Zaman makinesi sayfası**
+- [x] **2.7 Zaman makinesi sayfası** — `1e339d2`
   - `frontend/src/lib/services/system-service.ts` (≈27-115):
     - `getAllTimeStatuses` → her servisin status ucu (`*ApiSafe` istemcileri)
     - `simulateTimeAll` → catalog simulate'e tek çağrı
@@ -189,7 +189,7 @@
   > simüle → sapma uyarısı → yenile → 2 yıl sınırı → sıfırla akışı
   > doğrulandı; gerçek yığınla doğrulama 2.8'deki e2e'de.
 
-- [x] **2.8 e2e**
+- [x] **2.8 e2e** — `5b29681`
   - `.github/workflows/ci.yml` `backend-e2e` job'u (≈114-255) golden path'ine
     ekle: simulate → iki farklı servisin status'u aynı simüle saati gösterir
     → reset → gerçek saat.
@@ -205,3 +205,16 @@
 - README §5 yeşil olmalı.
 - Push edilirse CI e2e yeşil olmalı (push için izin iste).
 - README §1 madde 6.
+
+> Not (24.09): Faz dışı iki düzeltme CI'ı yeşile çekmek için ayrı commit
+> olarak eklendi: `42f2486` (auth `TestSessionResponse_RoundTrip` yerel saat
+> dilimi UTC olan makinelerde — CI runner'ları dahil — kırmızıydı) ve
+> `e769a55` (admin personel sayfasındaki tek satır Prettier kontrolünü
+> kırıyordu). §5 sonuçları: backend 11 modül vet temiz, 1033 test geçiyor
+> (faz başı aynı sayımla 996 geçen + 1 kırmızı), golangci-lint v2.13.2
+> değişen 7 modülde 0 bulgu, go.mod'lar tidy; frontend typecheck + lint +
+> Prettier + build temiz, 81 test; mobil 76 test. Mobil `tsc` temiz
+> checkout'ta `global.css` için TS2882 veriyor: Expo'nun geliştirici
+> makinesinde ürettiği (gitignore'daki) `expo-env.d.ts` yok; dosya
+> varken temiz. Mobile bu fazda dokunulmadı. Docker bu ortamda
+> çalışmadığı için e2e yalnız CI'da doğrulanabilir.
