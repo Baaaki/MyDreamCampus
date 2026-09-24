@@ -21,7 +21,10 @@ func TestStudentErrors_HTTPStatuses(t *testing.T) {
 		"STAFF_SERVICE_UNAVAILABLE": {ErrStaffServiceUnavailable, http.StatusServiceUnavailable},
 		"ALREADY_ENROLLED":          {ErrStudentAlreadyEnrolled, http.StatusConflict},
 		"GPA_TOO_LOW":               {ErrStudentGPALow, http.StatusBadRequest},
-		"ENROLLMENT_FULL":           {ErrEnrollmentCapacity, http.StatusConflict},
+		"ENROLLMENT_FULL":                          {ErrEnrollmentCapacity, http.StatusConflict},
+		"PROTECTED_ACCOUNT_DELETION_FORBIDDEN":     {ErrProtectedAccountDeletionForbidden, http.StatusForbidden},
+		"PROTECTED_ACCOUNT_DEACTIVATION_FORBIDDEN": {ErrProtectedAccountDeactivationForbidden, http.StatusForbidden},
+		"PROTECTED_ACCOUNT_EMAIL_CHANGE_FORBIDDEN":  {ErrProtectedAccountEmailChangeForbidden, http.StatusForbidden},
 	}
 	for code, c := range cases {
 		assert.Equal(t, code, c.err.Code, "code mismatch")
@@ -37,6 +40,9 @@ func TestStudentErrors_DistinctCodes(t *testing.T) {
 		ErrInvalidCSVFormat,
 		ErrStaffServiceUnavailable,
 		ErrStudentAlreadyEnrolled, ErrStudentGPALow, ErrEnrollmentCapacity,
+		ErrProtectedAccountDeletionForbidden,
+		ErrProtectedAccountDeactivationForbidden,
+		ErrProtectedAccountEmailChangeForbidden,
 	}
 	seen := make(map[string]bool, len(all))
 	for _, e := range all {

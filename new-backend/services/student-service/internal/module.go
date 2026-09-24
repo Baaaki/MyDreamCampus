@@ -57,7 +57,7 @@ func New(
 	importRepo := repository.NewImportRepository(pool)
 	importJobsRepo := repository.NewImportJobsRepository(pool)
 
-	studentSvc := service.NewStudentService(studentRepo, staffClient)
+	studentSvc := service.NewStudentService(studentRepo, staffClient, cfg)
 	importSvc := service.NewImportService(importRepo, studentRepo, staffClient)
 
 	consumer := worker.NewEventConsumer(rabbitmq.NewConsumer(rabbitConn), studentRepo, processedEventsRepo)

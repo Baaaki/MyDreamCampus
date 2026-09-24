@@ -2,7 +2,9 @@ package service
 
 import (
 	"context"
+	"strings"
 
+	"github.com/baaaki/mydreamcampus/shared/config"
 	sharedErrors "github.com/baaaki/mydreamcampus/shared/platform/errors"
 	"github.com/baaaki/mydreamcampus/shared/platform/logger"
 	"github.com/baaaki/mydreamcampus/shared/platform/utils"
@@ -40,12 +42,18 @@ type StaffServiceInterface interface {
 type StudentService struct {
 	studentRepo  StudentRepositoryInterface
 	staffService StaffServiceInterface
+	config       *config.Config
 }
 
-func NewStudentService(studentRepo StudentRepositoryInterface, staffService StaffServiceInterface) *StudentService {
+func NewStudentService(studentRepo StudentRepositoryInterface, staffService StaffServiceInterface, cfg ...*config.Config) *StudentService {
+	var c *config.Config
+	if len(cfg) > 0 {
+		c = cfg[0]
+	}
 	return &StudentService{
 		studentRepo:  studentRepo,
 		staffService: staffService,
+		config:       c,
 	}
 }
 
@@ -212,7 +220,7 @@ func (s *StudentService) UpdateStudent(ctx context.Context, id string, req dto.U
 	}
 
 	// Check if student exists
-	_, err = s.studentRepo.GetStudentByID(ctx, studentID)
+	currentStudent, err := s.studentRepo.GetStudentByID(ctx, studentID)
 	if err != nil {
 		// Check if student not found
 		if sharedErrors.Is(err, serviceErrors.ErrStudentNotFoundRepo) {
@@ -231,6 +239,35 @@ func (s *StudentService) UpdateStudent(ctx context.Context, id string, req dto.U
 		return dto.StudentResponse{}, sharedErrors.Wrap(sharedErrors.ErrInternal, err)
 	}
 
+	if s.config != nil {
+		if s.config.IsProtectedEmail(currentStudent.Email) {
+			if req.Status != nil && *req.Status != "active" {
+				serviceLogger.Warn("attempt to deactivate protected student account forbidden",
+					zap.String("student_id", id),
+					zap.String("email", currentStudent.Email),
+					zap.String("status", *req.Status),
+				)
+				return dto.StudentResponse{}, serviceErrors.ErrProtectedAccountDeactivationForbidden
+			}
+			if req.Email != nil && !strings.EqualFold(*req.Email, currentStudent.Email) {
+				serviceLogger.Warn("attempt to change email of protected student account forbidden",
+					zap.String("student_id", id),
+					zap.String("old_email", currentStudent.Email),
+					zap.String("new_email", *req.Email),
+				)
+				return dto.StudentResponse{}, serviceErrors.ErrProtectedAccountEmailChangeForbidden
+			}
+		}
+
+		if req.Email != nil && !strings.EqualFold(*req.Email, currentStudent.Email) && s.config.IsProtectedEmail(*req.Email) {
+			serviceLogger.Warn("attempt to claim protected email for student forbidden",
+				zap.String("student_id", id),
+				zap.String("email", *req.Email),
+			)
+			return dto.StudentResponse{}, serviceErrors.ErrProtectedAccountEmailChangeForbidden
+		}
+	}
+
 	// Validate and get advisor info if provided
 	var advisorName string
 	if req.AdvisorID != nil {
@@ -244,9 +281,6 @@ func (s *StudentService) UpdateStudent(ctx context.Context, id string, req dto.U
 		}
 		advisorName = advisorInfo.Name
 	}
-
-	// Get current student data for COALESCE defaults
-	currentStudent, _ := s.studentRepo.GetStudentByID(ctx, studentID)
 
 	classLevel := currentStudent.ClassLevel
 	if req.ClassLevel != nil {
@@ -373,6 +407,14 @@ func (s *StudentService) DeleteStudent(ctx context.Context, id string) error {
 
 		// Unexpected error - wrap and return, handler will log
 		return sharedErrors.Wrap(sharedErrors.ErrInternal, err)
+	}
+
+	if s.config != nil && s.config.IsProtectedEmail(student.Email) {
+		serviceLogger.Warn("attempt to delete protected student account forbidden",
+			zap.String("student_id", id),
+			zap.String("email", student.Email),
+		)
+		return serviceErrors.ErrProtectedAccountDeletionForbidden
 	}
 
 	eventPayload := buildStudentDeactivatedPayload(id, student.StudentNumber)

@@ -33,6 +33,11 @@ var (
 	ErrStudentGPALow          = sharedErrors.New("GPA_TOO_LOW", "Öğrencinin not ortalaması ders için yeterli değil", http.StatusBadRequest)
 	ErrEnrollmentCapacity     = sharedErrors.New("ENROLLMENT_FULL", "Ders kontenjanı dolu", http.StatusConflict)
 
+	// Protected system account errors
+	ErrProtectedAccountDeletionForbidden     = sharedErrors.New("PROTECTED_ACCOUNT_DELETION_FORBIDDEN", "Korunan sistem hesabı silinemez", http.StatusForbidden)
+	ErrProtectedAccountDeactivationForbidden = sharedErrors.New("PROTECTED_ACCOUNT_DEACTIVATION_FORBIDDEN", "Korunan sistem hesabı pasifleştirilemez", http.StatusForbidden)
+	ErrProtectedAccountEmailChangeForbidden  = sharedErrors.New("PROTECTED_ACCOUNT_EMAIL_CHANGE_FORBIDDEN", "Korunan sistem hesabının e-postası değiştirilemez", http.StatusForbidden)
+
 	// Repository-specific sentinel errors (for internal use)
 	ErrStudentNotFoundRepo     = sharedErrors.ErrNotFoundRepo
 	ErrStudentNumberExistsRepo = sharedErrors.ErrAlreadyExistsRepo
