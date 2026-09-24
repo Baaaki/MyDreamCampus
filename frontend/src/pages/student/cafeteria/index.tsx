@@ -1,5 +1,5 @@
 import { useState } from "react"
-import { useQuery, useQueryClient } from "@tanstack/react-query"
+import { useQuery } from "@tanstack/react-query"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
@@ -10,27 +10,12 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select"
-import {
-  Dialog,
-  DialogContent,
-  DialogHeader,
-  DialogTitle,
-  DialogDescription,
-  DialogFooter,
-} from "@/components/ui/dialog"
-import {
-  UtensilsCrossed,
-  CreditCard,
-  Check,
-  X,
-  MapPin,
-  Loader2,
-} from "lucide-react"
+import { UtensilsCrossed, CreditCard, X, MapPin, Loader2 } from "lucide-react"
 import {
   getCafeterias,
-  createBatchReservation,
   type CreateReservationRequest,
 } from "@/lib/services/meal-service"
+import { CheckoutDialog, type CheckoutItem } from "./checkout-dialog"
 
 // Days of the week
 const weekDays = [
@@ -81,7 +66,6 @@ interface MealSelection {
 const MEAL_PRICE = 25 // TL
 
 export default function StudentCafeteriaPage() {
-  const queryClient = useQueryClient()
   const [selectedCafeteria, setSelectedCafeteria] = useState<string>("")
   const [mealSelections, setMealSelections] = useState<MealSelection>({
     monday: "none",
@@ -91,9 +75,6 @@ export default function StudentCafeteriaPage() {
     friday: "none",
   })
   const [paymentDialogOpen, setPaymentDialogOpen] = useState(false)
-  const [paymentSuccess, setPaymentSuccess] = useState(false)
-  const [isSubmitting, setIsSubmitting] = useState(false)
-  const [paymentUrl, setPaymentUrl] = useState<string | null>(null)
 
   // Fetch cafeterias from API
   const { data: cafeteriaData, isLoading: isLoadingCafeterias } = useQuery({
@@ -137,35 +118,23 @@ export default function StudentCafeteriaPage() {
   ).length
   const totalPrice = selectedMealsCount * MEAL_PRICE
 
-  // Handle payment
-  const handlePayment = async () => {
-    setIsSubmitting(true)
-    try {
-      // Create reservations for selected meals
-      const reservations: CreateReservationRequest[] = weekDates
-        .filter((day) => mealSelections[day.key] !== "none")
-        .map((day) => ({
-          cafeteria_id: selectedCafeteria,
-          date: day.fullDate.toISOString().split("T")[0],
-          meal_time: "lunch" as const, // Default to lunch, could be made selectable
-          menu_type: mealSelections[day.key] as "normal" | "vegan",
-        }))
+  const checkoutItems: CheckoutItem[] = weekDates
+    .filter((day) => mealSelections[day.key] !== "none")
+    .map((day) => ({
+      key: day.key,
+      label: day.label,
+      menuType: mealSelections[day.key] as "normal" | "vegan",
+    }))
 
-      const response = await createBatchReservation({ reservations })
-
-      // Store payment URL for redirect
-      setPaymentUrl(response.payment_url)
-      setPaymentSuccess(true)
-
-      // Invalidate reservations cache so history page refreshes
-      queryClient.invalidateQueries({ queryKey: ["my-reservations"] })
-    } catch (error) {
-      console.error("Rezervasyon oluşturulurken hata:", error)
-      // Could add error handling UI here
-    } finally {
-      setIsSubmitting(false)
-    }
-  }
+  const buildReservations = (): CreateReservationRequest[] =>
+    weekDates
+      .filter((day) => mealSelections[day.key] !== "none")
+      .map((day) => ({
+        cafeteria_id: selectedCafeteria,
+        date: day.fullDate.toISOString().split("T")[0],
+        meal_time: "lunch" as const, // Default to lunch, could be made selectable
+        menu_type: mealSelections[day.key] as "normal" | "vegan",
+      }))
 
   const resetSelections = () => {
     setMealSelections({
@@ -175,9 +144,6 @@ export default function StudentCafeteriaPage() {
       thursday: "none",
       friday: "none",
     })
-    setPaymentSuccess(false)
-    setPaymentDialogOpen(false)
-    setPaymentUrl(null)
   }
 
   return (
@@ -196,7 +162,6 @@ export default function StudentCafeteriaPage() {
           </p>
         </div>
       </div>
-      {/* Cafeteria Selection */}\n
       {/* Cafeteria Selection */}
       <Card>
         <CardHeader>
@@ -437,132 +402,14 @@ export default function StudentCafeteriaPage() {
           </CardContent>
         </Card>
       )}
-      {/* Payment Dialog */}
-      <Dialog open={paymentDialogOpen} onOpenChange={setPaymentDialogOpen}>
-        <DialogContent>
-          <DialogHeader>
-            <DialogTitle>
-              {paymentSuccess ? "Ödeme Başarılı!" : "Ödeme Onayı"}
-            </DialogTitle>
-            <DialogDescription>
-              {paymentSuccess
-                ? "Yemek seçimleriniz kaydedildi."
-                : "Ödemeyi onaylamak için aşağıdaki bilgileri kontrol edin."}
-            </DialogDescription>
-          </DialogHeader>
-
-          {!paymentSuccess ? (
-            <>
-              <div className="space-y-4 py-4">
-                <div className="rounded-lg bg-gray-50 p-4 dark:bg-gray-800">
-                  <p className="mb-2 text-sm text-gray-600 dark:text-gray-400">
-                    Seçilen Yemekler:
-                  </p>
-                  <div className="space-y-2">
-                    {weekDates.map((day) => {
-                      const selection = mealSelections[day.key]
-                      if (selection === "none") return null
-                      return (
-                        <div
-                          key={day.key}
-                          className="flex items-center justify-between"
-                        >
-                          <span className="text-gray-900 dark:text-white">
-                            {day.label}
-                          </span>
-                          <Badge
-                            variant={
-                              selection === "vegan" ? "default" : "secondary"
-                            }
-                            className={
-                              selection === "vegan"
-                                ? "bg-green-500"
-                                : "bg-orange-500"
-                            }
-                          >
-                            {selection === "vegan" ? "Vegan" : "Normal"}
-                          </Badge>
-                        </div>
-                      )
-                    })}
-                  </div>
-                </div>
-                <div className="flex items-center justify-between rounded-lg bg-emerald-50 p-4 dark:bg-emerald-900/20">
-                  <span className="font-medium text-gray-900 dark:text-white">
-                    Toplam Tutar:
-                  </span>
-                  <span className="text-xl font-bold text-emerald-600">
-                    {totalPrice.toFixed(2)} ₺
-                  </span>
-                </div>
-              </div>
-              <DialogFooter>
-                <Button
-                  variant="outline"
-                  onClick={() => setPaymentDialogOpen(false)}
-                  disabled={isSubmitting}
-                >
-                  İptal
-                </Button>
-                <Button
-                  onClick={handlePayment}
-                  className="bg-emerald-600 hover:bg-emerald-700"
-                  disabled={isSubmitting}
-                >
-                  {isSubmitting ? (
-                    <>
-                      <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                      İşleniyor...
-                    </>
-                  ) : (
-                    <>
-                      <CreditCard className="mr-2 h-4 w-4" />
-                      Ödemeyi Onayla
-                    </>
-                  )}
-                </Button>
-              </DialogFooter>
-            </>
-          ) : (
-            <>
-              <div className="flex flex-col items-center py-8">
-                <div className="mb-4 flex h-16 w-16 items-center justify-center rounded-full bg-emerald-100 dark:bg-emerald-900/50">
-                  <Check className="h-8 w-8 text-emerald-600" />
-                </div>
-                <p className="mb-2 text-lg font-medium text-gray-900 dark:text-white">
-                  Rezervasyon oluşturuldu!
-                </p>
-                <p className="text-center text-sm text-gray-500 dark:text-gray-400">
-                  {selectedMealsCount} öğünlük yemek seçiminiz kaydedildi.
-                </p>
-                {paymentUrl && (
-                  <p className="mt-2 text-xs text-gray-400">
-                    Ödeme işlemi için yönlendirileceksiniz.
-                  </p>
-                )}
-              </div>
-              <DialogFooter className="flex flex-col gap-2 sm:flex-col">
-                {paymentUrl && (
-                  <Button
-                    onClick={() => window.open(paymentUrl, "_blank")}
-                    className="w-full bg-emerald-600 hover:bg-emerald-700"
-                  >
-                    <CreditCard className="mr-2 h-4 w-4" />
-                    Ödeme Sayfasına Git
-                  </Button>
-                )}
-                <Button
-                  onClick={resetSelections}
-                  variant={paymentUrl ? "outline" : "default"}
-                  className="w-full"
-                >
-                  Tamam
-                </Button>
-              </DialogFooter>
-            </>
-          )}
-        </DialogContent>
-      </Dialog>
+      <CheckoutDialog
+        open={paymentDialogOpen}
+        onOpenChange={setPaymentDialogOpen}
+        items={checkoutItems}
+        estimatedTotal={totalPrice}
+        buildRequest={buildReservations}
+        onPaid={resetSelections}
+      />
     </div>
   )
 }

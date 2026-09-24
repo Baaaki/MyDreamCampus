@@ -158,7 +158,7 @@ Yalnız `card_brand` (prefix'ten: Visa, Mastercard, Amex, Troy `9792`) ve
   > ise `bat_<batch>`) isteniyor — eskiden çıplak rezervasyon id'si
   > gidiyordu ve toplu rezervasyonun ödemesi bulunamazdı.
 
-- [ ] **3.6 Web**
+- [x] **3.6 Web**
   - `frontend/src/lib/api-client.ts`: `paymentApi` (`/api/payments`).
   - Yeni `frontend/src/lib/services/payment-service.ts` ve tipleri
     (`lib/types.ts`). `meal-service.ts` tiplerinde `payment_url` →
@@ -174,6 +174,15 @@ Yalnız `card_brand` (prefix'ten: Visa, Mastercard, Amex, Troy `9792`) ve
     kartları kutusu eklensin.
   - Vitest: form doğrulaması (Luhn, son kullanma tarihi).
   - **Commit:** `feat(frontend): add card checkout for meal reservations`
+  > Not (24.09): `react-hook-form`/`zod` projede kurulu olmadığı için (yeni
+  > kütüphane onay ister) form `useState` + `lib/payment-card.ts`'teki saf
+  > doğrulamayla yazıldı. Akış `pages/student/cafeteria/checkout-dialog.tsx`
+  > bileşeninde; diyalog kapatılıp açılınca aynı ödemeye devam eder, kart
+  > bilgisi gönderildiği anda state'ten silinir. Reddedilen kartta sonuç,
+  > rezervasyon `cancelled` görülünce (en geç 30 sn) gösterilir. Sayfadaki
+  > ekrana düşen `\n` metni de kaldırıldı. Vitest: kart doğrulaması,
+  > servisler ve diyaloğun başarılı/reddedilen/geçersiz kart akışları;
+  > Chromium'da API taklit edilerek masaüstü ve mobil genişlikte denendi.
 
 - [ ] **3.7 Mobil**
   - Yeni `mobile/services/paymentService.ts` ve testi.

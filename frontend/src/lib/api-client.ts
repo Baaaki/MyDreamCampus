@@ -231,6 +231,9 @@ export const gradesApi = apiClient.extend({
 export const mealApi = apiClient.extend({
   prefix: `${API_BASE_URL}/api/meals`,
 })
+export const paymentApi = apiClient.extend({
+  prefix: `${API_BASE_URL}/api/payments`,
+})
 
 // API clients without 401 auto-redirect — for admin pages that call
 // multiple services in parallel (e.g. system page). The global 401 hook

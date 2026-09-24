@@ -910,3 +910,28 @@ export interface AdminSessionsResponse {
   sessions: AdminSessionItem[]
   total: number
 }
+
+// Payment service: demo card checkout. Only the brand and last four digits
+// come back — the card number and CVC are never stored.
+export type PaymentStatus =
+  "pending" | "completed" | "failed" | "expired" | "refunded"
+
+export interface Payment {
+  id: string
+  status: PaymentStatus
+  amount: number
+  currency: string
+  card_brand: string | null
+  card_last4: string | null
+  failure_reason: string | null
+  expires_at: string
+  completed_at: string | null
+}
+
+export interface ConfirmPaymentRequest {
+  card_number: string
+  exp_month: number
+  exp_year: number
+  cvc: string
+  cardholder_name: string
+}

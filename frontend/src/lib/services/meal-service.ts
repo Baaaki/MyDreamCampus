@@ -70,7 +70,7 @@ export interface BatchReservationRequest {
 
 export interface CreateReservationResponse {
   reservation_id: string
-  payment_url: string
+  payment_id: string
   amount: number
   currency: string
   expires_at: string
@@ -79,7 +79,7 @@ export interface CreateReservationResponse {
 
 export interface CreateBatchReservationResponse {
   batch_id: string
-  payment_url: string
+  payment_id: string
   total_amount: number
   currency: string
   expires_at: string
@@ -150,6 +150,23 @@ export async function cancelReservation(
     .delete(`reservations/${reservationId}`)
     .json<ApiResponse<CancelReservationResponse>>()
   return response.data
+}
+
+/**
+ * Where a checkout's reservations stand. Payment settles the card at once,
+ * but meal learns the outcome from an event, so the reservations stay
+ * pending for a moment after the card is accepted or declined.
+ */
+export function checkoutOutcome(
+  reservationIds: string[],
+  reservations: Reservation[]
+): "confirmed" | "cancelled" | "pending" {
+  const mine = reservations.filter((r) => reservationIds.includes(r.id))
+  if (mine.length < reservationIds.length) return "pending"
+  if (mine.some((r) => r.status === "cancelled" || r.status === "expired")) {
+    return "cancelled"
+  }
+  return mine.every((r) => r.status === "confirmed") ? "confirmed" : "pending"
 }
 
 // Helper function to get the start of the current week (Monday)
