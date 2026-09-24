@@ -49,8 +49,8 @@
 
 ## 2. Genel kurallar
 
-- **Dal:** `demo-readiness`. `main`'e commit yok. Push etmeden önce
-  kullanıcıya sor.
+- **Dal:** `main` — projede tek dal var (`demo-readiness` 24.09.2026'da
+  `main`'e alındı ve silindi). Push etmeden önce kullanıcıya sor.
 - **landingpage/** asla stage edilmez. `git add -A` / `git add .` yok;
   dosyaları tek tek ekle (`CLAUDE.md` §14).
 - **Dil:** Konuşma ve bu dokümanlar Türkçe; kod, dosya adı, commit İngilizce;
