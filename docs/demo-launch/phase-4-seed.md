@@ -147,11 +147,13 @@
   > (ayse.demir mock'ta Matematik).
   > Süre: yerelde (servisler host'ta, Caddy'siz) 34 sn; CI süresi 4.5'te.
 
-- [ ] **4.4 Tarihler ve rol senaryoları**
-  - **Dönem adı** seed günündeki tarihten hesaplanır:
-    - Eylül–Ocak → `YYYY-YYYY+1 Güz`
-    - Şubat–Haziran → `YYYY-1-YYYY Bahar`
-    - Temmuz–Ağustos → gelecek Güz
+- [x] **4.4 Tarihler ve rol senaryoları**
+  - **Dönem adı** seed günündeki tarihten hesaplanır, backend'in biçiminde
+    (`YYYY-YYYY-Fall|Spring`; catalog dönem ve ders açılışında bunu
+    doğruluyor, web kayıt sayfası da bunu soruyor — karar 24.09):
+    - Eylül–Ocak → `YYYY-YYYY+1-Fall`
+    - Şubat–Haziran → `YYYY-1-YYYY-Spring`
+    - Temmuz–Ağustos → gelecek Fall
 
     SQL dosyalarında sabit `'2025-2026 Güz'` yerine bu değişkeni kullan
     (psql `-v semester=...`). Mevcut `'2025-2026 Bahar'` önkoşul penceresini
@@ -169,6 +171,39 @@
   - **Menü:** tüm aktif kafeteryalar için bu ayın ve gelecek ayın hafta içi
     günleri, `menu_dishes.json` havuzundan.
   - **Commit:** `feat(infra): seed dates and scenarios relative to the seed day`
+  > Not (24.09): Dönemler: aktif `:'semester'` (hard_deadline +120 gün) ve
+  > `planned` durumda sonraki dönem (admin arayüzden ona ders açabilsin diye);
+  > önkoşul penceresi sonraki dönemde. Periyotlar −35 … +45 gün (4 haftalık
+  > yoklama geçmişi kendi periyodu içinde kalsın diye −7 değil). Açılışlar
+  > yalnız Bilgisayar Mühendisliği'nde (6 CENG dersi; ahmet 101/102, elif.aydin
+  > 201/202, mehmet.kaya 301/350) — diğer bölümlerin öğretmeni ya da
+  > öğrencisi mock'ta birlikte yok. Program kuralı: 1. sınıf 101+102, 2. sınıf
+  > 201+202, 3–4. sınıf 301+350; Deniz ve Selin CENG102'yi tekrar alıyor.
+  > Ahmet'in 3 danışmanı (Ali Çelik, Zeynep Arslan, Oğuz Yıldırım) onay
+  > bekliyor. Vize girilmiş ve kilitli (zeynep: 78/85 — eski mock karnesi),
+  > final boş. Transkript: 2. sınıftan itibaren 101/102, 3. sınıftan itibaren
+  > 201/202, dönem adları kayıt yılından; mutlak not skalası grades'teki
+  > tabloyla aynı. Yoklama: 4 geçmiş hafta (3 haftada tek devamsızlık 14'te
+  > 10 kuralında "kaldı" gösteriyordu), 5. hafta öğretmenin açması için boş;
+  > zeynep'in tek devamsızlığı CENG301 2. hafta. Yemek: bu ayın ve gelecek
+  > ayın menüsü `menu_dishes.json`'dan; `monthly_menus` yıl+ay anahtarlı,
+  > kafeterya başına menü yok. `menu_data` iki biçimi birden taşıyor: web
+  > `{normalMenus, veganMenus}` haftalık yapıyı, mobil `"YYYY-MM-DD" →
+  > {lunch, dinner}` yapısını okuyor (eski seed yalnız mobilinkini yazıyordu,
+  > web menü sayfası boştu). Rezervasyon: aktif öğrencilere bu haftanın hafta
+  > içi öğle yemekleri (bugünden öncekiler kullanılmış) ve gelecek hafta
+  > Pzt–Çar; Per–Cum CI'ın yeni rezervasyonu için boş.
+  > Düzeltilen eski hata: kayıt programları katalog ders id'siyle
+  > yazılıyordu; danışman onayı olayı grades/attendance'ta düşerdi. Artık
+  > açılış id'si (yerelde onay → grades kaydı doğrulandı).
+  > Yerelde doğrulandı: zeynep programı/notları/transkripti/yoklaması/
+  > rezervasyonu; önkoşul penceresi (zeynep kabul, deniz
+  > `PREREQUISITES_NOT_MET`, kerem `INVALID_CLASS_LEVEL`); ahmet'in CENG101
+  > not listesi (11 öğrenci), final girişi, 5. hafta yoklama açma, 3 bekleyen
+  > program; admin için 19 fakülte, 91 ders, 2 dönem, 4 kafeterya, 2 aylık menü.
+  > Frontend'e kalan (Faz 5): web kayıt sayfası dönemi gerçek saatten
+  > hesaplıyor, sonraki dönemin penceresi arayüzden görünmüyor; admin menü
+  > sayfası kaydederken yalnız web biçimini yazıyor, mobil o ayı boş görür.
 
 - [ ] **4.5 Doğrulama**
   - Kullanıcıdan temiz bir yığın kurmasını iste; komutu kopyala-yapıştır

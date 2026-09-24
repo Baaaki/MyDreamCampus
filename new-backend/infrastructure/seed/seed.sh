@@ -217,9 +217,26 @@ done
 q auth "UPDATE auth.users SET force_password_change = false WHERE email IN ($EMAILS)" >/dev/null
 
 # --- 10. scenario data, one database at a time ---
+# Semester names follow the seed day, in the backend's own format
+# (YYYY-YYYY-Fall|Spring — what catalog validates and the web enrollment page
+# asks for): Sep-Jan is that autumn's Fall, Feb-Jun the academic year's Spring,
+# and Jul-Aug already the coming Fall. The next semester carries the
+# prerequisite scenario's open enrollment window.
+YEAR=$(date -u +%Y)
+MONTH=$(date -u +%m | sed 's/^0//')
+if [ "$MONTH" -ge 7 ]; then
+	SEMESTER="$YEAR-$((YEAR + 1))-Fall"; NEXT_SEMESTER="$YEAR-$((YEAR + 1))-Spring"
+elif [ "$MONTH" -eq 1 ]; then
+	SEMESTER="$((YEAR - 1))-$YEAR-Fall"; NEXT_SEMESTER="$((YEAR - 1))-$YEAR-Spring"
+else
+	SEMESTER="$((YEAR - 1))-$YEAR-Spring"; NEXT_SEMESTER="$YEAR-$((YEAR + 1))-Fall"
+fi
+echo ">> current semester $SEMESTER, next $NEXT_SEMESTER"
+
 run_sql() {
 	echo ">> seeding db:$1"
-	psql "$(svc_url "$1")" -v ON_ERROR_STOP=1 -q -f "$SQL/$2"
+	psql "$(svc_url "$1")" -v ON_ERROR_STOP=1 -q \
+		-v semester="$SEMESTER" -v next_semester="$NEXT_SEMESTER" -f "$SQL/$2"
 }
 
 # Order is a dependency chain, not cosmetics: catalog reads staff ids, and the
@@ -233,11 +250,11 @@ run_sql catalog 02-catalog.sql
 
 echo ">> exporting student and catalog rows for the remaining services"
 psql "$(svc_url student)" -v ON_ERROR_STOP=1 -q -c \
-	"\copy (SELECT id, student_number, first_name, last_name, email, department, class_level, is_active FROM student.students) TO '$STAGE/students.csv' CSV"
+	"\copy (SELECT id, student_number, first_name, last_name, email, department, class_level, is_active, enrollment_year, status FROM student.students) TO '$STAGE/students.csv' CSV"
 psql "$(svc_url catalog)" -v ON_ERROR_STOP=1 -q -c \
-	"\copy (SELECT id, course_code, name, credits, department, class_level FROM course_catalog.course_catalog) TO '$STAGE/courses.csv' CSV"
+	"\copy (SELECT id, course_code, name, credits, department, class_level, lab_hours FROM course_catalog.course_catalog) TO '$STAGE/courses.csv' CSV"
 psql "$(svc_url catalog)" -v ON_ERROR_STOP=1 -q -c \
-	"\copy (SELECT id, semester, course_code, credits, class_level, instructor_id, instructor_fullname, assessment_schema FROM course_catalog.semester_courses) TO '$STAGE/semester_courses.csv' CSV"
+	"\copy (SELECT id, semester, course_code, credits, class_level, instructor_id, instructor_fullname, assessment_schema, prerequisites FROM course_catalog.semester_courses) TO '$STAGE/semester_courses.csv' CSV"
 psql "$(svc_url catalog)" -v ON_ERROR_STOP=1 -q -c \
 	"\copy (SELECT id, semester, period_start, period_end, is_active, period_type FROM course_catalog.academic_periods) TO '$STAGE/periods.csv' CSV"
 
@@ -246,6 +263,8 @@ run_sql attendance 04-attendance.sql
 run_sql enrollment 05-enrollment.sql
 echo ">> seeding db:meal"
 psql "$(svc_url meal)" -v ON_ERROR_STOP=1 -q \
-	-v cafeterias="$(cat "$DATA/cafeterias.json")" -f "$SQL/06-meal.sql"
+	-v semester="$SEMESTER" -v next_semester="$NEXT_SEMESTER" \
+	-v cafeterias="$(cat "$DATA/cafeterias.json")" -v dishes="$(cat "$DATA/menu_dishes.json")" \
+	-f "$SQL/06-meal.sql"
 
 echo ">> seed complete in $(($(date +%s) - STARTED))s. Demo login = e-posta / e-posta (ör. zeynep.sahin@uni.edu.tr)."
