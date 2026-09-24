@@ -148,7 +148,7 @@ func (s *AttendanceService) CreateSession(ctx context.Context, instructorID uuid
 		for i, student := range enrolledStudents {
 			studentIDs[i] = utils.PgUUIDToUUID(student.ID)
 		}
-		if err := s.redisService.AddEnrolledStudents(ctx, sessionID, studentIDs, time.Until(expiresAt)+CacheTTLBuffer); err != nil {
+		if err := s.redisService.AddEnrolledStudents(ctx, sessionID, studentIDs, expiresAt.Sub(now)+CacheTTLBuffer); err != nil {
 			// Best-effort warm: scan path falls back to DB when the set is missing.
 			logger.Warn("failed to warm enrolled-student set", zap.Error(err))
 		}
@@ -164,7 +164,7 @@ func (s *AttendanceService) CreateSession(ctx context.Context, instructorID uuid
 		"qr_secret":      qrSecret,
 		"expires_at":     fmt.Sprintf("%d", expiresAt.Unix()),
 		"enrolled_count": fmt.Sprintf("%d", len(enrolledStudents)),
-	}, time.Until(expiresAt)+CacheTTLBuffer); err != nil {
+	}, expiresAt.Sub(now)+CacheTTLBuffer); err != nil {
 		logger.Warn("failed to warm session cache", zap.Error(err))
 	}
 
@@ -234,8 +234,10 @@ func (s *AttendanceService) ScanQR(ctx context.Context, studentID uuid.UUID, req
 		return dto.ScanQRResponse{}, fmt.Errorf("failed to marshal buffer data: %w", err)
 	}
 
-	// Scanned SET TTL = session remaining time + 1 hour safety buffer
-	scannedTTL := time.Until(utils.PgTimestampToTime(session.ExpiresAt)) + 1*time.Hour
+	// Scanned SET TTL = session remaining time + 1 hour safety buffer.
+	// Remaining on the service clock, the one expires_at was set on; against
+	// the real clock a simulated session would get a TTL off by the offset.
+	scannedTTL := utils.PgTimestampToTime(session.ExpiresAt).Sub(clock.Now()) + 1*time.Hour
 
 	added, err := s.redisService.AddToBuffer(ctx, sessionID, studentID.String(), string(bufferJSON), scannedTTL)
 	if err != nil {
