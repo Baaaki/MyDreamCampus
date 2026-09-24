@@ -84,7 +84,7 @@ Yalnız `card_brand` (prefix'ten: Visa, Mastercard, Amex, Troy `9792`) ve
   > listeliyor (DEPLOY.md sorun giderme). CI matrisinde payment zaten var;
   > CI'da sqlc adımı yok, migration e2e'deki migrate konteyneriyle koşuyor.
 
-- [ ] **3.2 Şema**
+- [x] **3.2 Şema**
   - `payment.payments`:
     - id uuid pk (`uuidv7()`), reference_id text unique, student_id uuid
     - amount numeric(10,2), currency char(3), description text
@@ -96,7 +96,7 @@ Yalnız `card_brand` (prefix'ten: Visa, Mastercard, Amex, Troy `9792`) ve
     kopyası (`services/staff-service/internal/repository/outbox_repository.go`,
     `outbox_store.go`, retention store).
   - `sqlc.yaml`'a rename bloğunu ekle (skills.md §1).
-  - **Commit:** `feat(payment): add payments and outbox tables`
+  - **Commit:** `feat(payment): add the payments table` (outbox tabloları 3.1'de)
 
 - [ ] **3.3 Initiate kalıcı olsun**
   - `/internal/payments/initiate`:

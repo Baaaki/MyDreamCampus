@@ -54,6 +54,51 @@ func (ns NullOutboxStatusEnum) Value() (driver.Value, error) {
 	return string(ns.OutboxStatusEnum), nil
 }
 
+type PaymentStatusEnum string
+
+const (
+	PaymentPaymentStatusEnumPending   PaymentStatusEnum = "pending"
+	PaymentPaymentStatusEnumCompleted PaymentStatusEnum = "completed"
+	PaymentPaymentStatusEnumFailed    PaymentStatusEnum = "failed"
+	PaymentPaymentStatusEnumExpired   PaymentStatusEnum = "expired"
+	PaymentPaymentStatusEnumRefunded  PaymentStatusEnum = "refunded"
+)
+
+func (e *PaymentStatusEnum) Scan(src interface{}) error {
+	switch s := src.(type) {
+	case []byte:
+		*e = PaymentStatusEnum(s)
+	case string:
+		*e = PaymentStatusEnum(s)
+	default:
+		return fmt.Errorf("unsupported scan type for PaymentStatusEnum: %T", src)
+	}
+	return nil
+}
+
+type NullPaymentStatusEnum struct {
+	PaymentStatusEnum PaymentStatusEnum `json:"payment_payment_status_enum"`
+	Valid             bool              `json:"valid"` // Valid is true if PaymentStatusEnum is not NULL
+}
+
+// Scan implements the Scanner interface.
+func (ns *NullPaymentStatusEnum) Scan(value interface{}) error {
+	if value == nil {
+		ns.PaymentStatusEnum, ns.Valid = "", false
+		return nil
+	}
+	ns.Valid = true
+	return ns.PaymentStatusEnum.Scan(value)
+}
+
+// Value implements the driver Valuer interface.
+func (ns NullPaymentStatusEnum) Value() (driver.Value, error) {
+	if !ns.Valid {
+		return nil, nil
+	}
+	return string(ns.PaymentStatusEnum), nil
+}
+
 type OutboxEvent struct {
 	ID            pgtype.UUID      `json:"id"`
 	EventType     string           `json:"event_type"`
@@ -66,4 +111,21 @@ type OutboxEvent struct {
 	CreatedAt     pgtype.Timestamp `json:"created_at"`
 	ProcessedAt   pgtype.Timestamp `json:"processed_at"`
 	CorrelationID pgtype.UUID      `json:"correlation_id"`
+}
+
+type Payment struct {
+	ID            pgtype.UUID        `json:"id"`
+	ReferenceID   string             `json:"reference_id"`
+	StudentID     pgtype.UUID        `json:"student_id"`
+	Amount        pgtype.Numeric     `json:"amount"`
+	Currency      string             `json:"currency"`
+	Description   string             `json:"description"`
+	Status        PaymentStatusEnum  `json:"status"`
+	CardBrand     pgtype.Text        `json:"card_brand"`
+	CardLast4     pgtype.Text        `json:"card_last4"`
+	FailureReason pgtype.Text        `json:"failure_reason"`
+	ExpiresAt     pgtype.Timestamptz `json:"expires_at"`
+	CompletedAt   pgtype.Timestamptz `json:"completed_at"`
+	CreatedAt     pgtype.Timestamptz `json:"created_at"`
+	UpdatedAt     pgtype.Timestamptz `json:"updated_at"`
 }

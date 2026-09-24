@@ -20,3 +20,5 @@ sql:
         rename:
           payment_outbox_event: "OutboxEvent"
           payment_outbox_status_enum: "OutboxStatusEnum"
+          payment_payment: "Payment"
+          payment_payment_status_enum: "PaymentStatusEnum"
