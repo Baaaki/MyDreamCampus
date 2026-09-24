@@ -46,7 +46,7 @@ altyapısındaki `vi.mock` ve `__mocks__` uygulama kodu değildir; kalır.
     → `hasNoMenu`; metin "Bu ay için menü yayınlanmadı".
   - **Commit:** `refactor(frontend): remove inline mock fallbacks`
 
-- [ ] **5.4 Dönem yönetimi**
+- [x] **5.4 Dönem yönetimi** (gemini ile yapıldı)
   - **Backend:** catalog'un `/api/catalog/admin/periods` uçları yalnız
     `catalog` türünü kapsıyor
     (`new-backend/shared/platform/repository/simple_period_repository.go`,

@@ -160,3 +160,63 @@ describe("clock offset spread", () => {
     expect(clockOffsetSpreadMs([row(status()), row(null)])).toBeNull()
   })
 })
+
+describe("academic periods management", () => {
+  afterEach(() => {
+    vi.unstubAllGlobals()
+    vi.resetAllMocks()
+  })
+
+  it("lists grades periods from catalog with type=grading", async () => {
+    const fetchSpy = stubFetch(() => json([]))
+    const { listGradesPeriods } = await loadService()
+
+    await listGradesPeriods("2025-2026-Fall")
+
+    expect(fetchSpy).toHaveBeenCalledTimes(1)
+    const request = fetchSpy.mock.calls[0]![0] as Request
+    const url = new URL(request.url)
+    expect(url.pathname).toBe("/api/catalog/admin/periods")
+    expect(url.searchParams.get("type")).toBe("grading")
+    expect(url.searchParams.get("semester")).toBe("2025-2026-Fall")
+  })
+
+  it("lists simple periods from catalog with requested type", async () => {
+    const fetchSpy = stubFetch(() => json([]))
+    const { listSimplePeriods } = await loadService()
+
+    await listSimplePeriods("enrollment", "2025-2026-Fall")
+
+    expect(fetchSpy).toHaveBeenCalledTimes(1)
+    const request = fetchSpy.mock.calls[0]![0] as Request
+    const url = new URL(request.url)
+    expect(url.pathname).toBe("/api/catalog/admin/periods")
+    expect(url.searchParams.get("type")).toBe("enrollment")
+    expect(url.searchParams.get("semester")).toBe("2025-2026-Fall")
+  })
+
+  it("creates a period in catalog with period_type", async () => {
+    const fetchSpy = stubFetch(() => json({ id: "p1" }))
+    const { createGradesPeriod, createSimplePeriod } = await loadService()
+
+    await createGradesPeriod({
+      semester: "2025-2026-Fall",
+      period_start: "2025-10-01T00:00:00Z",
+      period_end: "2025-11-01T00:00:00Z",
+    })
+    await createSimplePeriod("attendance", {
+      semester: "2025-2026-Fall",
+      period_start: "2025-10-01T00:00:00Z",
+      period_end: "2025-11-01T00:00:00Z",
+    })
+
+    expect(fetchSpy).toHaveBeenCalledTimes(2)
+    const req1 = fetchSpy.mock.calls[0]![0] as Request
+    const req2 = fetchSpy.mock.calls[1]![0] as Request
+    expect(new URL(req1.url).pathname).toBe("/api/catalog/admin/periods")
+    expect(new URL(req2.url).pathname).toBe("/api/catalog/admin/periods")
+    expect(JSON.parse(sentBodies[0]!).period_type).toBe("grading")
+    expect(JSON.parse(sentBodies[1]!).period_type).toBe("attendance")
+  })
+})
+

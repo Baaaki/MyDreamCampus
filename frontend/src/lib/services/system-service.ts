@@ -150,50 +150,45 @@ export function clockOffsetSpreadMs(
 export async function listGradesPeriods(
   semester?: string
 ): Promise<AcademicPeriod[]> {
-  const searchParams: Record<string, string> = {}
+  const searchParams: Record<string, string> = { type: "grading" }
   if (semester) searchParams.semester = semester
-  return gradesApiSafe
+  return catalogApiSafe
     .get("admin/periods", { searchParams })
     .json<AcademicPeriod[]>()
 }
 export async function createGradesPeriod(
   data: CreatePeriodRequest
 ): Promise<AcademicPeriod> {
-  return gradesApiSafe
-    .post("admin/periods", { json: data })
+  return catalogApiSafe
+    .post("admin/periods", { json: { ...data, period_type: "grading" } })
     .json<AcademicPeriod>()
 }
 export async function updateGradesPeriod(
   id: string,
   data: UpdatePeriodRequest
 ): Promise<AcademicPeriod> {
-  return gradesApiSafe
+  return catalogApiSafe
     .put(`admin/periods/${id}`, { json: data })
     .json<AcademicPeriod>()
 }
 export async function deleteGradesPeriod(id: string): Promise<void> {
-  await gradesApiSafe.delete(`admin/periods/${id}`)
+  await catalogApiSafe.delete(`admin/periods/${id}`)
 }
 
 // Simple Periods
-export type SimplePeriodServiceKey = "enrollment" | "catalog" | "attendance"
-
-const simplePeriodApi: Record<
-  SimplePeriodServiceKey,
-  typeof enrollmentApiSafe
-> = {
-  enrollment: enrollmentApiSafe,
-  catalog: catalogApiSafe,
-  attendance: attendanceApiSafe,
-}
+export type SimplePeriodServiceKey =
+  | "enrollment"
+  | "catalog"
+  | "attendance"
+  | "grading"
 
 export async function listSimplePeriods(
   service: SimplePeriodServiceKey,
   semester?: string
 ): Promise<SimplePeriod[]> {
-  const searchParams: Record<string, string> = {}
+  const searchParams: Record<string, string> = { type: service }
   if (semester) searchParams.semester = semester
-  return simplePeriodApi[service]
+  return catalogApiSafe
     .get("admin/periods", { searchParams })
     .json<SimplePeriod[]>()
 }
@@ -201,24 +196,24 @@ export async function createSimplePeriod(
   service: SimplePeriodServiceKey,
   data: SimpleCreatePeriodRequest
 ): Promise<SimplePeriod> {
-  return simplePeriodApi[service]
-    .post("admin/periods", { json: data })
+  return catalogApiSafe
+    .post("admin/periods", { json: { ...data, period_type: service } })
     .json<SimplePeriod>()
 }
 export async function updateSimplePeriod(
-  service: SimplePeriodServiceKey,
+  _service: SimplePeriodServiceKey,
   id: string,
   data: UpdatePeriodRequest
 ): Promise<SimplePeriod> {
-  return simplePeriodApi[service]
+  return catalogApiSafe
     .put(`admin/periods/${id}`, { json: data })
     .json<SimplePeriod>()
 }
 export async function deleteSimplePeriod(
-  service: SimplePeriodServiceKey,
+  _service: SimplePeriodServiceKey,
   id: string
 ): Promise<void> {
-  await simplePeriodApi[service].delete(`admin/periods/${id}`)
+  await catalogApiSafe.delete(`admin/periods/${id}`)
 }
 
 // Closed Days

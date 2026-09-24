@@ -15,7 +15,6 @@ import {
   ClipboardCheck,
   CalendarOff,
   Clock,
-  Eye,
   Trash2,
   Pencil,
 } from "lucide-react"
@@ -42,7 +41,6 @@ import {
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog"
 import Toast from "@/components/enrollment/Toast"
-
 import type {
   Semester,
   SemesterStatus,
@@ -79,107 +77,8 @@ const STATUS_BADGE: Record<
 const fmt = (iso: string) =>
   format(new Date(iso), "dd MMM yyyy HH:mm", { locale: tr })
 
-function buildMockData() {
-  const n = new Date()
-  const iso = n.toISOString()
-
-  const semesters: Semester[] = [
-    {
-      id: "mock-1",
-      name: "2025-2026-Fall",
-      status: "active",
-      hard_deadline: new Date(n.getTime() + 86400000 * 120).toISOString(),
-      activated_at: new Date(n.getTime() - 86400000 * 10).toISOString(),
-      completed_at: null,
-      created_at: new Date(n.getTime() - 86400000 * 30).toISOString(),
-      updated_at: new Date(n.getTime() - 86400000 * 10).toISOString(),
-    },
-    {
-      id: "mock-2",
-      name: "2025-2026-Spring",
-      status: "planned",
-      hard_deadline: new Date(n.getTime() + 86400000 * 300).toISOString(),
-      activated_at: null,
-      completed_at: null,
-      created_at: new Date(n.getTime() - 86400000 * 5).toISOString(),
-      updated_at: new Date(n.getTime() - 86400000 * 5).toISOString(),
-    },
-  ]
-
-  const grades: AcademicPeriod[] = [
-    {
-      id: "mg1",
-      semester: "2025-2026-Fall",
-      course_id: null,
-      period_start: new Date(n.getTime() - 86400000 * 15).toISOString(),
-      period_end: new Date(n.getTime() + 86400000 * 45).toISOString(),
-      is_active: true,
-      created_at: iso,
-      updated_at: iso,
-    },
-  ]
-
-  const enrollment: SimplePeriod[] = [
-    {
-      id: "me1",
-      semester: "2025-2026-Fall",
-      period_start: new Date(n.getTime() - 86400000 * 30).toISOString(),
-      period_end: new Date(n.getTime() - 86400000 * 5).toISOString(),
-      is_active: false,
-      created_at: iso,
-      updated_at: iso,
-    },
-  ]
-
-  const catalog: SimplePeriod[] = [
-    {
-      id: "mc1",
-      semester: "2025-2026-Fall",
-      period_start: new Date(n.getTime() - 86400000 * 45).toISOString(),
-      period_end: new Date(n.getTime() - 86400000 * 20).toISOString(),
-      is_active: false,
-      created_at: iso,
-      updated_at: iso,
-    },
-  ]
-
-  const attendance = {
-    start: new Date(n.getTime() - 86400000 * 10).toISOString(),
-    end: new Date(n.getTime() + 86400000 * 60).toISOString(),
-    active: true,
-  }
-
-  const closedDays: ClosedDay[] = [
-    {
-      id: "cd1",
-      date: "2025-10-29",
-      reason: "Cumhuriyet Bayramı",
-      created_at: iso,
-    },
-    {
-      id: "cd2",
-      date: "2025-11-10",
-      reason: "Atatürk'ü Anma Günü",
-      created_at: iso,
-    },
-    {
-      id: "cd3",
-      date: "2026-01-01",
-      reason: "Yılbaşı Tatili",
-      created_at: iso,
-    },
-  ]
-
-  return { semesters, grades, enrollment, catalog, attendance, closedDays }
-}
-
 export default function SemestersPage() {
   const navigate = useNavigate()
-  // Preview data replaces the live queries while it is set
-  const [mockData, setMockData] = useState<ReturnType<
-    typeof buildMockData
-  > | null>(null)
-  const mockMode = mockData !== null
 
   const [toast, setToast] = useState<{
     message: string
@@ -195,16 +94,14 @@ export default function SemestersPage() {
   )
 
   const {
-    data: liveSemesters = [],
+    data: semesters = [],
     isFetching: loading,
     isError: semestersError,
     refetch: fetchSemesters,
   } = useQuery({
     queryKey: ["system", "semesters"],
     queryFn: listSemesters,
-    enabled: !mockMode,
   })
-  const semesters: Semester[] = mockData?.semesters ?? liveSemesters
 
   const activeSemester = semesters.find(
     (s) => s.status === "active" && new Date() < new Date(s.hard_deadline)
@@ -244,22 +141,13 @@ export default function SemestersPage() {
         closedDays: valueOr(meals),
       }
     },
-    enabled: !mockMode && !!activeSemesterName,
+    enabled: !!activeSemesterName,
   })
-  const periodSource = mockData ?? livePeriods
-  const gradesPeriods: AcademicPeriod[] = periodSource?.grades ?? []
-  const enrollmentPeriods: SimplePeriod[] = periodSource?.enrollment ?? []
-  const catalogPeriods: SimplePeriod[] = periodSource?.catalog ?? []
-  // Preview attendance is a single range, not a period list
-  const attendancePeriods: SimplePeriod[] = mockData
-    ? []
-    : (livePeriods?.attendance ?? [])
-  const closedDays: ClosedDay[] = periodSource?.closedDays ?? []
-  const mockAttendance = mockData?.attendance ?? null
-
-  const toggleMockMode = () => {
-    setMockData(mockMode ? null : buildMockData())
-  }
+  const gradesPeriods: AcademicPeriod[] = livePeriods?.grades ?? []
+  const enrollmentPeriods: SimplePeriod[] = livePeriods?.enrollment ?? []
+  const catalogPeriods: SimplePeriod[] = livePeriods?.catalog ?? []
+  const attendancePeriods: SimplePeriod[] = livePeriods?.attendance ?? []
+  const closedDays: ClosedDay[] = livePeriods?.closedDays ?? []
 
   // Delete planned semester
   const [deleteTarget, setDeleteTarget] = useState<Semester | null>(null)
@@ -298,15 +186,6 @@ export default function SemestersPage() {
           için wizard'ı kullanın.
         </p>
       </div>
-
-      {mockMode && (
-        <div className="rounded-lg border border-amber-300 bg-amber-50 p-3 dark:border-amber-700 dark:bg-amber-900/20">
-          <p className="flex items-center gap-2 text-sm font-medium text-amber-700 dark:text-amber-300">
-            <Eye className="h-4 w-4" />
-            Önizleme modu — aşağıdaki veriler örnek (mock) verilerdir.
-          </p>
-        </div>
-      )}
 
       {expiredActiveSemester && (
         <div className="rounded-lg border border-red-200 bg-red-50 p-4 dark:border-red-800 dark:bg-red-900/20">
@@ -369,25 +248,12 @@ export default function SemestersPage() {
               <Button
                 variant="outline"
                 size="sm"
-                onClick={toggleMockMode}
-                className={
-                  mockMode
-                    ? "border-amber-400 bg-amber-50 text-amber-600 dark:bg-amber-900/20"
-                    : ""
-                }
-              >
-                <Eye className="mr-1 h-4 w-4" />
-                {mockMode ? "Mock Kapat" : "Önizleme"}
-              </Button>
-              <Button
-                variant="outline"
-                size="sm"
                 onClick={() => {
                   fetchSemesters()
                   // refetch ignores `enabled`; without a name there is nothing to load
                   if (activeSemesterName) fetchPeriods()
                 }}
-                disabled={loading || mockMode}
+                disabled={loading}
               >
                 <RefreshCw
                   className={`h-4 w-4 ${loading ? "animate-spin" : ""}`}
@@ -423,7 +289,7 @@ export default function SemestersPage() {
                       <Loader2 className="mx-auto h-5 w-5 animate-spin text-gray-400" />
                     </TableCell>
                   </TableRow>
-                ) : semestersError && !mockMode ? (
+                ) : semestersError ? (
                   <TableRow>
                     <TableCell
                       colSpan={6}
@@ -605,7 +471,7 @@ export default function SemestersPage() {
                           end: mainAttendancePeriod.period_end,
                           active: mainAttendancePeriod.is_active,
                         }
-                      : mockAttendance
+                      : null
                   }
                 />
 
