@@ -97,12 +97,19 @@ func (q *Queries) DeactivateSession(ctx context.Context, id pgtype.UUID) error {
 
 const getActiveSessionByID = `-- name: GetActiveSessionByID :one
 SELECT id, course_id, instructor_id, semester, week_number, session_date, session_type, qr_secret, qr_rotation_interval, started_at, expires_at, is_active, created_at FROM attendance.attendance_sessions
-WHERE id = $1 AND is_active = TRUE AND expires_at > NOW()
+WHERE id = $1 AND is_active = TRUE AND expires_at > $2
 LIMIT 1
 `
 
-func (q *Queries) GetActiveSessionByID(ctx context.Context, id pgtype.UUID) (AttendanceSession, error) {
-	row := q.db.QueryRow(ctx, getActiveSessionByID, id)
+type GetActiveSessionByIDParams struct {
+	ID  pgtype.UUID      `json:"id"`
+	Now pgtype.Timestamp `json:"now"`
+}
+
+// now is the service clock, which the time machine can shift; the
+// database's NOW() cannot follow it.
+func (q *Queries) GetActiveSessionByID(ctx context.Context, arg GetActiveSessionByIDParams) (AttendanceSession, error) {
+	row := q.db.QueryRow(ctx, getActiveSessionByID, arg.ID, arg.Now)
 	var i AttendanceSession
 	err := row.Scan(
 		&i.ID,
@@ -124,11 +131,11 @@ func (q *Queries) GetActiveSessionByID(ctx context.Context, id pgtype.UUID) (Att
 
 const getExpiredSessions = `-- name: GetExpiredSessions :many
 SELECT id, course_id, instructor_id, semester, week_number, session_date, session_type, qr_secret, qr_rotation_interval, started_at, expires_at, is_active, created_at FROM attendance.attendance_sessions
-WHERE is_active = TRUE AND expires_at < NOW()
+WHERE is_active = TRUE AND expires_at < $1
 `
 
-func (q *Queries) GetExpiredSessions(ctx context.Context) ([]AttendanceSession, error) {
-	rows, err := q.db.Query(ctx, getExpiredSessions)
+func (q *Queries) GetExpiredSessions(ctx context.Context, now pgtype.Timestamp) ([]AttendanceSession, error) {
+	rows, err := q.db.Query(ctx, getExpiredSessions, now)
 	if err != nil {
 		return nil, err
 	}
