@@ -55,7 +55,7 @@ Yalnız `card_brand` (prefix'ten: Visa, Mastercard, Amex, Troy `9792`) ve
 
 ## Görevler
 
-- [x] **3.1 payment veritabanı altyapısı**
+- [x] **3.1 payment veritabanı altyapısı** — `cb011cd`
   - `new-backend/infrastructure/postgres/init-databases.sh`:
     `create_service_db payment payment`.
   - `new-backend/infrastructure/migrate/Dockerfile` ve `entrypoint.sh`:
@@ -84,7 +84,7 @@ Yalnız `card_brand` (prefix'ten: Visa, Mastercard, Amex, Troy `9792`) ve
   > listeliyor (DEPLOY.md sorun giderme). CI matrisinde payment zaten var;
   > CI'da sqlc adımı yok, migration e2e'deki migrate konteyneriyle koşuyor.
 
-- [x] **3.2 Şema**
+- [x] **3.2 Şema** — `e9ca176`
   - `payment.payments`:
     - id uuid pk (`uuidv7()`), reference_id text unique, student_id uuid
     - amount numeric(10,2), currency char(3), description text
@@ -98,7 +98,7 @@ Yalnız `card_brand` (prefix'ten: Visa, Mastercard, Amex, Troy `9792`) ve
   - `sqlc.yaml`'a rename bloğunu ekle (skills.md §1).
   - **Commit:** `feat(payment): add the payments table` (outbox tabloları 3.1'de)
 
-- [x] **3.3 Initiate kalıcı olsun**
+- [x] **3.3 Initiate kalıcı olsun** — `c0e56df`, `76e43a9`
   - `/internal/payments/initiate`:
     - `pending` kayıt oluştur. reference_id zaten varsa mevcut kaydı döndür
       (idempotent).
@@ -117,7 +117,7 @@ Yalnız `card_brand` (prefix'ten: Visa, Mastercard, Amex, Troy `9792`) ve
   > iade ödenen tutara ulaşınca `refunded` olur. Bulunamayan referans 404,
   > tamamlanmamış ödeme / fazla iade 409.
 
-- [x] **3.4 Kart onayı ucu**
+- [x] **3.4 Kart onayı ucu** — `afba2c1`
   - `services/payment-service/internal/module.go` `RegisterRoutes` (şu an
     boş, ≈46). Zincir: `JWTAuth`, `CSRFProtection`, `UserRateLimit`,
     `RequireStudent`.
@@ -143,7 +143,7 @@ Yalnız `card_brand` (prefix'ten: Visa, Mastercard, Amex, Troy `9792`) ve
   > Idempotency kaydı yalnız istek gövdesinin SHA-256 özetini ve yanıtı
   > (son 4 hane) tutar. Event sabitleri `shared/events`'e eklendi.
 
-- [x] **3.5 meal tarafı**
+- [x] **3.5 meal tarafı** — `bf64c97`
   - `services/meal-service/internal/dto/reservation_dto.go:41`, `:51`:
     `PaymentURL` → `PaymentID` (`json:"payment_id"`).
   - `reservation_service.go` `CreateReservation` ve `CreateBatchReservation`
@@ -158,7 +158,7 @@ Yalnız `card_brand` (prefix'ten: Visa, Mastercard, Amex, Troy `9792`) ve
   > ise `bat_<batch>`) isteniyor — eskiden çıplak rezervasyon id'si
   > gidiyordu ve toplu rezervasyonun ödemesi bulunamazdı.
 
-- [x] **3.6 Web**
+- [x] **3.6 Web** — `dac05ee`
   - `frontend/src/lib/api-client.ts`: `paymentApi` (`/api/payments`).
   - Yeni `frontend/src/lib/services/payment-service.ts` ve tipleri
     (`lib/types.ts`). `meal-service.ts` tiplerinde `payment_url` →
@@ -184,7 +184,7 @@ Yalnız `card_brand` (prefix'ten: Visa, Mastercard, Amex, Troy `9792`) ve
   > servisler ve diyaloğun başarılı/reddedilen/geçersiz kart akışları;
   > Chromium'da API taklit edilerek masaüstü ve mobil genişlikte denendi.
 
-- [x] **3.7 Mobil**
+- [x] **3.7 Mobil** — `a829f2a`, `a57f684`
   - Yeni `mobile/services/paymentService.ts` ve testi.
   - `mobile/types/meal.types.ts`.
   - `mobile/hooks/useMeals.ts` (≈41'deki mock yorumunu güncelle).
@@ -202,7 +202,7 @@ Yalnız `card_brand` (prefix'ten: Visa, Mastercard, Amex, Troy `9792`) ve
   > commit'le eklendi. Cihazda manuel test bu ortamda yapılamadı; jest +
   > `tsc` temiz.
 
-- [x] **3.8 e2e**
+- [x] **3.8 e2e** — `2375165`
   - CI golden path:
     - öğrenci rezervasyon → 4242 ile confirm → rezervasyon `confirmed`
     - 4000 0000 0000 0002 → rezervasyon `cancelled`
@@ -218,3 +218,16 @@ Yalnız `card_brand` (prefix'ten: Visa, Mastercard, Amex, Troy `9792`) ve
 ## Faz sonu
 - README §5 yeşil olmalı.
 - README §1 madde 6.
+
+> Not (24.09): §5 sonuçları: backend 11 modül vet temiz, 1111 test geçiyor
+> (faz başı aynı sayımla 1033; +72 payment, +6 meal); golangci-lint v2.13.2
+> ve gosec v2.29.0 değişen 3 modülde (shared, meal, payment) 0 bulgu,
+> go.mod'lar tidy. Frontend typecheck + lint + Prettier + build temiz, 112
+> test. Mobil `tsc` temiz (temiz checkout dahil, `a829f2a`), 101 test.
+> Faz dışı ekler: `a829f2a` (mobil CI job'ı bu fazda ilk kez koşacağı için),
+> `fbb8107` (kök README'de ödeme artık mock değil).
+> e2e push sonrası CI'da doğrulanacak; Faz 2'nin PR çalıştırmasındaki e2e
+> hatası koddan değil, runner'ın imaj derlerken kapatılmasından
+> ("received a shutdown signal"). Mevcut volume'u olan kurulumda
+> `payment` veritabanı elle eklenmeli (migrate logu komutu yazar;
+> DEPLOY.md sorun giderme).
