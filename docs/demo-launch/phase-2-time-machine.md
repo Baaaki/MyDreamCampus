@@ -48,7 +48,7 @@
   > tutuyor; üretim kodu onu değiştiremez. `State()` bir `clock.Snapshot`
   > döner. `time_handler.go` 2.5'e kadar yeni API'ye geçici olarak uyarlandı.
 
-- [ ] **2.2 Redis ile servisler arası senkron**
+- [x] **2.2 Redis ile servisler arası senkron**
   - Yeni paket `shared/platform/clocksync`:
     - Redis anahtarı `clock:state` (JSON: `offset_seconds`, `until`, `set_at`,
       `set_by`), pub/sub kanalı `clock:changed`.
@@ -64,6 +64,12 @@
   - Test: Redis'i interface arkasına alıp sahte implementasyonla test et.
     **miniredis gibi yeni bir kütüphane eklemek için kullanıcıya sor.**
   - **Commit:** `feat(shared): sync the simulated clock across services via Redis`
+  > Not (24.09): Yeni kütüphane eklenmedi; testler `clocksync.Backend`
+  > arayüzünün sahte implementasyonuyla. Redis yöntemleri
+  > `platform/redis/clock.go`'da (SET/DEL + PUBLISH tek MULTI içinde).
+  > Okuma hatasında saat olduğu gibi kalır (her Redis hıçkırığında simüle
+  > son tarihler gidip gelmesin); geçersiz JSON'da gerçek saate döner.
+  > Yerelde gerçek redis-server'la elle doğrulandı.
 
 - [ ] **2.3 Gerçek saatte kalması gerekenler**
   - Şunlarda `clock.Now()` → `time.Now()`:
