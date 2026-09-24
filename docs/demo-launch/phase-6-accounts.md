@@ -29,7 +29,7 @@
 
 ## Görevler
 
-- [x] **6.1 auth şeması ve token** (gemini ile yapıldı)
+- [x] **6.1 auth şeması ve token** (gemini ile yapıldı) — `d340727`
   - Migration: `auth.users`'a
     - `is_superadmin boolean not null default false`
     - `is_demo boolean not null default false`
@@ -45,7 +45,7 @@
   - Testler.
   - **Commit:** `feat(auth): mark the super admin account`
 
-- [x] **6.2 Demo hesapları** (gemini ile yapıldı)
+- [x] **6.2 Demo hesapları** (gemini ile yapıldı) — `22f55f8`
   - Config (`shared/config/config.go`): `DEMO_MODE` (bool),
     `DEMO_ADMIN_EMAIL`, `DEMO_TEACHER_EMAIL`, `DEMO_STUDENT_EMAIL`.
     Compose'da `x-service-env`'e ve `.env.example`'a ekle.
@@ -62,7 +62,7 @@
     - Şifre "şifre = e-posta" kuralından hesaplanır, DB'den okunmaz.
   - **Commit:** `feat(auth): provision public demo accounts`
 
-- [x] **6.3 Sistem hesaplarını koruma** (gemini ile yapıldı)
+- [x] **6.3 Sistem hesaplarını koruma** (gemini ile yapıldı) — `a9764de`, `f4220be`, `16b0170`
   Admin paneli ziyaretçilere tamamen açık olduğu için bu korumalar şart. Aksi
   halde bir ziyaretçi:
   - demo öğrenciyi silip herkesi sabaha kadar dışarıda bırakabilir,
@@ -94,7 +94,7 @@
   - **Commit:** `feat(auth): protect the super admin and demo accounts`,
     `feat(staff): ...`, `feat(student): ...`
 
-- [ ] **6.4 Giriş ekranı paneli ve demo şeridi**
+- [x] **6.4 Giriş ekranı paneli ve demo şeridi** (gemini ile yapıldı) — `86c564a`, `5791997`
   - **Web** `frontend/src/pages/auth/login/index.tsx`:
     - Sağda (dar ekranda altta) bir "Demo hesapları" kartı; veriyi
       `GET /api/auth/demo-accounts`'tan alır.
