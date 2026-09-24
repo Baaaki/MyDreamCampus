@@ -15,7 +15,6 @@ import (
 	"github.com/baaaki/mydreamcampus/auth/internal/repository"
 	"github.com/baaaki/mydreamcampus/shared/config"
 	"github.com/baaaki/mydreamcampus/shared/events"
-	"github.com/baaaki/mydreamcampus/shared/platform/clock"
 	sharedErrors "github.com/baaaki/mydreamcampus/shared/platform/errors"
 	"github.com/baaaki/mydreamcampus/shared/platform/logger"
 	"github.com/baaaki/mydreamcampus/shared/platform/redis"
@@ -181,7 +180,7 @@ func (s *AuthService) Login(ctx context.Context, req dto.LoginRequest, deviceInf
 	}
 
 	// Create session
-	expiresAt := clock.Now().Add(time.Duration(s.config.JWT.RefreshTokenExpiry) * time.Hour)
+	expiresAt := time.Now().Add(time.Duration(s.config.JWT.RefreshTokenExpiry) * time.Hour)
 	deviceInfoPtr := utils.StringToPointer(deviceInfo)
 	ipAddressPtr := utils.StringToPointer(ipAddress)
 	_, err = s.sessionRepo.CreateSession(ctx, db.CreateSessionParams{
@@ -498,7 +497,7 @@ func (s *AuthService) RefreshAccessToken(ctx context.Context, refreshToken strin
 	// Replace the old session atomically. A lost race does not revoke the
 	// user's other sessions: two tabs refreshing at once is normal, and
 	// that would log the user out everywhere.
-	expiresAt := clock.Now().Add(time.Duration(s.config.JWT.RefreshTokenExpiry) * time.Hour)
+	expiresAt := time.Now().Add(time.Duration(s.config.JWT.RefreshTokenExpiry) * time.Hour)
 	_, err = s.sessionRepo.RotateSession(ctx, jti, db.CreateSessionParams{
 		UserID:          user.ID,
 		RefreshTokenJti: newJTI,
@@ -600,7 +599,7 @@ func (s *AuthService) ChangePassword(ctx context.Context, userID uuid.UUID, req 
 	}
 
 	// Create new session
-	expiresAt := clock.Now().Add(time.Duration(s.config.JWT.RefreshTokenExpiry) * time.Hour)
+	expiresAt := time.Now().Add(time.Duration(s.config.JWT.RefreshTokenExpiry) * time.Hour)
 	_, err = s.sessionRepo.CreateSession(ctx, db.CreateSessionParams{
 		UserID:          user.ID,
 		RefreshTokenJti: jti,
@@ -646,7 +645,7 @@ func (s *AuthService) RequestPasswordReset(ctx context.Context, email string) er
 
 	// Generate reset token and store in Redis
 	resetToken := uuid.New().String()
-	expiresAt := clock.Now().Add(1 * time.Hour)
+	expiresAt := time.Now().Add(1 * time.Hour)
 
 	if err := s.redisClient.StoreResetToken(ctx, resetToken, email, 1*time.Hour); err != nil {
 		return sharedErrors.Wrap(sharedErrors.ErrInternal, fmt.Errorf("failed to store reset token: %w", err))
@@ -853,7 +852,11 @@ func (s *AuthService) StartCleanupScheduler(ctx context.Context) {
 
 // generateAccessToken creates a JWT access token
 func (s *AuthService) generateAccessToken(user db.User) (string, error) {
-	now := clock.Now()
+	// Tokens, sessions and reset links run on the real clock: JWT
+	// validation and sessions.sql compare against real time, and a
+	// simulated issue time would log everyone out when the time machine
+	// moves.
+	now := time.Now()
 	expiresAt := now.Add(time.Duration(s.config.JWT.AccessTokenExpiry) * time.Minute)
 	jti := uuid.New().String() // Unique token ID for blacklist tracking
 
@@ -875,7 +878,7 @@ func (s *AuthService) generateAccessToken(user db.User) (string, error) {
 
 // generateRefreshToken creates a JWT refresh token
 func (s *AuthService) generateRefreshToken(user db.User) (string, string, error) {
-	now := clock.Now()
+	now := time.Now()
 	expiresAt := now.Add(time.Duration(s.config.JWT.RefreshTokenExpiry) * time.Hour)
 	jti := uuid.New().String()
 
