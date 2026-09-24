@@ -12,6 +12,7 @@ import (
 	"github.com/baaaki/mydreamcampus/auth/internal/db"
 	"github.com/baaaki/mydreamcampus/auth/internal/dto"
 	"github.com/baaaki/mydreamcampus/auth/internal/repository"
+	"github.com/baaaki/mydreamcampus/shared/config"
 	"github.com/baaaki/mydreamcampus/shared/events"
 	sharedErrors "github.com/baaaki/mydreamcampus/shared/platform/errors"
 	"github.com/baaaki/mydreamcampus/shared/platform/logger"
@@ -45,6 +46,7 @@ type EventService struct {
 	eventRepo processedEventChecker
 	pool      txBeginner
 	cache     TokenRevoker
+	config    *config.Config
 }
 
 // isDuplicateUser classifies CreateUser failures that mean "the user is
@@ -72,12 +74,14 @@ func NewEventService(
 	eventRepo *repository.EventRepository,
 	pool *pgxpool.Pool,
 	cache TokenRevoker,
+	cfg *config.Config,
 ) *EventService {
 	return &EventService{
 		authRepo:  authRepo,
 		eventRepo: eventRepo,
 		pool:      pool,
 		cache:     cache,
+		config:    cfg,
 	}
 }
 
@@ -443,6 +447,27 @@ func (s *EventService) HandleUserDeactivated(ctx context.Context, event dto.User
 	}
 
 	queries := db.New(tx)
+
+	// Defense in depth: Check if this user is a protected account
+	if s.config != nil {
+		user, err := queries.GetUserByID(ctx, utils.UUIDToPgtype(userID))
+		if err == nil && s.config.IsProtectedEmail(user.Email) {
+			logger.Warn("attempt to deactivate protected account ignored",
+				zap.String("user_id", userID.String()),
+				zap.String("email", user.Email),
+			)
+			if err := queries.MarkEventProcessed(ctx, db.MarkEventProcessedParams{
+				EventID:   event.EventID,
+				EventType: event.EventType,
+			}); err != nil {
+				return fmt.Errorf("%w: failed to mark event processed: %v", sharedErrors.ErrQueryFailed, err)
+			}
+			if err := tx.Commit(ctx); err != nil {
+				return fmt.Errorf("%w: failed to commit transaction: %v", sharedErrors.ErrTransactionFailed, err)
+			}
+			return nil
+		}
+	}
 
 	// Deactivate user
 	revokeVersion := 0

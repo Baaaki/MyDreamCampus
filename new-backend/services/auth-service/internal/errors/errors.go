@@ -38,7 +38,8 @@ var (
 	ErrForcePasswordChange = sharedErrors.New("FORCE_PASSWORD_CHANGE", "Devam etmek için şifrenizi değiştirmeniz gerekiyor", http.StatusForbidden)
 
 	// Session errors
-	ErrCannotTerminateSession = sharedErrors.New("CANNOT_TERMINATE_CURRENT_SESSION", "Aktif oturumunuzu sonlandırmak için çıkış yapın", http.StatusBadRequest)
+	ErrCannotTerminateSession     = sharedErrors.New("CANNOT_TERMINATE_CURRENT_SESSION", "Aktif oturumunuzu sonlandırmak için çıkış yapın", http.StatusBadRequest)
+	ErrDemoAccountActionForbidden = sharedErrors.New("DEMO_ACCOUNT_ACTION_FORBIDDEN", "Demo hesabında bu işlem kapalı", http.StatusForbidden)
 
 	// Rate limiting
 	ErrRateLimitExceeded = sharedErrors.New("RATE_LIMIT_EXCEEDED", "Çok fazla istek, lütfen biraz sonra tekrar deneyin", http.StatusTooManyRequests)

@@ -25,6 +25,7 @@ func TestAuthErrors_HTTPStatusCodes(t *testing.T) {
 		"ACCOUNT_DEACTIVATED":              {ErrAccountDeactivated, http.StatusUnauthorized},
 		"FORCE_PASSWORD_CHANGE":            {ErrForcePasswordChange, http.StatusForbidden},
 		"CANNOT_TERMINATE_CURRENT_SESSION": {ErrCannotTerminateSession, http.StatusBadRequest},
+		"DEMO_ACCOUNT_ACTION_FORBIDDEN":    {ErrDemoAccountActionForbidden, http.StatusForbidden},
 		"RATE_LIMIT_EXCEEDED":              {ErrRateLimitExceeded, http.StatusTooManyRequests},
 		"USER_NOT_FOUND":                   {ErrUserNotFound, http.StatusNotFound},
 		"USER_EXISTS":                      {ErrUserExists, http.StatusConflict},
@@ -49,7 +50,7 @@ func TestAuthErrors_DistinctCodes(t *testing.T) {
 		ErrInvalidCredentials, ErrWeakPassword, ErrInvalidOldPassword, ErrInvalidResetToken,
 		ErrInvalidToken, ErrExpiredToken, ErrTokenRevoked, ErrTokenVersionMismatch,
 		ErrAccountLocked, ErrAccountDeactivated, ErrForcePasswordChange,
-		ErrCannotTerminateSession, ErrRateLimitExceeded,
+		ErrCannotTerminateSession, ErrDemoAccountActionForbidden, ErrRateLimitExceeded,
 		ErrUserNotFound, ErrUserExists, ErrEmailExists, ErrSessionNotFound,
 	}
 	seen := make(map[string]bool, len(all))

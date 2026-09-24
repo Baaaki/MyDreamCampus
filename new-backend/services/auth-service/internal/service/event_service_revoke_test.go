@@ -7,6 +7,7 @@ import (
 	"testing"
 
 	"github.com/baaaki/mydreamcampus/auth/internal/dto"
+	"github.com/baaaki/mydreamcampus/shared/config"
 	"github.com/baaaki/mydreamcampus/shared/platform/logger"
 	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5"
@@ -46,6 +47,8 @@ func (t *userRowTx) QueryRow(_ context.Context, sql string, args ...any) pgx.Row
 	case strings.Contains(sql, "name: DeactivateUser "):
 		t.tokenVersion++
 		return versionRow{version: t.tokenVersion}
+	case strings.Contains(sql, "name: GetUserByID "):
+		return userScanRow{email: t.email}
 	}
 	return versionRow{err: pgx.ErrNoRows}
 }
@@ -64,6 +67,23 @@ func (r versionRow) Scan(dest ...any) error {
 	}
 	v := r.version
 	*dest[0].(**int32) = &v
+	return nil
+}
+
+type userScanRow struct {
+	email string
+	err   error
+}
+
+func (r userScanRow) Scan(dest ...any) error {
+	if r.err != nil {
+		return r.err
+	}
+	if len(dest) > 1 {
+		if ptr, ok := dest[1].(*string); ok {
+			*ptr = r.email
+		}
+	}
 	return nil
 }
 
@@ -169,4 +189,24 @@ func TestHandleUserUpdated_DepartmentOnly_DoesNotRevoke(t *testing.T) {
 
 	require.NoError(t, err)
 	assert.Empty(t, revoker.calls)
+}
+
+func TestHandleUserDeactivated_ProtectedAccount_Ignored(t *testing.T) {
+	tx := &userRowTx{email: "admin@university.edu.tr", tokenVersion: 2, exists: true}
+	svc, revoker := newRevokeTestService(t, tx)
+	svc.config = &config.Config{
+		Admin: config.AdminConfig{
+			Email: "admin@university.edu.tr",
+		},
+	}
+
+	err := svc.HandleUserDeactivated(context.Background(), dto.UserDeactivatedEvent{
+		BaseEvent: dto.BaseEvent{EventID: "ev-protected", EventType: "staff.deactivated"},
+		Data:      dto.UserDeactivatedData{ID: uuid.NewString()},
+	})
+
+	require.NoError(t, err)
+	assert.True(t, tx.committed, "event should be committed as processed so it's not redelivered")
+	assert.Equal(t, int32(2), tx.tokenVersion, "user must NOT be deactivated; token version unchanged")
+	assert.Empty(t, revoker.calls, "no access token revocation for protected user")
 }

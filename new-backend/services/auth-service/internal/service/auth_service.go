@@ -374,6 +374,24 @@ func (s *AuthService) revokeOutstandingAccessTokens(ctx context.Context, userID 
 
 // LogoutAll invalidates all sessions for a user and blacklists all tokens
 func (s *AuthService) LogoutAll(ctx context.Context, userID uuid.UUID, accessToken string) error {
+	user, err := s.authRepo.GetUserByID(ctx, userID)
+	if err != nil {
+		if sharedErrors.Is(err, serviceErrors.ErrUserNotFoundRepo) {
+			logger.Warn("user not found for logout all",
+				zap.Error(err),
+			)
+			return serviceErrors.ErrUserNotFound
+		}
+		if sharedErrors.Is(err, sharedErrors.ErrQueryFailed) {
+			return sharedErrors.Wrap(sharedErrors.ErrInternal, err)
+		}
+		return sharedErrors.Wrap(sharedErrors.ErrInternal, err)
+	}
+
+	if user.IsDemo {
+		return serviceErrors.ErrDemoAccountActionForbidden
+	}
+
 	// Increment token version (invalidates all tokens)
 	newVersion, err := s.authRepo.IncrementTokenVersion(ctx, userID)
 	if err != nil {
@@ -547,6 +565,10 @@ func (s *AuthService) ChangePassword(ctx context.Context, userID uuid.UUID, req 
 		return dto.ChangePasswordResponse{}, "", sharedErrors.Wrap(sharedErrors.ErrInternal, err)
 	}
 
+	if user.IsDemo {
+		return dto.ChangePasswordResponse{}, "", serviceErrors.ErrDemoAccountActionForbidden
+	}
+
 	// Verify old password
 	if !utils.VerifyPassword(user.PasswordHash, req.OldPassword) {
 		logger.Warn("invalid old password during password change",
@@ -632,6 +654,12 @@ func (s *AuthService) RequestPasswordReset(ctx context.Context, email string) er
 		zap.String("service", "AuthService"),
 		zap.String("method", "RequestPasswordReset"),
 	)
+
+	// Silently ignore password reset for protected accounts (super admin and demo accounts)
+	if s.config != nil && s.config.IsProtectedEmail(email) {
+		serviceLogger.Info("password reset requested for protected account; silently ignoring", zap.String("email", email))
+		return nil
+	}
 
 	// Get user
 	user, err := s.authRepo.GetUserByEmail(ctx, email)
@@ -738,16 +766,34 @@ func (s *AuthService) GetUserSessions(ctx context.Context, userID uuid.UUID, cur
 		return dto.SessionsResponse{}, sharedErrors.Wrap(sharedErrors.ErrInternal, err)
 	}
 
-	sessionResponses := make([]dto.SessionResponse, 0)
+	user, err := s.authRepo.GetUserByID(ctx, userID)
+	isDemo := err == nil && user.IsDemo
+
+	sessionResponses := make([]dto.SessionResponse, 0, len(sessions))
 	for _, session := range sessions {
+		isCurrent := session.RefreshTokenJti == currentJTI
+		ipAddress := session.IpAddress
+		deviceInfo := session.DeviceInfo
+
+		if isDemo && !isCurrent {
+			if ipAddress != nil {
+				masked := maskIP(*ipAddress)
+				ipAddress = &masked
+			}
+			if deviceInfo != nil {
+				shortened := shortenDeviceInfo(*deviceInfo)
+				deviceInfo = &shortened
+			}
+		}
+
 		sessionResponses = append(sessionResponses, dto.SessionResponse{
 			ID:         utils.PgtypeToUUID(session.ID).String(),
-			DeviceInfo: session.DeviceInfo,
-			IPAddress:  session.IpAddress,
+			DeviceInfo: deviceInfo,
+			IPAddress:  ipAddress,
 			CreatedAt:  session.CreatedAt.Time,
 			LastUsedAt: session.LastUsedAt.Time,
 			ExpiresAt:  session.ExpiresAt.Time,
-			IsCurrent:  session.RefreshTokenJti == currentJTI,
+			IsCurrent:  isCurrent,
 		})
 	}
 
@@ -770,6 +816,18 @@ func (s *AuthService) DeleteSession(ctx context.Context, sessionID, userID uuid.
 		}
 	}
 
+	user, err := s.authRepo.GetUserByID(ctx, userID)
+	if err != nil {
+		if sharedErrors.Is(err, serviceErrors.ErrUserNotFoundRepo) {
+			return serviceErrors.ErrUserNotFound
+		}
+		return sharedErrors.Wrap(sharedErrors.ErrInternal, err)
+	}
+
+	if user.IsDemo {
+		return serviceErrors.ErrDemoAccountActionForbidden
+	}
+
 	err = s.sessionRepo.DeleteSessionByID(ctx, sessionID, userID)
 	if err != nil {
 		return sharedErrors.Wrap(sharedErrors.ErrInternal, err)
@@ -781,6 +839,36 @@ func (s *AuthService) DeleteSession(ctx context.Context, sessionID, userID uuid.
 	)
 
 	return nil
+}
+
+func maskIP(ip string) string {
+	ip = strings.TrimSpace(ip)
+	if ip == "" {
+		return ""
+	}
+	if strings.Contains(ip, ".") {
+		parts := strings.Split(ip, ".")
+		if len(parts) >= 2 {
+			return parts[0] + "." + parts[1] + ".x.x"
+		}
+		return "x.x.x.x"
+	}
+	if strings.Contains(ip, ":") {
+		parts := strings.Split(ip, ":")
+		if len(parts) >= 2 {
+			return parts[0] + ":" + parts[1] + "::x:x"
+		}
+		return "x::x"
+	}
+	return "x.x.x.x"
+}
+
+func shortenDeviceInfo(device string) string {
+	runes := []rune(device)
+	if len(runes) > 24 {
+		return string(runes[:24]) + "..."
+	}
+	return device
 }
 
 // SeedAdmin creates the initial admin user

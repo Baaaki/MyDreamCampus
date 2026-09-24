@@ -112,3 +112,48 @@ func TestLoad_DemoConfig_DefaultAndOverride(t *testing.T) {
 	assert.Equal(t, "custom.student@campus.local", cfg.Demo.StudentEmail)
 }
 
+func TestLoad_ProtectedAccountEmails_DefaultAndOverride(t *testing.T) {
+	cfg, err := loadWithEnv(t, nil)
+	require.NoError(t, err)
+	expectedDefaults := []string{
+		"admin@university.edu.tr",
+		"demo.admin@mydreamcampus.com",
+		"ahmet.yilmaz@uni.edu.tr",
+		"zeynep.sahin@uni.edu.tr",
+	}
+	assert.Equal(t, expectedDefaults, cfg.ProtectedAccountEmails)
+
+	cfg, err = loadWithEnv(t, map[string]string{
+		"PROTECTED_ACCOUNT_EMAILS": "root@uni.edu.tr, vip@uni.edu.tr ",
+	})
+	require.NoError(t, err)
+	assert.Equal(t, []string{"root@uni.edu.tr", "vip@uni.edu.tr"}, cfg.ProtectedAccountEmails)
+}
+
+func TestConfig_IsProtectedEmail(t *testing.T) {
+	cfg, err := loadWithEnv(t, nil)
+	require.NoError(t, err)
+
+	// Defaults should be protected (case insensitive)
+	assert.True(t, cfg.IsProtectedEmail("ADMIN@university.edu.tr"))
+	assert.True(t, cfg.IsProtectedEmail("demo.admin@mydreamcampus.com"))
+	assert.True(t, cfg.IsProtectedEmail("ahmet.yilmaz@uni.edu.tr"))
+	assert.True(t, cfg.IsProtectedEmail("zeynep.sahin@uni.edu.tr"))
+
+	// Non-protected emails
+	assert.False(t, cfg.IsProtectedEmail("random@uni.edu.tr"))
+	assert.False(t, cfg.IsProtectedEmail(""))
+
+	// Custom override
+	customCfg, err := loadWithEnv(t, map[string]string{
+		"ADMIN_EMAIL":              "custom.admin@campus.local",
+		"DEMO_ADMIN_EMAIL":         "custom.demo@campus.local",
+		"PROTECTED_ACCOUNT_EMAILS": "special@campus.local",
+	})
+	require.NoError(t, err)
+	assert.True(t, customCfg.IsProtectedEmail("custom.admin@campus.local"))
+	assert.True(t, customCfg.IsProtectedEmail("custom.demo@campus.local"))
+	assert.True(t, customCfg.IsProtectedEmail("special@campus.local"))
+	assert.False(t, customCfg.IsProtectedEmail("random@campus.local"))
+}
+

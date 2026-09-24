@@ -60,7 +60,7 @@ func New(
 	outboxRepo := repository.NewOutboxRepository(pool)
 
 	authService := service.NewAuthService(authRepo, sessionRepo, eventRepo, redisClient, cfg)
-	eventService := service.NewEventService(authRepo, eventRepo, pool, redisClient)
+	eventService := service.NewEventService(authRepo, eventRepo, pool, redisClient, cfg)
 
 	authHandler := handler.NewAuthHandler(authService, cfg)
 

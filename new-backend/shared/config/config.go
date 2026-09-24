@@ -24,7 +24,8 @@ type Config struct {
 	RateLimit      RateLimitConfig
 	Timeout        TimeoutConfig
 	InternalClient InternalClientConfig
-	Demo           DemoConfig
+	Demo                   DemoConfig
+	ProtectedAccountEmails []string
 }
 
 type ServerConfig struct {
@@ -251,6 +252,7 @@ func Load() (*Config, error) {
 			TeacherEmail: viper.GetString("DEMO_TEACHER_EMAIL"),
 			StudentEmail: viper.GetString("DEMO_STUDENT_EMAIL"),
 		},
+		ProtectedAccountEmails: splitList(viper.GetString("PROTECTED_ACCOUNT_EMAILS")),
 	}
 
 	if err := cfg.Validate(); err != nil {
@@ -289,6 +291,7 @@ func setDefaults() {
 	viper.SetDefault("DEMO_ADMIN_EMAIL", "demo.admin@mydreamcampus.com")
 	viper.SetDefault("DEMO_TEACHER_EMAIL", "ahmet.yilmaz@uni.edu.tr")
 	viper.SetDefault("DEMO_STUDENT_EMAIL", "zeynep.sahin@uni.edu.tr")
+	viper.SetDefault("PROTECTED_ACCOUNT_EMAILS", "admin@university.edu.tr,demo.admin@mydreamcampus.com,ahmet.yilmaz@uni.edu.tr,zeynep.sahin@uni.edu.tr")
 
 	viper.SetDefault("OUTBOX_POLL_INTERVAL_SECONDS", 5)
 	viper.SetDefault("OUTBOX_BATCH_SIZE", 10)
@@ -340,6 +343,33 @@ func splitList(raw string) []string {
 		}
 	}
 	return out
+}
+
+// IsProtectedEmail returns true if the email belongs to any protected system
+// account (super admin, demo admin, demo teacher, demo student, or any address
+// configured in PROTECTED_ACCOUNT_EMAILS). Comparison is case-insensitive.
+func (c *Config) IsProtectedEmail(email string) bool {
+	if c == nil {
+		return false
+	}
+	target := strings.ToLower(strings.TrimSpace(email))
+	if target == "" {
+		return false
+	}
+	if strings.ToLower(strings.TrimSpace(c.Admin.Email)) == target {
+		return true
+	}
+	if strings.ToLower(strings.TrimSpace(c.Demo.AdminEmail)) == target ||
+		strings.ToLower(strings.TrimSpace(c.Demo.TeacherEmail)) == target ||
+		strings.ToLower(strings.TrimSpace(c.Demo.StudentEmail)) == target {
+		return true
+	}
+	for _, p := range c.ProtectedAccountEmails {
+		if strings.ToLower(strings.TrimSpace(p)) == target {
+			return true
+		}
+	}
+	return false
 }
 
 // ValidateQRSecret is checked only by services that sign QR codes with the
