@@ -37,6 +37,8 @@ type SimpleCreatePeriodRequest struct {
 	Semester    string    `json:"semester" binding:"required"`
 	PeriodStart time.Time `json:"period_start" binding:"required"`
 	PeriodEnd   time.Time `json:"period_end" binding:"required"`
+	PeriodType  string    `json:"period_type,omitempty"`
+	Type        string    `json:"type,omitempty"`
 }
 
 // SimplePeriodResponse is the response body for services without course-specific overrides.
@@ -48,4 +50,5 @@ type SimplePeriodResponse struct {
 	IsActive    bool      `json:"is_active"`
 	CreatedAt   time.Time `json:"created_at"`
 	UpdatedAt   time.Time `json:"updated_at"`
+	PeriodType  string    `json:"period_type,omitempty"`
 }

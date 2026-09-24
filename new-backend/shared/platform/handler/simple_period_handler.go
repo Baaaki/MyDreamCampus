@@ -1,13 +1,19 @@
 package handler
 
 import (
+	"context"
+	"encoding/json"
+	"fmt"
 	"net/http"
+	"time"
 
+	"github.com/baaaki/mydreamcampus/shared/events"
 	"github.com/baaaki/mydreamcampus/shared/platform/audit"
 	"github.com/baaaki/mydreamcampus/shared/platform/dto"
 	"github.com/baaaki/mydreamcampus/shared/platform/logger"
 	"github.com/baaaki/mydreamcampus/shared/platform/repository"
 	"github.com/baaaki/mydreamcampus/shared/platform/semester"
+	"github.com/baaaki/mydreamcampus/shared/platform/utils"
 	"github.com/gin-gonic/gin"
 	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5"
@@ -15,7 +21,7 @@ import (
 )
 
 // SimplePeriodHandler provides admin endpoints for managing academic periods
-// in services that don't need course-specific overrides (catalog, enrollment).
+// across all four period types (catalog, enrollment, grading, attendance).
 type SimplePeriodHandler struct {
 	repo            *repository.SimplePeriodRepository
 	semesterChecker semester.Checker
@@ -58,6 +64,28 @@ func (h *SimplePeriodHandler) CreatePeriod(c *gin.Context) {
 		return
 	}
 
+	periodType := req.PeriodType
+	if periodType == "" {
+		periodType = req.Type
+	}
+	if periodType == "" {
+		periodType = c.Query("period_type")
+	}
+	if periodType == "" {
+		periodType = c.Query("type")
+	}
+	if periodType == "" {
+		periodType = repository.PeriodTypeCatalog
+	}
+
+	if h.repo.HasPeriodType() && !repository.IsValidPeriodType(periodType) {
+		c.JSON(http.StatusBadRequest, gin.H{
+			"error": fmt.Sprintf("invalid period_type '%s', must be one of: catalog, enrollment, grading, attendance", periodType),
+			"code":  "VALIDATION_ERROR",
+		})
+		return
+	}
+
 	// Check semester is active
 	if h.semesterChecker != nil {
 		active, err := h.semesterChecker.IsSemesterActive(c.Request.Context(), req.Semester)
@@ -72,34 +100,86 @@ func (h *SimplePeriodHandler) CreatePeriod(c *gin.Context) {
 		}
 	}
 
-	period, err := h.repo.CreatePeriod(c.Request.Context(), repository.SimplePeriod{
-		Semester:    req.Semester,
-		PeriodStart: req.PeriodStart,
-		PeriodEnd:   req.PeriodEnd,
-		IsActive:    true,
-	})
-	if err != nil {
-		logger.Error("failed to create academic period", zap.Error(err))
-		c.JSON(http.StatusConflict, gin.H{
-			"error": "a period for this semester already exists",
-			"code":  "CONFLICT",
+	var period *repository.SimplePeriod
+	if h.repo.HasPeriodType() {
+		tx, err := h.repo.Pool().Begin(c.Request.Context())
+		if err != nil {
+			logger.Error("failed to start transaction", zap.Error(err))
+			c.JSON(http.StatusInternalServerError, gin.H{"error": "internal error", "code": "INTERNAL_ERROR"})
+			return
+		}
+		defer func() { _ = tx.Rollback(c.Request.Context()) }()
+
+		period, err = h.repo.CreatePeriodTx(c.Request.Context(), tx, repository.SimplePeriod{
+			Semester:    req.Semester,
+			PeriodStart: req.PeriodStart,
+			PeriodEnd:   req.PeriodEnd,
+			IsActive:    true,
+			PeriodType:  periodType,
+		}, periodType)
+		if err != nil {
+			logger.Error("failed to create academic period", zap.Error(err))
+			c.JSON(http.StatusConflict, gin.H{
+				"error": "a period for this semester and type already exists",
+				"code":  "CONFLICT",
+			})
+			return
+		}
+
+		if periodType != repository.PeriodTypeCatalog {
+			if err := queuePeriodEvent(c.Request.Context(), tx, period, periodType, events.PeriodActionCreated); err != nil {
+				logger.Error("failed to queue period event", zap.Error(err))
+				c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to queue event", "code": "INTERNAL_ERROR"})
+				return
+			}
+		}
+
+		if err := tx.Commit(c.Request.Context()); err != nil {
+			logger.Error("failed to commit period creation", zap.Error(err))
+			c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to commit", "code": "INTERNAL_ERROR"})
+			return
+		}
+	} else {
+		var err error
+		period, err = h.repo.CreatePeriod(c.Request.Context(), repository.SimplePeriod{
+			Semester:    req.Semester,
+			PeriodStart: req.PeriodStart,
+			PeriodEnd:   req.PeriodEnd,
+			IsActive:    true,
 		})
-		return
+		if err != nil {
+			logger.Error("failed to create academic period", zap.Error(err))
+			c.JSON(http.StatusConflict, gin.H{
+				"error": "a period for this semester already exists",
+				"code":  "CONFLICT",
+			})
+			return
+		}
 	}
 
 	// Audit log
 	if h.auditLogger != nil {
 		actorID, _ := c.Get("user_id")
+		actorRole, _ := c.Get("role")
+		roleStr := "admin"
+		if r, ok := actorRole.(string); ok && r != "" {
+			roleStr = r
+		}
+		actStr := "system"
+		if a, ok := actorID.(string); ok && a != "" {
+			actStr = a
+		}
 		if err := h.auditLogger.Log(c.Request.Context(), audit.AuditEvent{
-			ActorID:      actorID.(string),
-			ActorRole:    "admin",
+			ActorID:      actStr,
+			ActorRole:    roleStr,
 			Action:       "period.created",
 			ResourceType: "academic_period",
 			ResourceID:   period.ID.String(),
 			Details: map[string]any{
 				"semester":     req.Semester,
-				"period_start": req.PeriodStart.Format("2006-01-02T15:04:05Z07:00"),
-				"period_end":   req.PeriodEnd.Format("2006-01-02T15:04:05Z07:00"),
+				"period_type":  period.PeriodType,
+				"period_start": req.PeriodStart.Format(time.RFC3339),
+				"period_end":   req.PeriodEnd.Format(time.RFC3339),
 			},
 		}); err != nil {
 			logger.Warn("audit log write failed", zap.Error(err))
@@ -108,26 +188,23 @@ func (h *SimplePeriodHandler) CreatePeriod(c *gin.Context) {
 
 	logger.Info("academic period created",
 		zap.String("semester", period.Semester),
+		zap.String("period_type", period.PeriodType),
 		zap.String("period_id", period.ID.String()),
 	)
 
 	c.JSON(http.StatusCreated, toSimplePeriodResponse(period))
 }
 
-// ListPeriods lists academic periods, optionally filtered by semester.
-// GET /admin/periods?semester=2025-2026-Fall
+// ListPeriods lists academic periods, optionally filtered by semester and period_type/type.
+// GET /admin/periods?semester=2025-2026-Fall&type=enrollment
 func (h *SimplePeriodHandler) ListPeriods(c *gin.Context) {
 	semester := c.Query("semester")
-
-	var periods []repository.SimplePeriod
-	var err error
-
-	if semester != "" {
-		periods, err = h.repo.GetPeriodsBySemester(c.Request.Context(), semester)
-	} else {
-		periods, err = h.repo.GetAllPeriods(c.Request.Context())
+	periodType := c.Query("period_type")
+	if periodType == "" {
+		periodType = c.Query("type")
 	}
 
+	periods, err := h.repo.GetPeriods(c.Request.Context(), semester, periodType)
 	if err != nil {
 		logger.Error("failed to list academic periods", zap.Error(err))
 		c.JSON(http.StatusInternalServerError, gin.H{
@@ -193,34 +270,86 @@ func (h *SimplePeriodHandler) UpdatePeriod(c *gin.Context) {
 		}
 	}
 
-	period, err := h.repo.UpdatePeriod(c.Request.Context(), id, req.PeriodEnd, req.IsActive)
-	if err != nil {
-		if err == pgx.ErrNoRows {
-			c.JSON(http.StatusNotFound, gin.H{
-				"error": "period not found",
-				"code":  "NOT_FOUND",
+	var period *repository.SimplePeriod
+	if h.repo.HasPeriodType() {
+		tx, err := h.repo.Pool().Begin(c.Request.Context())
+		if err != nil {
+			logger.Error("failed to start transaction", zap.Error(err))
+			c.JSON(http.StatusInternalServerError, gin.H{"error": "internal error", "code": "INTERNAL_ERROR"})
+			return
+		}
+		defer func() { _ = tx.Rollback(c.Request.Context()) }()
+
+		period, err = h.repo.UpdatePeriodTx(c.Request.Context(), tx, id, req.PeriodEnd, req.IsActive)
+		if err != nil {
+			if err == pgx.ErrNoRows {
+				c.JSON(http.StatusNotFound, gin.H{
+					"error": "period not found",
+					"code":  "NOT_FOUND",
+				})
+				return
+			}
+			logger.Error("failed to update academic period", zap.Error(err))
+			c.JSON(http.StatusInternalServerError, gin.H{
+				"error": "failed to update period",
+				"code":  "INTERNAL_ERROR",
 			})
 			return
 		}
-		logger.Error("failed to update academic period", zap.Error(err))
-		c.JSON(http.StatusInternalServerError, gin.H{
-			"error": "failed to update period",
-			"code":  "INTERNAL_ERROR",
-		})
-		return
+
+		if period.PeriodType != "" && period.PeriodType != repository.PeriodTypeCatalog {
+			if err := queuePeriodEvent(c.Request.Context(), tx, period, period.PeriodType, events.PeriodActionUpdated); err != nil {
+				logger.Error("failed to queue period update event", zap.Error(err))
+				c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to queue event", "code": "INTERNAL_ERROR"})
+				return
+			}
+		}
+
+		if err := tx.Commit(c.Request.Context()); err != nil {
+			logger.Error("failed to commit period update", zap.Error(err))
+			c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to commit", "code": "INTERNAL_ERROR"})
+			return
+		}
+	} else {
+		period, err = h.repo.UpdatePeriod(c.Request.Context(), id, req.PeriodEnd, req.IsActive)
+		if err != nil {
+			if err == pgx.ErrNoRows {
+				c.JSON(http.StatusNotFound, gin.H{
+					"error": "period not found",
+					"code":  "NOT_FOUND",
+				})
+				return
+			}
+			logger.Error("failed to update academic period", zap.Error(err))
+			c.JSON(http.StatusInternalServerError, gin.H{
+				"error": "failed to update period",
+				"code":  "INTERNAL_ERROR",
+			})
+			return
+		}
 	}
 
 	// Audit log
 	if h.auditLogger != nil {
 		actorID, _ := c.Get("user_id")
+		actorRole, _ := c.Get("role")
+		roleStr := "admin"
+		if r, ok := actorRole.(string); ok && r != "" {
+			roleStr = r
+		}
+		actStr := "system"
+		if a, ok := actorID.(string); ok && a != "" {
+			actStr = a
+		}
 		if err := h.auditLogger.Log(c.Request.Context(), audit.AuditEvent{
-			ActorID:      actorID.(string),
-			ActorRole:    "admin",
+			ActorID:      actStr,
+			ActorRole:    roleStr,
 			Action:       "period.updated",
 			ResourceType: "academic_period",
 			ResourceID:   id.String(),
 			Details: map[string]any{
-				"semester": existing.Semester,
+				"semester":    existing.Semester,
+				"period_type": period.PeriodType,
 			},
 		}); err != nil {
 			logger.Warn("audit log write failed", zap.Error(err))
@@ -229,6 +358,7 @@ func (h *SimplePeriodHandler) UpdatePeriod(c *gin.Context) {
 
 	logger.Info("academic period updated",
 		zap.String("period_id", id.String()),
+		zap.String("period_type", period.PeriodType),
 	)
 
 	c.JSON(http.StatusOK, toSimplePeriodResponse(period))
@@ -273,33 +403,83 @@ func (h *SimplePeriodHandler) DeletePeriod(c *gin.Context) {
 		}
 	}
 
-	if err := h.repo.DeletePeriod(c.Request.Context(), id); err != nil {
-		if err == pgx.ErrNoRows {
-			c.JSON(http.StatusNotFound, gin.H{
-				"error": "period not found",
-				"code":  "NOT_FOUND",
+	if h.repo.HasPeriodType() {
+		tx, err := h.repo.Pool().Begin(c.Request.Context())
+		if err != nil {
+			logger.Error("failed to start transaction", zap.Error(err))
+			c.JSON(http.StatusInternalServerError, gin.H{"error": "internal error", "code": "INTERNAL_ERROR"})
+			return
+		}
+		defer func() { _ = tx.Rollback(c.Request.Context()) }()
+
+		if err := h.repo.DeletePeriodTx(c.Request.Context(), tx, id); err != nil {
+			if err == pgx.ErrNoRows {
+				c.JSON(http.StatusNotFound, gin.H{
+					"error": "period not found",
+					"code":  "NOT_FOUND",
+				})
+				return
+			}
+			logger.Error("failed to delete academic period", zap.Error(err))
+			c.JSON(http.StatusInternalServerError, gin.H{
+				"error": "failed to delete period",
+				"code":  "INTERNAL_ERROR",
 			})
 			return
 		}
-		logger.Error("failed to delete academic period", zap.Error(err))
-		c.JSON(http.StatusInternalServerError, gin.H{
-			"error": "failed to delete period",
-			"code":  "INTERNAL_ERROR",
-		})
-		return
+
+		if existing.PeriodType != "" && existing.PeriodType != repository.PeriodTypeCatalog {
+			if err := queuePeriodDeletedEvent(c.Request.Context(), tx, existing.Semester, existing.PeriodType); err != nil {
+				logger.Error("failed to queue period deletion event", zap.Error(err))
+				c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to queue event", "code": "INTERNAL_ERROR"})
+				return
+			}
+		}
+
+		if err := tx.Commit(c.Request.Context()); err != nil {
+			logger.Error("failed to commit period deletion", zap.Error(err))
+			c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to commit", "code": "INTERNAL_ERROR"})
+			return
+		}
+	} else {
+		if err := h.repo.DeletePeriod(c.Request.Context(), id); err != nil {
+			if err == pgx.ErrNoRows {
+				c.JSON(http.StatusNotFound, gin.H{
+					"error": "period not found",
+					"code":  "NOT_FOUND",
+				})
+				return
+			}
+			logger.Error("failed to delete academic period", zap.Error(err))
+			c.JSON(http.StatusInternalServerError, gin.H{
+				"error": "failed to delete period",
+				"code":  "INTERNAL_ERROR",
+			})
+			return
+		}
 	}
 
 	// Audit log
 	if h.auditLogger != nil {
 		actorID, _ := c.Get("user_id")
+		actorRole, _ := c.Get("role")
+		roleStr := "admin"
+		if r, ok := actorRole.(string); ok && r != "" {
+			roleStr = r
+		}
+		actStr := "system"
+		if a, ok := actorID.(string); ok && a != "" {
+			actStr = a
+		}
 		if err := h.auditLogger.Log(c.Request.Context(), audit.AuditEvent{
-			ActorID:      actorID.(string),
-			ActorRole:    "admin",
+			ActorID:      actStr,
+			ActorRole:    roleStr,
 			Action:       "period.deleted",
 			ResourceType: "academic_period",
 			ResourceID:   id.String(),
 			Details: map[string]any{
-				"semester": existing.Semester,
+				"semester":    existing.Semester,
+				"period_type": existing.PeriodType,
 			},
 		}); err != nil {
 			logger.Warn("audit log write failed", zap.Error(err))
@@ -308,11 +488,50 @@ func (h *SimplePeriodHandler) DeletePeriod(c *gin.Context) {
 
 	logger.Info("academic period deleted",
 		zap.String("period_id", id.String()),
+		zap.String("period_type", existing.PeriodType),
 	)
 
 	c.JSON(http.StatusOK, gin.H{
 		"message": "period deleted successfully",
 	})
+}
+
+func queuePeriodEvent(ctx context.Context, tx pgx.Tx, p *repository.SimplePeriod, periodType, action string) error {
+	payload, err := json.Marshal(map[string]any{
+		"id":           p.ID.String(),
+		"semester":     p.Semester,
+		"period_type":  periodType,
+		"period_start": p.PeriodStart.Format(time.RFC3339),
+		"period_end":   p.PeriodEnd.Format(time.RFC3339),
+		"is_active":    p.IsActive,
+	})
+	if err != nil {
+		return fmt.Errorf("marshal period event payload: %w", err)
+	}
+	eventType := events.PeriodEventType(periodType, action)
+	correlationID := utils.CorrelationIDFromContext(ctx)
+	_, err = tx.Exec(ctx, `
+		INSERT INTO course_catalog.outbox_events (event_type, routing_key, payload, correlation_id)
+		VALUES ($1, $2, $3, $4)
+	`, eventType, eventType, payload, correlationID)
+	return err
+}
+
+func queuePeriodDeletedEvent(ctx context.Context, tx pgx.Tx, semester, periodType string) error {
+	payload, err := json.Marshal(map[string]any{
+		"semester":    semester,
+		"period_type": periodType,
+	})
+	if err != nil {
+		return fmt.Errorf("marshal period event payload: %w", err)
+	}
+	eventType := events.PeriodEventType(periodType, events.PeriodActionDeleted)
+	correlationID := utils.CorrelationIDFromContext(ctx)
+	_, err = tx.Exec(ctx, `
+		INSERT INTO course_catalog.outbox_events (event_type, routing_key, payload, correlation_id)
+		VALUES ($1, $2, $3, $4)
+	`, eventType, eventType, payload, correlationID)
+	return err
 }
 
 func toSimplePeriodResponse(p *repository.SimplePeriod) dto.SimplePeriodResponse {
@@ -324,5 +543,6 @@ func toSimplePeriodResponse(p *repository.SimplePeriod) dto.SimplePeriodResponse
 		IsActive:    p.IsActive,
 		CreatedAt:   p.CreatedAt,
 		UpdatedAt:   p.UpdatedAt,
+		PeriodType:  p.PeriodType,
 	}
 }
