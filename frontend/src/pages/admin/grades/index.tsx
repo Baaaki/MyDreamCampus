@@ -37,12 +37,7 @@ import type {
   StudentGrades,
   SemesterCourse,
 } from "@/lib/types"
-import { mockCourseCatalog } from "@/mock_data/catalog"
 import { useFaculties } from "@/lib/services/catalog-service"
-import {
-  mockAdminCourseStatus,
-  mockAdminStudents,
-} from "@/mock_data/admin_grades"
 import { getActiveSemester } from "@/lib/services/system-service"
 
 type AdminCourseRow = Pick<
@@ -88,9 +83,6 @@ export default function AdminGradesPage() {
   } | null
   const [lockAction, setLockAction] = useState<LockActionState>(null)
 
-  // Toggles testing functionality without backend
-  const [useMockData, setUseMockData] = useState(false)
-
   const {
     data: faculties = [],
     isLoading: isLoadingFaculties,
@@ -98,12 +90,10 @@ export default function AdminGradesPage() {
   } = useFaculties()
 
   // Active Semester State
-  const { data: liveActiveSemester = "" } = useQuery({
+  const { data: activeSemester = "" } = useQuery({
     queryKey: ["semesters", "active", "name"],
     queryFn: async () => (await getActiveSemester())?.name ?? "",
-    enabled: !useMockData,
   })
-  const activeSemester = useMockData ? "2025-2026 Güz" : liveActiveSemester
 
   // Removed auto-fetching of courses on mount
 
@@ -112,7 +102,7 @@ export default function AdminGradesPage() {
       setError("Lütfen önce fakülte ve bölüm seçimi yapınız.")
       return
     }
-    if (!useMockData && !activeSemester) {
+    if (!activeSemester) {
       setError("Aktif dönem bulunamadı. Lütfen önce bir dönem aktifleştirin.")
       return
     }
@@ -120,56 +110,33 @@ export default function AdminGradesPage() {
     setHasSearched(true)
     setError("")
     try {
-      if (useMockData) {
-        const filtered = mockCourseCatalog.filter(
-          (c) =>
-            c.faculty === facultyFilter &&
-            c.department === departmentFilter &&
-            (searchQuery
-              ? c.course_code
-                  .toLowerCase()
-                  .includes(searchQuery.toLowerCase()) ||
-                c.name.toLowerCase().includes(searchQuery.toLowerCase())
-              : true)
-        )
-        setCourses(
-          filtered.map((c) => ({
-            id: c.id,
-            course_code: c.course_code,
-            course_name: c.name,
-            department: c.department,
-            faculty: c.faculty,
-          }))
-        )
-      } else {
-        const resp = await semesterApi
-          .get(`${encodeURIComponent(activeSemester)}/courses`, {
-            searchParams: {
-              faculty: facultyFilter,
-              department: departmentFilter,
-              limit: 100,
-            },
-          })
-          .json<{ data: SemesterCourse[] | null }>()
-
-        const q = searchQuery.trim().toLowerCase()
-        const filtered = (resp.data || []).filter(
-          (c) =>
-            !q ||
-            c.course_code.toLowerCase().includes(q) ||
-            c.course_name.toLowerCase().includes(q)
-        )
-        setCourses(
-          filtered.map((c) => ({
-            id: c.id,
-            course_code: c.course_code,
-            course_name: c.course_name,
-            department: c.department,
+      const resp = await semesterApi
+        .get(`${encodeURIComponent(activeSemester)}/courses`, {
+          searchParams: {
             faculty: facultyFilter,
-            instructor_fullname: c.instructor_fullname,
-          }))
-        )
-      }
+            department: departmentFilter,
+            limit: 100,
+          },
+        })
+        .json<{ data: SemesterCourse[] | null }>()
+
+      const q = searchQuery.trim().toLowerCase()
+      const filtered = (resp.data || []).filter(
+        (c) =>
+          !q ||
+          c.course_code.toLowerCase().includes(q) ||
+          c.course_name.toLowerCase().includes(q)
+      )
+      setCourses(
+        filtered.map((c) => ({
+          id: c.id,
+          course_code: c.course_code,
+          course_name: c.course_name,
+          department: c.department,
+          faculty: facultyFilter,
+          instructor_fullname: c.instructor_fullname,
+        }))
+      )
     } catch (err) {
       if (err instanceof HTTPError && err.response.status === 404) {
         setCourses([])
@@ -186,17 +153,12 @@ export default function AdminGradesPage() {
     setView("STUDENTS")
     setLoading(true)
     try {
-      if (useMockData) {
-        setCourseStatus(mockAdminCourseStatus)
-        setStudents(JSON.parse(JSON.stringify(mockAdminStudents))) // Deep clone to allow local modifications
-      } else {
-        const [statusRes, studentsRes] = await Promise.all([
-          gradesService.getCourseStatus(course.id),
-          gradesService.getCourseStudents(course.id),
-        ])
-        setCourseStatus(statusRes)
-        setStudents(studentsRes.students || [])
-      }
+      const [statusRes, studentsRes] = await Promise.all([
+        gradesService.getCourseStatus(course.id),
+        gradesService.getCourseStudents(course.id),
+      ])
+      setCourseStatus(statusRes)
+      setStudents(studentsRes.students || [])
     } catch {
       setError("Ders verileri alınamadı.")
     } finally {
@@ -211,40 +173,23 @@ export default function AdminGradesPage() {
   ) => {
     setActionLoading(`${student.registration_id}-${slug}`)
     try {
-      if (useMockData) {
-        // Simulate local state update instead of API Call
-        await new Promise((r) => setTimeout(r, 400))
-        setStudents((prev) =>
-          prev.map((s) => {
-            if (s.registration_id === student.registration_id) {
-              const updatedScores = { ...s.scores }
-              if (updatedScores[slug]) {
-                updatedScores[slug].is_locked = !isLocked
-              }
-              return { ...s, scores: updatedScores }
-            }
-            return s
-          })
-        )
+      if (isLocked) {
+        await gradesService.unlockScore({
+          registration_id: student.registration_id,
+          slug,
+        })
       } else {
-        if (isLocked) {
-          await gradesService.unlockScore({
-            registration_id: student.registration_id,
-            slug,
-          })
-        } else {
-          await gradesService.lockScore({
-            registration_id: student.registration_id,
-            slug,
-          })
-        }
-
-        // Refresh students
-        const studentsRes = await gradesService.getCourseStudents(
-          selectedCourse!.id
-        )
-        setStudents(studentsRes.students || [])
+        await gradesService.lockScore({
+          registration_id: student.registration_id,
+          slug,
+        })
       }
+
+      // Refresh students
+      const studentsRes = await gradesService.getCourseStudents(
+        selectedCourse!.id
+      )
+      setStudents(studentsRes.students || [])
     } catch {
       alert("İşlem başarısız oldu.")
     } finally {
@@ -587,26 +532,6 @@ export default function AdminGradesPage() {
               Öğrenci notları ve değerlendirmelerin kilit durumlarını buradan
               öğrenci bazında yönetebilirsiniz.
             </p>
-          </div>
-          <div className="flex items-center gap-2 rounded border bg-white px-3 py-1.5 shadow-sm dark:border-gray-800 dark:bg-gray-900">
-            <label
-              htmlFor="mock-toggle"
-              className="cursor-pointer text-xs font-semibold text-gray-700 select-none dark:text-gray-300"
-            >
-              Test Modu (Mock Veri)
-            </label>
-            <input
-              id="mock-toggle"
-              type="checkbox"
-              className="cursor-pointer rounded accent-blue-600"
-              checked={useMockData}
-              onChange={(e) => {
-                setUseMockData(e.target.checked)
-                setHasSearched(false)
-                setCourses([])
-                if (view === "STUDENTS") setView("COURSES")
-              }}
-            />
           </div>
         </div>
       </div>

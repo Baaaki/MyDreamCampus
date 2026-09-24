@@ -1,14 +1,13 @@
-import { useState, useMemo } from "react"
+import { useState } from "react"
 import { useParams, useNavigate, useLocation } from "react-router"
-import { useQuery } from "@tanstack/react-query"
+import { useQuery, useQueryClient } from "@tanstack/react-query"
 import { attendanceApiSafe } from "@/lib/api-client"
-import type { SessionRecordsResponse, AdminSessionItem } from "@/lib/types"
-import {
-  generateMockSessionRecords,
-  mockAdminSessionsResponse,
-  markMockStudentPresent,
-} from "@/mock_data/admin_attendance"
-import { mockCourseCatalog } from "@/mock_data/catalog"
+import { catalogService } from "@/lib/services/catalog-service"
+import type {
+  SessionRecordsResponse,
+  AdminSessionItem,
+  SessionDetailsResponse,
+} from "@/lib/types"
 import {
   Table,
   TableBody,
@@ -35,71 +34,67 @@ export default function AdminAttendanceSessionPage() {
   const { sessionId } = useParams<{ sessionId: string }>()
   const navigate = useNavigate()
   const location = useLocation()
-
-  // Persist useMockData across reloads manually if needed,
-  // or default to false. Since the user arrives via URL mostly, let's keep it stateful.
-  const [useMockData, setUseMockData] = useState<boolean>(
-    () => sessionId?.startsWith("sess-mock-") || false
-  )
-  const [mockRefresh, setMockRefresh] = useState(0)
+  const queryClient = useQueryClient()
 
   // Read session item from router state if available
   const sessionItemState = location.state?.session as
-    AdminSessionItem | undefined
+    | AdminSessionItem
+    | undefined
 
-  // If directly navigated, fallback to finding it in mock data (if mock is enabled)
-  const sessionItem =
-    sessionItemState ||
-    (useMockData
-      ? mockAdminSessionsResponse.sessions.find(
-          (s) => s.session_id === sessionId
-        )
-      : undefined)
+  const { data: sessionDetailsApi } = useQuery({
+    queryKey: ["admin-session-details", sessionId],
+    queryFn: () =>
+      attendanceApiSafe
+        .get(`sessions/${sessionId}`)
+        .json<SessionDetailsResponse>(),
+    enabled: !!sessionId && !sessionItemState,
+  })
+
+  const sessionItem = sessionItemState || sessionDetailsApi
 
   // Lookup comprehensive course info from catalog
-  const courseInfo = useMemo(() => {
-    if (!sessionItem) return undefined
-    return mockCourseCatalog.find(
-      (c) => c.course_code === sessionItem.course_code
-    )
-  }, [sessionItem])
+  const { data: courseInfo } = useQuery({
+    queryKey: ["course-by-code", sessionItem?.course_code],
+    queryFn: () => catalogService.getCourseByCode(sessionItem!.course_code),
+    enabled: !!sessionItem?.course_code,
+  })
 
-  const { data: recordsApiData, isLoading: recordsLoadingApi } = useQuery({
+  const { data: records, isLoading: recordsLoading } = useQuery({
     queryKey: ["admin-session-records", sessionId],
     queryFn: () =>
       attendanceApiSafe
         .get(`sessions/${sessionId}/records`)
         .json<SessionRecordsResponse>(),
-    enabled: !!sessionId && !useMockData,
+    enabled: !!sessionId,
   })
-
-  const records =
-    useMockData && sessionId
-      ? generateMockSessionRecords(sessionId)
-      : recordsApiData
-  const recordsLoading = !useMockData && recordsLoadingApi
 
   const presentStudents = records?.records.filter((r) => r.is_present) || []
   const absentStudents = records?.records.filter((r) => !r.is_present) || []
 
   const [studentToMark, setStudentToMark] = useState<string | null>(null)
+  const [isMarking, setIsMarking] = useState(false)
 
-  const confirmMarkPresent = () => {
-    if (studentToMark) {
-      if (useMockData && sessionId) {
-        markMockStudentPresent(sessionId, studentToMark)
-        setMockRefresh((prev) => prev + 1)
-      } else {
-        alert(
-          'Backend endpoint bağlatısı henüz yapılmadı. Lütfen "Test Modu (Mock Veri)"nu aktif edip deneyin.'
-        )
-      }
+  const confirmMarkPresent = async () => {
+    if (!studentToMark || !sessionId) return
+    setIsMarking(true)
+    try {
+      await attendanceApiSafe.post(`sessions/${sessionId}/manual`, {
+        json: {
+          student_id: studentToMark,
+          is_present: true,
+          note: "Admin tarafından manuel eklendi",
+        },
+      })
+      await queryClient.invalidateQueries({
+        queryKey: ["admin-session-records", sessionId],
+      })
+    } catch (err) {
+      console.error("Manuel yoklama eklenemedi:", err)
+    } finally {
+      setIsMarking(false)
       setStudentToMark(null)
     }
   }
-
-  // just to silence linter if mockRefresh is considered unused in strict modes.
-  console.debug("mockRefresh", mockRefresh)
 
   return (
     <div className="space-y-6">
@@ -120,21 +115,6 @@ export default function AdminAttendanceSessionPage() {
               Bu oturuma katılan öğrencilerin detaylı yoklama kayıtları
             </p>
           </div>
-        </div>
-        <div className="flex items-center gap-2 rounded border bg-white px-3 py-1.5 shadow-sm dark:border-gray-800 dark:bg-gray-900">
-          <label
-            htmlFor="mock-toggle"
-            className="cursor-pointer text-xs font-semibold text-gray-700 select-none dark:text-gray-300"
-          >
-            Test Modu (Mock Veri)
-          </label>
-          <input
-            id="mock-toggle"
-            type="checkbox"
-            className="cursor-pointer rounded accent-indigo-600"
-            checked={useMockData}
-            onChange={(e) => setUseMockData(e.target.checked)}
-          />
         </div>
       </div>
 
@@ -211,9 +191,7 @@ export default function AdminAttendanceSessionPage() {
               </div>
             ) : (
               <div className="py-4 text-center text-sm text-gray-500">
-                {!useMockData
-                  ? "Oturum bilgisine ulaşılamadı. Test Modunu aktifleştirmeyi deneyin."
-                  : "Böyle bir oturum bulunamadı."}
+                Oturum bilgisi yükleniyor veya bulunamadı.
               </div>
             )}
           </div>
@@ -426,8 +404,11 @@ export default function AdminAttendanceSessionPage() {
           </AlertDialogHeader>
           <AlertDialogFooter>
             <AlertDialogCancel>İptal</AlertDialogCancel>
-            <AlertDialogAction onClick={confirmMarkPresent}>
-              Evet, Ekle
+            <AlertDialogAction
+              onClick={confirmMarkPresent}
+              disabled={isMarking}
+            >
+              {isMarking ? "Ekleniyor..." : "Evet, Ekle"}
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>

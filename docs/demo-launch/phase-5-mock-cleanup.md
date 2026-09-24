@@ -27,13 +27,14 @@ altyapısındaki `vi.mock` ve `__mocks__` uygulama kodu değildir; kalır.
       `student/index.tsx`
   - **Commit:** `refactor(frontend): load faculties from the catalog service`
 
-- [ ] **5.2 Admin sayfalarında "Test Modu"**
+- [x] **5.2 Admin sayfalarında "Test Modu"** (gemini ile yapıldı)
   - `pages/admin/grades/index.tsx`: `useMockData` (≈89-104, 121, 187, 212),
     anahtar (≈579-590).
   - `pages/admin/attendance/index.tsx`: ≈71-201.
   - `pages/admin/attendance/sessionId/index.tsx`: ≈39-90;
     `generateMockSessionRecords` ve `markMockStudentPresent`.
   - **Commit:** `refactor(frontend): drop the mock data toggles from admin pages`
+
 
 - [ ] **5.3 Diğer sahte dallar**
   - `pages/student/grades/index.tsx` (≈20, 41, 163): `VITE_USE_MOCK_API`

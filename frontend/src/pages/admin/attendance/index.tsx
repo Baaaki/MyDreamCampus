@@ -16,8 +16,6 @@ import {
 import { Button } from "@/components/ui/button"
 import { ChevronLeft, ChevronRight, Calendar } from "lucide-react"
 import { catalogService, useFaculties } from "@/lib/services/catalog-service"
-import { mockCourseCatalog } from "@/mock_data/catalog"
-import { mockAdminSessionsResponse } from "@/mock_data/admin_attendance"
 
 function getMonthRange(year: number, month: number) {
   const start = new Date(year, month, 1)
@@ -68,24 +66,19 @@ export default function AdminAttendancePage() {
 
   const { start_date, end_date } = getMonthRange(year, month)
 
-  const [useMockData, setUseMockData] = useState(false)
-
   const {
     data: faculties = [],
     isLoading: isLoadingFaculties,
     isError: isErrorFaculties,
   } = useFaculties()
 
-  const { data: apiData, isLoading } = useQuery({
+  const { data, isLoading } = useQuery({
     queryKey: ["admin-attendance-sessions", start_date, end_date],
     queryFn: () =>
       attendanceApiSafe
         .get("admin/sessions", { searchParams: { start_date, end_date } })
         .json<AdminSessionsResponse>(),
-    enabled: !useMockData,
   })
-
-  const data = useMockData ? mockAdminSessionsResponse : apiData
 
   const [facultyFilter, setFacultyFilter] = useState("")
   const [departmentFilter, setDepartmentFilter] = useState("")
@@ -103,25 +96,13 @@ export default function AdminAttendancePage() {
         department: departmentFilter,
         limit: 1000,
       }),
-    enabled: !!facultyFilter && !useMockData,
+    enabled: !!facultyFilter,
   })
 
   const validCourseCodes = useMemo(() => {
-    if (useMockData) {
-      if (!facultyFilter) return new Set<string>()
-      return new Set(
-        mockCourseCatalog
-          .filter(
-            (c) =>
-              c.faculty === facultyFilter &&
-              (departmentFilter ? c.department === departmentFilter : true)
-          )
-          .map((c) => c.course_code)
-      )
-    }
     if (!coursesData?.courses) return new Set<string>()
     return new Set(coursesData.courses.map((c) => c.course_code))
-  }, [coursesData, useMockData, facultyFilter, departmentFilter])
+  }, [coursesData])
 
   // Group sessions by date
   const sessionsByDate = useMemo(() => {
@@ -191,21 +172,6 @@ export default function AdminAttendancePage() {
           <p className="mt-1 text-sm text-gray-500 dark:text-gray-400">
             Aylık yoklama oturumlarını görüntüleyin
           </p>
-        </div>
-        <div className="flex items-center gap-2 rounded border bg-white px-3 py-1.5 shadow-sm dark:border-gray-800 dark:bg-gray-900">
-          <label
-            htmlFor="mock-toggle"
-            className="cursor-pointer text-xs font-semibold text-gray-700 select-none dark:text-gray-300"
-          >
-            Test Modu (Mock Veri)
-          </label>
-          <input
-            id="mock-toggle"
-            type="checkbox"
-            className="cursor-pointer rounded accent-indigo-600"
-            checked={useMockData}
-            onChange={(e) => setUseMockData(e.target.checked)}
-          />
         </div>
       </div>
 
