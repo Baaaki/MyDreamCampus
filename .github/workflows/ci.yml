@@ -180,7 +180,18 @@ jobs:
         # path prefix still routes to the service that owns it.
         run: |
           set -eu
-          api() { curl -sS -o /tmp/body -w '%{http_code}' "$@"; }
+          # The seed spends most of the admin's per-user budget (200 a minute,
+          # one bucket across every service) moments before this step starts,
+          # so a 429 is waited out, not failed on. Rate limiting is not what
+          # this job tests.
+          api() {
+            for _ in $(seq 1 40); do
+              code=$(curl -sS -o /tmp/body -D /tmp/headers -w '%{http_code}' "$@")
+              [ "$code" = 429 ] || break
+              sleep "$(awk 'tolower($1) == "retry-after:" { print $2 + 0 }' /tmp/headers | grep . || echo 2)"
+            done
+            echo "$code"
+          }
           expect() {
             want="$1"; got="$2"; what="$3"
             if [ "$got" != "$want" ]; then
@@ -231,7 +242,13 @@ jobs:
           code=$(api http://localhost/api/admin-staff -H "Authorization: Bearer $STUDENT_TOKEN")
           expect 403 "$code" "administrative staff directory is admin-only"
 
-          code=$(api http://localhost/api/enrollment/available-courses \
+          # The seed names its semesters after the day it runs, so the
+          # active one is read back rather than spelled out here.
+          code=$(api http://localhost/api/catalog/admin/semesters/active -H "Authorization: Bearer $TOKEN")
+          expect 200 "$code" "active semester (catalog)"
+          SEMESTER=$(jq -r '.name | @uri' /tmp/body)
+
+          code=$(api "http://localhost/api/enrollment/available-courses?semester=$SEMESTER" \
             -H "Authorization: Bearer $STUDENT_TOKEN")
           expect 200 "$code" "available courses (enrollment -> student + catalog)"
 
@@ -301,7 +318,8 @@ jobs:
           FRI=$(date -u -d "-$((DOW - 1)) days +11 days" +%F)
 
           checkout() {
-            day="$1"; card="$2"; want="$3"
+            # Not "want": expect() sets that global, and sh has no locals.
+            day="$1"; card="$2"; want_status="$3"
             code=$(api -X POST http://localhost/api/meals/reservations/batch \
               -H "Authorization: Bearer $STUDENT_TOKEN" -H 'Content-Type: application/json' \
               -d "{\"reservations\":[{\"cafeteria_id\":\"$CAFETERIA\",\"date\":\"$day\",\"meal_time\":\"lunch\",\"menu_type\":\"normal\"}]}")
@@ -320,13 +338,13 @@ jobs:
               code=$(api "http://localhost/api/meals/reservations/my?from_date=$day&to_date=$day" \
                 -H "Authorization: Bearer $STUDENT_TOKEN")
               status=$(jq -r --arg id "$RESERVATION" '.data.reservations[]? | select(.id == $id) | .status' /tmp/body)
-              if [ "$code" = 200 ] && [ "$status" = "$want" ]; then
-                echo "ok  [$code] reservation $day is $want (payment event -> meal)"
+              if [ "$code" = 200 ] && [ "$status" = "$want_status" ]; then
+                echo "ok  [$code] reservation $day is $want_status (payment event -> meal)"
                 return 0
               fi
               sleep 1
             done
-            echo "::error::reservation $day never became $want (last: $status)"
+            echo "::error::reservation $day never became $want_status (last: $status)"
             exit 1
           }
 
@@ -341,8 +359,9 @@ jobs:
           code=$(api "http://localhost/api/payments/$PAYMENT" -H "Authorization: Bearer $TOKEN")
           expect 403 "$code" "payments are for their student only"
 
-          # No token must never be served.
-          code=$(api http://localhost/api/grades)
+          # No token must never be served. A real route: /api/grades alone
+          # matches nothing and answers 404 before any auth runs.
+          code=$(api http://localhost/api/grades/my/grades)
           expect 401 "$code" "unauthenticated request is rejected (grades)"
 
       - name: Collect logs on failure
