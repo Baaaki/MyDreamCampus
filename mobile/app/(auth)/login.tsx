@@ -8,7 +8,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { Button, Input, Text } from '@/components/ui';
 import { useAuthContext } from '@/contexts/AuthContext';
 import { useTheme } from '@/contexts/ThemeContext';
-import { useLogin } from '@/hooks/useAuth';
+import { useLogin, useDemoAccounts } from '@/hooks/useAuth';
 import { useHaptic } from '@/hooks/useHaptic';
 import { COLORS } from '@/lib/theme';
 
@@ -25,6 +25,7 @@ export default function LoginScreen() {
   const [formError, setFormError] = useState<string | null>(null);
 
   const loginMutation = useLogin();
+  const { data: demoAccounts } = useDemoAccounts();
 
   const handleLogin = () => {
     if (!email || !password) {
@@ -172,6 +173,50 @@ export default function LoginScreen() {
             >
               <Text>{loginMutation.isPending ? 'Giris yapiliyor...' : 'Giris Yap'}</Text>
             </Button>
+            {demoAccounts && demoAccounts.length > 0 && (
+              <View className="mt-4 rounded-2xl border border-border bg-card p-4">
+                <View className="mb-2 flex-row items-center gap-2">
+                  <Ionicons name="people-outline" size={18} color={colors.primary} />
+                  <Text className="text-sm font-bold text-foreground">Demo Hesapları</Text>
+                </View>
+                <Text className="mb-3 text-xs text-muted-foreground">
+                  Dokunarak formu otomatik doldurabilirsiniz:
+                </Text>
+                <View className="gap-2">
+                  {demoAccounts.map((account) => (
+                    <Pressable
+                      key={account.email}
+                      onPress={() => {
+                        haptic.selection();
+                        setEmail(account.email);
+                        setPassword(account.password);
+                        setFormError(null);
+                      }}
+                      className="flex-row items-center justify-between rounded-xl border border-border/60 bg-muted/30 p-3 active:opacity-70"
+                      accessibilityRole="button"
+                      accessibilityLabel={`${account.label || account.role} ile doldur`}
+                    >
+                      <View className="flex-1">
+                        <View className="flex-row items-center gap-2">
+                          <Text className="text-xs font-semibold text-foreground">
+                            {account.label || account.role}
+                          </Text>
+                          <View className="rounded-md bg-primary/10 px-1.5 py-0.5">
+                            <Text className="font-mono text-[10px] font-bold uppercase text-primary">
+                              {account.role}
+                            </Text>
+                          </View>
+                        </View>
+                        <Text className="mt-0.5 font-mono text-xs text-muted-foreground">
+                          {account.email}
+                        </Text>
+                      </View>
+                      <Ionicons name="arrow-forward-circle-outline" size={20} color={colors.primary} />
+                    </Pressable>
+                  ))}
+                </View>
+              </View>
+            )}
           </Animated.View>
 
           <Animated.View entering={FadeInDown.delay(300).duration(500)}>

@@ -4,6 +4,7 @@ jest.mock("./api", () => {
     __esModule: true,
     default: {
       post: jest.fn(),
+      get: jest.fn(),
     },
   };
 });
@@ -12,7 +13,7 @@ import * as SecureStore from "expo-secure-store";
 import api from "./api";
 import authService from "./authService";
 
-const apiMock = api as unknown as { post: jest.Mock };
+const apiMock = api as unknown as { post: jest.Mock; get: jest.Mock };
 
 beforeEach(() => {
   (SecureStore as unknown as { __resetStore: () => void }).__resetStore();
@@ -170,5 +171,25 @@ describe("authService.clearAuth", () => {
     expect(await SecureStore.getItemAsync("jwt_token")).toBeNull();
     expect(await SecureStore.getItemAsync("refresh_token")).toBeNull();
     expect(await SecureStore.getItemAsync("user_data")).toBeNull();
+  });
+});
+
+describe("authService.getDemoAccounts", () => {
+  it("returns demo accounts list when API succeeds", async () => {
+    const mockAccounts = [
+      { role: "admin", label: "Demo Yönetici", email: "demo.admin@mydreamcampus.com", password: "demo.admin@mydreamcampus.com" },
+    ];
+    apiMock.get.mockResolvedValueOnce({ data: mockAccounts });
+
+    const accounts = await authService.getDemoAccounts();
+    expect(accounts).toEqual(mockAccounts);
+    expect(apiMock.get).toHaveBeenCalledWith("/auth/demo-accounts");
+  });
+
+  it("returns empty array when API returns 404 or fails", async () => {
+    apiMock.get.mockRejectedValueOnce(new Error("404 Not Found"));
+
+    const accounts = await authService.getDemoAccounts();
+    expect(accounts).toEqual([]);
   });
 });

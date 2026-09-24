@@ -7,6 +7,7 @@ import type {
   ChangePasswordRequest,
   ChangePasswordResponse,
   User,
+  DemoAccount,
 } from '@/types/auth.types';
 
 const TOKEN_KEY = 'jwt_token';
@@ -96,6 +97,14 @@ export const authService = {
     }
   },
 
+  async getDemoAccounts(): Promise<DemoAccount[]> {
+    try {
+      const response = await api.get<DemoAccount[]>('/auth/demo-accounts');
+      return Array.isArray(response.data) ? response.data : [];
+    } catch {
+      return [];
+    }
+  },
   async clearAuth(): Promise<void> {
     await SecureStore.deleteItemAsync(TOKEN_KEY);
     await SecureStore.deleteItemAsync(REFRESH_TOKEN_KEY);

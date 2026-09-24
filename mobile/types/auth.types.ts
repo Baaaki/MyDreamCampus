@@ -56,3 +56,10 @@ export interface AuthError {
   error: string;
   message?: string;
 }
+
+export interface DemoAccount {
+  role: string;
+  label: string;
+  email: string;
+  password: string;
+}

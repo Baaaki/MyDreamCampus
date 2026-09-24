@@ -1,4 +1,4 @@
-import { useMutation, useQueryClient } from '@tanstack/react-query';
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { authService } from '@/services/authService';
 import type { LoginRequest, ChangePasswordRequest } from '@/types/auth.types';
 
@@ -38,3 +38,15 @@ export const useChangePassword = () => {
     mutationFn: (data: ChangePasswordRequest) => authService.changePassword(data),
   });
 };
+/**
+ * Demo accounts query hook
+ */
+export const useDemoAccounts = () => {
+  return useQuery({
+    queryKey: ['demo-accounts'],
+    queryFn: () => authService.getDemoAccounts(),
+    staleTime: 5 * 60 * 1000,
+    retry: false,
+  });
+};
+
