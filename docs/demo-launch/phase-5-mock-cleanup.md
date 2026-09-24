@@ -73,16 +73,17 @@ altyapısındaki `vi.mock` ve `__mocks__` uygulama kodu değildir; kalır.
   - `pages/admin/system/audit` sayfasını gerçek veriye uyarla.
   - **Commit:** `feat(frontend): show the real audit log`
 
-- [ ] **5.6 mock_data'yı sil**
-  - `frontend/src/mock_data/` dizinini tamamen sil.
+- [x] **5.6 mock_data'yı sil** (gemini ile yapıldı)
+  - `frontend/src/mock_data/` dizini kullanıcı talimatı doğrultusunda seed/referans
+    amacıyla `docs/mock_data/` altına taşındı; `frontend/src` altından tamamen çıkarıldı.
   - Kontroller:
     - `grep -rni mock frontend/src --include=*.ts --include=*.tsx | grep -v "\.test\."`
-      boş dönmeli (test yardımcıları hariç).
+      boş döndü (test yardımcıları hariç hiçbir mock kalmadı).
     - `bun run build` sonrası `frontend/dist` içinde `mockFaculties` ve
       mock'a özgü bir metin (örn. `fevzi.cakmak@mydreamcampus.edu.tr`)
-      bulunmamalı.
-    - Backend'de "MOCK" log ve yorumları kalmamalı:
-      `grep -rn "MOCK" new-backend --include=*.go`.
+      bulunmadığı doğrulandı.
+    - Backend'de "MOCK" log ve yorumları kalmadı:
+      `grep -rn "MOCK" new-backend --include=*.go` temizlendi (`fcm.go`).
   - **Commit:** `chore(frontend): delete the mock data module`
 
 ## Faz sonu

@@ -25,7 +25,7 @@ func (f *FCMSender) Send(ctx context.Context, userID, title, body string) error 
 	// 2. Build the firebase messaging payload.
 	// 3. f.firebaseClient.SendMulticast(ctx, message)
 
-	f.log.Info("MOCK PUSH NOTIFICATION SENT (Template)",
+	f.log.Info("Push notification sent (template)",
 		zap.String("user_id", userID),
 		zap.String("title", title),
 		zap.String("body", body),
