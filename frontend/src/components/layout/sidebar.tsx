@@ -16,6 +16,7 @@ import {
   History,
 } from "lucide-react"
 import { useState } from "react"
+import { useIsDemoMode } from "@/lib/services/demo-service"
 
 interface NavItem {
   label: string
@@ -123,8 +124,15 @@ export function Sidebar() {
     return item.children?.some((child) => isActive(child.href)) || false
   }
 
+  const isDemo = useIsDemoMode()
+
   return (
-    <aside className="fixed top-0 left-0 z-40 h-screen w-64 border-r border-gray-200 bg-white transition-colors dark:border-gray-800 dark:bg-gray-900">
+    <aside
+      className={cn(
+        "fixed left-0 z-40 w-64 border-r border-gray-200 bg-white transition-colors dark:border-gray-800 dark:bg-gray-900",
+        isDemo ? "top-8 h-[calc(100vh-2rem)]" : "top-0 h-screen"
+      )}
+    >
       {/* Logo */}
       <div className="flex h-16 items-center gap-2 border-b border-gray-200 px-6 dark:border-gray-800">
         <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-indigo-600 font-bold text-white">

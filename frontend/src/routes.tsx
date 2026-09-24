@@ -8,6 +8,7 @@ import { AuthGuard } from "@/components/auth-guard"
 // Auth pages stay eager: login is the cold-start landing for unauthenticated
 // users, and the auth bundle is small enough that splitting it would only
 // add a network round trip before the first render.
+import { DemoBanner } from "@/components/layout/demo-banner"
 import LoginPage from "@/pages/auth/login"
 import NotFoundPage from "@/pages/not-found"
 import ChangePasswordPage from "@/pages/auth/change-password"
@@ -99,7 +100,9 @@ function LoadingFallback() {
 
 export function AppRoutes() {
   return (
-    <Suspense fallback={<LoadingFallback />}>
+    <>
+      <DemoBanner />
+      <Suspense fallback={<LoadingFallback />}>
       <Routes>
         <Route path="/" element={<Navigate to="/auth/login" replace />} />
 
@@ -226,5 +229,6 @@ export function AppRoutes() {
         <Route path="*" element={<NotFoundPage />} />
       </Routes>
     </Suspense>
+    </>
   )
 }

@@ -11,6 +11,8 @@ import {
 import { Moon, Sun, LogOut, User, Settings, Bell } from "lucide-react"
 import { useNavigate } from "react-router"
 import { authApi } from "@/lib/api-client"
+import { cn } from "@/lib/utils"
+import { useIsDemoMode } from "@/lib/services/demo-service"
 
 const roleTitles: Record<string, string> = {
   admin: "Admin Panel",
@@ -52,11 +54,17 @@ export function Header() {
     navigate("/auth/login")
   }
 
+  const isDemo = useIsDemoMode()
   const panelTitle = roleTitles[user?.role ?? ""] ?? "Panel"
   const roleLabel = roleLabels[user?.role ?? ""] ?? "Kullanici"
 
   return (
-    <header className="fixed top-0 right-0 left-52 z-30 h-16 border-b border-gray-200 bg-white transition-colors dark:border-gray-800 dark:bg-gray-900">
+    <header
+      className={cn(
+        "fixed right-0 left-52 z-30 h-16 border-b border-gray-200 bg-white transition-colors dark:border-gray-800 dark:bg-gray-900",
+        isDemo ? "top-8" : "top-0"
+      )}
+    >
       <div className="flex h-full items-center justify-between px-6">
         {/* Left side - Page title or breadcrumb can go here */}
         <div className="flex items-center gap-4">

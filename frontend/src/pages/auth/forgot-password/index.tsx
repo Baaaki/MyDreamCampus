@@ -2,8 +2,10 @@ import { useState } from "react"
 import { Link } from "react-router"
 import { authApi } from "@/lib/api-client"
 import { apiErrorMessage } from "@/lib/api-error"
+import { useIsDemoMode } from "@/lib/services/demo-service"
 
 export default function ForgotPasswordPage() {
+  const isDemo = useIsDemoMode()
   const [email, setEmail] = useState("")
   const [sent, setSent] = useState(false)
   const [error, setError] = useState("")
@@ -38,6 +40,14 @@ export default function ForgotPasswordPage() {
             E-posta adresinize bir sıfırlama bağlantısı göndereceğiz
           </p>
         </div>
+        {isDemo && (
+          <div
+            role="status"
+            className="rounded-md border border-amber-200 bg-amber-50 p-3 text-center text-sm font-medium text-amber-800"
+          >
+            Demo ortamında e-posta gönderilmez
+          </div>
+        )}
         {sent ? (
           <div className="rounded-md bg-green-50 p-4">
             <p className="text-sm text-green-800">

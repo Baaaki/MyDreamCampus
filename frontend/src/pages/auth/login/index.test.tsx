@@ -2,26 +2,37 @@ import { describe, it, expect, beforeEach, afterEach, vi } from "vitest"
 import { render, screen } from "@testing-library/react"
 import userEvent from "@testing-library/user-event"
 import { MemoryRouter, Route, Routes } from "react-router"
+import { QueryClient, QueryClientProvider } from "@tanstack/react-query"
 import LoginPage from "./index"
 
 function renderAt(initial = "/auth/login") {
+  const queryClient = new QueryClient({
+    defaultOptions: {
+      queries: {
+        retry: false,
+      },
+    },
+  })
+
   return render(
-    <MemoryRouter initialEntries={[initial]}>
-      <Routes>
-        <Route path="/auth/login" element={<LoginPage />} />
-        <Route
-          path="/auth/change-password"
-          element={<div>change-password-page</div>}
-        />
-        <Route path="/dashboard" element={<div>admin-home</div>} />
-        <Route path="/teacher/attendance" element={<div>teacher-home</div>} />
-        <Route path="/student/dashboard" element={<div>student-home</div>} />
-        <Route
-          path="/grades/transcripts"
-          element={<div>safe-redirect-target</div>}
-        />
-      </Routes>
-    </MemoryRouter>
+    <QueryClientProvider client={queryClient}>
+      <MemoryRouter initialEntries={[initial]}>
+        <Routes>
+          <Route path="/auth/login" element={<LoginPage />} />
+          <Route
+            path="/auth/change-password"
+            element={<div>change-password-page</div>}
+          />
+          <Route path="/dashboard" element={<div>admin-home</div>} />
+          <Route path="/teacher/attendance" element={<div>teacher-home</div>} />
+          <Route path="/student/dashboard" element={<div>student-home</div>} />
+          <Route
+            path="/grades/transcripts"
+            element={<div>safe-redirect-target</div>}
+          />
+        </Routes>
+      </MemoryRouter>
+    </QueryClientProvider>
   )
 }
 
@@ -253,5 +264,136 @@ describe("LoginPage - error handling", () => {
 
     await screen.findByText(/giriş başarısız|locked|request failed/i)
     expect(localStorage.getItem("user")).toBeNull()
+  })
+})
+
+describe("LoginPage - demo accounts panel", () => {
+  const demoAccounts = [
+    {
+      role: "admin",
+      label: "Demo Yönetici",
+      email: "demo.admin@mydreamcampus.com",
+      password: "demo.admin@mydreamcampus.com",
+    },
+    {
+      role: "teacher",
+      label: "Demo Öğretmen",
+      email: "ahmet.yilmaz@uni.edu.tr",
+      password: "ahmet.yilmaz@uni.edu.tr",
+    },
+    {
+      role: "student",
+      label: "Demo Öğrenci",
+      email: "zeynep.sahin@uni.edu.tr",
+      password: "zeynep.sahin@uni.edu.tr",
+    },
+  ]
+
+  it("renders demo accounts when GET /api/auth/demo-accounts succeeds", async () => {
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(async (input: RequestInfo | URL) => {
+        const url = typeof input === "string" ? input : input instanceof Request ? input.url : input.toString()
+        if (url.includes("/api/auth/demo-accounts")) {
+          return jsonResponse(demoAccounts)
+        }
+        return jsonResponse({})
+      })
+    )
+
+    renderAt()
+
+    expect(await screen.findByText("Demo Hesapları")).toBeInTheDocument()
+    expect(screen.getByText("Demo Yönetici")).toBeInTheDocument()
+    expect(screen.getAllByText("demo.admin@mydreamcampus.com").length).toBeGreaterThanOrEqual(1)
+    expect(screen.getByText("Demo Öğretmen")).toBeInTheDocument()
+    expect(screen.getAllByText("ahmet.yilmaz@uni.edu.tr").length).toBeGreaterThanOrEqual(1)
+    expect(screen.getByText("Demo Öğrenci")).toBeInTheDocument()
+    expect(screen.getAllByText("zeynep.sahin@uni.edu.tr").length).toBeGreaterThanOrEqual(1)
+  })
+
+  it("hides demo accounts panel when GET /api/auth/demo-accounts returns 404", async () => {
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(async (input: RequestInfo | URL) => {
+        const url = typeof input === "string" ? input : input instanceof Request ? input.url : input.toString()
+        if (url.includes("/api/auth/demo-accounts")) {
+          return new Response(JSON.stringify({ error: "DEMO_MODE_DISABLED" }), {
+            status: 404,
+            headers: { "Content-Type": "application/json" },
+          })
+        }
+        return jsonResponse({})
+      })
+    )
+
+    renderAt()
+
+    await new Promise((r) => setTimeout(r, 50))
+    expect(screen.queryByText("Demo Hesapları")).not.toBeInTheDocument()
+  })
+
+  it("fills credentials and logs in when clicking 'Bu hesapla gir'", async () => {
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(async (input: RequestInfo | URL) => {
+        const url = typeof input === "string" ? input : input instanceof Request ? input.url : input.toString()
+        if (url.includes("/api/auth/demo-accounts")) {
+          return jsonResponse(demoAccounts)
+        }
+        if (url.includes("/api/auth/login")) {
+          return jsonResponse({
+            access_token: "at-demo",
+            user: { id: "u-admin", email: "demo.admin@mydreamcampus.com", role: "admin" },
+          })
+        }
+        return jsonResponse({})
+      })
+    )
+
+    renderAt()
+
+    expect(await screen.findByText("Demo Yönetici")).toBeInTheDocument()
+
+    const loginButtons = screen.getAllByRole("button", { name: /bu hesapla gir/i })
+    await userEvent.click(loginButtons[0])
+
+    expect(await screen.findByText("admin-home")).toBeInTheDocument()
+    expect(JSON.parse(localStorage.getItem("user")!)).toMatchObject({
+      email: "demo.admin@mydreamcampus.com",
+      role: "admin",
+    })
+  })
+
+  it("copies credentials to clipboard when clicking 'Kopyala'", async () => {
+    const writeTextMock = vi.fn().mockResolvedValue(undefined)
+    Object.assign(navigator, {
+      clipboard: {
+        writeText: writeTextMock,
+      },
+    })
+
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(async (input: RequestInfo | URL) => {
+        const url = typeof input === "string" ? input : input instanceof Request ? input.url : input.toString()
+        if (url.includes("/api/auth/demo-accounts")) {
+          return jsonResponse(demoAccounts)
+        }
+        return jsonResponse({})
+      })
+    )
+
+    renderAt()
+
+    expect(await screen.findByText("Demo Yönetici")).toBeInTheDocument()
+
+    const copyButtons = screen.getAllByRole("button", { name: /kopyala/i })
+    await userEvent.click(copyButtons[0])
+
+    expect(writeTextMock).toHaveBeenCalledWith(
+      "demo.admin@mydreamcampus.com / demo.admin@mydreamcampus.com"
+    )
+    expect(await screen.findByText("Kopyalandı")).toBeInTheDocument()
   })
 })

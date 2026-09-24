@@ -17,6 +17,13 @@ export interface AuthResponse {
   message?: string
 }
 
+export interface DemoAccount {
+  role: string
+  label: string
+  email: string
+  password: string
+}
+
 export interface Session {
   id: string
   device_info?: string
