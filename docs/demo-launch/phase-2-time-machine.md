@@ -189,11 +189,17 @@
   > simüle → sapma uyarısı → yenile → 2 yıl sınırı → sıfırla akışı
   > doğrulandı; gerçek yığınla doğrulama 2.8'deki e2e'de.
 
-- [ ] **2.8 e2e**
+- [x] **2.8 e2e**
   - `.github/workflows/ci.yml` `backend-e2e` job'u (≈114-255) golden path'ine
     ekle: simulate → iki farklı servisin status'u aynı simüle saati gösterir
     → reset → gerçek saat.
   - **Commit:** `test(infra): cover the time machine in the e2e job`
+  > Not (24.09): Golden path'e eklendi: +1 yıl simulate → grades, meals ve
+  > payments aynı `offset_seconds`'ı gösterene kadar (en fazla 15 sn)
+  > bekle → simüle saat hedefe ±2 dk → simülasyon altında admin login ve
+  > token'la istek → +3 yıl 400 → reset → grades ve meals gerçek saat.
+  > Docker bu ortamda yok; betik sözdizimi ve bekleme mantığı sahte API'ye
+  > karşı yerelde koşturuldu. Gerçek yığında doğrulama push sonrası CI'da.
 
 ## Faz sonu
 - README §5 yeşil olmalı.

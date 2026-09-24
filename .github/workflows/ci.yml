@@ -235,6 +235,57 @@ jobs:
             -H "Authorization: Bearer $STUDENT_TOKEN")
           expect 200 "$code" "available courses (enrollment -> student + catalog)"
 
+          # Time machine: catalog stores the offset in Redis and every other
+          # service picks it up, from the pub/sub message or at the latest on
+          # its 10-second re-read.
+          wait_clock() {
+            svc="$1"; want_active="$2"; want_offset="$3"
+            for i in $(seq 1 15); do
+              code=$(api "http://localhost/api/$svc/admin/time/status" -H "Authorization: Bearer $TOKEN")
+              if [ "$code" = 200 ] \
+                && [ "$(jq -r .active /tmp/body)" = "$want_active" ] \
+                && [ "$(jq -r .offset_seconds /tmp/body)" = "$want_offset" ]; then
+                echo "ok  [$code] $svc clock active=$want_active offset=$want_offset"
+                return 0
+              fi
+              sleep 1
+            done
+            echo "::error::$svc clock never reached active=$want_active offset=$want_offset: $(head -c 300 /tmp/body)"
+            exit 1
+          }
+
+          TARGET=$(date -u -d '+1 year' +%Y-%m-%dT%H:%M:%SZ)
+          code=$(api -X POST http://localhost/api/catalog/admin/time/simulate \
+            -H "Authorization: Bearer $TOKEN" -H 'Content-Type: application/json' \
+            -d "{\"time\":\"$TARGET\"}")
+          expect 200 "$code" "simulate one year ahead (catalog)"
+          OFFSET=$(jq -r '.offset_seconds' /tmp/body)
+
+          wait_clock grades true "$OFFSET"
+          wait_clock meals true "$OFFSET"
+          wait_clock payments true "$OFFSET"
+          drift=$(( $(date -u -d "$(jq -r .current_time /tmp/body)" +%s) - $(date -u -d "$TARGET" +%s) ))
+          [ "${drift#-}" -le 120 ] || { echo "::error::simulated clock is ${drift}s away from $TARGET"; exit 1; }
+
+          # Tokens stay on the real clock: one issued a year "ahead" must work.
+          code=$(api -X POST http://localhost/api/auth/login \
+            -H 'Content-Type: application/json' \
+            -d '{"email":"admin@university.edu.tr","password":"ci-admin-password"}')
+          expect 200 "$code" "admin login under the time machine (auth)"
+          SIM_TOKEN=$(jq -r '.access_token' /tmp/body)
+          code=$(api http://localhost/api/staff -H "Authorization: Bearer $SIM_TOKEN")
+          expect 200 "$code" "token issued under the time machine is accepted (staff)"
+
+          code=$(api -X POST http://localhost/api/catalog/admin/time/simulate \
+            -H "Authorization: Bearer $TOKEN" -H 'Content-Type: application/json' \
+            -d "{\"time\":\"$(date -u -d '+3 years' +%Y-%m-%dT%H:%M:%SZ)\"}")
+          expect 400 "$code" "simulating beyond two years is rejected"
+
+          code=$(api -X POST http://localhost/api/catalog/admin/time/reset -H "Authorization: Bearer $TOKEN")
+          expect 200 "$code" "reset to the real clock (catalog)"
+          wait_clock grades false 0
+          wait_clock meals false 0
+
           # No token must never be served.
           code=$(api http://localhost/api/grades)
           expect 401 "$code" "unauthenticated request is rejected (grades)"
