@@ -33,7 +33,7 @@ func TestHTTPPaymentClient_InitiatePayment_ReturnsPayment(t *testing.T) {
 		gotPath, gotSecret = r.URL.Path, r.Header.Get("X-Internal-Secret")
 		require.NoError(t, json.NewDecoder(r.Body).Decode(&got))
 		_ = json.NewEncoder(w).Encode(dto.InitiatePaymentResponse{
-			PaymentID: "pay_123", PaymentURL: "https://mock/pay/123", Amount: 15, Currency: "TRY",
+			PaymentID: "pay_123", Amount: 15, Currency: "TRY",
 		})
 	})
 

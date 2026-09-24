@@ -126,31 +126,32 @@ func (c *PaymentEventConsumer) HandlePaymentFailed(ctx context.Context, body []b
 	}
 
 	if isBatch {
-		// Expire all reservations in batch
+		// A declined card cancels the reservation outright: "expired" is kept
+		// for payments nobody completed in time.
 		err = c.reservationRepo.UpdateReservationsByBatchID(ctx, db.UpdateReservationsByBatchIDParams{
 			BatchID:   pgtype.UUID{Bytes: parsedID, Valid: true},
-			Status:    db.MealReservationStatusEnumExpired,
+			Status:    db.MealReservationStatusEnumCancelled,
 			ExpiresAt: pgtype.Timestamptz{Valid: false},
 		})
 		if err != nil {
-			c.logger.Error("failed to expire batch reservations", zap.Error(err))
+			c.logger.Error("failed to cancel batch reservations", zap.Error(err))
 			return err
 		}
 
-		c.logger.Info("batch reservations expired due to payment failure", zap.String("batch_id", parsedID.String()))
+		c.logger.Info("batch reservations cancelled due to payment failure", zap.String("batch_id", parsedID.String()))
 	} else {
-		// Expire single reservation
+		// Cancel single reservation
 		_, err = c.reservationRepo.UpdateReservationByID(ctx, db.UpdateReservationByIDParams{
 			ID:        utils.UUIDToPgtype(parsedID),
-			Status:    db.MealReservationStatusEnumExpired,
+			Status:    db.MealReservationStatusEnumCancelled,
 			ExpiresAt: pgtype.Timestamptz{Valid: false},
 		})
 		if err != nil {
-			c.logger.Error("failed to expire reservation", zap.Error(err))
+			c.logger.Error("failed to cancel reservation", zap.Error(err))
 			return err
 		}
 
-		c.logger.Info("reservation expired due to payment failure", zap.String("reservation_id", parsedID.String()))
+		c.logger.Info("reservation cancelled due to payment failure", zap.String("reservation_id", parsedID.String()))
 	}
 
 	// Mark event as processed

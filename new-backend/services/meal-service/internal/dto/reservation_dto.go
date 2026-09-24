@@ -38,7 +38,7 @@ type CafeteriaInfo struct {
 // CreateReservationResponse represents response after creating reservation
 type CreateReservationResponse struct {
 	ReservationID string              `json:"reservation_id"`
-	PaymentURL    string              `json:"payment_url"`
+	PaymentID     string              `json:"payment_id"`
 	Amount        float64             `json:"amount"`
 	Currency      string              `json:"currency"`
 	ExpiresAt     time.Time           `json:"expires_at"`
@@ -48,7 +48,7 @@ type CreateReservationResponse struct {
 // CreateBatchReservationResponse represents response after creating batch reservations
 type CreateBatchReservationResponse struct {
 	BatchID      string                `json:"batch_id"`
-	PaymentURL   string                `json:"payment_url"`
+	PaymentID    string                `json:"payment_id"`
 	TotalAmount  float64               `json:"total_amount"`
 	Currency     string                `json:"currency"`
 	ExpiresAt    time.Time             `json:"expires_at"`

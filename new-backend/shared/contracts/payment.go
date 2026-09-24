@@ -11,17 +11,17 @@ type InitiatePaymentRequest struct {
 }
 
 // InitiatePaymentResponse is returned by POST /internal/payments/initiate.
+// The student confirms PaymentID with a card at /api/payments.
 type InitiatePaymentResponse struct {
-	PaymentID  string  `json:"payment_id"`
-	PaymentURL string  `json:"payment_url"`
-	Amount     float64 `json:"amount"`
-	Currency   string  `json:"currency"`
-	ExpiresAt  string  `json:"expires_at"`
+	PaymentID string  `json:"payment_id"`
+	Amount    float64 `json:"amount"`
+	Currency  string  `json:"currency"`
+	ExpiresAt string  `json:"expires_at"`
 }
 
 // RefundRequest is the body of POST /internal/payments/refund.
 type RefundRequest struct {
-	ReferenceID string  `json:"reference_id" binding:"required"` // reservation ID
+	ReferenceID string  `json:"reference_id" binding:"required"` // the payment's: "res_uuid" or "bat_uuid"
 	Amount      float64 `json:"amount" binding:"required"`
 	Currency    string  `json:"currency" binding:"required"`
 	Reason      string  `json:"reason"`

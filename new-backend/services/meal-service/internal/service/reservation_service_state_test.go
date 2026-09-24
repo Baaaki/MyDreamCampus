@@ -56,14 +56,18 @@ func (s activeStudent) GetStudentCacheByID(context.Context, uuid.UUID) (db.Stude
 	return db.StudentView{ID: utils.UUIDToPgtype(s.id), StudentNumber: "20260001", IsActive: true}, nil
 }
 
-type countingPayment struct{ refunds int }
+type countingPayment struct {
+	refunds    int
+	lastRefund dto.RefundRequest
+}
 
 func (p *countingPayment) InitiatePayment(context.Context, dto.InitiatePaymentRequest) (*dto.InitiatePaymentResponse, error) {
 	return &dto.InitiatePaymentResponse{}, nil
 }
 
-func (p *countingPayment) RequestRefund(context.Context, dto.RefundRequest) (*dto.RefundResponse, error) {
+func (p *countingPayment) RequestRefund(_ context.Context, req dto.RefundRequest) (*dto.RefundResponse, error) {
 	p.refunds++
+	p.lastRefund = req
 	return &dto.RefundResponse{Status: "completed"}, nil
 }
 
@@ -128,4 +132,31 @@ func TestCancelReservation_AfterUse_ReturnsInvalidStatusWithoutRefund(t *testing
 	_, err := svc.CancelReservation(context.Background(), studentID, utils.PgtypeToUUID(store.reservation.ID).String())
 	assert.ErrorIs(t, err, serviceErrors.ErrInvalidStatusForCancel)
 	assert.Zero(t, payment.refunds)
+}
+
+// Payment keys a refund by the reference the reservation was paid under; a
+// batch member refunded under its own id would find no payment.
+func TestCancelReservation_RefundsUnderPaymentReference(t *testing.T) {
+	batchID := uuid.New()
+	cases := []struct {
+		name    string
+		batchID pgtype.UUID
+		want    func(resID string) string
+	}{
+		{"single reservation", pgtype.UUID{}, func(resID string) string { return "res_" + resID }},
+		{"batch member", utils.UUIDToPgtype(batchID), func(string) string { return "bat_" + batchID.String() }},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			freezeAt(t, 2026, time.May, 4, 10, 0)
+			svc, store, payment, studentID := newRaceFixture(t, time.Date(2026, time.May, 12, 0, 0, 0, 0, time.UTC))
+			store.reservation.BatchID = tc.batchID
+			resID := utils.PgtypeToUUID(store.reservation.ID).String()
+
+			_, err := svc.CancelReservation(context.Background(), studentID, resID)
+
+			require.NoError(t, err)
+			assert.Equal(t, tc.want(resID), payment.lastRefund.ReferenceID)
+		})
+	}
 }

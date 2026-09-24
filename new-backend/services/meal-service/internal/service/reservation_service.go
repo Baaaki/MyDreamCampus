@@ -217,7 +217,7 @@ func (s *ReservationService) CreateReservation(ctx context.Context, studentID uu
 
 	return &dto.CreateReservationResponse{
 		ReservationID: reservation.ID.String(),
-		PaymentURL:    paymentResp.PaymentURL,
+		PaymentID:     paymentResp.PaymentID,
 		Amount:        s.cfg.Reservation.MealPriceTRY,
 		Currency:      "TRY",
 		ExpiresAt:     expiresAt,
@@ -232,6 +232,15 @@ func (s *ReservationService) CreateReservation(ctx context.Context, studentID uu
 			CreatedAt:     reservation.CreatedAt.Time,
 		},
 	}, nil
+}
+
+// paymentReference is the reference the reservation was paid under: its
+// batch's when it was booked in one, its own otherwise.
+func paymentReference(r db.GetReservationByIDRow) string {
+	if r.BatchID.Valid {
+		return fmt.Sprintf("bat_%s", r.BatchID.String())
+	}
+	return fmt.Sprintf("res_%s", r.ID.String())
 }
 
 // CreateBatchReservation creates multiple reservations atomically
@@ -452,7 +461,7 @@ func (s *ReservationService) CreateBatchReservation(ctx context.Context, student
 		})
 	}
 
-	s.logger.Info("batch reservation created after successful payment",
+	s.logger.Info("pending batch reservation created, awaiting payment.completed event",
 		zap.String("batch_id", batchID.String()),
 		zap.String("student_id", studentID.String()),
 		zap.String("payment_id", paymentResp.PaymentID),
@@ -461,7 +470,7 @@ func (s *ReservationService) CreateBatchReservation(ctx context.Context, student
 
 	return &dto.CreateBatchReservationResponse{
 		BatchID:      batchID.String(),
-		PaymentURL:   paymentResp.PaymentURL,
+		PaymentID:    paymentResp.PaymentID,
 		TotalAmount:  totalAmount,
 		Currency:     "TRY",
 		ExpiresAt:    expiresAt,
@@ -672,7 +681,7 @@ func (s *ReservationService) CancelReservation(ctx context.Context, studentID uu
 
 	refundStatus := "pending"
 	refundResp, err := s.paymentClient.RequestRefund(ctx, dto.RefundRequest{
-		ReferenceID: resID.String(),
+		ReferenceID: paymentReference(reservation),
 		Amount:      s.cfg.Reservation.MealPriceTRY,
 		Currency:    "TRY",
 		Reason:      "Student cancelled reservation",

@@ -150,3 +150,19 @@ func copyMap(m map[string]any) map[string]any {
 	}
 	return out
 }
+
+// The web and mobile checkout read payment_id to confirm the card; the old
+// payment_url pointed at a page that never existed.
+func TestCreateReservationResponses_CarryPaymentID(t *testing.T) {
+	for name, v := range map[string]any{
+		"single": CreateReservationResponse{PaymentID: "p-1"},
+		"batch":  CreateBatchReservationResponse{PaymentID: "p-1"},
+	} {
+		t.Run(name, func(t *testing.T) {
+			raw, err := json.Marshal(v)
+			require.NoError(t, err)
+			assert.Contains(t, string(raw), `"payment_id":"p-1"`)
+			assert.NotContains(t, string(raw), "payment_url")
+		})
+	}
+}

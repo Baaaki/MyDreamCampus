@@ -143,13 +143,20 @@ Yalnız `card_brand` (prefix'ten: Visa, Mastercard, Amex, Troy `9792`) ve
   > Idempotency kaydı yalnız istek gövdesinin SHA-256 özetini ve yanıtı
   > (son 4 hane) tutar. Event sabitleri `shared/events`'e eklendi.
 
-- [ ] **3.5 meal tarafı**
+- [x] **3.5 meal tarafı**
   - `services/meal-service/internal/dto/reservation_dto.go:41`, `:51`:
     `PaymentURL` → `PaymentID` (`json:"payment_id"`).
   - `reservation_service.go` `CreateReservation` ve `CreateBatchReservation`
     yanıtlarını güncelle.
   - Testleri güncelle.
   - **Commit:** `feat(meal): return the payment id for card checkout`
+  > Not (24.09): `contracts.InitiatePaymentResponse.PaymentURL` burada
+  > kaldırıldı (3.3 notu). Hedef akışın 4. adımı için `payment.failed`
+  > consumer'ı rezervasyonu artık `expired` değil `cancelled` yapıyor
+  > (`expired` süresi dolan ödemelere kaldı; event payload'ı değişmedi).
+  > İptalde iade, rezervasyonun ödendiği referansla (`res_<id>` veya toplu
+  > ise `bat_<batch>`) isteniyor — eskiden çıplak rezervasyon id'si
+  > gidiyordu ve toplu rezervasyonun ödemesi bulunamazdı.
 
 - [ ] **3.6 Web**
   - `frontend/src/lib/api-client.ts`: `paymentApi` (`/api/payments`).
