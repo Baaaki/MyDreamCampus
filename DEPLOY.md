@@ -534,9 +534,14 @@ Manuel bir şey yapman gerekmez:
 
 - **Admin** ilk açılışta otomatik oluşur (`.env`'deki `ADMIN_EMAIL` /
   `ADMIN_INITIAL_PASSWORD`).
-- **`seed` servisi** auth/staff/student/catalog ayağa kalkınca otomatik çalışır; demo öğretmen,
-  ders ve öğrencileri **gerçek admin API üzerinden** oluşturur (event zinciri
-  düzgün dolsun diye — ham SQL değil). Tekrar çalıştırmak güvenli (idempotent).
+- **`seed` servisi** auth/staff/student/catalog ayağa kalkınca otomatik çalışır;
+  öğretmen, ders, öğrenci ve profilleri **gerçek admin API üzerinden** oluşturur
+  (event zinciri düzgün dolsun diye — ham SQL değil), fakülte/bölüm listesini
+  ve senaryo verisini (dönem, program, not, yoklama, menü, rezervasyon) servis
+  veritabanlarına SQL ile yazar. Tarihler seed gününe göredir: aktif dönem o
+  günün dönemidir (`YYYY-YYYY-Fall|Spring`), periyotlar o gün açıktır.
+- Seed **yalnız boş sistemde** koşar: öğrenci kaydı varsa hiçbir şey yazmadan
+  çıkar. Bir API hatasında durur ve `exited (1)` kalır — log hatayı gösterir.
   Kapatmak istersen `.env`'de `SEED_DEMO=false`.
 
 Seed loglarını gör:
@@ -554,16 +559,18 @@ docker compose logs seed        # ">> seed complete" görmelisin
 | Öğrenci | `zeynep.sahin@uni.edu.tr` | `zeynep.sahin@uni.edu.tr` |
 
 > Provisioned kullanıcıların şifresi **e-posta adreslerinin aynısıdır**. Seed,
-> demo hesaplarında "ilk girişte şifre değiştir" bayrağını kapatır, böylece
-> giriş kesintisiz olur. Tüm demo hesapları
-> [seed/data/](new-backend/infrastructure/seed/data/) altında — düzenleyip
-> `docker compose up -d --build seed` ile yeniden çalıştırabilirsin.
+> seed'lediği hesaplarda "ilk girişte şifre değiştir" bayrağını kapatır, böylece
+> giriş kesintisiz olur. Tüm demo içeriği
+> [seed/data/](new-backend/infrastructure/seed/data/) altında.
 
-> Ders kataloğunu genişletmek istersen ham SQL yerine
-> [seed/data/courses.json](new-backend/infrastructure/seed/data/courses.json)
-> dosyasını düzenle: seed onu katalog servisinin kendi API'sinden geçirir, ve
-> ders eklemenin tetiklediği olaylar diğer servislerin projeksiyonlarına da
-> düşer. Doğrudan `psql` ile yazılan satır o zincirin dışında kalır.
+> Seed içeriğini değiştirmek (örn.
+> [seed/data/courses.json](new-backend/infrastructure/seed/data/courses.json))
+> yalnız **temiz bir kurulumda** etkili olur — veri dolu bir sistemde seed
+> atlanır. Çalışan sisteme ders, öğretmen ya da öğrenci eklemek için admin
+> arayüzünü kullan: kayıt API'den geçer ve tetiklediği olaylar diğer
+> servislerin projeksiyonlarına da düşer. Doğrudan `psql` ile yazılan satır o
+> zincirin dışında kalır. Seed'i baştan koşturmak volume'ları siler:
+> `docker compose down -v && make deploy`.
 
 ---
 
