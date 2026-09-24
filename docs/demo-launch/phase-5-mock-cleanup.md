@@ -36,7 +36,7 @@ altyapısındaki `vi.mock` ve `__mocks__` uygulama kodu değildir; kalır.
   - **Commit:** `refactor(frontend): drop the mock data toggles from admin pages`
 
 
-- [ ] **5.3 Diğer sahte dallar**
+- [x] **5.3 Diğer sahte dallar** (gemini ile yapıldı)
   - `pages/student/grades/index.tsx` (≈20, 41, 163): `VITE_USE_MOCK_API`
     dalı. `frontend/.env.example`'daki `VITE_USE_MOCK_API=true` satırını sil
     (örnek dosyayı kopyalayan sahte not görüyor).

@@ -19,7 +19,6 @@ import {
 } from "@/components/ui/table"
 import { gradesApi } from "@/lib/api-client"
 import { apiErrorMessage } from "@/lib/api-error"
-import { mockMyGradesResponse } from "@/mock_data/grades"
 import type {
   MyGradesResponse,
   ActiveCourse,
@@ -39,8 +38,6 @@ import {
   ChevronDown,
   Sigma,
 } from "lucide-react"
-
-const USE_MOCK = import.meta.env.VITE_USE_MOCK_API === "true"
 
 // ============================================
 // Notlandırma Sistemi (Yönetmelik)
@@ -161,9 +158,7 @@ export default function StudentGradesPage() {
   } = useQuery({
     queryKey: ["grades", "my"],
     queryFn: async (): Promise<MyGradesResponse> => {
-      const res = USE_MOCK
-        ? mockMyGradesResponse
-        : await gradesApi.get("my/grades").json<MyGradesResponse>()
+      const res = await gradesApi.get("my/grades").json<MyGradesResponse>()
       // Backend ders listesi boşsa null dönüyor — array'e normalize et
       return {
         ...res,

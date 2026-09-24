@@ -216,7 +216,7 @@ export default function MealMenuPage() {
 
   // Backend'den veri varsa onu kullan
   const menuData = monthlyMenuResponse?.data?.menu_data || null
-  const isUsingMockData = !menuData || error
+  const hasNoMenu = !menuData || !!error
 
   // Seçilen gün için menüyü hesapla
   const dailyMenu = useMemo(() => {
@@ -390,12 +390,11 @@ export default function MealMenuPage() {
         </button>
       </div>
 
-      {/* Backend bağlantı uyarısı */}
-      {isUsingMockData && !isLoading && (
-        <div className="mb-4 rounded-md border border-yellow-200 bg-yellow-50 p-4">
-          <p className="text-sm text-yellow-800">
-            ⚠️ Bu ay için henüz menü oluşturulmamış veya backend'e
-            bağlanılamadı.
+      {/* Menü bulunamadı uyarısı */}
+      {hasNoMenu && !isLoading && (
+        <div className="mb-4 rounded-md border border-amber-200 bg-amber-50 p-4 dark:border-amber-900/30 dark:bg-amber-950/20">
+          <p className="text-sm text-amber-800 dark:text-amber-300">
+            ℹ️ Bu ay için menü yayınlanmadı.
           </p>
         </div>
       )}

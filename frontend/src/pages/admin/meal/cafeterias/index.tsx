@@ -77,50 +77,6 @@ const deleteCafeteria = async (id: string): Promise<void> => {
   await mealApi.delete(`cafeterias/${id}`)
 }
 
-// Mock data - Backend'den veri gelmezse gösterilir
-const mockCafeterias: Cafeteria[] = [
-  {
-    id: "1",
-    name: "Merkez Yemekhane",
-    location: "Ana Kampüs, A Blok",
-    has_vegan_menu: true,
-    serves_dinner: true,
-    is_active: true,
-    created_at: "2024-01-01T00:00:00Z",
-    updated_at: "2024-01-01T00:00:00Z",
-  },
-  {
-    id: "2",
-    name: "Mühendislik Yemekhanesi",
-    location: "Mühendislik Fakültesi, Zemin Kat",
-    has_vegan_menu: true,
-    serves_dinner: false,
-    is_active: true,
-    created_at: "2024-01-01T00:00:00Z",
-    updated_at: "2024-01-01T00:00:00Z",
-  },
-  {
-    id: "3",
-    name: "Fen Fakültesi Kafeteryası",
-    location: "Fen Fakültesi, B Blok",
-    has_vegan_menu: false,
-    serves_dinner: false,
-    is_active: true,
-    created_at: "2024-01-01T00:00:00Z",
-    updated_at: "2024-01-01T00:00:00Z",
-  },
-  {
-    id: "4",
-    name: "Güney Kampüs Yemekhanesi",
-    location: "Güney Kampüs",
-    has_vegan_menu: true,
-    serves_dinner: true,
-    is_active: false,
-    created_at: "2024-01-01T00:00:00Z",
-    updated_at: "2024-01-01T00:00:00Z",
-  },
-]
-
 interface CafeteriaFormData {
   name: string
   location: string
@@ -150,17 +106,14 @@ export default function CafeteriasPage() {
   )
   const [formData, setFormData] = useState<CafeteriaFormData>(initialFormData)
 
-  // Fetch cafeterias - backend'den veri gelmezse mock kullan
+  // Fetch cafeterias
   const { data: apiCafeterias, isLoading } = useQuery({
     queryKey: ["cafeterias"],
     queryFn: fetchCafeterias,
     retry: 1,
   })
 
-  // Backend'den veri varsa onu kullan, yoksa mock veri
-  const cafeterias =
-    apiCafeterias && apiCafeterias.length > 0 ? apiCafeterias : mockCafeterias
-  const isUsingMockData = !apiCafeterias || apiCafeterias.length === 0
+  const cafeterias = apiCafeterias ?? []
 
   // Create mutation
   const createMutation = useMutation({
@@ -265,15 +218,6 @@ export default function CafeteriasPage() {
 
   return (
     <div className="space-y-6">
-      {/* Mock data uyarısı */}
-      {isUsingMockData && (
-        <div className="rounded-md border border-yellow-200 bg-yellow-50 p-4">
-          <p className="text-sm text-yellow-800">
-            ⚠️ Backend'e bağlanılamadı, örnek veriler gösteriliyor.
-          </p>
-        </div>
-      )}
-
       {/* Header */}
       <div className="flex items-center justify-between">
         <div>
@@ -383,7 +327,7 @@ export default function CafeteriasPage() {
                     colSpan={6}
                     className="py-8 text-center text-muted-foreground"
                   >
-                    Yemekhane bulunamadı
+                    Kayıtlı yemekhane bulunamadı
                   </TableCell>
                 </TableRow>
               ) : (

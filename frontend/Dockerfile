@@ -15,9 +15,7 @@ COPY frontend/ .
 # Same-origin: empty base URL -> the SPA calls relative /api/... which Caddy
 # routes to the owning service. Real API, not mock.
 ARG VITE_API_BASE_URL=""
-ARG VITE_USE_MOCK_API="false"
 ENV VITE_API_BASE_URL=$VITE_API_BASE_URL
-ENV VITE_USE_MOCK_API=$VITE_USE_MOCK_API
 RUN bun run build
 
 FROM caddy:2-alpine
