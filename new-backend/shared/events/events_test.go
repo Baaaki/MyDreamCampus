@@ -24,6 +24,8 @@ func TestEventNames_FollowDottedConvention(t *testing.T) {
 		"EventEnrollmentProgramRejected":      EventEnrollmentProgramRejected,
 		"EventEnrollmentProgramCancelled":     EventEnrollmentProgramCancelled,
 		"EventAttendanceSemesterFailed":       EventAttendanceSemesterFailed,
+		"EventPaymentCompleted":               EventPaymentCompleted,
+		"EventPaymentFailed":                  EventPaymentFailed,
 	}
 	for name, value := range all {
 		assert.NotEmpty(t, value, "%s must not be empty", name)
@@ -44,6 +46,8 @@ func TestRoutingKeys_MatchEventNames(t *testing.T) {
 		EventEnrollmentProgramApproved:  RoutingKeyEnrollmentProgramApproved,
 		EventEnrollmentProgramRejected:  RoutingKeyEnrollmentProgramRejected,
 		EventEnrollmentProgramCancelled: RoutingKeyEnrollmentProgramCancelled,
+		EventPaymentCompleted:           RoutingKeyPaymentCompleted,
+		EventPaymentFailed:              RoutingKeyPaymentFailed,
 	}
 	for event, routing := range pairs {
 		assert.Equal(t, event, routing,

@@ -20,6 +20,14 @@ var (
 	// Request errors
 	ErrInvalidInitiate = sharedErrors.New("INVALID_PAYMENT_REQUEST", "Ödeme isteği geçersiz", http.StatusBadRequest)
 
+	// Card validation errors. 422 and not a failed payment: the student
+	// fixes the form and tries again on the same payment.
+	ErrInvalidCardNumber = sharedErrors.New("INVALID_CARD_NUMBER", "Kart numarası geçersiz", http.StatusUnprocessableEntity)
+	ErrInvalidExpiry     = sharedErrors.New("INVALID_CARD_EXPIRY", "Son kullanma tarihi geçersiz", http.StatusUnprocessableEntity)
+	ErrCardExpired       = sharedErrors.New("CARD_EXPIRED", "Kartın son kullanma tarihi geçmiş", http.StatusUnprocessableEntity)
+	ErrInvalidCVC        = sharedErrors.New("INVALID_CVC", "CVC 3 veya 4 haneli olmalı", http.StatusUnprocessableEntity)
+	ErrInvalidCardholder = sharedErrors.New("INVALID_CARDHOLDER", "Kart üzerindeki ad gerekli", http.StatusUnprocessableEntity)
+
 	// Repository sentinel
 	ErrPaymentNotFoundRepo = sharedErrors.ErrNotFoundRepo
 )

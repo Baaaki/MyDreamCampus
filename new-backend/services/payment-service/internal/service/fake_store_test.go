@@ -16,6 +16,12 @@ type fakeStore struct {
 	byRef       map[string]*db.Payment
 	createCalls []db.CreatePaymentParams
 	expireNow   time.Time
+	events      []fakeEvent
+}
+
+type fakeEvent struct {
+	eventType string
+	payload   map[string]any
 }
 
 func newFakeStore() *fakeStore {
@@ -82,4 +88,49 @@ func (f *fakeStore) ExpireOverduePayments(_ context.Context, now time.Time) (int
 		}
 	}
 	return n, nil
+}
+
+func (f *fakeStore) GetPaymentByID(_ context.Context, id uuid.UUID) (db.Payment, error) {
+	if p := f.byID(id); p != nil {
+		return *p, nil
+	}
+	return db.Payment{}, serviceErrors.ErrPaymentNotFoundRepo
+}
+
+func (f *fakeStore) CompletePaymentWithEvent(_ context.Context, params db.CompletePaymentParams, payload map[string]any) (db.Payment, error) {
+	p := f.byID(utils.PgtypeToUUID(params.ID))
+	if p == nil || p.Status != db.PaymentPaymentStatusEnumPending {
+		return db.Payment{}, serviceErrors.ErrPaymentNotFoundRepo
+	}
+	p.Status = db.PaymentPaymentStatusEnumCompleted
+	p.CardBrand, p.CardLast4, p.CompletedAt = params.CardBrand, params.CardLast4, params.CompletedAt
+	f.events = append(f.events, fakeEvent{"payment.completed", payload})
+	return *p, nil
+}
+
+func (f *fakeStore) FailPaymentWithEvent(_ context.Context, params db.FailPaymentParams, payload map[string]any) (db.Payment, error) {
+	p := f.byID(utils.PgtypeToUUID(params.ID))
+	if p == nil || p.Status != db.PaymentPaymentStatusEnumPending {
+		return db.Payment{}, serviceErrors.ErrPaymentNotFoundRepo
+	}
+	p.Status = db.PaymentPaymentStatusEnumFailed
+	p.CardBrand, p.CardLast4, p.FailureReason = params.CardBrand, params.CardLast4, params.FailureReason
+	f.events = append(f.events, fakeEvent{"payment.failed", payload})
+	return *p, nil
+}
+
+func (f *fakeStore) ExpirePayment(_ context.Context, id uuid.UUID) error {
+	if p := f.byID(id); p != nil && p.Status == db.PaymentPaymentStatusEnumPending {
+		p.Status = db.PaymentPaymentStatusEnumExpired
+	}
+	return nil
+}
+
+func (f *fakeStore) byID(id uuid.UUID) *db.Payment {
+	for _, p := range f.byRef {
+		if utils.PgtypeToUUID(p.ID) == id {
+			return p
+		}
+	}
+	return nil
 }

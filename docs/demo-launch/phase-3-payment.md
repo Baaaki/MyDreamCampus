@@ -117,7 +117,7 @@ Yalnız `card_brand` (prefix'ten: Visa, Mastercard, Amex, Troy `9792`) ve
   > iade ödenen tutara ulaşınca `refunded` olur. Bulunamayan referans 404,
   > tamamlanmamış ödeme / fazla iade 409.
 
-- [ ] **3.4 Kart onayı ucu**
+- [x] **3.4 Kart onayı ucu**
   - `services/payment-service/internal/module.go` `RegisterRoutes` (şu an
     boş, ≈46). Zincir: `JWTAuth`, `CSRFProtection`, `UserRateLimit`,
     `RequireStudent`.
@@ -136,6 +136,12 @@ Yalnız `card_brand` (prefix'ten: Visa, Mastercard, Amex, Troy `9792`) ve
   - Birim testleri: Luhn, test kartları, sahiplik, durum geçişleri; kart
     numarasının loga düşmediğini doğrula (logger'ı yakalayan test).
   - **Commit:** `feat(payment): confirm payments with test cards`
+  > Not (24.09): Reddedilen kart bir istek hatası değil, 200 + `status:
+  > "failed"` ve `failure_reason` döner. Doğrulama `internal/card`'da; YY veya
+  > YYYY yıl kabul edilir, kart son kullanma ayının son gününe kadar
+  > geçerlidir. Bilinmeyen marka (`6011...`) `card_brand = NULL` olur.
+  > Idempotency kaydı yalnız istek gövdesinin SHA-256 özetini ve yanıtı
+  > (son 4 hane) tutar. Event sabitleri `shared/events`'e eklendi.
 
 - [ ] **3.5 meal tarafı**
   - `services/meal-service/internal/dto/reservation_dto.go:41`, `:51`:

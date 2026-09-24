@@ -65,9 +65,17 @@ func (m *Module) RetentionStore() eventbus.RetentionStore {
 	return repository.NewRetentionStore(m.pool)
 }
 
-// RegisterRoutes mounts nothing under /api — payment has no user-facing
-// endpoints. Meal, its single caller, reaches it through RegisterPublicRoutes.
-func (m *Module) RegisterRoutes(*gin.RouterGroup) {}
+// RegisterRoutes mounts the student's checkout under /api/payments. The
+// chain goes on a sub-group: router also carries the admin time status
+// route, which has a chain of its own.
+func (m *Module) RegisterRoutes(router *gin.RouterGroup) {
+	student := router.Group("")
+	student.Use(platformMiddleware.JWTAuth())
+	student.Use(platformMiddleware.CSRFProtection())
+	student.Use(platformMiddleware.UserRateLimit())
+	student.Use(platformMiddleware.RequireStudent())
+	m.paymentHandler.RegisterRoutes(student)
+}
 
 // RegisterPublicRoutes mounts the /internal sub-tree at the root, outside the
 // /api prefix Caddy proxies, so payment is reachable only from inside the

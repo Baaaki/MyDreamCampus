@@ -11,6 +11,50 @@ import (
 	"github.com/jackc/pgx/v5/pgtype"
 )
 
+const completePayment = `-- name: CompletePayment :one
+UPDATE payment.payments
+SET status = 'completed', card_brand = $2, card_last4 = $3, completed_at = $4, updated_at = NOW()
+WHERE id = $1 AND status = 'pending'
+RETURNING id, reference_id, student_id, amount, refunded_amount, currency, description, status, card_brand, card_last4, failure_reason, expires_at, completed_at, created_at, updated_at
+`
+
+type CompletePaymentParams struct {
+	ID          pgtype.UUID        `json:"id"`
+	CardBrand   pgtype.Text        `json:"card_brand"`
+	CardLast4   pgtype.Text        `json:"card_last4"`
+	CompletedAt pgtype.Timestamptz `json:"completed_at"`
+}
+
+// status = 'pending' in the WHERE clause lets only one of two concurrent
+// confirms through; the other matches no row.
+func (q *Queries) CompletePayment(ctx context.Context, arg CompletePaymentParams) (Payment, error) {
+	row := q.db.QueryRow(ctx, completePayment,
+		arg.ID,
+		arg.CardBrand,
+		arg.CardLast4,
+		arg.CompletedAt,
+	)
+	var i Payment
+	err := row.Scan(
+		&i.ID,
+		&i.ReferenceID,
+		&i.StudentID,
+		&i.Amount,
+		&i.RefundedAmount,
+		&i.Currency,
+		&i.Description,
+		&i.Status,
+		&i.CardBrand,
+		&i.CardLast4,
+		&i.FailureReason,
+		&i.ExpiresAt,
+		&i.CompletedAt,
+		&i.CreatedAt,
+		&i.UpdatedAt,
+	)
+	return i, err
+}
+
 const createPayment = `-- name: CreatePayment :one
 INSERT INTO payment.payments (reference_id, student_id, amount, currency, description, expires_at)
 VALUES ($1, $2, $3, $4, $5, $6)
@@ -71,6 +115,90 @@ func (q *Queries) ExpireOverduePayments(ctx context.Context, expiresAt pgtype.Ti
 		return 0, err
 	}
 	return result.RowsAffected(), nil
+}
+
+const expirePayment = `-- name: ExpirePayment :execrows
+UPDATE payment.payments
+SET status = 'expired', updated_at = NOW()
+WHERE id = $1 AND status = 'pending'
+`
+
+func (q *Queries) ExpirePayment(ctx context.Context, id pgtype.UUID) (int64, error) {
+	result, err := q.db.Exec(ctx, expirePayment, id)
+	if err != nil {
+		return 0, err
+	}
+	return result.RowsAffected(), nil
+}
+
+const failPayment = `-- name: FailPayment :one
+UPDATE payment.payments
+SET status = 'failed', card_brand = $2, card_last4 = $3, failure_reason = $4, updated_at = NOW()
+WHERE id = $1 AND status = 'pending'
+RETURNING id, reference_id, student_id, amount, refunded_amount, currency, description, status, card_brand, card_last4, failure_reason, expires_at, completed_at, created_at, updated_at
+`
+
+type FailPaymentParams struct {
+	ID            pgtype.UUID `json:"id"`
+	CardBrand     pgtype.Text `json:"card_brand"`
+	CardLast4     pgtype.Text `json:"card_last4"`
+	FailureReason pgtype.Text `json:"failure_reason"`
+}
+
+func (q *Queries) FailPayment(ctx context.Context, arg FailPaymentParams) (Payment, error) {
+	row := q.db.QueryRow(ctx, failPayment,
+		arg.ID,
+		arg.CardBrand,
+		arg.CardLast4,
+		arg.FailureReason,
+	)
+	var i Payment
+	err := row.Scan(
+		&i.ID,
+		&i.ReferenceID,
+		&i.StudentID,
+		&i.Amount,
+		&i.RefundedAmount,
+		&i.Currency,
+		&i.Description,
+		&i.Status,
+		&i.CardBrand,
+		&i.CardLast4,
+		&i.FailureReason,
+		&i.ExpiresAt,
+		&i.CompletedAt,
+		&i.CreatedAt,
+		&i.UpdatedAt,
+	)
+	return i, err
+}
+
+const getPaymentByID = `-- name: GetPaymentByID :one
+SELECT id, reference_id, student_id, amount, refunded_amount, currency, description, status, card_brand, card_last4, failure_reason, expires_at, completed_at, created_at, updated_at FROM payment.payments
+WHERE id = $1
+`
+
+func (q *Queries) GetPaymentByID(ctx context.Context, id pgtype.UUID) (Payment, error) {
+	row := q.db.QueryRow(ctx, getPaymentByID, id)
+	var i Payment
+	err := row.Scan(
+		&i.ID,
+		&i.ReferenceID,
+		&i.StudentID,
+		&i.Amount,
+		&i.RefundedAmount,
+		&i.Currency,
+		&i.Description,
+		&i.Status,
+		&i.CardBrand,
+		&i.CardLast4,
+		&i.FailureReason,
+		&i.ExpiresAt,
+		&i.CompletedAt,
+		&i.CreatedAt,
+		&i.UpdatedAt,
+	)
+	return i, err
 }
 
 const getPaymentByReferenceID = `-- name: GetPaymentByReferenceID :one

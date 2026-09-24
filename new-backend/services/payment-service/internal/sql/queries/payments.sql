@@ -29,3 +29,26 @@ RETURNING *;
 UPDATE payment.payments
 SET status = 'expired', updated_at = NOW()
 WHERE status = 'pending' AND expires_at <= $1;
+
+-- name: GetPaymentByID :one
+SELECT * FROM payment.payments
+WHERE id = $1;
+
+-- name: CompletePayment :one
+-- status = 'pending' in the WHERE clause lets only one of two concurrent
+-- confirms through; the other matches no row.
+UPDATE payment.payments
+SET status = 'completed', card_brand = $2, card_last4 = $3, completed_at = $4, updated_at = NOW()
+WHERE id = $1 AND status = 'pending'
+RETURNING *;
+
+-- name: FailPayment :one
+UPDATE payment.payments
+SET status = 'failed', card_brand = $2, card_last4 = $3, failure_reason = $4, updated_at = NOW()
+WHERE id = $1 AND status = 'pending'
+RETURNING *;
+
+-- name: ExpirePayment :execrows
+UPDATE payment.payments
+SET status = 'expired', updated_at = NOW()
+WHERE id = $1 AND status = 'pending';

@@ -92,6 +92,12 @@ const (
 	EventAttendanceSemesterFailed = "attendance.semester.failed"
 )
 
+// Payment Service Events
+const (
+	EventPaymentCompleted = "payment.completed"
+	EventPaymentFailed    = "payment.failed"
+)
+
 // ============================================================================
 // RABBITMQ QUEUE NAMES (Used in consumer setup)
 // ============================================================================
@@ -144,4 +150,8 @@ const (
 	RoutingKeyEnrollmentProgramRejected  = "enrollment.program.rejected"
 	RoutingKeyEnrollmentProgramCancelled = "enrollment.program.cancelled"
 	RoutingKeyEnrollmentAll              = "enrollment.#"
+
+	// Payment events routing keys
+	RoutingKeyPaymentCompleted = "payment.completed"
+	RoutingKeyPaymentFailed    = "payment.failed"
 )

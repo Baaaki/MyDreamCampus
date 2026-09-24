@@ -101,8 +101,7 @@ Filtreleme broker'da yapılır — her tüketici sadece kendi dönem tipini alı
 **Envelope:** `{event_id, event_type, timestamp, data}` — `event_id`
 idempotency anahtarı, `processed_events` tablosuyla kontrol edilir.
 
-**Kural:** Her publish outbox üzerinden (istisna: payment — DB'si yok).
-Her consumer idempotent.
+**Kural:** Her publish outbox üzerinden. Her consumer idempotent.
 
 ### 3.1 Kuyruk Declare Sorumluluğu
 
@@ -238,7 +237,8 @@ Service URL formatı: `http://<servis-adı>:<port>` (compose DNS).
 
 Mimarinin taşıdığı, henüz kapatılmamış açıklar:
 
-- payment mock (gerçek sağlayıcı entegrasyonu yok, outbox kullanmıyor)
+- payment gerçek bir sağlayıcıya bağlı değil: ödeme yalnız test kartlarıyla
+  onaylanır (`POST /api/payments/:payment_id/confirm`), para çekilmez
 - İlk şifre = email (`force_password_change`)
 - Notification'daki iskelet handler'lar (`grades.entered`, `student.graduated`)
 - Mobil push gönderimi iskelet (`delivery/push` yalnızca logluyor; FCM entegrasyonu yok)
