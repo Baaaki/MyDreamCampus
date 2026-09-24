@@ -217,8 +217,14 @@ jobs:
           expect 200 "$code" "list administrative staff (staff, /api/admin-staff)"
           [ "$(jq '.data | length' /tmp/body)" -ge 1 ] || { echo "::error::no administrative staff seeded"; exit 1; }
 
-          code=$(api http://localhost/api/catalog/courses)
+          code=$(api "http://localhost/api/catalog/courses?limit=100")
           expect 200 "$code" "list courses (catalog)"
+          [ "$(jq '.pagination.total' /tmp/body)" -eq 91 ] || { echo "::error::expected 91 seeded courses, got $(jq '.pagination.total' /tmp/body)"; exit 1; }
+
+          # Public, like the course list: the faculty filters are built from it.
+          code=$(api http://localhost/api/catalog/faculties)
+          expect 200 "$code" "list faculties (catalog)"
+          [ "$(jq '.data | length' /tmp/body)" -eq 19 ] || { echo "::error::expected 19 seeded faculties"; exit 1; }
 
           code=$(api http://localhost/api/students -H "Authorization: Bearer $TOKEN")
           expect 200 "$code" "list students (student)"
@@ -251,6 +257,12 @@ jobs:
           code=$(api "http://localhost/api/enrollment/available-courses?semester=$SEMESTER" \
             -H "Authorization: Bearer $STUDENT_TOKEN")
           expect 200 "$code" "available courses (enrollment -> student + catalog)"
+
+          code=$(api "http://localhost/api/enrollment/my-enrollments?semester=$SEMESTER" \
+            -H "Authorization: Bearer $STUDENT_TOKEN")
+          expect 200 "$code" "demo student's program (enrollment)"
+          [ "$(jq -r '.programs[0].status' /tmp/body)" = approved ] \
+            || { echo "::error::the demo student has no approved program this semester"; exit 1; }
 
           # Time machine: catalog stores the offset in Redis and every other
           # service picks it up, from the pub/sub message or at the latest on

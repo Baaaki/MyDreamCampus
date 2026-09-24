@@ -205,7 +205,7 @@
   > hesaplıyor, sonraki dönemin penceresi arayüzden görünmüyor; admin menü
   > sayfası kaydederken yalnız web biçimini yazıyor, mobil o ayı boş görür.
 
-- [ ] **4.5 Doğrulama**
+- [x] **4.5 Doğrulama**
   - Kullanıcıdan temiz bir yığın kurmasını iste; komutu kopyala-yapıştır
     olarak ver (volume'lar silinir, uyar):
     `sudo docker compose -f new-backend/infrastructure/docker-compose.yml -f new-backend/infrastructure/docker-compose.standalone.yml down -v && make deploy`
@@ -214,6 +214,21 @@
     - üç demo hesabıyla girildiğinde ekranlar dolu (katalogda 111 ders,
       fakülte filtreleri).
   - Sonucu görevin altına yaz.
+  > Not (24.09): Temiz yığın komutu kullanıcıya rapordan verildi; kullanıcı
+  > makinesindeki sonuç orada beklenir. Bu oturumda iki yerde doğrulandı:
+  > (1) Yerel: altyapı konteynerleri + servisler host'ta, boş DB, seed logu
+  > hatasız (30 sn); CI golden path'i buna karşı baştan sona yeşil;
+  > Playwright ile zeynep/ahmet/admin ekranları dolu (katalog 91 ders —
+  > 111 değil, bkz. 4.2 — ve 19 fakülte, dönemler, kafeteryalar, aylık
+  > menü; öğrenci kayıt/not/menü, öğretmen not/yoklama/onay). Web öğrenci
+  > yoklama sayfası API'ye hiç bağlı değil (sabit "kayıt yok" metni) — veri
+  > API'de var, sayfa Faz 5'e not edildi. (2) CI `backend-e2e`: golden path
+  > seed içeriğini de kontrol ediyor (91 ders, 19 fakülte, demo öğrencinin
+  > aktif dönemde onaylı programı). Golden path'in seed'den sonraki hiç
+  > koşmamış adımları da düzeltildi (`fix(infra)` commit'i: kayıt listesine
+  > dönem parametresi, `checkout()` içinde `want` değişkenini `expect()`'in
+  > ezmesi, var olmayan `/api/grades` rotası, seed'in admin kovasını
+  > doldurmasından sonra 429'da bekleme).
 
 ## Faz sonu
 - README §5 yeşil olmalı.
