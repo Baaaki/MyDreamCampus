@@ -2,14 +2,15 @@ package payment
 
 import (
 	"context"
+	"time"
 
 	"github.com/baaaki/mydreamcampus/payment/internal/handler"
 	"github.com/baaaki/mydreamcampus/payment/internal/repository"
 	"github.com/baaaki/mydreamcampus/payment/internal/service"
+	"github.com/baaaki/mydreamcampus/payment/internal/worker"
 	"github.com/baaaki/mydreamcampus/shared/config"
 	"github.com/baaaki/mydreamcampus/shared/eventbus"
 	platformMiddleware "github.com/baaaki/mydreamcampus/shared/platform/middleware"
-	"github.com/baaaki/mydreamcampus/shared/platform/rabbitmq"
 	"github.com/gin-gonic/gin"
 	"github.com/jackc/pgx/v5/pgxpool"
 	"go.uber.org/zap"
@@ -23,9 +24,16 @@ type Module struct {
 	paymentHandler *handler.PaymentHandler
 }
 
-func New(cfg *config.Config, logger *zap.Logger, pool *pgxpool.Pool, rabbitConn *rabbitmq.Connection) *Module {
-	publisher := rabbitmq.NewPublisher(rabbitConn)
-	paymentSvc := service.NewPaymentService(publisher, logger)
+// expiryInterval matches meal's reservation expiry job, so a lapsed payment
+// and its reservation close within the same minute.
+const expiryInterval = time.Minute
+
+func New(cfg *config.Config, logger *zap.Logger, pool *pgxpool.Pool) *Module {
+	paymentSvc := service.NewPaymentService(
+		repository.NewPaymentRepository(pool),
+		time.Duration(cfg.Reservation.TimeoutMinutes)*time.Minute,
+		logger,
+	)
 
 	return &Module{
 		cfg:            cfg,
@@ -41,8 +49,9 @@ func (m *Module) Name() string {
 	return "payments"
 }
 
+// Bootstrap starts the expiry worker; it stops when ctx is cancelled.
 func (m *Module) Bootstrap(ctx context.Context) error {
-	m.logger.Info("bootstrapping mock payment module")
+	go worker.NewExpiryWorker(m.paymentService, expiryInterval, m.logger).Start(ctx)
 	return nil
 }
 

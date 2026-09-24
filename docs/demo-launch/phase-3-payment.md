@@ -98,7 +98,7 @@ Yalnız `card_brand` (prefix'ten: Visa, Mastercard, Amex, Troy `9792`) ve
   - `sqlc.yaml`'a rename bloğunu ekle (skills.md §1).
   - **Commit:** `feat(payment): add the payments table` (outbox tabloları 3.1'de)
 
-- [ ] **3.3 Initiate kalıcı olsun**
+- [x] **3.3 Initiate kalıcı olsun**
   - `/internal/payments/initiate`:
     - `pending` kayıt oluştur. reference_id zaten varsa mevcut kaydı döndür
       (idempotent).
@@ -109,6 +109,13 @@ Yalnız `card_brand` (prefix'ten: Visa, Mastercard, Amex, Troy `9792`) ve
     kendi rezervasyonunu zaten düşürüyor; burada event gerekmez.
   - `new-backend/shared/contracts/payment.go`: `PaymentURL` alanını kaldır.
   - **Commit:** `feat(payment): persist initiated payments`
+  > Not (24.09): `PaymentURL` alanı `contracts`'tan 3.5'te kaldırılıyor —
+  > meal onu okuduğu için burada silmek meal'in derlemesini bozardı; payment
+  > alanı artık doldurmuyor. İade: meal tek öğünü iptal ettiğinde toplu
+  > ödemenin yalnız bir kısmı döner; bunun için `payments`'a (henüz hiçbir
+  > yerde uygulanmamış 00002'ye) `refunded_amount` eklendi, ödeme toplam
+  > iade ödenen tutara ulaşınca `refunded` olur. Bulunamayan referans 404,
+  > tamamlanmamış ödeme / fazla iade 409.
 
 - [ ] **3.4 Kart onayı ucu**
   - `services/payment-service/internal/module.go` `RegisterRoutes` (şu an

@@ -2,16 +2,29 @@ package service
 
 import (
 	"context"
-	"fmt"
+	"errors"
+	"strings"
 	"time"
 
+	"github.com/baaaki/mydreamcampus/payment/internal/db"
+	serviceErrors "github.com/baaaki/mydreamcampus/payment/internal/errors"
 	"github.com/baaaki/mydreamcampus/shared/platform/clock"
-	"github.com/baaaki/mydreamcampus/shared/platform/rabbitmq"
+	sharedErrors "github.com/baaaki/mydreamcampus/shared/platform/errors"
+	"github.com/baaaki/mydreamcampus/shared/platform/utils"
 	"github.com/google/uuid"
 	"go.uber.org/zap"
 )
 
-// InitiatePaymentRequest represents the payment details
+// Store is the persistence the payment service needs. The repository
+// implements it; tests use an in-memory fake.
+type Store interface {
+	CreatePayment(ctx context.Context, params db.CreatePaymentParams) (db.Payment, error)
+	GetPaymentByReferenceID(ctx context.Context, referenceID string) (db.Payment, error)
+	RefundPayment(ctx context.Context, referenceID string, amount float64) (db.Payment, error)
+	ExpireOverduePayments(ctx context.Context, now time.Time) (int64, error)
+}
+
+// InitiatePaymentRequest is what meal asks to be paid.
 type InitiatePaymentRequest struct {
 	ReferenceID string
 	Amount      float64
@@ -20,16 +33,15 @@ type InitiatePaymentRequest struct {
 	StudentID   string
 }
 
-// InitiatePaymentResponse represents the mock response
+// InitiatePaymentResponse identifies the pending payment the student confirms.
 type InitiatePaymentResponse struct {
-	PaymentID  string
-	PaymentURL string
-	Amount     float64
-	Currency   string
-	ExpiresAt  string
+	PaymentID string
+	Amount    float64
+	Currency  string
+	ExpiresAt time.Time
 }
 
-// RefundRequest represents the refund details
+// RefundRequest returns part or all of a completed payment.
 type RefundRequest struct {
 	ReferenceID string
 	Amount      float64
@@ -37,7 +49,7 @@ type RefundRequest struct {
 	Reason      string
 }
 
-// RefundResponse represents the mock refund response
+// RefundResponse reports a processed refund.
 type RefundResponse struct {
 	RefundID string
 	Amount   float64
@@ -46,122 +58,126 @@ type RefundResponse struct {
 	Message  string
 }
 
-// PaymentCompletedEvent is published after a successful mock payment
-type PaymentCompletedEvent struct {
-	EventType string                    `json:"event_type"`
-	EventID   string                    `json:"event_id"`
-	Timestamp time.Time                 `json:"timestamp"`
-	Data      PaymentCompletedEventData `json:"data"`
-}
-
-type PaymentCompletedEventData struct {
-	PaymentID   string  `json:"payment_id"`
-	ReferenceID string  `json:"reference_id"` // "res_uuid" or "bat_uuid"
-	Amount      float64 `json:"amount"`
-	Currency    string  `json:"currency"`
-}
-
-// PaymentService is the in-process mock payment service
 type PaymentService struct {
-	publisher *rabbitmq.Publisher
-	logger    *zap.Logger
+	store Store
+	// timeout matches meal's reservation hold, so the payment and the
+	// reservation it pays for lapse together.
+	timeout time.Duration
+	logger  *zap.Logger
 }
 
-func NewPaymentService(publisher *rabbitmq.Publisher, logger *zap.Logger) *PaymentService {
-	// Only the exchange, which payment owns. The meal.payment_* queues used to
-	// be declared here too — a publisher defining its consumer's queues. Meal
-	// declares them itself; payment must not know who listens.
-	// Non-fatal: publish re-declares, and the mock flow must not block boot.
-	if err := publisher.DeclareExchange("payment.events"); err != nil {
-		logger.Warn("failed to declare payment exchange", zap.Error(err))
-	}
-
+func NewPaymentService(store Store, timeout time.Duration, logger *zap.Logger) *PaymentService {
 	return &PaymentService{
-		publisher: publisher,
-		logger:    logger,
+		store:   store,
+		timeout: timeout,
+		logger:  logger,
 	}
 }
 
-// InitiatePayment mocks a payment initiation. It returns success and immediately publishes a payment.completed event.
+// InitiatePayment opens a pending payment for a meal reservation. A retried
+// call with the same reference returns the payment it opened the first time.
 func (s *PaymentService) InitiatePayment(ctx context.Context, req InitiatePaymentRequest) (*InitiatePaymentResponse, error) {
-	s.logger.Info("MOCK: Processing payment initiation",
-		zap.String("reference_id", req.ReferenceID),
-		zap.Float64("amount", req.Amount),
-		zap.String("currency", req.Currency),
-		zap.String("student_id", req.StudentID),
-		zap.String("description", req.Description),
+	studentID, err := uuid.Parse(req.StudentID)
+	// Below one kuruş the amount would round to zero in NUMERIC(10,2).
+	if err != nil || req.Amount < 0.01 || len(req.Currency) != 3 || !validReference(req.ReferenceID) {
+		return nil, serviceErrors.ErrInvalidInitiate
+	}
+
+	payment, err := s.store.CreatePayment(ctx, db.CreatePaymentParams{
+		ReferenceID: req.ReferenceID,
+		StudentID:   utils.UUIDToPgtype(studentID),
+		Amount:      utils.Float64ToPgNumeric(req.Amount),
+		Currency:    req.Currency,
+		Description: req.Description,
+		ExpiresAt:   utils.TimeToPgTimestamptz(clock.Now().Add(s.timeout)),
+	})
+	if err != nil {
+		return nil, err
+	}
+
+	amount, err := utils.PgNumericToFloat64(payment.Amount)
+	if err != nil {
+		return nil, err
+	}
+
+	s.logger.Info("payment initiated",
+		zap.String("payment_id", utils.PgtypeToUUIDString(payment.ID)),
+		zap.String("reference_id", payment.ReferenceID),
+		zap.String("student_id", studentID.String()),
+		zap.String("status", string(payment.Status)),
 	)
-
-	// Generate mock payment ID
-	paymentID := fmt.Sprintf("pay_%s", uuid.New().String()[:8])
-
-	// Generate mock payment URL
-	paymentURL := fmt.Sprintf("https://mock-payment.mydreamcampus.com/pay/%s", paymentID)
-
-	// Set expiration time (30 minutes from now)
-	expiresAt := clock.Now().Add(30 * time.Minute).Format(time.RFC3339)
-
-	s.logger.Info("MOCK: Payment initiated successfully",
-		zap.String("payment_id", paymentID),
-		zap.String("payment_url", paymentURL),
-	)
-
-	// Publish payment.completed event to mock an asynchronous webhook confirmation
-	go func() {
-		// Small delay to simulate async payment
-		time.Sleep(2 * time.Second)
-
-		event := PaymentCompletedEvent{
-			EventType: "payment.completed",
-			EventID:   uuid.New().String(),
-			Timestamp: clock.Now(),
-			Data: PaymentCompletedEventData{
-				PaymentID:   paymentID,
-				ReferenceID: req.ReferenceID,
-				Amount:      req.Amount,
-				Currency:    req.Currency,
-			},
-		}
-
-		err := s.publisher.Publish(context.WithoutCancel(ctx), "payment.events", "payment.completed", event)
-		if err != nil {
-			s.logger.Error("failed to publish mock payment.completed event", zap.Error(err))
-		} else {
-			s.logger.Info("MOCK: Published payment.completed event", zap.String("payment_id", paymentID))
-		}
-	}()
 
 	return &InitiatePaymentResponse{
-		PaymentID:  paymentID,
-		PaymentURL: paymentURL,
-		Amount:     req.Amount,
-		Currency:   req.Currency,
-		ExpiresAt:  expiresAt,
+		PaymentID: utils.PgtypeToUUIDString(payment.ID),
+		Amount:    amount,
+		Currency:  payment.Currency,
+		ExpiresAt: payment.ExpiresAt.Time,
 	}, nil
 }
 
-// RequestRefund handles refund requests
-// MOCK: Always returns success for development/testing
+// RequestRefund returns amount from a completed payment. Meal refunds one
+// meal at a time, so a batch payment is refunded in parts.
 func (s *PaymentService) RequestRefund(ctx context.Context, req RefundRequest) (*RefundResponse, error) {
-	s.logger.Info("MOCK: Processing refund request",
-		zap.String("reference_id", req.ReferenceID),
+	if req.Amount < 0.01 {
+		return nil, sharedErrors.ErrValidation
+	}
+
+	payment, err := s.store.RefundPayment(ctx, req.ReferenceID, req.Amount)
+	if errors.Is(err, serviceErrors.ErrPaymentNotFoundRepo) {
+		return nil, s.refundRejection(ctx, req.ReferenceID)
+	}
+	if err != nil {
+		return nil, err
+	}
+
+	s.logger.Info("payment refunded",
+		zap.String("payment_id", utils.PgtypeToUUIDString(payment.ID)),
+		zap.String("reference_id", payment.ReferenceID),
 		zap.Float64("amount", req.Amount),
-		zap.String("currency", req.Currency),
-		zap.String("reason", req.Reason),
-	)
-
-	// Generate mock refund ID
-	refundID := fmt.Sprintf("ref_%s", uuid.New().String()[:8])
-
-	s.logger.Info("MOCK: Refund completed successfully",
-		zap.String("refund_id", refundID),
+		zap.String("status", string(payment.Status)),
 	)
 
 	return &RefundResponse{
-		RefundID: refundID,
+		// Refunds are recorded on the payment itself, not as rows of their own.
+		RefundID: utils.PgtypeToUUIDString(payment.ID),
 		Amount:   req.Amount,
-		Currency: req.Currency,
+		Currency: payment.Currency,
 		Status:   "completed",
 		Message:  "İade işlendi",
 	}, nil
+}
+
+// refundRejection explains why no payment qualified for the refund.
+func (s *PaymentService) refundRejection(ctx context.Context, referenceID string) error {
+	payment, err := s.store.GetPaymentByReferenceID(ctx, referenceID)
+	if errors.Is(err, serviceErrors.ErrPaymentNotFoundRepo) {
+		return serviceErrors.ErrPaymentNotFound
+	}
+	if err != nil {
+		return err
+	}
+	if payment.Status != db.PaymentPaymentStatusEnumCompleted {
+		return serviceErrors.ErrRefundNotAllowed
+	}
+	return serviceErrors.ErrRefundTooLarge
+}
+
+// ExpireOverdue marks pending payments past their deadline as expired. No
+// event follows: meal drops the reservation on its own timer.
+func (s *PaymentService) ExpireOverdue(ctx context.Context) (int64, error) {
+	return s.store.ExpireOverduePayments(ctx, clock.Now())
+}
+
+// validReference accepts the two shapes meal's payment consumer can route:
+// "res_<uuid>" for one reservation and "bat_<uuid>" for a batch.
+func validReference(ref string) bool {
+	rest, ok := strings.CutPrefix(ref, "res_")
+	if !ok {
+		rest, ok = strings.CutPrefix(ref, "bat_")
+	}
+	if !ok {
+		return false
+	}
+	_, err := uuid.Parse(rest)
+	return err == nil
 }

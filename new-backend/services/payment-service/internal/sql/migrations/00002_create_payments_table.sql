@@ -10,6 +10,10 @@ CREATE TABLE IF NOT EXISTS payment.payments (
     reference_id TEXT NOT NULL UNIQUE,
     student_id UUID NOT NULL,
     amount NUMERIC(10,2) NOT NULL CHECK (amount > 0),
+    -- A batch is paid at once but cancelled one meal at a time, so refunds
+    -- are partial; the status turns 'refunded' once they add up to amount.
+    refunded_amount NUMERIC(10,2) NOT NULL DEFAULT 0
+        CHECK (refunded_amount >= 0 AND refunded_amount <= amount),
     currency CHAR(3) NOT NULL,
     description TEXT NOT NULL DEFAULT '',
     status payment.payment_status_enum NOT NULL DEFAULT 'pending',

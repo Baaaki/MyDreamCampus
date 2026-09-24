@@ -4,9 +4,9 @@ import (
 	"context"
 	"time"
 
+	"github.com/baaaki/mydreamcampus/payment/internal/db"
 	"github.com/baaaki/mydreamcampus/shared/eventbus"
 	"github.com/baaaki/mydreamcampus/shared/platform/utils"
-	"github.com/baaaki/mydreamcampus/payment/internal/db"
 	"github.com/jackc/pgx/v5/pgxpool"
 )
 

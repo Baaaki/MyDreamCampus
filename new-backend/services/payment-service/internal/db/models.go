@@ -114,18 +114,19 @@ type OutboxEvent struct {
 }
 
 type Payment struct {
-	ID            pgtype.UUID        `json:"id"`
-	ReferenceID   string             `json:"reference_id"`
-	StudentID     pgtype.UUID        `json:"student_id"`
-	Amount        pgtype.Numeric     `json:"amount"`
-	Currency      string             `json:"currency"`
-	Description   string             `json:"description"`
-	Status        PaymentStatusEnum  `json:"status"`
-	CardBrand     pgtype.Text        `json:"card_brand"`
-	CardLast4     pgtype.Text        `json:"card_last4"`
-	FailureReason pgtype.Text        `json:"failure_reason"`
-	ExpiresAt     pgtype.Timestamptz `json:"expires_at"`
-	CompletedAt   pgtype.Timestamptz `json:"completed_at"`
-	CreatedAt     pgtype.Timestamptz `json:"created_at"`
-	UpdatedAt     pgtype.Timestamptz `json:"updated_at"`
+	ID             pgtype.UUID        `json:"id"`
+	ReferenceID    string             `json:"reference_id"`
+	StudentID      pgtype.UUID        `json:"student_id"`
+	Amount         pgtype.Numeric     `json:"amount"`
+	RefundedAmount pgtype.Numeric     `json:"refunded_amount"`
+	Currency       string             `json:"currency"`
+	Description    string             `json:"description"`
+	Status         PaymentStatusEnum  `json:"status"`
+	CardBrand      pgtype.Text        `json:"card_brand"`
+	CardLast4      pgtype.Text        `json:"card_last4"`
+	FailureReason  pgtype.Text        `json:"failure_reason"`
+	ExpiresAt      pgtype.Timestamptz `json:"expires_at"`
+	CompletedAt    pgtype.Timestamptz `json:"completed_at"`
+	CreatedAt      pgtype.Timestamptz `json:"created_at"`
+	UpdatedAt      pgtype.Timestamptz `json:"updated_at"`
 }

@@ -4,9 +4,9 @@ import (
 	"context"
 	"fmt"
 
+	"github.com/baaaki/mydreamcampus/payment/internal/db"
 	sharedErrors "github.com/baaaki/mydreamcampus/shared/platform/errors"
 	"github.com/baaaki/mydreamcampus/shared/platform/utils"
-	"github.com/baaaki/mydreamcampus/payment/internal/db"
 	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5/pgxpool"
 )

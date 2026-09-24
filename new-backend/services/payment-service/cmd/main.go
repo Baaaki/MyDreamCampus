@@ -15,7 +15,7 @@ func main() {
 
 	// Payment consumes nothing: meal calls it over internal REST and learns
 	// the outcome from payment.* events. No queues to declare.
-	module := payment.New(rt.Cfg, logger.Log, rt.Pool, rt.Rabbit)
+	module := payment.New(rt.Cfg, logger.Log, rt.Pool)
 	if err := module.Bootstrap(rt.Ctx); err != nil {
 		logger.Fatal("failed to bootstrap payment module", zap.Error(err))
 	}

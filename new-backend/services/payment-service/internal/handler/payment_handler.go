@@ -2,6 +2,7 @@ package handler
 
 import (
 	"context"
+	"errors"
 	"net/http"
 	"time"
 
@@ -15,8 +16,7 @@ import (
 
 const requestTimeout = 10 * time.Second
 
-// PaymentHandler exposes the mock payment service over internal REST so
-// meal can reach it the same way it will once payment runs on its own.
+// PaymentHandler exposes the payment service to meal over internal REST.
 type PaymentHandler struct {
 	service *service.PaymentService
 }
@@ -26,8 +26,7 @@ func NewPaymentHandler(svc *service.PaymentService) *PaymentHandler {
 }
 
 // RegisterInternalRoutes mounts the endpoints meal calls. The caller
-// supplies a group already guarded by RequireInternalSecret — payment has
-// no user-facing routes at all.
+// supplies a group already guarded by RequireInternalSecret.
 func (h *PaymentHandler) RegisterInternalRoutes(rg *gin.RouterGroup) {
 	rg.POST("/payments/initiate", h.InitiatePayment)
 	rg.POST("/payments/refund", h.RequestRefund)
@@ -63,19 +62,15 @@ func (h *PaymentHandler) InitiatePayment(c *gin.Context) {
 	if err != nil {
 		reqLogger.Error("payment initiation failed", zap.Error(err),
 			zap.String("reference_id", req.ReferenceID))
-		c.JSON(http.StatusInternalServerError, gin.H{
-			"error": sharedErrors.ErrInternal.Message,
-			"code":  sharedErrors.ErrInternal.Code,
-		})
+		writeError(c, err)
 		return
 	}
 
 	c.JSON(http.StatusOK, dto.InitiatePaymentResponse{
-		PaymentID:  resp.PaymentID,
-		PaymentURL: resp.PaymentURL,
-		Amount:     resp.Amount,
-		Currency:   resp.Currency,
-		ExpiresAt:  resp.ExpiresAt,
+		PaymentID: resp.PaymentID,
+		Amount:    resp.Amount,
+		Currency:  resp.Currency,
+		ExpiresAt: resp.ExpiresAt.Format(time.RFC3339),
 	})
 }
 
@@ -108,10 +103,7 @@ func (h *PaymentHandler) RequestRefund(c *gin.Context) {
 	if err != nil {
 		reqLogger.Error("refund failed", zap.Error(err),
 			zap.String("reference_id", req.ReferenceID))
-		c.JSON(http.StatusInternalServerError, gin.H{
-			"error": sharedErrors.ErrInternal.Message,
-			"code":  sharedErrors.ErrInternal.Code,
-		})
+		writeError(c, err)
 		return
 	}
 
@@ -121,5 +113,19 @@ func (h *PaymentHandler) RequestRefund(c *gin.Context) {
 		Currency: resp.Currency,
 		Status:   resp.Status,
 		Message:  resp.Message,
+	})
+}
+
+// writeError answers with the AppError's own status and message, and hides
+// anything else behind a generic 500.
+func writeError(c *gin.Context, err error) {
+	var appErr *sharedErrors.AppError
+	if errors.As(err, &appErr) {
+		c.JSON(appErr.HTTPStatus, gin.H{"error": appErr.Message, "code": appErr.Code})
+		return
+	}
+	c.JSON(http.StatusInternalServerError, gin.H{
+		"error": sharedErrors.ErrInternal.Message,
+		"code":  sharedErrors.ErrInternal.Code,
 	})
 }
