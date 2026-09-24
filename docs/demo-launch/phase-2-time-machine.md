@@ -106,7 +106,7 @@
   > - Kabul testi: `auth/internal/service/time_machine_test.go` (±1 yıl ofsette
   >   login, token doğrulama, refresh).
 
-- [ ] **2.4 SQL'deki iş saati karşılaştırmaları**
+- [x] **2.4 SQL'deki iş saati karşılaştırmaları**
   - Aşağıdaki sorgularda `NOW()` → sqlc parametresi (`sqlc.arg(now)`); Go
     tarafı `clock.Now()` geçer:
     - `services/attendance-service/internal/sql/queries/attendance_sessions.sql:16`
@@ -120,6 +120,11 @@
   - Her serviste `make sqlc`.
   - **Commit:** servis başına, örn.
     `fix(attendance): compare session expiry against the service clock`
+  > Not (24.09): `clock.Now()` repository katmanında geçiliyor; repository
+  > imzaları ve servis arayüzleri değişmedi. meal sorgularında `now`
+  > parametresi CTE yüzünden belirsiz kaldığı için `::timestamptz` ile
+  > tiplendi. sqlc v1.31.1 (üretilmiş dosyalardaki sürüm) ile üretildi;
+  > değişiklik öncesi `make sqlc` fark üretmedi.
 
 - [ ] **2.5 Uçlar**
   - **Durum:** her servis

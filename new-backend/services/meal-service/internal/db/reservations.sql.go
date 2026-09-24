@@ -123,16 +123,21 @@ func (q *Queries) CheckActiveReservationsForSlots(ctx context.Context, arg Check
 const cleanupExpiredReservations = `-- name: CleanupExpiredReservations :exec
 WITH cleanup_batch AS (
     SELECT id FROM meal.reservations
-    WHERE status = 'expired' AND expires_at < NOW() - INTERVAL '7 days'
-    LIMIT $1
+    WHERE status = 'expired' AND expires_at < $1::timestamptz - INTERVAL '7 days'
+    LIMIT $2
     FOR UPDATE SKIP LOCKED
 )
 DELETE FROM meal.reservations
 WHERE id IN (SELECT id FROM cleanup_batch)
 `
 
-func (q *Queries) CleanupExpiredReservations(ctx context.Context, limit int32) error {
-	_, err := q.db.Exec(ctx, cleanupExpiredReservations, limit)
+type CleanupExpiredReservationsParams struct {
+	Now       pgtype.Timestamptz `json:"now"`
+	BatchSize int32              `json:"batch_size"`
+}
+
+func (q *Queries) CleanupExpiredReservations(ctx context.Context, arg CleanupExpiredReservationsParams) error {
+	_, err := q.db.Exec(ctx, cleanupExpiredReservations, arg.Now, arg.BatchSize)
 	return err
 }
 
@@ -214,8 +219,8 @@ func (q *Queries) CreateReservation(ctx context.Context, arg CreateReservationPa
 const expirePendingReservations = `-- name: ExpirePendingReservations :exec
 WITH expired_batch AS (
     SELECT id FROM meal.reservations
-    WHERE status = 'pending' AND expires_at < NOW()
-    LIMIT $1
+    WHERE status = 'pending' AND expires_at < $1::timestamptz
+    LIMIT $2
     FOR UPDATE SKIP LOCKED
 )
 UPDATE meal.reservations
@@ -223,8 +228,15 @@ SET status = 'expired', updated_at = NOW()
 WHERE id IN (SELECT id FROM expired_batch)
 `
 
-func (q *Queries) ExpirePendingReservations(ctx context.Context, limit int32) error {
-	_, err := q.db.Exec(ctx, expirePendingReservations, limit)
+type ExpirePendingReservationsParams struct {
+	Now       pgtype.Timestamptz `json:"now"`
+	BatchSize int32              `json:"batch_size"`
+}
+
+// now is the service clock, which the time machine can shift; expires_at
+// was set on it too.
+func (q *Queries) ExpirePendingReservations(ctx context.Context, arg ExpirePendingReservationsParams) error {
+	_, err := q.db.Exec(ctx, expirePendingReservations, arg.Now, arg.BatchSize)
 	return err
 }
 

@@ -8,6 +8,7 @@ import (
 
 	"github.com/baaaki/mydreamcampus/meal/internal/db"
 	serviceErrors "github.com/baaaki/mydreamcampus/meal/internal/errors"
+	"github.com/baaaki/mydreamcampus/shared/platform/clock"
 	sharedErrors "github.com/baaaki/mydreamcampus/shared/platform/errors"
 	"github.com/baaaki/mydreamcampus/shared/platform/utils"
 	"github.com/google/uuid"
@@ -248,7 +249,10 @@ func (r *ReservationRepository) CancelReservationWithRefund(ctx context.Context,
 
 // ExpirePendingReservations expires pending reservations that have timed out
 func (r *ReservationRepository) ExpirePendingReservations(ctx context.Context, limit int32) error {
-	err := r.queries.ExpirePendingReservations(ctx, limit)
+	err := r.queries.ExpirePendingReservations(ctx, db.ExpirePendingReservationsParams{
+		Now:       utils.TimeToPgTimestamptz(clock.Now()),
+		BatchSize: limit,
+	})
 	if err != nil {
 		return fmt.Errorf("%w: failed to expire pending reservations: %v", sharedErrors.ErrQueryFailed, err)
 	}
@@ -257,7 +261,10 @@ func (r *ReservationRepository) ExpirePendingReservations(ctx context.Context, l
 
 // CleanupExpiredReservations removes old expired reservations
 func (r *ReservationRepository) CleanupExpiredReservations(ctx context.Context, limit int32) error {
-	err := r.queries.CleanupExpiredReservations(ctx, limit)
+	err := r.queries.CleanupExpiredReservations(ctx, db.CleanupExpiredReservationsParams{
+		Now:       utils.TimeToPgTimestamptz(clock.Now()),
+		BatchSize: limit,
+	})
 	if err != nil {
 		return fmt.Errorf("%w: failed to cleanup expired reservations: %v", sharedErrors.ErrQueryFailed, err)
 	}
