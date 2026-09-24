@@ -68,8 +68,10 @@ func (w *ReservationWorker) runExpiryJob(ctx context.Context) {
 // runCleanupJob cleans up old expired reservations
 func (w *ReservationWorker) runCleanupJob(ctx context.Context) {
 	// Calculate next 03:00 UTC+3
+	// nextRun is on the service clock, so the wait is measured on it too;
+	// time.Until would be off by the time machine's offset.
 	nextRun := w.getNext3AM()
-	timer := time.NewTimer(time.Until(nextRun))
+	timer := time.NewTimer(nextRun.Sub(clock.Now()))
 	defer timer.Stop()
 
 	for {
@@ -80,7 +82,7 @@ func (w *ReservationWorker) runCleanupJob(ctx context.Context) {
 			}
 			// Schedule next run
 			nextRun = w.getNext3AM()
-			timer.Reset(time.Until(nextRun))
+			timer.Reset(nextRun.Sub(clock.Now()))
 
 		case <-w.stopChan:
 			w.logger.Info("cleanup job stopped")

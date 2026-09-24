@@ -71,7 +71,7 @@
   > son tarihler gidip gelmesin); geçersiz JSON'da gerçek saate döner.
   > Yerelde gerçek redis-server'la elle doğrulandı.
 
-- [ ] **2.3 Gerçek saatte kalması gerekenler**
+- [x] **2.3 Gerçek saatte kalması gerekenler**
   - Şunlarda `clock.Now()` → `time.Now()`:
     - `shared/platform/utils/jwt.go:77`, `:112`
     - `services/auth-service/internal/service/auth_service.go`:
@@ -87,6 +87,24 @@
   - **Kabul:** Test: ofset +1 yıl iken login olunuyor ve token doğrulanıyor.
   - **Commit:** `fix(shared): keep security timestamps on the real clock`
     (+ servis bazında gerekirse)
+  > Not (24.09): Gözden geçirme sonucu:
+  > - Gerçek saate alınanlar: `jwt.go` (2), auth token üretimi (2), oturum
+  >   `expiresAt` (3), şifre sıfırlama süresi, RabbitMQ envelope Timestamp.
+  > - `clock.Now()` kalanlar: `rules/*`, catalog dönem başlangıcı,
+  >   attendance oturum/QR/işaretleme, meal rezervasyon/QR/gün hesapları,
+  >   grades son tarihleri, payment ödeme süresi ve olay gövdelerindeki iş
+  >   zaman damgaları (`*_at`, event DTO `Timestamp`). Hiçbir consumer bu
+  >   damgaları karşılaştırmıyor.
+  > - Planda yoktu, eklendi: iş kuralı olup `time.Now()` okuyan yerler
+  >   `clock.Now()`'a alındı — catalog dönem son tarihi kontrolleri
+  >   (repository 2, handler 2). Simüle anlardan türeyen süreler artık aynı
+  >   saatle ölçülüyor: attendance Redis TTL'leri (3) ve meal temizlik
+  >   zamanlayıcısı (2); `time.Until` ofset kadar yanlış süre veriyordu.
+  > - Karar bekleyen yok. Bilinen sınır: meal'in 03:00 temizlik
+  >   zamanlayıcısı saat değişince yeniden kurulmuyor; bir sonraki çalışma
+  >   eski plana göre olur (temizlik işi, kural değil).
+  > - Kabul testi: `auth/internal/service/time_machine_test.go` (±1 yıl ofsette
+  >   login, token doğrulama, refresh).
 
 - [ ] **2.4 SQL'deki iş saati karşılaştırmaları**
   - Aşağıdaki sorgularda `NOW()` → sqlc parametresi (`sqlc.arg(now)`); Go
