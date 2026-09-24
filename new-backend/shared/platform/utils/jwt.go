@@ -5,7 +5,6 @@ import (
 	"os"
 	"time"
 
-	"github.com/baaaki/mydreamcampus/shared/platform/clock"
 	"github.com/golang-jwt/jwt/v5"
 	"github.com/google/uuid"
 )
@@ -74,7 +73,10 @@ func GenerateAccessToken(userID, role, department string, tokenVersion int) (str
 // Returns: (tokenString, jti, error)
 // expiryMinutes: token expiry time in minutes
 func GenerateAccessTokenWithSecret(userID, role, department string, tokenVersion int, secret []byte, expiryMinutes int) (string, string, error) {
-	now := clock.Now()
+	// Real time, not clock.Now: validation checks exp against the real
+	// clock, so a simulated issue time would log everyone out (or keep
+	// tokens alive for years) the moment the time machine moved.
+	now := time.Now()
 	expiresAt := now.Add(time.Duration(expiryMinutes) * time.Minute)
 	jti := uuid.New().String() // Unique JWT ID for token blacklisting/revocation
 
@@ -109,7 +111,7 @@ func GenerateRefreshToken(userID string, tokenVersion int) (string, string, erro
 // Returns: (tokenString, jti, error)
 // expiryHours: token expiry time in hours
 func GenerateRefreshTokenWithSecret(userID string, tokenVersion int, secret []byte, expiryHours int) (string, string, error) {
-	now := clock.Now()
+	now := time.Now() // real time: see GenerateAccessTokenWithSecret
 	expiresAt := now.Add(time.Duration(expiryHours) * time.Hour)
 	jti := uuid.New().String() // Unique JWT ID for session tracking
 
