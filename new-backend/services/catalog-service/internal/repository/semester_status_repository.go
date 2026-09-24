@@ -84,9 +84,13 @@ func (r *SemesterStatusRepository) IsSemesterActive(ctx context.Context, semeste
 	}
 
 	// status == active — check hard_deadline
-	if semester.HardDeadline.Valid && clock.Now().After(semester.HardDeadline.Time) {
+	now := clock.Now()
+	if semester.HardDeadline.Valid && now.After(semester.HardDeadline.Time) {
 		// Auto-complete: hard deadline has passed
-		if err := r.queries.AutoCompleteSemester(ctx, semesterName); err != nil {
+		if err := r.queries.AutoCompleteSemester(ctx, db.AutoCompleteSemesterParams{
+			Name: semesterName,
+			Now:  utils.TimeToPgTimestamptz(now),
+		}); err != nil {
 			log.Warn("failed to auto-complete semester",
 				zap.String("semester", semesterName),
 				zap.Error(err),

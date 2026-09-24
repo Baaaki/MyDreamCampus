@@ -34,11 +34,17 @@ func (q *Queries) ActivateSemester(ctx context.Context, id pgtype.UUID) (Semeste
 
 const autoCompleteSemester = `-- name: AutoCompleteSemester :exec
 UPDATE course_catalog.semesters SET status = 'completed'
-WHERE name = $1 AND status = 'active' AND hard_deadline < NOW()
+WHERE name = $1 AND status = 'active' AND hard_deadline < $2
 `
 
-func (q *Queries) AutoCompleteSemester(ctx context.Context, name string) error {
-	_, err := q.db.Exec(ctx, autoCompleteSemester, name)
+type AutoCompleteSemesterParams struct {
+	Name string             `json:"name"`
+	Now  pgtype.Timestamptz `json:"now"`
+}
+
+// now is the service clock, which the time machine can shift.
+func (q *Queries) AutoCompleteSemester(ctx context.Context, arg AutoCompleteSemesterParams) error {
+	_, err := q.db.Exec(ctx, autoCompleteSemester, arg.Name, arg.Now)
 	return err
 }
 
