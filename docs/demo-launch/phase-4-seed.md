@@ -33,7 +33,7 @@
 
 ## Görevler
 
-- [ ] **4.1 Fakülte ve bölüm referans tabloları**
+- [x] **4.1 Fakülte ve bölüm referans tabloları**
   - catalog migration:
     - `course_catalog.faculties`: id uuid, slug text unique (örn.
       `fac-egitim`), code, name unique, sort_order
@@ -49,6 +49,11 @@
     DB'lerde. Adların birebir eşleşmesi yeterli.
   - Testler.
   - **Commit:** `feat(catalog): add faculty and department reference data`
+  > Not (24.09): `departments`'a `description` (mock'taki 6 bölüm açıklaması
+  > kaybolmasın, frontend tipinde de var) ve `sort_order` (mock'taki sıra
+  > korunsun) eklendi. Yanıt `{"data": [...]}` zarfında, `ListCourses` gibi;
+  > boş açıklama alanı yanıtta yer almıyor. Tablolar yalnız seed ile dolar;
+  > yazma ucu bu fazın kapsamında değil.
 
 - [ ] **4.2 Mock içeriğini seed verisine dönüştür**
   - **Dönüştürücü geçicidir ve repoya girmez.** Oturumun scratchpad dizininde

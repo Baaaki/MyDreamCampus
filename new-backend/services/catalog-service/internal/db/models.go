@@ -470,6 +470,28 @@ type CourseScheduleSession struct {
 	SessionType      ScheduleSessionTypeEnum `json:"session_type"`
 }
 
+type Department struct {
+	ID          pgtype.UUID        `json:"id"`
+	FacultyID   pgtype.UUID        `json:"faculty_id"`
+	Slug        string             `json:"slug"`
+	Code        string             `json:"code"`
+	Name        string             `json:"name"`
+	Description pgtype.Text        `json:"description"`
+	SortOrder   int16              `json:"sort_order"`
+	CreatedAt   pgtype.Timestamptz `json:"created_at"`
+	UpdatedAt   pgtype.Timestamptz `json:"updated_at"`
+}
+
+type Faculty struct {
+	ID        pgtype.UUID        `json:"id"`
+	Slug      string             `json:"slug"`
+	Code      string             `json:"code"`
+	Name      string             `json:"name"`
+	SortOrder int16              `json:"sort_order"`
+	CreatedAt pgtype.Timestamptz `json:"created_at"`
+	UpdatedAt pgtype.Timestamptz `json:"updated_at"`
+}
+
 type OutboxEvent struct {
 	ID            pgtype.UUID          `json:"id"`
 	EventType     string               `json:"event_type"`

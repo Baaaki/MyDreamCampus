@@ -3,7 +3,8 @@
 //
 // Owns the course_catalog schema (course_catalog table, semester_courses,
 // course_schedule_sessions, semesters, audit_log, academic_periods,
-// outbox_events) and publishes course.* events through its outbox.
+// faculties, departments, outbox_events) and publishes course.* events
+// through its outbox.
 package coursecatalog
 
 import (
@@ -45,6 +46,7 @@ type Module struct {
 	semesterService *service.SemesterService
 
 	catalogHandler        *handler.CatalogHandler
+	facultyHandler        *handler.FacultyHandler
 	semesterHandler       *handler.SemesterHandler
 	semesterStatusHandler *handler.SemesterStatusHandler
 	auditHandler          *handler.AuditHandler
@@ -66,6 +68,7 @@ func New(
 	clockBackend clocksync.Backend,
 ) *Module {
 	catalogRepo := repository.NewCatalogRepository(pool)
+	facultyRepo := repository.NewFacultyRepository(pool)
 	semesterRepo := repository.NewSemesterRepository(pool)
 	scheduleRepo := repository.NewScheduleRepository(pool)
 	outboxRepo := repository.NewOutboxRepository(pool)
@@ -98,6 +101,7 @@ func New(
 		catalogService:     catalogSvc,
 		semesterService:    semesterSvc,
 		catalogHandler:     handler.NewCatalogHandler(catalogSvc),
+		facultyHandler:     handler.NewFacultyHandler(service.NewFacultyService(facultyRepo)),
 		semesterHandler:    handler.NewSemesterHandler(semesterSvc),
 		semesterStatusHandler: handler.NewSemesterStatusHandler(
 			semesterStatusRepo, periodRepo, auditLogger, mealClient, pool,
@@ -129,9 +133,11 @@ func (m *Module) RetentionStore() eventbus.RetentionStore { return m.retentionSt
 // course browsing) live before the JWT-auth chain so the public router
 // matches first.
 func (m *Module) RegisterRoutes(rg *gin.RouterGroup) {
-	// Public — anonymous browsing of catalog courses.
+	// Public — anonymous browsing of catalog courses and the faculty tree
+	// their filters are built from.
 	rg.GET("/courses", m.catalogHandler.ListCourses)
 	rg.GET("/courses/:course_code", m.catalogHandler.GetCourseByCourseCode)
+	rg.GET("/faculties", m.facultyHandler.ListFaculties)
 
 	// Protected — JWT + CSRF + per-user rate limit.
 	protected := rg.Group("")

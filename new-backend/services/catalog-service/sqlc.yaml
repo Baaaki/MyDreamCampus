@@ -28,6 +28,8 @@ sql:
           course_catalog_academic_period: "AcademicPeriod"
           course_catalog_semester: "Semester"
           course_catalog_audit_log: "AuditLog"
+          course_catalog_faculty: "Faculty"
+          course_catalog_department: "Department"
           course_catalog_course_catalog_status_enum: "CourseCatalogStatusEnum"
           course_catalog_course_type_enum: "CourseTypeEnum"
           course_catalog_course_category_enum: "CourseCategoryEnum"
