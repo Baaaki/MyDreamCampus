@@ -758,10 +758,15 @@ export interface CloseSessionResponse {
 }
 
 // System Management types (Time Machine & Academic Periods)
+// current_time and real_time come from one snapshot on the service, so
+// their difference is its offset, free of request latency.
 export interface TimeStatus {
-  mode: "real" | "simulated"
+  service: string
+  active: boolean
   current_time: string
-  simulated_time: string | null
+  real_time: string
+  offset_seconds: number
+  until?: string
 }
 
 export interface ServiceTimeStatus {

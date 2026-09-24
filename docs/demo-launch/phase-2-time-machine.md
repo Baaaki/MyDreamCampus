@@ -155,7 +155,7 @@
   > kaldırıldı. 8 servisin rotaları geçici bir testle çakışmasız bağlandı.
   > `01-REFERANS-MIMARI.md` güncellendi.
 
-- [ ] **2.6 Görünürlük (K1)**
+- [x] **2.6 Görünürlük (K1)** — K1 = Hayır, uygulanmadı
   - Shared middleware: saat simüle ise her yanıta `X-Simulated-Time` ve
     `X-Simulated-Until` başlıklarını ekle. Bunları
     `shared/platform/middleware/cors.go`'daki `Access-Control-Expose-Headers`'a
@@ -166,8 +166,11 @@
     Zaman yetmezse not düş.
   - **Commit:** `feat(frontend): show a banner while the time machine is active`
     (+ mobil)
+  > Not (24.09): K1 cevabı "Hayır — otomatik kapanma ve şerit yok" olduğu
+  > için başlık, CORS expose, web ve mobil şerit yapılmadı. Durum yalnız
+  > Zaman Makinesi sayfasında görünür.
 
-- [ ] **2.7 Zaman makinesi sayfası**
+- [x] **2.7 Zaman makinesi sayfası**
   - `frontend/src/lib/services/system-service.ts` (≈27-115):
     - `getAllTimeStatuses` → her servisin status ucu (`*ApiSafe` istemcileri)
     - `simulateTimeAll` → catalog simulate'e tek çağrı
@@ -178,6 +181,13 @@
   - `frontend/src/pages/admin/system/time/`: kalan süreyi, servis bazında
     saati ve servisler arası sapma uyarısını göster.
   - **Commit:** `feat(frontend): wire the time machine page to the backend`
+  > Not (24.09): `paymentApiSafe` eklendi. Sayfa 10 sn'de bir yenilenir,
+  > saatler arada saniye saniye akar; sapma uyarısı eşiği 1 sn (servisler
+  > ayarı en geç 10 sn'de alır). Tarih girişi ±2 yılla sınırlı; backend'in
+  > 400 mesajı toast'ta görünür. `MOCK_DELAY` yalnız `listAuditLog` için
+  > kaldı (mock temizliği Faz 5). Sahte API + Playwright ile tarayıcıda
+  > simüle → sapma uyarısı → yenile → 2 yıl sınırı → sıfırla akışı
+  > doğrulandı; gerçek yığınla doğrulama 2.8'deki e2e'de.
 
 - [ ] **2.8 e2e**
   - `.github/workflows/ci.yml` `backend-e2e` job'u (≈114-255) golden path'ine
