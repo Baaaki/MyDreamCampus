@@ -33,7 +33,7 @@
 
 ## Görevler
 
-- [x] **4.1 Fakülte ve bölüm referans tabloları**
+- [x] **4.1 Fakülte ve bölüm referans tabloları** — `acc5abd`
   - catalog migration:
     - `course_catalog.faculties`: id uuid, slug text unique (örn.
       `fac-egitim`), code, name unique, sort_order
@@ -55,7 +55,7 @@
   > boş açıklama alanı yanıtta yer almıyor. Tablolar yalnız seed ile dolar;
   > yazma ucu bu fazın kapsamında değil.
 
-- [x] **4.2 Mock içeriğini seed verisine dönüştür**
+- [x] **4.2 Mock içeriğini seed verisine dönüştür** — `7888f1b`
   - **Dönüştürücü geçicidir ve repoya girmez.** Oturumun scratchpad dizininde
     bun ile yaz: `frontend/src/mock_data/*.ts` dosyalarını import edip
     `new-backend/infrastructure/seed/data/` altına JSON üretsin.
@@ -111,7 +111,7 @@
   > örnek haftalık menü havuzdaki yemeklerden oluşur. API yanıtı biçimindeki
   > not/yoklama/rezervasyon mock'ları 4.4'te SQL ile üretilir.
 
-- [x] **4.3 seed.sh'i yeniden yaz**
+- [x] **4.3 seed.sh'i yeniden yaz** — `4f6ae8e`
   - Sıra:
     1. fakülte/bölüm (SQL, catalog)
     2. öğretmenler (API) ve profilleri (API)
@@ -147,7 +147,7 @@
   > (ayse.demir mock'ta Matematik).
   > Süre: yerelde (servisler host'ta, Caddy'siz) 34 sn; CI süresi 4.5'te.
 
-- [x] **4.4 Tarihler ve rol senaryoları**
+- [x] **4.4 Tarihler ve rol senaryoları** — `9d08c3c`, `255bd12`
   - **Dönem adı** seed günündeki tarihten hesaplanır, backend'in biçiminde
     (`YYYY-YYYY-Fall|Spring`; catalog dönem ve ders açılışında bunu
     doğruluyor, web kayıt sayfası da bunu soruyor — karar 24.09):
@@ -205,7 +205,7 @@
   > hesaplıyor, sonraki dönemin penceresi arayüzden görünmüyor; admin menü
   > sayfası kaydederken yalnız web biçimini yazıyor, mobil o ayı boş görür.
 
-- [x] **4.5 Doğrulama**
+- [x] **4.5 Doğrulama** — `9f80276`, `38342cf`
   - Kullanıcıdan temiz bir yığın kurmasını iste; komutu kopyala-yapıştır
     olarak ver (volume'lar silinir, uyar):
     `sudo docker compose -f new-backend/infrastructure/docker-compose.yml -f new-backend/infrastructure/docker-compose.standalone.yml down -v && make deploy`
