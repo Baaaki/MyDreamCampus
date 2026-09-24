@@ -16,6 +16,7 @@ import (
 	"github.com/baaaki/mydreamcampus/shared/contracts"
 	"github.com/baaaki/mydreamcampus/shared/events"
 	"github.com/baaaki/mydreamcampus/shared/platform/audit"
+	"github.com/baaaki/mydreamcampus/shared/platform/clock"
 	"github.com/baaaki/mydreamcampus/shared/platform/logger"
 	sharedRepo "github.com/baaaki/mydreamcampus/shared/platform/repository"
 	"github.com/baaaki/mydreamcampus/shared/platform/utils"
@@ -154,7 +155,7 @@ func (h *SemesterStatusHandler) CreateSemester(c *gin.Context) {
 		return
 	}
 
-	if req.HardDeadline.Before(time.Now()) {
+	if req.HardDeadline.Before(clock.Now()) {
 		c.JSON(http.StatusBadRequest, gin.H{
 			"error": "Son tarih ileri bir tarih olmalıdır",
 			"code":  "VALIDATION_ERROR",
@@ -929,7 +930,7 @@ func (h *SemesterStatusHandler) UpdatePlannedSemester(c *gin.Context) {
 	}
 
 	// Validation: hard_deadline must be in the future
-	if req.HardDeadline.Before(time.Now()) {
+	if req.HardDeadline.Before(clock.Now()) {
 		c.JSON(http.StatusBadRequest, gin.H{
 			"error": "Son tarih ileri bir tarih olmalıdır",
 			"code":  "VALIDATION_ERROR",
