@@ -48,9 +48,9 @@ func New(cfg *config.Config, pool *pgxpool.Pool) *Module {
 	teacherProfileRepo := repository.NewTeacherProfileRepository(pool)
 	adminStaffRepo := repository.NewAdminStaffRepository(pool)
 
-	staffSvc := service.NewStaffService(staffRepo)
+	staffSvc := service.NewStaffService(staffRepo, cfg)
 	teacherProfileSvc := service.NewTeacherProfileService(teacherProfileRepo)
-	adminStaffSvc := service.NewAdminStaffService(adminStaffRepo)
+	adminStaffSvc := service.NewAdminStaffService(adminStaffRepo, cfg)
 
 	return &Module{
 		cfg:                   cfg,

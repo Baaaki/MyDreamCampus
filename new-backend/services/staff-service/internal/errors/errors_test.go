@@ -21,7 +21,11 @@ func TestStaffErrors_HTTPStatuses(t *testing.T) {
 		"ADVISOR_NOT_QUALIFIED":     {ErrAdvisorNotQualified, http.StatusBadRequest},
 		"ADVISOR_OVERLOADED":        {ErrAdvisorHasTooManyStudents, http.StatusConflict},
 		"TEACHER_PROFILE_NOT_FOUND": {ErrTeacherProfileNotFound, http.StatusNotFound},
-		"NOT_A_TEACHER":             {ErrNotATeacher, http.StatusBadRequest},
+		"NOT_A_TEACHER":                            {ErrNotATeacher, http.StatusBadRequest},
+		"ADMIN_STAFF_NOT_FOUND":                    {ErrAdminStaffNotFound, http.StatusNotFound},
+		"PROTECTED_ACCOUNT_DELETION_FORBIDDEN":     {ErrProtectedAccountDeletionForbidden, http.StatusForbidden},
+		"PROTECTED_ACCOUNT_DEACTIVATION_FORBIDDEN": {ErrProtectedAccountDeactivationForbidden, http.StatusForbidden},
+		"PROTECTED_ACCOUNT_EMAIL_CHANGE_FORBIDDEN":  {ErrProtectedAccountEmailChangeForbidden, http.StatusForbidden},
 	}
 	for code, c := range cases {
 		assert.Equal(t, code, c.err.Code)
@@ -36,6 +40,10 @@ func TestStaffErrors_DistinctCodes(t *testing.T) {
 		ErrEmailExists, ErrCannotCreateAdmin, ErrInvalidRole,
 		ErrAdvisorNotQualified, ErrAdvisorHasTooManyStudents,
 		ErrTeacherProfileNotFound, ErrNotATeacher,
+		ErrAdminStaffNotFound,
+		ErrProtectedAccountDeletionForbidden,
+		ErrProtectedAccountDeactivationForbidden,
+		ErrProtectedAccountEmailChangeForbidden,
 	}
 	seen := make(map[string]bool, len(all))
 	for _, e := range all {

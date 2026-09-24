@@ -34,6 +34,11 @@ var (
 	// Administrative staff directory errors
 	ErrAdminStaffNotFound = sharedErrors.New("ADMIN_STAFF_NOT_FOUND", "İdari personel bulunamadı", http.StatusNotFound)
 
+	// Protected system account errors
+	ErrProtectedAccountDeletionForbidden     = sharedErrors.New("PROTECTED_ACCOUNT_DELETION_FORBIDDEN", "Korunan sistem hesabı silinemez", http.StatusForbidden)
+	ErrProtectedAccountDeactivationForbidden = sharedErrors.New("PROTECTED_ACCOUNT_DEACTIVATION_FORBIDDEN", "Korunan sistem hesabı pasifleştirilemez", http.StatusForbidden)
+	ErrProtectedAccountEmailChangeForbidden  = sharedErrors.New("PROTECTED_ACCOUNT_EMAIL_CHANGE_FORBIDDEN", "Korunan sistem hesabının e-postası değiştirilemez", http.StatusForbidden)
+
 	// Repository-specific sentinel errors (for internal use)
 	ErrStaffNotFoundRepo          = sharedErrors.ErrNotFoundRepo
 	ErrStaffExistsRepo            = sharedErrors.ErrAlreadyExistsRepo

@@ -3,6 +3,7 @@ package service
 import (
 	"context"
 
+	"github.com/baaaki/mydreamcampus/shared/config"
 	sharedErrors "github.com/baaaki/mydreamcampus/shared/platform/errors"
 	"github.com/baaaki/mydreamcampus/shared/platform/logger"
 	"github.com/baaaki/mydreamcampus/shared/platform/utils"
@@ -15,13 +16,31 @@ import (
 	"go.uber.org/zap"
 )
 
-type StaffService struct {
-	staffRepo *repository.StaffRepository
+type StaffStore interface {
+	GetStaffByEmail(ctx context.Context, email string) (db.Staff, error)
+	CreateStaffWithEvent(ctx context.Context, params db.CreateStaffParams, eventPayload map[string]any) (db.Staff, error)
+	GetStaffByID(ctx context.Context, id uuid.UUID) (db.Staff, error)
+	UpdateStaffWithEvent(ctx context.Context, id uuid.UUID, params db.UpdateStaffParams, eventPayload map[string]any) (db.Staff, error)
+	SoftDeleteStaffWithEvent(ctx context.Context, id uuid.UUID, eventPayload map[string]any) error
+	ListStaff(ctx context.Context, limit, offset int32) ([]db.Staff, int64, error)
+	GetInstructorsByDepartment(ctx context.Context, department string) ([]db.Staff, error)
 }
 
-func NewStaffService(staffRepo *repository.StaffRepository) *StaffService {
+var _ StaffStore = (*repository.StaffRepository)(nil)
+
+type StaffService struct {
+	staffRepo StaffStore
+	config    *config.Config
+}
+
+func NewStaffService(staffRepo StaffStore, cfg ...*config.Config) *StaffService {
+	var c *config.Config
+	if len(cfg) > 0 {
+		c = cfg[0]
+	}
 	return &StaffService{
 		staffRepo: staffRepo,
+		config:    c,
 	}
 }
 
@@ -254,6 +273,14 @@ func (s *StaffService) DeleteStaff(ctx context.Context, id string) error {
 
 		// Unexpected error - wrap and return, handler will log
 		return sharedErrors.Wrap(sharedErrors.ErrInternal, err)
+	}
+
+	if s.config != nil && s.config.IsProtectedEmail(existingStaff.Email) {
+		serviceLogger.Warn("attempt to delete protected staff account forbidden",
+			zap.String("staff_id", id),
+			zap.String("email", existingStaff.Email),
+		)
+		return serviceErrors.ErrProtectedAccountDeletionForbidden
 	}
 
 	eventPayload := buildStaffDeactivatedPayload(id)

@@ -3,8 +3,10 @@ package service
 import (
 	"context"
 	"encoding/json"
+	"strings"
 	"time"
 
+	"github.com/baaaki/mydreamcampus/shared/config"
 	sharedErrors "github.com/baaaki/mydreamcampus/shared/platform/errors"
 	"github.com/baaaki/mydreamcampus/shared/platform/logger"
 	"github.com/baaaki/mydreamcampus/shared/platform/utils"
@@ -28,11 +30,16 @@ type AdminStaffStore interface {
 // AdminStaffService manages the administrative staff directory. It publishes
 // no events: these records never become accounts.
 type AdminStaffService struct {
-	store AdminStaffStore
+	store  AdminStaffStore
+	config *config.Config
 }
 
-func NewAdminStaffService(store AdminStaffStore) *AdminStaffService {
-	return &AdminStaffService{store: store}
+func NewAdminStaffService(store AdminStaffStore, cfg ...*config.Config) *AdminStaffService {
+	var c *config.Config
+	if len(cfg) > 0 {
+		c = cfg[0]
+	}
+	return &AdminStaffService{store: store, config: c}
 }
 
 const startDateLayout = "2006-01-02"
@@ -80,6 +87,20 @@ func (s *AdminStaffService) Update(ctx context.Context, rawID string, req dto.Ad
 	if err != nil {
 		return dto.AdminStaffResponse{}, sharedErrors.ErrInvalidID
 	}
+
+	if s.config != nil {
+		existing, err := s.store.GetByID(ctx, id)
+		if err != nil {
+			return dto.AdminStaffResponse{}, mapAdminStaffError(err)
+		}
+		if s.config.IsProtectedEmail(existing.Email) && req.Email != "" && !strings.EqualFold(req.Email, existing.Email) {
+			return dto.AdminStaffResponse{}, serviceErrors.ErrProtectedAccountEmailChangeForbidden
+		}
+		if req.Email != "" && !strings.EqualFold(req.Email, existing.Email) && s.config.IsProtectedEmail(req.Email) {
+			return dto.AdminStaffResponse{}, serviceErrors.ErrProtectedAccountEmailChangeForbidden
+		}
+	}
+
 	fields, err := adminStaffFields(req)
 	if err != nil {
 		return dto.AdminStaffResponse{}, err
