@@ -10,7 +10,6 @@ package staff
 import (
 	"github.com/baaaki/mydreamcampus/shared/config"
 	"github.com/baaaki/mydreamcampus/shared/eventbus"
-	platformHandler "github.com/baaaki/mydreamcampus/shared/platform/handler"
 	platformMiddleware "github.com/baaaki/mydreamcampus/shared/platform/middleware"
 	"github.com/baaaki/mydreamcampus/staff/internal/handler"
 	"github.com/baaaki/mydreamcampus/staff/internal/repository"
@@ -38,7 +37,6 @@ type Module struct {
 	staffHandler          *handler.StaffHandler
 	teacherProfileHandler *handler.TeacherProfileHandler
 	adminStaffHandler     *handler.AdminStaffHandler
-	timeHandler           *platformHandler.TimeHandler
 }
 
 // New wires repositories, services and handlers from shared infra. Staff
@@ -69,7 +67,6 @@ func New(cfg *config.Config, pool *pgxpool.Pool) *Module {
 		staffHandler:          handler.NewStaffHandler(staffSvc),
 		teacherProfileHandler: handler.NewTeacherProfileHandler(teacherProfileSvc),
 		adminStaffHandler:     handler.NewAdminStaffHandler(adminStaffSvc),
-		timeHandler:           platformHandler.NewTimeHandler(),
 	}
 }
 
@@ -111,12 +108,6 @@ func (m *Module) RegisterRoutes(rg *gin.RouterGroup) {
 			admin.DELETE("/:id", m.staffHandler.DeleteStaff)
 			admin.PUT("/:id/profile", m.teacherProfileHandler.UpdateTeacherProfile)
 		}
-
-		// Time Machine admin endpoints under /api/staff/admin (kept under
-		// staff for now — matches the microservice URL the frontend uses).
-		timeAdmin := rg.Group("/admin")
-		timeAdmin.Use(platformMiddleware.RequireAdmin())
-		m.timeHandler.RegisterRoutes(timeAdmin)
 	}
 }
 

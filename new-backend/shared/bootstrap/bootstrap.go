@@ -21,6 +21,7 @@ import (
 	"github.com/baaaki/mydreamcampus/shared/eventbus"
 	"github.com/baaaki/mydreamcampus/shared/httpserver"
 	"github.com/baaaki/mydreamcampus/shared/platform/audit"
+	"github.com/baaaki/mydreamcampus/shared/platform/clocksync"
 	"github.com/baaaki/mydreamcampus/shared/platform/database"
 	"github.com/baaaki/mydreamcampus/shared/platform/logger"
 	platformMiddleware "github.com/baaaki/mydreamcampus/shared/platform/middleware"
@@ -195,6 +196,10 @@ func (r *Runtime) initRedis(opts Options) {
 	// Keys are namespaced per service, so a client that reuses one key across
 	// two services cannot be served the wrong service's stored response.
 	platformMiddleware.SetIdempotencyStore(client, opts.Service)
+
+	// The time machine's offset is shared through Redis. Without Redis the
+	// service stays on the real clock, which is the safe side to fail on.
+	clocksync.Start(r.Ctx, client)
 
 	if !r.Cfg.RateLimit.Enabled {
 		return

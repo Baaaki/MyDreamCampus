@@ -90,6 +90,16 @@ func (s *Server) RegisterModules(modules ...Module) {
 	api := s.router.Group("/api")
 	for _, m := range modules {
 		group := api.Group("/" + m.Name())
+		// Every service reports its own clock so the time machine page can
+		// show that all of them moved. Mounted before the module's routes:
+		// a module that calls group.Use would otherwise run its chain on
+		// this route a second time.
+		group.GET("/admin/time/status",
+			platformMiddleware.JWTAuth(),
+			platformMiddleware.UserRateLimit(),
+			platformMiddleware.RequireAdmin(),
+			platformHandler.TimeStatus(s.service),
+		)
 		m.RegisterRoutes(group)
 		if pub, ok := m.(PublicRoutesProvider); ok {
 			pub.RegisterPublicRoutes(s.router)

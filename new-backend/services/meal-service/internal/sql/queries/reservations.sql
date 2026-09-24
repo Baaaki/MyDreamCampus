@@ -90,10 +90,12 @@ WHERE r.cafeteria_id = $1
 LIMIT 1;
 
 -- name: ExpirePendingReservations :exec
+-- now is the service clock, which the time machine can shift; expires_at
+-- was set on it too.
 WITH expired_batch AS (
     SELECT id FROM meal.reservations
-    WHERE status = 'pending' AND expires_at < NOW()
-    LIMIT $1
+    WHERE status = 'pending' AND expires_at < sqlc.arg(now)::timestamptz
+    LIMIT sqlc.arg(batch_size)
     FOR UPDATE SKIP LOCKED
 )
 UPDATE meal.reservations
@@ -103,8 +105,8 @@ WHERE id IN (SELECT id FROM expired_batch);
 -- name: CleanupExpiredReservations :exec
 WITH cleanup_batch AS (
     SELECT id FROM meal.reservations
-    WHERE status = 'expired' AND expires_at < NOW() - INTERVAL '7 days'
-    LIMIT $1
+    WHERE status = 'expired' AND expires_at < sqlc.arg(now)::timestamptz - INTERVAL '7 days'
+    LIMIT sqlc.arg(batch_size)
     FOR UPDATE SKIP LOCKED
 )
 DELETE FROM meal.reservations

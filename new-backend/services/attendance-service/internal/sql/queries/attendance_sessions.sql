@@ -12,8 +12,10 @@ WHERE id = $1
 LIMIT 1;
 
 -- name: GetActiveSessionByID :one
+-- now is the service clock, which the time machine can shift; the
+-- database's NOW() cannot follow it.
 SELECT * FROM attendance.attendance_sessions
-WHERE id = $1 AND is_active = TRUE AND expires_at > NOW()
+WHERE id = sqlc.arg(id) AND is_active = TRUE AND expires_at > sqlc.arg(now)
 LIMIT 1;
 
 -- name: CheckSessionExists :one
@@ -41,7 +43,7 @@ WHERE id = $1;
 
 -- name: GetExpiredSessions :many
 SELECT * FROM attendance.attendance_sessions
-WHERE is_active = TRUE AND expires_at < NOW();
+WHERE is_active = TRUE AND expires_at < sqlc.arg(now);
 
 -- name: GetSessionsByDateRange :many
 SELECT

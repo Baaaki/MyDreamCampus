@@ -6,6 +6,7 @@ import (
 
 	"github.com/baaaki/mydreamcampus/catalog/internal/db"
 	"github.com/baaaki/mydreamcampus/shared/platform/audit"
+	"github.com/baaaki/mydreamcampus/shared/platform/clock"
 	"github.com/baaaki/mydreamcampus/shared/platform/logger"
 	"github.com/baaaki/mydreamcampus/shared/platform/utils"
 	"github.com/google/uuid"
@@ -83,9 +84,13 @@ func (r *SemesterStatusRepository) IsSemesterActive(ctx context.Context, semeste
 	}
 
 	// status == active — check hard_deadline
-	if semester.HardDeadline.Valid && time.Now().After(semester.HardDeadline.Time) {
+	now := clock.Now()
+	if semester.HardDeadline.Valid && now.After(semester.HardDeadline.Time) {
 		// Auto-complete: hard deadline has passed
-		if err := r.queries.AutoCompleteSemester(ctx, semesterName); err != nil {
+		if err := r.queries.AutoCompleteSemester(ctx, db.AutoCompleteSemesterParams{
+			Name: semesterName,
+			Now:  utils.TimeToPgTimestamptz(now),
+		}); err != nil {
 			log.Warn("failed to auto-complete semester",
 				zap.String("semester", semesterName),
 				zap.Error(err),
@@ -143,7 +148,7 @@ func (r *SemesterStatusRepository) GetSemesterInfo(ctx context.Context, semester
 	}
 
 	hardDeadline := utils.PgTimestamptzToTime(semester.HardDeadline)
-	isPast := time.Now().After(hardDeadline)
+	isPast := clock.Now().After(hardDeadline)
 
 	return &SemesterInfo{
 		Name:           semester.Name,

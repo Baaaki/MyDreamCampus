@@ -160,7 +160,7 @@ Başlangıç durumu (24.09.2026, Faz 0 sonu): 11 Go modülünde `go vet` temiz,
 |---|---|---|---|
 | 0 | [phase-0-setup.md](phase-0-setup.md) | Hazırlık: onay, kararlar, dal | Bitti |
 | 1 | [phase-1-security.md](phase-1-security.md) | Güvenlik ve doğruluk düzeltmeleri | Bitti |
-| 2 | [phase-2-time-machine.md](phase-2-time-machine.md) | Tüm servislerde zaman makinesi | Bekliyor |
+| 2 | [phase-2-time-machine.md](phase-2-time-machine.md) | Tüm servislerde zaman makinesi | Bitti |
 | 3 | [phase-3-payment.md](phase-3-payment.md) | Sahte kartla ödeme | Bekliyor |
 | 4 | [phase-4-seed.md](phase-4-seed.md) | Referans veri ve seed'in yeniden yazımı | Bekliyor |
 | 5 | [phase-5-mock-cleanup.md](phase-5-mock-cleanup.md) | Frontend'den mock temizliği | Bekliyor |
@@ -189,3 +189,4 @@ Durum değerleri: **Bekliyor**, **Devam ediyor**, **Bitti**, **Engelli**.
 | 23.09.2026 | — | Plan yazıldı (inceleme oturumu) | Faz 0 bekliyor |
 | 23–24.09.2026 | Faz 0 (0.1–0.5) | Plan onayı, K1–K5, dal; Go 1.27, Docker/CI, frontend (vite 8, react-router 8, lint 92→0) ve mobil (Expo SDK 57) güncellemeleri. 0.5: backend 11 modül vet temiz / 972 test; frontend typecheck+lint+build temiz / 68 test; mobil tsc temiz / 67 test — hepsi yeşil | Faz 1 bekliyor |
 | 24.09.2026 | Faz 1 (1.1–1.10) | Güvenlik ve doğruluk düzeltmeleri, 16 commit. Planda olmayan ek düzeltmeler: e-posta değişim event'i hiç işlenemiyordu (1.3), iki sekme refresh yarışında cookie'ler siliniyordu (1.4), mobil yoklama ekranı hata metnini göstermiyordu (1.8). Backend 11 modül vet temiz / 997 test; frontend typecheck+lint+build temiz / 73 test; mobil tsc temiz / 76 test | Faz 2 bekliyor |
+| 24.09.2026 | Faz 2 (2.1–2.8) | Zaman makinesi ofset modeline geçti ve Redis (`clock:state` + `clock:changed`, 10 sn yeniden okuma) ile 9 servise yayıldı; token/oturum/envelope gerçek saatte; SQL `NOW()` karşılaştırmaları servis saatine bağlandı; her serviste `admin/time/status`, catalog'da ±2 yıl sınırlı simulate/reset + audit; frontend sayfası backend'e bağlandı; e2e'ye eklendi. 2.6 K1 = Hayır nedeniyle yapılmadı. Planda olmayan ekler: catalog son tarih kontrolleri ve attendance/meal TTL-zamanlayıcı süreleri servis saatine alındı; CI'ı kıran iki eski sorun düzeltildi (auth TZ testi, Prettier). 16 commit (bu ilerleme commit'i dahil). Backend 11 modül vet temiz / 1033 test; frontend typecheck+lint+Prettier+build temiz / 81 test; mobil 76 test (tsc notu faz dosyasında). e2e push sonrası CI'da doğrulanacak | Faz 3 bekliyor |

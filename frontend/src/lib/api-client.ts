@@ -274,6 +274,9 @@ export const studentApiSafe = noRedirectClient.extend({
 export const staffApiSafe = noRedirectClient.extend({
   prefix: `${API_BASE_URL}/api/staff`,
 })
+export const paymentApiSafe = noRedirectClient.extend({
+  prefix: `${API_BASE_URL}/api/payments`,
+})
 
 // Export the raw ky client for direct use if needed
 export { apiClient }

@@ -5,68 +5,118 @@ import (
 	"testing"
 	"time"
 
+	"github.com/baaaki/mydreamcampus/shared/platform/clock/internal/source"
 	"github.com/stretchr/testify/assert"
 )
 
-func TestNow_RealMode(t *testing.T) {
-	Reset()
-	defer Reset()
+var base = time.Date(2026, 9, 24, 12, 0, 0, 0, time.UTC)
 
-	assert.Equal(t, ModeReal, GetMode())
+// pinBase fixes the real clock the offset is applied to.
+func pinBase(t *testing.T, at *time.Time) {
+	t.Helper()
+	source.Set(func() time.Time { return *at })
+	Reset()
+	t.Cleanup(func() {
+		source.Restore()
+		Reset()
+	})
+}
+
+func TestNow_NoSimulation_ReturnsRealTime(t *testing.T) {
+	Reset()
 	a := Now()
 	time.Sleep(2 * time.Millisecond)
 	b := Now()
 	assert.True(t, b.After(a), "real clock must advance")
+	assert.WithinDuration(t, time.Now(), b, time.Second)
 }
 
-func TestSet_FreezesTime(t *testing.T) {
-	frozen := time.Date(2026, 4, 25, 9, 0, 0, 0, time.UTC)
-	Set(frozen)
-	defer Reset()
+func TestSetOffset_ShiftedTime_KeepsMoving(t *testing.T) {
+	wall := base
+	pinBase(t, &wall)
 
-	assert.Equal(t, ModeSimulated, GetMode())
-	assert.Equal(t, frozen, Now())
+	SetOffset(365*24*time.Hour, time.Time{})
+	assert.Equal(t, base.Add(365*24*time.Hour), Now())
 
-	time.Sleep(2 * time.Millisecond)
-	assert.Equal(t, frozen, Now(), "simulated time must not advance with wall clock")
+	wall = base.Add(90 * time.Second)
+	assert.Equal(t, base.Add(365*24*time.Hour+90*time.Second), Now(),
+		"simulated time must advance with the real clock")
 }
 
-func TestReset_ReturnsToReal(t *testing.T) {
-	Set(time.Date(2020, 1, 1, 0, 0, 0, 0, time.UTC))
+func TestSetOffset_NegativeOffset_GoesBack(t *testing.T) {
+	wall := base
+	pinBase(t, &wall)
+
+	SetOffset(-48*time.Hour, time.Time{})
+	assert.Equal(t, base.Add(-48*time.Hour), Now())
+}
+
+func TestSetOffset_UntilPassed_ReturnsRealTime(t *testing.T) {
+	wall := base
+	pinBase(t, &wall)
+
+	until := base.Add(30 * time.Minute)
+	SetOffset(time.Hour, until)
+	assert.Equal(t, base.Add(time.Hour), Now())
+
+	wall = until.Add(-time.Nanosecond)
+	assert.Equal(t, wall.Add(time.Hour), Now(), "still active just before until")
+
+	wall = until
+	assert.Equal(t, until, Now(), "expires exactly at until")
+	assert.False(t, State().Active)
+}
+
+func TestReset_EndsSimulation(t *testing.T) {
+	wall := base
+	pinBase(t, &wall)
+
+	SetOffset(time.Hour, time.Time{})
 	Reset()
-	assert.Equal(t, ModeReal, GetMode())
-	assert.Nil(t, SimulatedTime())
+	assert.Equal(t, base, Now())
+	assert.False(t, State().Active)
 }
 
-func TestSimulatedTime(t *testing.T) {
-	defer Reset()
+func TestState_Inactive_ReportsRealTime(t *testing.T) {
+	wall := base
+	pinBase(t, &wall)
 
-	Reset()
-	assert.Nil(t, SimulatedTime(), "real mode must report nil simulated time")
-
-	frozen := time.Date(2026, 6, 1, 12, 0, 0, 0, time.UTC)
-	Set(frozen)
-	got := SimulatedTime()
-	assert.NotNil(t, got)
-	assert.Equal(t, frozen, *got)
+	assert.Equal(t, Snapshot{Now: base}, State())
 }
 
-func TestClock_ConcurrentSafe(t *testing.T) {
-	defer Reset()
+func TestState_Active_ReportsOffsetAndUntil(t *testing.T) {
+	wall := base
+	pinBase(t, &wall)
+
+	until := base.Add(time.Hour)
+	SetOffset(-2*time.Hour, until)
+
+	assert.Equal(t, Snapshot{
+		Active: true,
+		Offset: -2 * time.Hour,
+		Now:    base.Add(-2 * time.Hour),
+		Until:  until,
+	}, State())
+}
+
+func TestClock_ConcurrentAccess_RaceFree(t *testing.T) {
+	t.Cleanup(Reset)
 
 	var wg sync.WaitGroup
-	for i := 0; i < 50; i++ {
+	for i := range 50 {
 		wg.Add(1)
-		go func(i int) {
+		go func() {
 			defer wg.Done()
-			if i%2 == 0 {
-				Set(time.Unix(int64(i), 0))
-			} else {
+			switch i % 3 {
+			case 0:
+				SetOffset(time.Duration(i)*time.Hour, time.Time{})
+			case 1:
+				Reset()
+			default:
 				_ = Now()
-				_ = GetMode()
+				_ = State()
 			}
-		}(i)
+		}()
 	}
 	wg.Wait()
-	// Test passes if race detector finds nothing.
 }

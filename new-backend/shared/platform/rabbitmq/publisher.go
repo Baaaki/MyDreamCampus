@@ -6,7 +6,6 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/baaaki/mydreamcampus/shared/platform/clock"
 	"github.com/baaaki/mydreamcampus/shared/platform/logger"
 	amqp "github.com/rabbitmq/amqp091-go"
 	"go.uber.org/zap"
@@ -56,7 +55,7 @@ func (p *Publisher) Publish(ctx context.Context, exchangeName, routingKey string
 			ContentType:  "application/json",
 			Body:         body,
 			DeliveryMode: amqp.Persistent, // persist to disk
-			Timestamp:    clock.Now(),
+			Timestamp:    time.Now(),      // transport metadata, not a business time
 		},
 	)
 

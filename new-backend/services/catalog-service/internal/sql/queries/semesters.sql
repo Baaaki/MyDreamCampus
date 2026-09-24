@@ -21,8 +21,9 @@ UPDATE course_catalog.semesters SET status = 'completed' WHERE id = $1 AND statu
 RETURNING *;
 
 -- name: AutoCompleteSemester :exec
+-- now is the service clock, which the time machine can shift.
 UPDATE course_catalog.semesters SET status = 'completed'
-WHERE name = $1 AND status = 'active' AND hard_deadline < NOW();
+WHERE name = sqlc.arg(name) AND status = 'active' AND hard_deadline < sqlc.arg(now);
 
 -- name: HasActiveSemester :one
 -- INVARIANT: Only one semester can be active at any given time.

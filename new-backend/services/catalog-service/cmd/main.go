@@ -7,6 +7,7 @@ import (
 	"github.com/baaaki/mydreamcampus/shared/bootstrap"
 	"github.com/baaaki/mydreamcampus/shared/eventbus"
 	"github.com/baaaki/mydreamcampus/shared/platform/audit"
+	"github.com/baaaki/mydreamcampus/shared/platform/clocksync"
 	"github.com/baaaki/mydreamcampus/shared/platform/logger"
 	"go.uber.org/zap"
 )
@@ -24,9 +25,17 @@ func main() {
 		{Queue: worker.QueueAuditEvents, Exchange: "meal.events", RoutingKey: audit.EventAuditEntryCreated},
 	})
 
+	// Catalog owns the time machine controls. A nil *ClientWrapper inside
+	// the interface would pass the handler's nil check and panic on use.
+	var clockBackend clocksync.Backend
+	if rt.Redis != nil {
+		clockBackend = rt.Redis
+	}
+
 	module := catalog.New(rt.Cfg, rt.Pool, rt.Rabbit,
 		service.NewHTTPStaffClient(rt.InternalClient("staff")),
 		service.NewHTTPMealClient(rt.InternalClient("meal")),
+		clockBackend,
 	)
 	if err := module.Bootstrap(rt.Ctx); err != nil {
 		logger.Fatal("failed to bootstrap catalog module", zap.Error(err))

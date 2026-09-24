@@ -7,9 +7,12 @@ import {
   attendanceApiSafe,
   studentApiSafe,
   staffApiSafe,
+  paymentApiSafe,
 } from "@/lib/api-client"
+import { apiErrorMessage } from "@/lib/api-error"
 import type {
   ServiceTimeStatus,
+  TimeStatus,
   AcademicPeriod,
   SimplePeriod,
   CreatePeriodRequest,
@@ -33,6 +36,7 @@ export type ServiceKey =
   | "attendance"
   | "student"
   | "staff"
+  | "payment"
 
 interface ServiceConfig {
   label: string
@@ -47,7 +51,7 @@ const SERVICES: Record<ServiceKey, ServiceConfig> = {
     timePath: "admin/time",
     api: enrollmentApiSafe,
   },
-  meal: { label: "Yemekhane", timePath: "time", api: mealApiSafe },
+  meal: { label: "Yemekhane", timePath: "admin/time", api: mealApiSafe },
   catalog: {
     label: "Ders Kataloğu",
     timePath: "admin/time",
@@ -61,6 +65,7 @@ const SERVICES: Record<ServiceKey, ServiceConfig> = {
   },
   student: { label: "Öğrenci", timePath: "admin/time", api: studentApiSafe },
   staff: { label: "Personel", timePath: "admin/time", api: staffApiSafe },
+  payment: { label: "Ödeme", timePath: "admin/time", api: paymentApiSafe },
 }
 
 export const SERVICE_KEYS: ServiceKey[] = [
@@ -72,45 +77,73 @@ export const SERVICE_KEYS: ServiceKey[] = [
   "attendance",
   "student",
   "staff",
+  "payment",
 ]
 
 export function getServiceLabel(key: ServiceKey): string {
   return SERVICES[key].label
 }
 
-const MOCK_DELAY = () => new Promise((resolve) => setTimeout(resolve, 300))
-
 // ============================================================================
-// MOCK DATA
+// Time machine
 // ============================================================================
 
+/** Every service's own clock. One failing service does not hide the rest. */
 export async function getAllTimeStatuses(): Promise<ServiceTimeStatus[]> {
-  await MOCK_DELAY()
-  return SERVICE_KEYS.map((key) => ({
-    service: key,
-    label: SERVICES[key].label,
-    status: {
-      mode: "real" as const,
-      current_time: new Date().toISOString(),
-      simulated_time: null,
-    },
-    error: null,
-  }))
+  const results = await Promise.allSettled(
+    SERVICE_KEYS.map((key) =>
+      SERVICES[key].api
+        .get(`${SERVICES[key].timePath}/status`)
+        .json<TimeStatus>()
+    )
+  )
+  return SERVICE_KEYS.map((key, i) => {
+    const result = results[i]!
+    const label = SERVICES[key].label
+    return result.status === "fulfilled"
+      ? { service: key, label, status: result.value, error: null }
+      : {
+          service: key,
+          label,
+          status: null,
+          error: apiErrorMessage(result.reason, "Servise ulaşılamadı"),
+        }
+  })
 }
 
-export async function simulateTimeAll(
-  _time: string
-): Promise<{ success: string[]; failed: string[] }> {
-  await MOCK_DELAY()
-  return { success: SERVICE_KEYS.map((k) => SERVICES[k].label), failed: [] }
+/**
+ * Moves every service's clock: catalog owns the setting and shares it
+ * through Redis, so one call is enough. `time` is an ISO 8601 instant.
+ */
+export async function simulateTimeAll(time: string): Promise<TimeStatus> {
+  return catalogApiSafe
+    .post("admin/time/simulate", { json: { time } })
+    .json<TimeStatus>()
 }
 
-export async function resetTimeAll(): Promise<{
-  success: string[]
-  failed: string[]
-}> {
-  await MOCK_DELAY()
-  return { success: SERVICE_KEYS.map((k) => SERVICES[k].label), failed: [] }
+/** Returns every service to the real clock. */
+export async function resetTimeAll(): Promise<TimeStatus> {
+  return catalogApiSafe.post("admin/time/reset").json<TimeStatus>()
+}
+
+/** A service's offset in ms, measured on the service itself. */
+export function clockOffsetMs(status: TimeStatus): number {
+  return Date.parse(status.current_time) - Date.parse(status.real_time)
+}
+
+/**
+ * Largest offset difference between the services that answered, in ms;
+ * null when fewer than two did. Services pick up a change within 10
+ * seconds, so a lasting spread means one of them lost Redis.
+ */
+export function clockOffsetSpreadMs(
+  statuses: ServiceTimeStatus[]
+): number | null {
+  const offsets = statuses.flatMap((s) =>
+    s.status ? [clockOffsetMs(s.status)] : []
+  )
+  if (offsets.length < 2) return null
+  return Math.max(...offsets) - Math.min(...offsets)
 }
 
 // Grades Periods
@@ -254,6 +287,9 @@ export async function updateSemester(
     .json<SemesterWriteResponse>()
   return unwrapSemester(body)
 }
+
+// Audit log — still mock data, removed in the mock cleanup phase.
+const MOCK_DELAY = () => new Promise((resolve) => setTimeout(resolve, 300))
 
 // Audit Log Filters
 export interface AuditLogFilters {

@@ -4,6 +4,7 @@ import (
 	"context"
 
 	"github.com/baaaki/mydreamcampus/attendance/internal/db"
+	"github.com/baaaki/mydreamcampus/shared/platform/clock"
 	"github.com/baaaki/mydreamcampus/shared/platform/utils"
 	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5/pgxpool"
@@ -30,7 +31,10 @@ func (r *SessionRepository) GetSessionByID(ctx context.Context, sessionID uuid.U
 }
 
 func (r *SessionRepository) GetActiveSessionByID(ctx context.Context, sessionID uuid.UUID) (db.AttendanceSession, error) {
-	return r.queries.GetActiveSessionByID(ctx, utils.UUIDToPgUUID(sessionID))
+	return r.queries.GetActiveSessionByID(ctx, db.GetActiveSessionByIDParams{
+		ID:  utils.UUIDToPgUUID(sessionID),
+		Now: utils.TimeToPgTimestamp(clock.Now()),
+	})
 }
 
 func (r *SessionRepository) CheckSessionExists(ctx context.Context, courseID uuid.UUID, weekNumber int16, sessionType db.SessionTypeEnum) (bool, error) {
@@ -57,7 +61,7 @@ func (r *SessionRepository) DeactivateSession(ctx context.Context, sessionID uui
 }
 
 func (r *SessionRepository) GetExpiredSessions(ctx context.Context) ([]db.AttendanceSession, error) {
-	return r.queries.GetExpiredSessions(ctx)
+	return r.queries.GetExpiredSessions(ctx, utils.TimeToPgTimestamp(clock.Now()))
 }
 
 func (r *SessionRepository) GetSessionsByDateRange(ctx context.Context, params db.GetSessionsByDateRangeParams) ([]db.GetSessionsByDateRangeRow, error) {
