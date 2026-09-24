@@ -202,11 +202,18 @@ Yalnız `card_brand` (prefix'ten: Visa, Mastercard, Amex, Troy `9792`) ve
   > commit'le eklendi. Cihazda manuel test bu ortamda yapılamadı; jest +
   > `tsc` temiz.
 
-- [ ] **3.8 e2e**
+- [x] **3.8 e2e**
   - CI golden path:
     - öğrenci rezervasyon → 4242 ile confirm → rezervasyon `confirmed`
     - 4000 0000 0000 0002 → rezervasyon `cancelled`
   - **Commit:** `test(infra): cover card checkout in the e2e job`
+  > Not (24.09): Golden path'e eklendi: gelecek haftanın Perşembe ve Cuma
+  > öğlesi (seed Pzt–Çar'ı dolduruyor) toplu rezerve edilir; 4242 →
+  > `confirmed`, 0002 → `cancelled` (30 sn yoklama); sonuçlanmış ödemeyi
+  > tekrar onaylamak 409, admin'in ödemeyi okuması 403. İptal/iade adımı
+  > eklenmedi: iptal kilidi önceki cuma 23:59'a bağlı, hafta sonu koşan CI
+  > kırmızıya düşerdi. Docker bu ortamda çalışmadığı için doğrulama push
+  > sonrası CI'da.
 
 ## Faz sonu
 - README §5 yeşil olmalı.

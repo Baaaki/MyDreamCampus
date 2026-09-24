@@ -285,6 +285,61 @@ jobs:
           expect 200 "$code" "reset to the real clock (catalog)"
           wait_clock grades false 0
           wait_clock meals false 0
+          wait_clock payments false 0
+
+          # Card checkout: meal reserves and opens a pending payment over
+          # internal REST, the card settles it through Caddy, and payment's
+          # outbox event reaches meal's consumer — the reservation's status
+          # is the only place that last hop shows.
+          code=$(api http://localhost/api/meals/cafeterias -H "Authorization: Bearer $STUDENT_TOKEN")
+          expect 200 "$code" "list cafeterias (meal)"
+          CAFETERIA=$(jq -r '.data.cafeterias[0].id' /tmp/body)
+
+          # Next week's Thursday and Friday: the seed books Monday-Wednesday.
+          DOW=$(date -u +%u)
+          THU=$(date -u -d "-$((DOW - 1)) days +10 days" +%F)
+          FRI=$(date -u -d "-$((DOW - 1)) days +11 days" +%F)
+
+          checkout() {
+            day="$1"; card="$2"; want="$3"
+            code=$(api -X POST http://localhost/api/meals/reservations/batch \
+              -H "Authorization: Bearer $STUDENT_TOKEN" -H 'Content-Type: application/json' \
+              -d "{\"reservations\":[{\"cafeteria_id\":\"$CAFETERIA\",\"date\":\"$day\",\"meal_time\":\"lunch\",\"menu_type\":\"normal\"}]}")
+            expect 200 "$code" "reserve $day lunch (meal -> payment initiate)"
+            PAYMENT=$(jq -r '.data.payment_id' /tmp/body)
+            RESERVATION=$(jq -r '.data.reservations[0].id' /tmp/body)
+            [ "$(jq -r '.data.reservations[0].status' /tmp/body)" = pending ] \
+              || { echo "::error::a new reservation must wait for its payment"; exit 1; }
+
+            code=$(api -X POST "http://localhost/api/payments/$PAYMENT/confirm" \
+              -H "Authorization: Bearer $STUDENT_TOKEN" -H 'Content-Type: application/json' \
+              -d "{\"card_number\":\"$card\",\"exp_month\":12,\"exp_year\":2030,\"cvc\":\"123\",\"cardholder_name\":\"Zeynep Sahin\"}")
+            expect 200 "$code" "confirm with $card (payment)"
+
+            for i in $(seq 1 30); do
+              code=$(api "http://localhost/api/meals/reservations/my?from_date=$day&to_date=$day" \
+                -H "Authorization: Bearer $STUDENT_TOKEN")
+              status=$(jq -r --arg id "$RESERVATION" '.data.reservations[]? | select(.id == $id) | .status' /tmp/body)
+              if [ "$code" = 200 ] && [ "$status" = "$want" ]; then
+                echo "ok  [$code] reservation $day is $want (payment event -> meal)"
+                return 0
+              fi
+              sleep 1
+            done
+            echo "::error::reservation $day never became $want (last: $status)"
+            exit 1
+          }
+
+          checkout "$THU" 4242424242424242 confirmed
+          checkout "$FRI" 4000000000000002 cancelled
+
+          code=$(api -X POST "http://localhost/api/payments/$PAYMENT/confirm" \
+            -H "Authorization: Bearer $STUDENT_TOKEN" -H 'Content-Type: application/json' \
+            -d '{"card_number":"4242424242424242","exp_month":12,"exp_year":2030,"cvc":"123","cardholder_name":"Zeynep Sahin"}')
+          expect 409 "$code" "a settled payment cannot be charged again"
+
+          code=$(api "http://localhost/api/payments/$PAYMENT" -H "Authorization: Bearer $TOKEN")
+          expect 403 "$code" "payments are for their student only"
 
           # No token must never be served.
           code=$(api http://localhost/api/grades)
