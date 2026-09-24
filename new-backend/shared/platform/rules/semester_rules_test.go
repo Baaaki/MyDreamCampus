@@ -4,15 +4,14 @@ import (
 	"testing"
 	"time"
 
-	"github.com/baaaki/mydreamcampus/shared/platform/clock"
+	"github.com/baaaki/mydreamcampus/shared/platform/clock/clocktest"
 	"github.com/stretchr/testify/assert"
 )
 
 func tp(t time.Time) *time.Time { return &t }
 
 func TestCanOperateInSemester_HardDeadlineBlocksAll(t *testing.T) {
-	clock.Set(time.Date(2026, 6, 1, 0, 0, 0, 0, time.UTC))
-	defer clock.Reset()
+	clocktest.Freeze(t, time.Date(2026, 6, 1, 0, 0, 0, 0, time.UTC))
 
 	hard := time.Date(2026, 5, 1, 0, 0, 0, 0, time.UTC)
 	for _, admin := range []bool{false, true} {
@@ -26,8 +25,7 @@ func TestCanOperateInSemester_HardDeadlineBlocksAll(t *testing.T) {
 }
 
 func TestCanOperateInSemester_AdminBypassWithinHardDeadline(t *testing.T) {
-	clock.Set(time.Date(2026, 6, 1, 0, 0, 0, 0, time.UTC))
-	defer clock.Reset()
+	clocktest.Freeze(t, time.Date(2026, 6, 1, 0, 0, 0, 0, time.UTC))
 
 	res := CanOperateInSemester(SemesterOperationParams{
 		HardDeadline:  time.Date(2027, 1, 1, 0, 0, 0, 0, time.UTC),
@@ -38,8 +36,7 @@ func TestCanOperateInSemester_AdminBypassWithinHardDeadline(t *testing.T) {
 }
 
 func TestCanOperateInSemester_NoPeriodAllowed(t *testing.T) {
-	clock.Set(time.Date(2026, 6, 1, 0, 0, 0, 0, time.UTC))
-	defer clock.Reset()
+	clocktest.Freeze(t, time.Date(2026, 6, 1, 0, 0, 0, 0, time.UTC))
 
 	res := CanOperateInSemester(SemesterOperationParams{
 		HardDeadline: time.Date(2027, 1, 1, 0, 0, 0, 0, time.UTC),
@@ -49,8 +46,7 @@ func TestCanOperateInSemester_NoPeriodAllowed(t *testing.T) {
 }
 
 func TestCanOperateInSemester_PeriodChecks(t *testing.T) {
-	clock.Set(time.Date(2026, 6, 1, 12, 0, 0, 0, time.UTC))
-	defer clock.Reset()
+	clocktest.Freeze(t, time.Date(2026, 6, 1, 12, 0, 0, 0, time.UTC))
 
 	hard := time.Date(2027, 1, 1, 0, 0, 0, 0, time.UTC)
 
@@ -86,8 +82,7 @@ func TestCanOperateInSemester_PeriodChecks(t *testing.T) {
 }
 
 func TestCanEnrollInSemester_StrictPeriodLock(t *testing.T) {
-	clock.Set(time.Date(2026, 6, 1, 0, 0, 0, 0, time.UTC))
-	defer clock.Reset()
+	clocktest.Freeze(t, time.Date(2026, 6, 1, 0, 0, 0, 0, time.UTC))
 
 	t.Run("nil period start = closed", func(t *testing.T) {
 		res := CanEnrollInSemester(EnrollmentParams{})

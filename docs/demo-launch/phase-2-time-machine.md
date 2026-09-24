@@ -32,7 +32,7 @@
 
 ## Görevler
 
-- [ ] **2.1 clock paketini ofset modeline çevir**
+- [x] **2.1 clock paketini ofset modeline çevir**
   - `shared/platform/clock/clock.go` API'si:
     - `SetOffset(offset time.Duration, until time.Time)`
     - `Reset()`
@@ -42,6 +42,11 @@
     döner (her çağrıda ucuz kontrol).
   - Testler.
   - **Commit:** `refactor(shared): switch the simulated clock to an offset model`
+  > Not (24.09): Testler kesin anlara (örn. tam 03:00) dondurmaya ihtiyaç
+  > duyduğu için dondurma yalnız test yardımcısında kaldı:
+  > `clock/clocktest.Freeze(t, at)`. Taban saati `clock/internal/source`
+  > tutuyor; üretim kodu onu değiştiremez. `State()` bir `clock.Snapshot`
+  > döner. `time_handler.go` 2.5'e kadar yeni API'ye geçici olarak uyarlandı.
 
 - [ ] **2.2 Redis ile servisler arası senkron**
   - Yeni paket `shared/platform/clocksync`:

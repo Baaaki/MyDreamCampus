@@ -10,15 +10,15 @@ import (
 	"github.com/baaaki/mydreamcampus/meal/internal/db"
 	serviceErrors "github.com/baaaki/mydreamcampus/meal/internal/errors"
 	"github.com/baaaki/mydreamcampus/shared/config"
-	"github.com/baaaki/mydreamcampus/shared/platform/clock"
+	"github.com/baaaki/mydreamcampus/shared/platform/clock/clocktest"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"go.uber.org/zap"
 )
 
 // utcPlus3 mirrors the time zone the production code uses for all
-// meal-time math. Tests use it so that the wall-clock hour we set with
-// clock.Set is the same hour that the function sees.
+// meal-time math. Tests use it so that the wall-clock hour we freeze
+// is the same hour that the function sees.
 var utcPlus3 = time.FixedZone("UTC+3", 3*3600)
 
 // newTestService builds a ReservationService wired with only the
@@ -49,13 +49,12 @@ func defaultCfg() *config.Config {
 	}
 }
 
-// freezeAt freezes the package clock at the given UTC+3 wall time and
-// returns a cleanup that resets it. Helpers below use it so each test
-// case sees a deterministic Now().
+// freezeAt freezes the package clock at the given UTC+3 wall time until
+// the test ends. Helpers below use it so each test case sees a
+// deterministic Now().
 func freezeAt(t *testing.T, year int, month time.Month, day, hour, minute int) {
 	t.Helper()
-	clock.Set(time.Date(year, month, day, hour, minute, 0, 0, utcPlus3))
-	t.Cleanup(clock.Reset)
+	clocktest.Freeze(t, time.Date(year, month, day, hour, minute, 0, 0, utcPlus3))
 }
 
 func TestReservationService_SignQRPayload(t *testing.T) {
@@ -97,34 +96,30 @@ func TestReservationService_QRWindow(t *testing.T) {
 	t.Run("buckets time by QRValidityWindowSeconds", func(t *testing.T) {
 		// 30s window: a known unix value divided by 30 must equal qrWindow.
 		t0 := time.Unix(1_700_000_010, 0) // arbitrary fixed instant
-		clock.Set(t0)
-		t.Cleanup(clock.Reset)
+		clocktest.Freeze(t, t0)
 		assert.Equal(t, t0.Unix()/30, s.qrWindow())
 	})
 
 	t.Run("stays in same bucket within the window", func(t *testing.T) {
-		clock.Set(time.Unix(1_700_000_010, 0))
+		clocktest.Freeze(t, time.Unix(1_700_000_010, 0))
 		first := s.qrWindow()
 
-		clock.Set(time.Unix(1_700_000_010+15, 0)) // still inside same 30s bucket
-		t.Cleanup(clock.Reset)
+		clocktest.Freeze(t, time.Unix(1_700_000_010+15, 0)) // still inside same 30s bucket
 		assert.Equal(t, first, s.qrWindow())
 	})
 
 	t.Run("advances to next bucket past the window edge", func(t *testing.T) {
-		clock.Set(time.Unix(1_700_000_010, 0))
+		clocktest.Freeze(t, time.Unix(1_700_000_010, 0))
 		first := s.qrWindow()
 
-		clock.Set(time.Unix(1_700_000_010+30, 0)) // crossed the boundary
-		t.Cleanup(clock.Reset)
+		clocktest.Freeze(t, time.Unix(1_700_000_010+30, 0)) // crossed the boundary
 		assert.Equal(t, first+1, s.qrWindow())
 	})
 }
 
 func TestReservationService_QRRoundTrip(t *testing.T) {
 	s := newTestService(defaultCfg())
-	clock.Set(time.Unix(1_700_000_010, 0))
-	t.Cleanup(clock.Reset)
+	clocktest.Freeze(t, time.Unix(1_700_000_010, 0))
 
 	t.Run("generate then parse returns the original parts", func(t *testing.T) {
 		qr := s.generateQRPayload("cafeA", "2026-04-27", "lunch")
@@ -159,8 +154,7 @@ func TestReservationService_VerifyQRSignature(t *testing.T) {
 	s := newTestService(defaultCfg())
 
 	// Pin the clock so the helpers under test agree on what "current bucket" is.
-	clock.Set(time.Unix(1_700_000_010, 0))
-	t.Cleanup(clock.Reset)
+	clocktest.Freeze(t, time.Unix(1_700_000_010, 0))
 
 	cafeteriaID, date, mealTime := "cafeA", "2026-04-27", "lunch"
 	current := s.qrWindow()

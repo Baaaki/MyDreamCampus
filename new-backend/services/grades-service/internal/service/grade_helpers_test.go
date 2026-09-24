@@ -7,7 +7,7 @@ import (
 	"time"
 
 	"github.com/baaaki/mydreamcampus/grades/internal/dto"
-	"github.com/baaaki/mydreamcampus/shared/platform/clock"
+	"github.com/baaaki/mydreamcampus/shared/platform/clock/clocktest"
 	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5/pgtype"
 	"github.com/stretchr/testify/assert"
@@ -47,8 +47,7 @@ func TestIsValidSlug(t *testing.T) {
 
 func TestBuildFinalizeRequestedEventParams(t *testing.T) {
 	fixedTime := time.Date(2026, time.April, 27, 12, 0, 0, 0, time.UTC)
-	clock.Set(fixedTime)
-	t.Cleanup(clock.Reset)
+	clocktest.Freeze(t, fixedTime)
 
 	courseID := uuid.New()
 	instructorID := uuid.New()
@@ -76,8 +75,7 @@ func TestBuildFinalizeRequestedEventParams(t *testing.T) {
 
 func TestBuildGradeSubmittedEventParams(t *testing.T) {
 	fixedTime := time.Date(2026, time.April, 27, 9, 30, 0, 0, time.UTC)
-	clock.Set(fixedTime)
-	t.Cleanup(clock.Reset)
+	clocktest.Freeze(t, fixedTime)
 
 	studentID := uuid.New()
 

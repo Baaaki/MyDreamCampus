@@ -4,7 +4,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/baaaki/mydreamcampus/shared/platform/clock"
+	"github.com/baaaki/mydreamcampus/shared/platform/clock/clocktest"
 	"github.com/stretchr/testify/assert"
 )
 
@@ -25,8 +25,7 @@ func TestIsWithinPeriod(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			clock.Set(tt.now)
-			defer clock.Reset()
+			clocktest.Freeze(t, tt.now)
 			res := IsWithinPeriod(start, end)
 			assert.Equal(t, tt.wantAllowed, res.Allowed)
 			assert.Contains(t, res.Reason, tt.wantReason)

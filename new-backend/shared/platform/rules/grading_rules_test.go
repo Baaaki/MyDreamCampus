@@ -4,13 +4,12 @@ import (
 	"testing"
 	"time"
 
-	"github.com/baaaki/mydreamcampus/shared/platform/clock"
+	"github.com/baaaki/mydreamcampus/shared/platform/clock/clocktest"
 	"github.com/stretchr/testify/assert"
 )
 
 func TestCanEditGrade_HardDeadlineBlocksEveryone(t *testing.T) {
-	clock.Set(time.Date(2026, 6, 1, 0, 0, 0, 0, time.UTC))
-	defer clock.Reset()
+	clocktest.Freeze(t, time.Date(2026, 6, 1, 0, 0, 0, 0, time.UTC))
 
 	hard := time.Date(2026, 5, 1, 0, 0, 0, 0, time.UTC)
 	cases := []bool{false, true} // both regular and admin
@@ -26,8 +25,7 @@ func TestCanEditGrade_HardDeadlineBlocksEveryone(t *testing.T) {
 }
 
 func TestCanEditGrade_AdminBypassesScoreLockAndPeriod(t *testing.T) {
-	clock.Set(time.Date(2026, 6, 1, 0, 0, 0, 0, time.UTC))
-	defer clock.Reset()
+	clocktest.Freeze(t, time.Date(2026, 6, 1, 0, 0, 0, 0, time.UTC))
 
 	res := CanEditGrade(GradeEditParams{
 		IsLocked:       true,
@@ -39,8 +37,7 @@ func TestCanEditGrade_AdminBypassesScoreLockAndPeriod(t *testing.T) {
 }
 
 func TestCanEditGrade_LockedScoreRejectsNonAdmin(t *testing.T) {
-	clock.Set(time.Date(2026, 6, 1, 0, 0, 0, 0, time.UTC))
-	defer clock.Reset()
+	clocktest.Freeze(t, time.Date(2026, 6, 1, 0, 0, 0, 0, time.UTC))
 
 	res := CanEditGrade(GradeEditParams{
 		IsLocked:       true,
@@ -51,8 +48,7 @@ func TestCanEditGrade_LockedScoreRejectsNonAdmin(t *testing.T) {
 }
 
 func TestCanEditGrade_PeriodEndedRejectsTeacher(t *testing.T) {
-	clock.Set(time.Date(2026, 6, 1, 0, 0, 0, 0, time.UTC))
-	defer clock.Reset()
+	clocktest.Freeze(t, time.Date(2026, 6, 1, 0, 0, 0, 0, time.UTC))
 
 	res := CanEditGrade(GradeEditParams{
 		GlobalDeadline: time.Date(2026, 5, 1, 0, 0, 0, 0, time.UTC), // ended
@@ -62,8 +58,7 @@ func TestCanEditGrade_PeriodEndedRejectsTeacher(t *testing.T) {
 }
 
 func TestCanEditGrade_OverrideExtendsDeadline(t *testing.T) {
-	clock.Set(time.Date(2026, 6, 1, 0, 0, 0, 0, time.UTC))
-	defer clock.Reset()
+	clocktest.Freeze(t, time.Date(2026, 6, 1, 0, 0, 0, 0, time.UTC))
 
 	override := time.Date(2026, 7, 1, 0, 0, 0, 0, time.UTC)
 	res := CanEditGrade(GradeEditParams{
@@ -75,8 +70,7 @@ func TestCanEditGrade_OverrideExtendsDeadline(t *testing.T) {
 }
 
 func TestCanEditGrade_OverrideEarlierThanGlobalIgnored(t *testing.T) {
-	clock.Set(time.Date(2026, 6, 1, 0, 0, 0, 0, time.UTC))
-	defer clock.Reset()
+	clocktest.Freeze(t, time.Date(2026, 6, 1, 0, 0, 0, 0, time.UTC))
 
 	override := time.Date(2026, 5, 1, 0, 0, 0, 0, time.UTC)
 	res := CanEditGrade(GradeEditParams{
@@ -89,8 +83,7 @@ func TestCanEditGrade_OverrideEarlierThanGlobalIgnored(t *testing.T) {
 }
 
 func TestCanEditGrade_HappyPath(t *testing.T) {
-	clock.Set(time.Date(2026, 6, 1, 0, 0, 0, 0, time.UTC))
-	defer clock.Reset()
+	clocktest.Freeze(t, time.Date(2026, 6, 1, 0, 0, 0, 0, time.UTC))
 
 	res := CanEditGrade(GradeEditParams{
 		GlobalDeadline: time.Date(2026, 7, 1, 0, 0, 0, 0, time.UTC),

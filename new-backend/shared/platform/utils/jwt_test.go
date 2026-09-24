@@ -5,7 +5,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/baaaki/mydreamcampus/shared/platform/clock"
+	"github.com/baaaki/mydreamcampus/shared/platform/clock/clocktest"
 	"github.com/golang-jwt/jwt/v5"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -54,13 +54,12 @@ func TestValidateTokenWithSecret_RejectsBadSignature(t *testing.T) {
 }
 
 func TestValidateTokenWithSecret_RejectsExpired(t *testing.T) {
-	clock.Set(time.Date(2026, 1, 1, 12, 0, 0, 0, time.UTC))
-	defer clock.Reset()
+	clocktest.Freeze(t, time.Date(2026, 1, 1, 12, 0, 0, 0, time.UTC))
 
 	token, _, err := GenerateAccessTokenWithSecret("u", "r", "", 1, testSecret, 15)
 	require.NoError(t, err)
 
-	clock.Set(time.Date(2026, 1, 1, 13, 0, 0, 0, time.UTC)) // 1 hour later
+	clocktest.Freeze(t, time.Date(2026, 1, 1, 13, 0, 0, 0, time.UTC)) // 1 hour later
 	_, err = ValidateTokenWithSecret(token, testSecret)
 	assert.ErrorIs(t, err, ErrExpiredToken)
 }
@@ -98,13 +97,12 @@ func TestValidateTokenWithSecret_RejectsAlgNone(t *testing.T) {
 }
 
 func TestValidateTokenIgnoreExpiry_AcceptsExpired(t *testing.T) {
-	clock.Set(time.Date(2026, 1, 1, 12, 0, 0, 0, time.UTC))
-	defer clock.Reset()
+	clocktest.Freeze(t, time.Date(2026, 1, 1, 12, 0, 0, 0, time.UTC))
 
 	token, _, err := GenerateAccessTokenWithSecret("u-3", "admin", "", 2, testSecret, 15)
 	require.NoError(t, err)
 
-	clock.Set(time.Date(2026, 1, 2, 0, 0, 0, 0, time.UTC)) // way past expiry
+	clocktest.Freeze(t, time.Date(2026, 1, 2, 0, 0, 0, 0, time.UTC)) // way past expiry
 	claims, err := ValidateTokenIgnoreExpiryWithSecret(token, testSecret)
 	require.NoError(t, err)
 	assert.Equal(t, "u-3", claims.UserID)

@@ -2,6 +2,7 @@ package handler
 
 import (
 	"net/http"
+	"time"
 
 	"github.com/baaaki/mydreamcampus/shared/platform/clock"
 	"github.com/baaaki/mydreamcampus/shared/platform/dto"
@@ -20,11 +21,11 @@ func NewTimeHandler() *TimeHandler {
 // RegisterRoutes mounts time-control endpoints under the given router group.
 // The caller is responsible for applying RequireAdmin() middleware.
 func (h *TimeHandler) RegisterRoutes(rg *gin.RouterGroup) {
-	time := rg.Group("/time")
+	tm := rg.Group("/time")
 	{
-		time.POST("/simulate", h.Simulate)
-		time.POST("/reset", h.Reset)
-		time.GET("/status", h.Status)
+		tm.POST("/simulate", h.Simulate)
+		tm.POST("/reset", h.Reset)
+		tm.GET("/status", h.Status)
 	}
 }
 
@@ -41,7 +42,7 @@ func (h *TimeHandler) Simulate(c *gin.Context) {
 		return
 	}
 
-	clock.Set(req.Time)
+	clock.SetOffset(time.Until(req.Time), time.Time{})
 
 	logger.Info("clock switched to simulated mode",
 		zap.Time("simulated_time", req.Time),
@@ -69,9 +70,11 @@ func (h *TimeHandler) Reset(c *gin.Context) {
 // Status returns the current clock mode and time.
 // GET /admin/time/status
 func (h *TimeHandler) Status(c *gin.Context) {
-	c.JSON(http.StatusOK, dto.TimeStatusResponse{
-		Mode:          string(clock.GetMode()),
-		CurrentTime:   clock.Now(),
-		SimulatedTime: clock.SimulatedTime(),
-	})
+	state := clock.State()
+	resp := dto.TimeStatusResponse{Mode: "real", CurrentTime: state.Now}
+	if state.Active {
+		resp.Mode = "simulated"
+		resp.SimulatedTime = &state.Now
+	}
+	c.JSON(http.StatusOK, resp)
 }

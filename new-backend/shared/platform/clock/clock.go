@@ -1,77 +1,79 @@
+// Package clock is the service clock for business rules: semester
+// deadlines, reservation windows, attendance expiry, grading periods.
+//
+// The time machine shifts it by an offset rather than freezing it, so the
+// simulated time keeps moving — a frozen clock never rotated attendance QR
+// codes and kept them valid forever. Security and infrastructure timestamps
+// (tokens, sessions, rate limits, idempotency, outbox retries, Redis TTLs)
+// must use time.Now instead: shifting those would log everyone out or
+// replay work the moment the clock moves forward.
 package clock
 
 import (
-	"sync"
+	"sync/atomic"
 	"time"
+
+	"github.com/baaaki/mydreamcampus/shared/platform/clock/internal/source"
 )
 
-// Mode represents the clock operating mode.
-type Mode string
-
-const (
-	ModeReal      Mode = "real"
-	ModeSimulated Mode = "simulated"
-)
-
-// systemClock is the package-level singleton.
-// Read-heavy, write-rare pattern — uses RWMutex.
-var systemClock = &clockState{
-	mode: ModeReal,
+type setting struct {
+	offset time.Duration
+	until  time.Time
 }
 
-type clockState struct {
-	mu        sync.RWMutex
-	mode      Mode
-	fixedTime time.Time
+// activeAt reports whether the setting still applies at the real instant now.
+func (s *setting) activeAt(now time.Time) bool {
+	return s.until.IsZero() || now.Before(s.until)
 }
 
-// Now returns the current time based on the active mode.
-// In Real mode, it returns time.Now().
-// In Simulated mode, it returns the frozen simulated time.
+// Read on every request, written a few times a day at most.
+var current atomic.Pointer[setting]
+
+// Now returns the real time, shifted by the offset while a simulation is
+// active.
 func Now() time.Time {
-	systemClock.mu.RLock()
-	defer systemClock.mu.RUnlock()
-
-	if systemClock.mode == ModeSimulated {
-		return systemClock.fixedTime
+	now := source.Now()
+	if s := current.Load(); s != nil && s.activeAt(now) {
+		return now.Add(s.offset)
 	}
-	return time.Now()
+	return now
 }
 
-// Set switches to Simulated mode and freezes time at the given value.
-func Set(t time.Time) {
-	systemClock.mu.Lock()
-	defer systemClock.mu.Unlock()
-
-	systemClock.mode = ModeSimulated
-	systemClock.fixedTime = t
+// SetOffset starts a simulation: Now returns the real time plus offset until
+// the real clock reaches until. A zero until never expires.
+func SetOffset(offset time.Duration, until time.Time) {
+	current.Store(&setting{offset: offset, until: until})
 }
 
-// Reset switches back to Real mode (time.Now()).
+// Reset ends the simulation.
 func Reset() {
-	systemClock.mu.Lock()
-	defer systemClock.mu.Unlock()
-
-	systemClock.mode = ModeReal
-	systemClock.fixedTime = time.Time{}
+	current.Store(nil)
 }
 
-// GetMode returns the current clock mode ("real" or "simulated").
-func GetMode() Mode {
-	systemClock.mu.RLock()
-	defer systemClock.mu.RUnlock()
-
-	return systemClock.mode
+// Snapshot describes the clock at one instant.
+type Snapshot struct {
+	// Active is false when no simulation was set or its until has passed.
+	Active bool
+	// Offset is zero when inactive.
+	Offset time.Duration
+	// Now is what clock.Now returned at the moment of the snapshot.
+	Now time.Time
+	// Until is zero when inactive or when the simulation never expires.
+	Until time.Time
 }
 
-// SimulatedTime returns the simulated time if in Simulated mode, or nil if in Real mode.
-func SimulatedTime() *time.Time {
-	systemClock.mu.RLock()
-	defer systemClock.mu.RUnlock()
-
-	if systemClock.mode == ModeSimulated {
-		t := systemClock.fixedTime
-		return &t
+// State returns a consistent snapshot; reading Now and the offset through
+// separate calls could straddle a SetOffset.
+func State() Snapshot {
+	now := source.Now()
+	s := current.Load()
+	if s == nil || !s.activeAt(now) {
+		return Snapshot{Now: now}
 	}
-	return nil
+	return Snapshot{
+		Active: true,
+		Offset: s.offset,
+		Now:    now.Add(s.offset),
+		Until:  s.until,
+	}
 }
