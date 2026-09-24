@@ -6,9 +6,9 @@ replace github.com/baaaki/mydreamcampus/shared => ../../shared
 
 require (
 	github.com/baaaki/mydreamcampus/shared v0.0.0-00010101000000-000000000000
-	github.com/jackc/pgx/v5 v5.10.0
+	github.com/jackc/pgx/v5 v5.11.0
 	github.com/jordan-wright/email v4.0.1-0.20210109023952-943e75fe5223+incompatible
-	github.com/rabbitmq/amqp091-go v1.13.0
+	github.com/rabbitmq/amqp091-go v1.15.0
 	github.com/spf13/viper v1.21.0
 	go.uber.org/zap v1.28.0
 )
