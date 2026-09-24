@@ -63,7 +63,10 @@ func TestUserResponse_OmitsNilDepartment(t *testing.T) {
 }
 
 func TestSessionResponse_RoundTrip(t *testing.T) {
-	now := time.Now().Truncate(time.Second)
+	// UTC: JSON keeps the instant, not the Location. A Local time with a
+	// zero offset decodes as UTC, so the struct comparison failed on any
+	// machine whose local zone is UTC — CI runners among them.
+	now := time.Now().UTC().Truncate(time.Second)
 	dev := "Chrome/Linux"
 	ip := "10.0.0.1"
 	s := SessionResponse{
