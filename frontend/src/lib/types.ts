@@ -880,11 +880,11 @@ export interface AuditLogEntry {
   action: string
   resource_type: string
   resource_id: string
-  details: Record<string, unknown>
+  details?: Record<string, unknown> | null
 }
 
 export interface AuditLogListResponse {
-  entries: AuditLogEntry[]
+  data: AuditLogEntry[]
   total: number
 }
 

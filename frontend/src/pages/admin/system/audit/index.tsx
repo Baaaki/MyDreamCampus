@@ -44,6 +44,13 @@ const SERVICE_COLORS: Record<string, string> = {
   grades:
     "bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-300",
   meal: "bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-300",
+  attendance:
+    "bg-orange-100 text-orange-700 dark:bg-orange-900/30 dark:text-orange-300",
+  auth: "bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-300",
+  students: "bg-cyan-100 text-cyan-700 dark:bg-cyan-900/30 dark:text-cyan-300",
+  staff: "bg-indigo-100 text-indigo-700 dark:bg-indigo-900/30 dark:text-indigo-300",
+  payment:
+    "bg-emerald-100 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-300",
 }
 
 export default function AuditLogPage() {
@@ -74,7 +81,7 @@ export default function AuditLogPage() {
     },
     placeholderData: keepPreviousData,
   })
-  const entries: AuditLogEntry[] = data?.entries || []
+  const entries: AuditLogEntry[] = data?.data || []
   const total = data?.total || 0
 
   const totalPages = Math.max(1, Math.ceil(total / PAGE_SIZE))
@@ -119,6 +126,11 @@ export default function AuditLogPage() {
                 <option value="enrollment">Enrollment</option>
                 <option value="grades">Grades</option>
                 <option value="meal">Meal</option>
+                <option value="attendance">Attendance</option>
+                <option value="auth">Auth</option>
+                <option value="students">Students</option>
+                <option value="staff">Staff</option>
+                <option value="payment">Payment</option>
               </select>
             </div>
             <div className="max-w-xs flex-1">

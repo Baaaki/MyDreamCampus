@@ -220,3 +220,36 @@ describe("academic periods management", () => {
   })
 })
 
+describe("audit log service", () => {
+  afterEach(() => {
+    vi.unstubAllGlobals()
+    vi.resetAllMocks()
+  })
+
+  it("queries catalog admin/audit-log with filter query params", async () => {
+    const fetchSpy = stubFetch(() => json({ data: [], total: 0 }))
+    const { listAuditLog } = await loadService()
+
+    await listAuditLog({
+      service: "catalog",
+      action: "semester.activated",
+      actor_id: "00000000-0000-0000-0000-000000000001",
+      limit: 20,
+      offset: 40,
+    })
+
+    expect(fetchSpy).toHaveBeenCalledTimes(1)
+    const request = fetchSpy.mock.calls[0]![0] as Request
+    const url = new URL(request.url)
+    expect(url.pathname).toBe("/api/catalog/admin/audit-log")
+    expect(url.searchParams.get("service")).toBe("catalog")
+    expect(url.searchParams.get("action")).toBe("semester.activated")
+    expect(url.searchParams.get("actor_id")).toBe(
+      "00000000-0000-0000-0000-000000000001"
+    )
+    expect(url.searchParams.get("limit")).toBe("20")
+    expect(url.searchParams.get("offset")).toBe("40")
+  })
+})
+
+

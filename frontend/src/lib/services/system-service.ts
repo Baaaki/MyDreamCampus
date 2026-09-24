@@ -23,7 +23,6 @@ import type {
   Semester,
   CreateSemesterRequest,
   UpdateSemesterRequest,
-  AuditLogEntry,
   AuditLogListResponse,
 } from "@/lib/types"
 
@@ -283,9 +282,6 @@ export async function updateSemester(
   return unwrapSemester(body)
 }
 
-// Audit log — still mock data, removed in the mock cleanup phase.
-const MOCK_DELAY = () => new Promise((resolve) => setTimeout(resolve, 300))
-
 // Audit Log Filters
 export interface AuditLogFilters {
   service?: string
@@ -294,44 +290,18 @@ export interface AuditLogFilters {
   limit?: number
   offset?: number
 }
+
 export async function listAuditLog(
-  _filters: AuditLogFilters = {}
+  filters: AuditLogFilters = {}
 ): Promise<AuditLogListResponse> {
-  await MOCK_DELAY()
-  const entries: AuditLogEntry[] = [
-    {
-      id: "aud1",
-      timestamp: new Date(Date.now() - 3600000).toISOString(),
-      service: "catalog",
-      action: "semester.activated",
-      resource_type: "semester",
-      resource_id: "sem2",
-      actor_role: "admin",
-      actor_id: "admin-123",
-      details: { note: "Mock data" },
-    },
-    {
-      id: "aud2",
-      timestamp: new Date(Date.now() - 7200000).toISOString(),
-      service: "grades",
-      action: "period.created",
-      resource_type: "period",
-      resource_id: "gp1",
-      actor_role: "admin",
-      actor_id: "admin-123",
-      details: { course_id: "CS101" },
-    },
-    {
-      id: "aud3",
-      timestamp: new Date(Date.now() - 86400000).toISOString(),
-      service: "meal",
-      action: "closed_day.created",
-      resource_type: "meal",
-      resource_id: "cd1",
-      actor_role: "admin",
-      actor_id: "admin-456",
-      details: { date: "2025-01-01" },
-    },
-  ]
-  return { entries, total: 3 }
+  const searchParams: Record<string, string | number> = {}
+  if (filters.limit !== undefined) searchParams.limit = filters.limit
+  if (filters.offset !== undefined) searchParams.offset = filters.offset
+  if (filters.service) searchParams.service = filters.service
+  if (filters.action) searchParams.action = filters.action
+  if (filters.actor_id) searchParams.actor_id = filters.actor_id
+
+  return catalogApiSafe
+    .get("admin/audit-log", { searchParams })
+    .json<AuditLogListResponse>()
 }

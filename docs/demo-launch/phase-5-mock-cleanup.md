@@ -64,7 +64,7 @@ altyapısındaki `vi.mock` ve `__mocks__` uygulama kodu değildir; kalır.
   - **Commit:** `fix(catalog): manage every period type from the catalog`,
     `refactor(frontend): read periods from the catalog`
 
-- [ ] **5.5 Denetim kaydı**
+- [x] **5.5 Denetim kaydı** (gemini ile yapıldı)
   - `system-service.ts` `listAuditLog` (≈260) sahte veri dönüyor. Bunun
     yerine `GET /api/catalog/admin/audit-log` çağrılsın. Filtre parametrelerini
     ve yanıt biçimini
