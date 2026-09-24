@@ -12,7 +12,7 @@ altyapısındaki `vi.mock` ve `__mocks__` uygulama kodu değildir; kalır.
 
 ## Görevler
 
-- [ ] **5.1 Fakülte listesi API'den**
+- [x] **5.1 Fakülte listesi API'den** (gemini ile yapıldı)
   - `lib/services/catalog-service.ts`: `getFaculties()`. Hook
     `useFaculties()` (TanStack Query, `staleTime: Infinity`).
   - `mockFaculties` kullanan 12 dosyayı hook'a geçir; yüklenme ve hata

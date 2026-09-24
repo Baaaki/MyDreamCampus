@@ -50,7 +50,7 @@ import {
   PopoverContent,
   PopoverTrigger,
 } from "@/components/ui/popover"
-import { mockFaculties } from "@/mock_data/catalog"
+import { useFaculties } from "@/lib/services/catalog-service"
 import { apiErrorMessage } from "@/lib/api-error"
 
 interface Staff {
@@ -128,19 +128,25 @@ export default function StaffPage() {
     office_location: "",
   })
 
+  const {
+    data: faculties = [],
+    isLoading: isLoadingFaculties,
+    isError: isErrorFaculties,
+  } = useFaculties()
+
   // Filtered departments based on selected faculty (for create form)
   const filteredDepartments = useMemo(() => {
     if (!selectedFaculty) return []
-    const faculty = mockFaculties.find((f) => f.name === selectedFaculty)
+    const faculty = faculties.find((f) => f.name === selectedFaculty)
     return faculty?.departments || []
-  }, [selectedFaculty])
+  }, [selectedFaculty, faculties])
 
   // Filtered departments based on selected faculty (for edit form)
   const editFilteredDepartments = useMemo(() => {
     if (!editSelectedFaculty) return []
-    const faculty = mockFaculties.find((f) => f.name === editSelectedFaculty)
+    const faculty = faculties.find((f) => f.name === editSelectedFaculty)
     return faculty?.departments || []
-  }, [editSelectedFaculty])
+  }, [editSelectedFaculty, faculties])
 
   // Update form for edit - tüm alanlar düzenlenebilir
   const [updateFormData, setUpdateFormData] = useState({
@@ -325,7 +331,7 @@ export default function StaffPage() {
 
     // Find the faculty that contains this department
     if (staff.department) {
-      const facultyWithDept = mockFaculties.find((f) =>
+      const facultyWithDept = faculties.find((f) =>
         f.departments.some((d) => d.name === staff.department)
       )
       setEditSelectedFaculty(facultyWithDept?.name || "")
@@ -438,9 +444,19 @@ export default function StaffPage() {
                       <Command>
                         <CommandInput placeholder="Fakülte ara..." />
                         <CommandList>
+                          {isLoadingFaculties && (
+                            <div className="p-2 text-center text-sm text-muted-foreground">
+                              Fakülteler yükleniyor...
+                            </div>
+                          )}
+                          {isErrorFaculties && (
+                            <div className="p-2 text-center text-sm text-destructive">
+                              Fakülteler yüklenirken hata oluştu
+                            </div>
+                          )}
                           <CommandEmpty>Fakülte bulunamadı.</CommandEmpty>
                           <CommandGroup>
-                            {mockFaculties.map((faculty) => (
+                            {faculties.map((faculty) => (
                               <CommandItem
                                 key={faculty.id}
                                 value={faculty.name}
@@ -844,9 +860,19 @@ export default function StaffPage() {
                     <Command>
                       <CommandInput placeholder="Fakülte ara..." />
                       <CommandList>
+                        {isLoadingFaculties && (
+                          <div className="p-2 text-center text-sm text-muted-foreground">
+                            Fakülteler yükleniyor...
+                          </div>
+                        )}
+                        {isErrorFaculties && (
+                          <div className="p-2 text-center text-sm text-destructive">
+                            Fakülteler yüklenirken hata oluştu
+                          </div>
+                        )}
                         <CommandEmpty>Fakülte bulunamadı.</CommandEmpty>
                         <CommandGroup>
-                          {mockFaculties.map((faculty) => (
+                          {faculties.map((faculty) => (
                             <CommandItem
                               key={faculty.id}
                               value={faculty.name}

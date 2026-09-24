@@ -15,8 +15,8 @@ import {
 } from "@/components/ui/table"
 import { Button } from "@/components/ui/button"
 import { ChevronLeft, ChevronRight, Calendar } from "lucide-react"
-import { catalogService } from "@/lib/services/catalog-service"
-import { mockFaculties, mockCourseCatalog } from "@/mock_data/catalog"
+import { catalogService, useFaculties } from "@/lib/services/catalog-service"
+import { mockCourseCatalog } from "@/mock_data/catalog"
 import { mockAdminSessionsResponse } from "@/mock_data/admin_attendance"
 
 function getMonthRange(year: number, month: number) {
@@ -69,6 +69,12 @@ export default function AdminAttendancePage() {
   const { start_date, end_date } = getMonthRange(year, month)
 
   const [useMockData, setUseMockData] = useState(false)
+
+  const {
+    data: faculties = [],
+    isLoading: isLoadingFaculties,
+    isError: isErrorFaculties,
+  } = useFaculties()
 
   const { data: apiData, isLoading } = useQuery({
     queryKey: ["admin-attendance-sessions", start_date, end_date],
@@ -216,14 +222,26 @@ export default function AdminAttendancePage() {
                 setFacultyFilter(e.target.value)
                 setDepartmentFilter("")
               }}
+              disabled={isLoadingFaculties}
             >
-              <option value="">Tüm Fakülteler</option>
-              {mockFaculties.map((f) => (
+              <option value="">
+                {isLoadingFaculties
+                  ? "Fakülteler Yükleniyor..."
+                  : isErrorFaculties
+                    ? "Fakülteler Yüklenemedi"
+                    : "Tüm Fakülteler"}
+              </option>
+              {faculties.map((f) => (
                 <option key={f.id} value={f.name}>
                   {f.name}
                 </option>
               ))}
             </select>
+            {isErrorFaculties && (
+              <p className="mt-1 text-xs text-destructive">
+                Fakülteler yüklenirken bir hata oluştu
+              </p>
+            )}
           </div>
           <div>
             <label className="mb-1 block text-sm font-medium text-gray-700 dark:text-gray-300">
@@ -236,7 +254,7 @@ export default function AdminAttendancePage() {
               disabled={!facultyFilter}
             >
               <option value="">Tüm Bölümler</option>
-              {mockFaculties
+              {faculties
                 .find((f) => f.name === facultyFilter)
                 ?.departments.map((d) => (
                   <option key={d.id} value={d.name}>

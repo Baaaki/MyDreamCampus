@@ -3,7 +3,7 @@ import { useNavigate } from "react-router"
 import { useQuery } from "@tanstack/react-query"
 import { format } from "date-fns"
 import { tr } from "date-fns/locale"
-import { mockFaculties } from "@/mock_data/catalog"
+import { useFaculties } from "@/lib/services/catalog-service"
 import type {
   Department,
   Faculty,
@@ -216,6 +216,12 @@ export default function SemesterReviewPage() {
     },
     []
   )
+
+  const {
+    data: faculties = [],
+    isLoading: isLoadingFaculties,
+    isError: isErrorFaculties,
+  } = useFaculties()
 
   // Fetch planned semester
   const { data: semester, isLoading: semesterLoading } = useQuery({
@@ -482,8 +488,21 @@ export default function SemesterReviewPage() {
           <CardContent>
             {!selectedDepartment ? (
               /* Faculty / Department Selection */
-              <div className="space-y-2">
-                {mockFaculties.map((faculty) => {
+              isLoadingFaculties ? (
+                <div className="flex items-center justify-center p-8">
+                  <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
+                  <span className="ml-2 text-sm text-muted-foreground">
+                    Fakülteler yükleniyor...
+                  </span>
+                </div>
+              ) : isErrorFaculties ? (
+                <div className="flex items-center justify-center gap-2 p-8 text-sm text-destructive">
+                  <AlertCircle className="h-5 w-5" />
+                  <span>Fakülteler yüklenirken bir hata oluştu</span>
+                </div>
+              ) : (
+                <div className="space-y-2">
+                  {faculties.map((faculty) => {
                   const isExpanded = expandedFaculties.includes(faculty.id)
                   return (
                     <div
@@ -538,6 +557,7 @@ export default function SemesterReviewPage() {
                   )
                 })}
               </div>
+              )
             ) : (
               /* Weekly Schedule View */
               <div>

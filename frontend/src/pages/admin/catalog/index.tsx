@@ -1,9 +1,8 @@
 import { useState } from "react"
 import { useNavigate } from "react-router"
 import { useQuery } from "@tanstack/react-query"
-import { mockFaculties } from "@/mock_data/catalog"
 import type { CourseCatalog, Department, Faculty } from "@/lib/types"
-import { catalogService } from "@/lib/services/catalog-service"
+import { catalogService, useFaculties } from "@/lib/services/catalog-service"
 import {
   Dialog,
   DialogContent,
@@ -26,6 +25,8 @@ import {
   BookOpen,
   Building2,
   Plus,
+  Loader2,
+  AlertCircle,
 } from "lucide-react"
 
 // Semester info helper
@@ -46,6 +47,12 @@ export default function CourseCatalogPage() {
     null
   )
   const [isDetailOpen, setIsDetailOpen] = useState(false)
+
+  const {
+    data: faculties = [],
+    isLoading: isLoadingFaculties,
+    isError: isErrorFaculties,
+  } = useFaculties()
 
   const selectedDepartmentName = selectedDepartment?.dept.name
   const {
@@ -150,87 +157,103 @@ export default function CourseCatalogPage() {
             </div>
 
             {/* Faculty Accordion */}
-            <div className="space-y-2">
-              {mockFaculties.map((faculty) => {
-                const isExpanded = expandedFaculties.includes(faculty.id)
-                return (
-                  <div
-                    key={faculty.id}
-                    className="overflow-hidden rounded-lg border"
-                  >
-                    {/* Faculty Header */}
-                    <button
-                      onClick={() => toggleFaculty(faculty.id)}
-                      className="flex w-full items-center justify-between bg-gray-50 p-4 text-left transition-colors hover:bg-gray-100"
+            {isLoadingFaculties && (
+              <div className="flex items-center justify-center p-8">
+                <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
+                <span className="ml-2 text-sm text-muted-foreground">
+                  Fakülteler yükleniyor...
+                </span>
+              </div>
+            )}
+            {isErrorFaculties && (
+              <div className="flex items-center justify-center gap-2 p-8 text-sm text-destructive">
+                <AlertCircle className="h-5 w-5" />
+                <span>Fakülteler yüklenirken bir hata oluştu</span>
+              </div>
+            )}
+            {!isLoadingFaculties && !isErrorFaculties && (
+              <div className="space-y-2">
+                {faculties.map((faculty) => {
+                  const isExpanded = expandedFaculties.includes(faculty.id)
+                  return (
+                    <div
+                      key={faculty.id}
+                      className="overflow-hidden rounded-lg border"
                     >
-                      <div className="flex items-center gap-3">
-                        <Building2 className="h-5 w-5 text-indigo-600" />
-                        <span className="font-semibold text-gray-900">
-                          {faculty.name}
-                        </span>
-                        <Badge variant="outline" className="text-xs">
-                          {faculty.departments.length} bölüm
-                        </Badge>
-                      </div>
-                      {isExpanded ? (
-                        <ChevronDown className="h-5 w-5 text-gray-500" />
-                      ) : (
-                        <ChevronRight className="h-5 w-5 text-gray-500" />
-                      )}
-                    </button>
+                      {/* Faculty Header */}
+                      <button
+                        onClick={() => toggleFaculty(faculty.id)}
+                        className="flex w-full items-center justify-between bg-gray-50 p-4 text-left transition-colors hover:bg-gray-100"
+                      >
+                        <div className="flex items-center gap-3">
+                          <Building2 className="h-5 w-5 text-indigo-600" />
+                          <span className="font-semibold text-gray-900">
+                            {faculty.name}
+                          </span>
+                          <Badge variant="outline" className="text-xs">
+                            {faculty.departments.length} bölüm
+                          </Badge>
+                        </div>
+                        {isExpanded ? (
+                          <ChevronDown className="h-5 w-5 text-gray-500" />
+                        ) : (
+                          <ChevronRight className="h-5 w-5 text-gray-500" />
+                        )}
+                      </button>
 
-                    {/* Departments List */}
-                    {isExpanded && (
-                      <div className="border-t bg-white">
-                        {faculty.departments.map((dept, index) => {
-                          const courseCount = courseCounts[dept.name] || 0
-                          return (
-                            <button
-                              key={dept.id}
-                              onClick={() =>
-                                handleDepartmentClick(dept, faculty)
-                              }
-                              className={`flex w-full items-center justify-between p-3 pl-12 text-left transition-colors hover:bg-indigo-50 ${
-                                index !== faculty.departments.length - 1
-                                  ? "border-b border-gray-100"
-                                  : ""
-                              }`}
-                            >
-                              <div className="flex items-center gap-3">
-                                <GraduationCap className="h-4 w-4 text-gray-400" />
-                                <span className="text-gray-700">
-                                  {dept.name}
-                                </span>
-                              </div>
-                              <div className="flex items-center gap-2">
-                                {courseCount > 0 && (
-                                  <span className="text-xs text-gray-500">
-                                    {courseCount} ders
+                      {/* Departments List */}
+                      {isExpanded && (
+                        <div className="border-t bg-white">
+                          {faculty.departments.map((dept, index) => {
+                            const courseCount = courseCounts[dept.name] || 0
+                            return (
+                              <button
+                                key={dept.id}
+                                onClick={() =>
+                                  handleDepartmentClick(dept, faculty)
+                                }
+                                className={`flex w-full items-center justify-between p-3 pl-12 text-left transition-colors hover:bg-indigo-50 ${
+                                  index !== faculty.departments.length - 1
+                                    ? "border-b border-gray-100"
+                                    : ""
+                                }`}
+                              >
+                                <div className="flex items-center gap-3">
+                                  <GraduationCap className="h-4 w-4 text-gray-400" />
+                                  <span className="text-gray-700">
+                                    {dept.name}
                                   </span>
-                                )}
-                                <ChevronRight className="h-4 w-4 text-gray-400" />
-                              </div>
-                            </button>
-                          )
-                        })}
-                      </div>
-                    )}
-                  </div>
-                )
-              })}
-            </div>
+                                </div>
+                                <div className="flex items-center gap-2">
+                                  {courseCount > 0 && (
+                                    <span className="text-xs text-gray-500">
+                                      {courseCount} ders
+                                    </span>
+                                  )}
+                                  <ChevronRight className="h-4 w-4 text-gray-400" />
+                                </div>
+                              </button>
+                            )
+                          })}
+                        </div>
+                      )}
+                    </div>
+                  )
+                })}
+              </div>
+            )}
 
             {/* Stats */}
             <div className="mt-8 grid grid-cols-2 gap-4 border-t pt-6 text-center">
               <div className="rounded-lg bg-indigo-50 p-4">
                 <div className="text-2xl font-bold text-indigo-600">
-                  {mockFaculties.length}
+                  {faculties.length}
                 </div>
                 <div className="text-sm text-gray-600">Fakülte</div>
               </div>
               <div className="rounded-lg bg-green-50 p-4">
                 <div className="text-2xl font-bold text-green-600">
-                  {mockFaculties.reduce(
+                  {faculties.reduce(
                     (sum, f) => sum + f.departments.length,
                     0
                   )}

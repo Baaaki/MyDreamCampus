@@ -5,7 +5,7 @@ import {
   adminStaffService,
   toAdminStaffRecord,
 } from "@/lib/services/admin-staff-service"
-import { mockFaculties } from "@/mock_data"
+import { useFaculties } from "@/lib/services/catalog-service"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
@@ -327,8 +327,14 @@ export default function StaffProfilePage() {
   const [isLoading, setIsLoading] = useState(false)
   const [expandedArticles, setExpandedArticles] = useState<string[]>([])
 
+  const {
+    data: faculties = [],
+    isLoading: isLoadingFaculties,
+    isError: isErrorFaculties,
+  } = useFaculties()
+
   // Get departments for selected faculty
-  const selectedFaculty = mockFaculties.find((f) => f.id === selectedFacultyId)
+  const selectedFaculty = faculties.find((f) => f.id === selectedFacultyId)
   const departments = selectedFaculty?.departments || []
 
   // Handle staff type change - reset selections
@@ -354,7 +360,7 @@ export default function StaffProfilePage() {
 
     setIsLoadingStaff(true)
 
-    const selectedFac = mockFaculties.find((f) => f.id === selectedFacultyId)
+    const selectedFac = faculties.find((f) => f.id === selectedFacultyId)
     const selectedDept = departments.find((d) => d.id === selectedDepartmentId)
 
     if (staffType === "academic") {
@@ -1034,18 +1040,32 @@ export default function StaffProfilePage() {
                   <Select
                     value={selectedFacultyId}
                     onValueChange={handleFacultyChange}
+                    disabled={isLoadingFaculties}
                   >
                     <SelectTrigger id="faculty">
-                      <SelectValue placeholder="Fakülte seçin..." />
+                      <SelectValue
+                        placeholder={
+                          isLoadingFaculties
+                            ? "Fakülteler yükleniyor..."
+                            : isErrorFaculties
+                              ? "Fakülteler yüklenemedi"
+                              : "Fakülte seçin..."
+                        }
+                      />
                     </SelectTrigger>
                     <SelectContent>
-                      {mockFaculties.map((faculty) => (
+                      {faculties.map((faculty) => (
                         <SelectItem key={faculty.id} value={faculty.id}>
                           {faculty.name}
                         </SelectItem>
                       ))}
                     </SelectContent>
                   </Select>
+                  {isErrorFaculties && (
+                    <p className="text-xs text-destructive">
+                      Fakülteler yüklenirken bir hata oluştu
+                    </p>
+                  )}
                 </div>
 
                 {/* Department selection - only for academic staff */}

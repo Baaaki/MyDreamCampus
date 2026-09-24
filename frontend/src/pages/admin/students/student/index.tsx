@@ -8,6 +8,7 @@ import {
   Save,
   Printer,
   User,
+  AlertCircle,
 } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import {
@@ -35,7 +36,7 @@ import {
   TableRow,
 } from "@/components/ui/table"
 import { studentApi } from "@/lib/api-client"
-import { mockFaculties } from "@/mock_data"
+import { useFaculties } from "@/lib/services/catalog-service"
 import type { Student } from "@/lib/types"
 
 export default function StudentPage() {
@@ -51,13 +52,19 @@ export default function StudentPage() {
   const [selectedFacultyId, setSelectedFacultyId] = useState<string>("")
   const [selectedDepartmentId, setSelectedDepartmentId] = useState<string>("")
 
+  const {
+    data: faculties = [],
+    isLoading: isLoadingFaculties,
+    isError: isErrorFaculties,
+  } = useFaculties()
+
   // Data state
   const [studentList, setStudentList] = useState<Student[]>([])
   const [profile, setProfile] = useState<Student | null>(null)
 
   // Available departments based on selected faculty
   const availableDepartments = selectedFacultyId
-    ? mockFaculties.find((f) => f.id === selectedFacultyId)?.departments || []
+    ? faculties.find((f) => f.id === selectedFacultyId)?.departments || []
     : []
 
   // Reset logic when faculty changes
@@ -72,7 +79,7 @@ export default function StudentPage() {
 
     setIsLoading(true)
     try {
-      const faculty = mockFaculties.find((f) => f.id === selectedFacultyId)
+      const faculty = faculties.find((f) => f.id === selectedFacultyId)
       const department = faculty?.departments.find(
         (d) => d.id === selectedDepartmentId
       )
@@ -205,21 +212,36 @@ export default function StudentPage() {
                   <Select
                     value={selectedFacultyId}
                     onValueChange={handleFacultyChange}
+                    disabled={isLoadingFaculties}
                   >
                     <SelectTrigger
                       id="faculty"
                       className="h-12 border-gray-200 bg-gray-50"
                     >
-                      <SelectValue placeholder="Fakülte seçiniz..." />
+                      <SelectValue
+                        placeholder={
+                          isLoadingFaculties
+                            ? "Fakülteler yükleniyor..."
+                            : isErrorFaculties
+                              ? "Fakülteler yüklenemedi"
+                              : "Fakülte seçiniz..."
+                        }
+                      />
                     </SelectTrigger>
                     <SelectContent>
-                      {mockFaculties.map((faculty) => (
+                      {faculties.map((faculty) => (
                         <SelectItem key={faculty.id} value={faculty.id}>
                           {faculty.name}
                         </SelectItem>
                       ))}
                     </SelectContent>
                   </Select>
+                  {isErrorFaculties && (
+                    <p className="mt-1 flex items-center text-xs text-destructive">
+                      <AlertCircle className="mr-1 h-3 w-3" />
+                      Fakülteler yüklenirken bir hata oluştu
+                    </p>
+                  )}
                 </div>
 
                 <div className="space-y-2">
@@ -298,11 +320,11 @@ export default function StudentPage() {
 
               <div className="text-right">
                 <h2 className="text-lg font-semibold text-gray-800">
-                  {mockFaculties.find((f) => f.id === selectedFacultyId)?.name}
+                  {faculties.find((f) => f.id === selectedFacultyId)?.name}
                 </h2>
                 <p className="text-sm text-gray-500">
                   {
-                    mockFaculties
+                    faculties
                       .find((f) => f.id === selectedFacultyId)
                       ?.departments.find((d) => d.id === selectedDepartmentId)
                       ?.name

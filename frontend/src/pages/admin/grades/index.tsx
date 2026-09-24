@@ -37,7 +37,8 @@ import type {
   StudentGrades,
   SemesterCourse,
 } from "@/lib/types"
-import { mockFaculties, mockCourseCatalog } from "@/mock_data/catalog"
+import { mockCourseCatalog } from "@/mock_data/catalog"
+import { useFaculties } from "@/lib/services/catalog-service"
 import {
   mockAdminCourseStatus,
   mockAdminStudents,
@@ -89,6 +90,12 @@ export default function AdminGradesPage() {
 
   // Toggles testing functionality without backend
   const [useMockData, setUseMockData] = useState(false)
+
+  const {
+    data: faculties = [],
+    isLoading: isLoadingFaculties,
+    isError: isErrorFaculties,
+  } = useFaculties()
 
   // Active Semester State
   const { data: liveActiveSemester = "" } = useQuery({
@@ -247,7 +254,7 @@ export default function AdminGradesPage() {
 
   // VIEWS
   const renderCourses = () => {
-    const selectedFaculty = mockFaculties.find((f) => f.name === facultyFilter)
+    const selectedFaculty = faculties.find((f) => f.name === facultyFilter)
 
     return (
       <div className="space-y-6">
@@ -264,14 +271,26 @@ export default function AdminGradesPage() {
                   setFacultyFilter(e.target.value)
                   setDepartmentFilter("")
                 }}
+                disabled={isLoadingFaculties}
               >
-                <option value="">Fakülte Seçiniz</option>
-                {mockFaculties.map((f) => (
+                <option value="">
+                  {isLoadingFaculties
+                    ? "Fakülteler Yükleniyor..."
+                    : isErrorFaculties
+                      ? "Fakülteler Yüklenemedi"
+                      : "Fakülte Seçiniz"}
+                </option>
+                {faculties.map((f) => (
                   <option key={f.id} value={f.name}>
                     {f.name}
                   </option>
                 ))}
               </select>
+              {isErrorFaculties && (
+                <p className="mt-1 text-xs text-destructive">
+                  Fakülteler yüklenirken bir hata oluştu
+                </p>
+              )}
             </div>
             <div>
               <label className="mb-1 block text-sm font-medium text-gray-700 dark:text-gray-300">

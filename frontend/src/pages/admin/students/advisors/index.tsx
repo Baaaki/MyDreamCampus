@@ -44,9 +44,10 @@ import {
   ArrowUp,
   ArrowDown,
   Loader2,
+  AlertCircle,
 } from "lucide-react"
 import { Link } from "react-router"
-import { mockFaculties } from "@/mock_data/catalog"
+import { useFaculties } from "@/lib/services/catalog-service"
 
 type Student = {
   id: string
@@ -135,6 +136,12 @@ export default function AdvisorManagementPage() {
   const [bulkSelectedFaculty, setBulkSelectedFaculty] = useState<string>("")
   const [bulkSelectedDepartment, setBulkSelectedDepartment] =
     useState<string>("")
+
+  const {
+    data: faculties = [],
+    isLoading: isLoadingFaculties,
+    isError: isErrorFaculties,
+  } = useFaculties()
 
   // Pagination states
   const [orphanedPage, setOrphanedPage] = useState(1)
@@ -345,14 +352,14 @@ export default function AdvisorManagementPage() {
     return 0
   })
 
-  // Helper: Get unique faculties from mock data
+  // Helper: Get unique faculties from API data
   const getUniqueFaculties = () => {
-    return mockFaculties.map((f) => f.name).sort()
+    return faculties.map((f) => f.name).sort()
   }
 
-  // Helper: Get departments for a specific faculty from mock data
+  // Helper: Get departments for a specific faculty from API data
   const getDepartmentsForFaculty = (facultyName: string) => {
-    const faculty = mockFaculties.find((f) => f.name === facultyName)
+    const faculty = faculties.find((f) => f.name === facultyName)
     if (!faculty) return []
     return faculty.departments.map((d) => d.name).sort()
   }
@@ -447,9 +454,18 @@ export default function AdvisorManagementPage() {
                         setBulkSelectedDepartment("")
                         setBulkAdvisorId("")
                       }}
+                      disabled={isLoadingFaculties}
                     >
                       <SelectTrigger>
-                        <SelectValue placeholder="Fakülte seçin" />
+                        <SelectValue
+                          placeholder={
+                            isLoadingFaculties
+                              ? "Fakülteler yükleniyor..."
+                              : isErrorFaculties
+                                ? "Fakülteler yüklenemedi"
+                                : "Fakülte seçin"
+                          }
+                        />
                       </SelectTrigger>
                       <SelectContent>
                         {getUniqueFaculties().map((faculty) => (
@@ -459,6 +475,12 @@ export default function AdvisorManagementPage() {
                         ))}
                       </SelectContent>
                     </Select>
+                    {isErrorFaculties && (
+                      <p className="mt-1 flex items-center text-xs text-destructive">
+                        <AlertCircle className="mr-1 h-3 w-3" />
+                        Fakülteler yüklenirken bir hata oluştu
+                      </p>
+                    )}
                   </div>
 
                   {bulkSelectedFaculty && (

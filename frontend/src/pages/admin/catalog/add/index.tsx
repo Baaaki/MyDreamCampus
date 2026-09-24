@@ -20,7 +20,7 @@ import {
   SelectValue,
 } from "@/components/ui/select"
 import { Separator } from "@/components/ui/separator"
-import { mockFaculties } from "@/mock_data/catalog"
+import { useFaculties } from "@/lib/services/catalog-service"
 import { catalogApi } from "@/lib/api-client"
 import type {
   Faculty,
@@ -131,8 +131,14 @@ export default function AddCoursePage() {
   const navigate = useNavigate()
   const [formData, setFormData] = useState<FormData>(initialFormData)
 
+  const {
+    data: faculties = [],
+    isLoading: isLoadingFaculties,
+    isError: isErrorFaculties,
+  } = useFaculties()
+
   const selectedFaculty: Faculty | null =
-    mockFaculties.find((f) => f.id === formData.faculty_id) || null
+    faculties.find((f) => f.id === formData.faculty_id) || null
   const departments: Department[] = selectedFaculty
     ? selectedFaculty.departments
     : []
@@ -267,7 +273,7 @@ export default function AddCoursePage() {
     e.preventDefault()
 
     // Get faculty and department names from IDs
-    const faculty = mockFaculties.find((f) => f.id === formData.faculty_id)
+    const faculty = faculties.find((f) => f.id === formData.faculty_id)
     const department = departments.find((d) => d.id === formData.department_id)
 
     if (!faculty || !department) {
@@ -334,16 +340,29 @@ export default function AddCoursePage() {
                 }
               >
                 <SelectTrigger className="w-full">
-                  <SelectValue placeholder="Fakülte seçin" />
+                  <SelectValue
+                    placeholder={
+                      isLoadingFaculties
+                        ? "Fakülteler yükleniyor..."
+                        : isErrorFaculties
+                          ? "Fakülteler yüklenemedi"
+                          : "Fakülte seçin"
+                    }
+                  />
                 </SelectTrigger>
                 <SelectContent>
-                  {mockFaculties.map((faculty) => (
+                  {faculties.map((faculty) => (
                     <SelectItem key={faculty.id} value={faculty.id}>
                       {faculty.name}
                     </SelectItem>
                   ))}
                 </SelectContent>
               </Select>
+              {isErrorFaculties && (
+                <p className="text-xs text-destructive">
+                  Fakülteler yüklenirken bir hata oluştu
+                </p>
+              )}
             </div>
 
             <div className="space-y-2">

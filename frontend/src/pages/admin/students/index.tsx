@@ -29,7 +29,7 @@ import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Badge } from "@/components/ui/badge"
 import { studentApi } from "@/lib/api-client"
-import { mockFaculties } from "@/mock_data/catalog"
+import { useFaculties } from "@/lib/services/catalog-service"
 import { staffApi } from "@/lib/api-client"
 import type { Department, Staff } from "@/lib/types"
 import {
@@ -40,6 +40,7 @@ import {
   Upload,
   Users,
   Loader2,
+  AlertCircle,
 } from "lucide-react"
 import { Link } from "react-router"
 
@@ -130,6 +131,12 @@ export default function StudentsPage() {
     []
   )
   const [loadingEditAdvisors, setLoadingEditAdvisors] = useState(false)
+
+  const {
+    data: faculties = [],
+    isLoading: isLoadingFaculties,
+    isError: isErrorFaculties,
+  } = useFaculties()
 
   const {
     data: studentPage,
@@ -472,7 +479,7 @@ export default function StudentsPage() {
                   <Select
                     value={createFormData.faculty}
                     onValueChange={(value) => {
-                      const selectedFaculty = mockFaculties.find(
+                      const selectedFaculty = faculties.find(
                         (f) => f.name === value
                       )
                       setCreateFormData({
@@ -482,18 +489,33 @@ export default function StudentsPage() {
                       })
                       setCreateDepartments(selectedFaculty?.departments || [])
                     }}
+                    disabled={isLoadingFaculties}
                   >
                     <SelectTrigger className="w-full">
-                      <SelectValue placeholder="Fakülte seçin..." />
+                      <SelectValue
+                        placeholder={
+                          isLoadingFaculties
+                            ? "Fakülteler yükleniyor..."
+                            : isErrorFaculties
+                              ? "Fakülteler yüklenemedi"
+                              : "Fakülte seçin..."
+                        }
+                      />
                     </SelectTrigger>
                     <SelectContent>
-                      {mockFaculties.map((faculty) => (
+                      {faculties.map((faculty) => (
                         <SelectItem key={faculty.id} value={faculty.name}>
                           {faculty.name}
                         </SelectItem>
                       ))}
                     </SelectContent>
                   </Select>
+                  {isErrorFaculties && (
+                    <p className="mt-1 flex items-center text-xs text-destructive">
+                      <AlertCircle className="mr-1 h-3 w-3" />
+                      Fakülteler yüklenirken bir hata oluştu
+                    </p>
+                  )}
                 </div>
                 <div>
                   <Label htmlFor="department">Bölüm</Label>

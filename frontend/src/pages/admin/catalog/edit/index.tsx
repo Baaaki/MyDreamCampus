@@ -1,7 +1,6 @@
 import { useState, useMemo } from "react"
 import { useNavigate } from "react-router"
 import { useMutation, useQuery } from "@tanstack/react-query"
-import { mockFaculties } from "@/mock_data/catalog"
 import type {
   CourseCatalog,
   Department,
@@ -11,6 +10,7 @@ import type {
 } from "@/lib/types"
 import {
   catalogService,
+  useFaculties,
   type UpdateCourseRequest,
 } from "@/lib/services/catalog-service"
 import {
@@ -150,6 +150,12 @@ export default function EditCourseCatalogPage() {
     dept: Department
     faculty: Faculty
   } | null>(null)
+
+  const {
+    data: faculties = [],
+    isLoading: isLoadingFaculties,
+    isError: isErrorFaculties,
+  } = useFaculties()
 
   const selectedDepartmentName = selectedDepartment?.dept.name
   const {
@@ -504,8 +510,23 @@ export default function EditCourseCatalogPage() {
             </div>
 
             {/* Faculty Accordion */}
-            <div className="space-y-2">
-              {mockFaculties.map((faculty) => {
+            {isLoadingFaculties && (
+              <div className="flex items-center justify-center p-8">
+                <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
+                <span className="ml-2 text-sm text-muted-foreground">
+                  Fakülteler yükleniyor...
+                </span>
+              </div>
+            )}
+            {isErrorFaculties && (
+              <div className="flex items-center justify-center gap-2 p-8 text-sm text-destructive">
+                <AlertCircle className="h-5 w-5" />
+                <span>Fakülteler yüklenirken bir hata oluştu</span>
+              </div>
+            )}
+            {!isLoadingFaculties && !isErrorFaculties && (
+              <div className="space-y-2">
+                {faculties.map((faculty) => {
                 const isExpanded = expandedFaculties.includes(faculty.id)
                 return (
                   <div
@@ -571,6 +592,7 @@ export default function EditCourseCatalogPage() {
                 )
               })}
             </div>
+            )}
           </div>
         </div>
       </div>

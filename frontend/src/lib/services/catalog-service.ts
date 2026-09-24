@@ -1,9 +1,11 @@
+import { useQuery } from "@tanstack/react-query"
 import { catalogApi } from "@/lib/api-client"
 import type {
   CourseCatalog,
   CourseCoordinator,
   WeeklyTopic,
   Prerequisite,
+  Faculty,
 } from "@/lib/types"
 
 // API Response types
@@ -309,6 +311,26 @@ export const catalogService = {
       .json<CourseResponse>()
     return mapCourseResponseToCourseCatalog(response)
   },
+
+  /**
+   * Get all faculties and their departments
+   */
+  async getFaculties(): Promise<Faculty[]> {
+    const response = await catalogApi
+      .get("faculties")
+      .json<{ data: Faculty[] }>()
+    return response.data || []
+  },
+}
+
+export const getFaculties = () => catalogService.getFaculties()
+
+export function useFaculties() {
+  return useQuery({
+    queryKey: ["faculties"],
+    queryFn: () => catalogService.getFaculties(),
+    staleTime: Infinity,
+  })
 }
 
 export default catalogService

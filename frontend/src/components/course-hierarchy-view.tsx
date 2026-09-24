@@ -1,6 +1,6 @@
 import { useState, useMemo } from "react"
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query"
-import { mockFaculties } from "@/mock_data/catalog"
+import { useFaculties } from "@/lib/services/catalog-service"
 import type { Department, Faculty, SemesterCourse } from "@/lib/types"
 import { semesterApi } from "@/lib/api-client"
 import { Badge } from "@/components/ui/badge"
@@ -22,6 +22,7 @@ import {
   GraduationCap,
   Trash2,
   Loader2,
+  AlertCircle,
   Plus,
 } from "lucide-react"
 import { Button } from "@/components/ui/button"
@@ -160,6 +161,12 @@ export default function CourseHierarchyView({
     faculty: Faculty
   } | null>(null)
 
+  const {
+    data: faculties = [],
+    isLoading: isLoadingFaculties,
+    isError: isErrorFaculties,
+  } = useFaculties()
+
   // Fetch semester courses from backend
   const {
     data: semesterCourses = [],
@@ -280,9 +287,29 @@ export default function CourseHierarchyView({
 
   // Faculty & Department List View (Accordion)
   if (!selectedDepartment) {
+    if (isLoadingFaculties) {
+      return (
+        <div className="flex items-center justify-center p-8">
+          <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
+          <span className="ml-2 text-sm text-muted-foreground">
+            Fakülteler yükleniyor...
+          </span>
+        </div>
+      )
+    }
+
+    if (isErrorFaculties) {
+      return (
+        <div className="flex items-center justify-center gap-2 p-8 text-sm text-destructive">
+          <AlertCircle className="h-5 w-5" />
+          <span>Fakülteler yüklenirken bir hata oluştu</span>
+        </div>
+      )
+    }
+
     return (
       <div className="space-y-2">
-        {mockFaculties.map((faculty) => {
+        {faculties.map((faculty) => {
           const isExpanded = expandedFaculties.includes(faculty.id)
           return (
             <div

@@ -31,7 +31,7 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog"
-import { mockFaculties } from "@/mock_data/catalog"
+import { useFaculties } from "@/lib/services/catalog-service"
 import type {
   Department,
   AssessmentItem,
@@ -249,8 +249,15 @@ export default function SemesterCoursesPage() {
     ...(facultyFromUrl ? { faculty_id: facultyFromUrl } : {}),
     ...(departmentFromUrl ? { department_id: departmentFromUrl } : {}),
   }))
+
+  const {
+    data: faculties = [],
+    isLoading: isLoadingFaculties,
+    isError: isErrorFaculties,
+  } = useFaculties()
+
   const departments: Department[] =
-    mockFaculties.find((f) => f.id === formData.faculty_id)?.departments ?? []
+    faculties.find((f) => f.id === formData.faculty_id)?.departments ?? []
   const [activeSessionType, setActiveSessionType] = useState<"theory" | "lab">(
     "theory"
   )
@@ -821,16 +828,29 @@ export default function SemesterCoursesPage() {
                   }}
                 >
                   <SelectTrigger>
-                    <SelectValue placeholder="Fakülte seçin" />
+                    <SelectValue
+                      placeholder={
+                        isLoadingFaculties
+                          ? "Fakülteler yükleniyor..."
+                          : isErrorFaculties
+                            ? "Fakülteler yüklenemedi"
+                            : "Fakülte seçin"
+                      }
+                    />
                   </SelectTrigger>
                   <SelectContent>
-                    {mockFaculties.map((faculty) => (
+                    {faculties.map((faculty) => (
                       <SelectItem key={faculty.id} value={faculty.id}>
                         {faculty.name}
                       </SelectItem>
                     ))}
                   </SelectContent>
                 </Select>
+                {isErrorFaculties && (
+                  <p className="text-xs text-destructive">
+                    Fakülteler yüklenirken bir hata oluştu
+                  </p>
+                )}
               </div>
 
               <div className="space-y-2">
