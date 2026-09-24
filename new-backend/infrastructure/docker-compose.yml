@@ -58,6 +58,10 @@ x-service-env: &service-env
   # only turns one slow hop into two.
   REQUEST_TIMEOUT_SECONDS: ${REQUEST_TIMEOUT_SECONDS:-20}
   DB_MAX_CONNS: ${DB_MAX_CONNS:-10}
+  DEMO_MODE: ${DEMO_MODE:-false}
+  DEMO_ADMIN_EMAIL: ${DEMO_ADMIN_EMAIL:-demo.admin@mydreamcampus.com}
+  DEMO_TEACHER_EMAIL: ${DEMO_TEACHER_EMAIL:-ahmet.yilmaz@uni.edu.tr}
+  DEMO_STUDENT_EMAIL: ${DEMO_STUDENT_EMAIL:-zeynep.sahin@uni.edu.tr}
 
 x-service: &service
   restart: unless-stopped
@@ -383,6 +387,8 @@ services:
       SEED_DEMO: ${SEED_DEMO:-true}
       ADMIN_EMAIL: ${ADMIN_EMAIL:-admin@university.edu.tr}
       ADMIN_INITIAL_PASSWORD: ${ADMIN_INITIAL_PASSWORD:?set ADMIN_INITIAL_PASSWORD in .env}
+      DEMO_TEACHER_EMAIL: ${DEMO_TEACHER_EMAIL:-ahmet.yilmaz@uni.edu.tr}
+      DEMO_STUDENT_EMAIL: ${DEMO_STUDENT_EMAIL:-zeynep.sahin@uni.edu.tr}
       # One DSN per database the relational seed writes to. A single DB_URL
       # cannot work any more: the eight schemas it fills are eight databases.
       PG_HOST: postgres

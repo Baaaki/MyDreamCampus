@@ -90,3 +90,25 @@ func TestLoad_DBMaxConns_DefaultAndOverride(t *testing.T) {
 	require.NoError(t, err)
 	assert.Equal(t, 6, cfg.Database.MaxConns)
 }
+
+func TestLoad_DemoConfig_DefaultAndOverride(t *testing.T) {
+	cfg, err := loadWithEnv(t, nil)
+	require.NoError(t, err)
+	assert.False(t, cfg.Demo.Enabled)
+	assert.Equal(t, "demo.admin@mydreamcampus.com", cfg.Demo.AdminEmail)
+	assert.Equal(t, "ahmet.yilmaz@uni.edu.tr", cfg.Demo.TeacherEmail)
+	assert.Equal(t, "zeynep.sahin@uni.edu.tr", cfg.Demo.StudentEmail)
+
+	cfg, err = loadWithEnv(t, map[string]string{
+		"DEMO_MODE":          "true",
+		"DEMO_ADMIN_EMAIL":   "custom.admin@campus.local",
+		"DEMO_TEACHER_EMAIL": "custom.teacher@campus.local",
+		"DEMO_STUDENT_EMAIL": "custom.student@campus.local",
+	})
+	require.NoError(t, err)
+	assert.True(t, cfg.Demo.Enabled)
+	assert.Equal(t, "custom.admin@campus.local", cfg.Demo.AdminEmail)
+	assert.Equal(t, "custom.teacher@campus.local", cfg.Demo.TeacherEmail)
+	assert.Equal(t, "custom.student@campus.local", cfg.Demo.StudentEmail)
+}
+

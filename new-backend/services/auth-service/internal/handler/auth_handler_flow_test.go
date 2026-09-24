@@ -26,6 +26,8 @@ type fakeAuthService struct {
 	refreshErr    error
 	changeErr     error
 	deleteErr     error
+	demoErr       error
+	demoAccounts  []dto.DemoAccountResponse
 	logoutRefresh string
 	logoutAccess  string
 }
@@ -70,15 +72,29 @@ func (f *fakeAuthService) DeleteSession(context.Context, uuid.UUID, uuid.UUID, s
 	return f.deleteErr
 }
 
+func (f *fakeAuthService) GetDemoAccounts(context.Context) ([]dto.DemoAccountResponse, error) {
+	if f.demoErr != nil {
+		return nil, f.demoErr
+	}
+	if f.demoAccounts != nil {
+		return f.demoAccounts, nil
+	}
+	return []dto.DemoAccountResponse{}, nil
+}
+
 const flowUserID = "3f2a1b0c-9d8e-4f7a-8b6c-5d4e3f2a1b0c"
 
 func newFlowRouter(t *testing.T, svc *fakeAuthService) *gin.Engine {
-	t.Helper()
-	require.NoError(t, logger.Init("test"))
-	gin.SetMode(gin.TestMode)
 	cfg := &config.Config{}
 	cfg.JWT.AccessTokenExpiry = 15
 	cfg.JWT.RefreshTokenExpiry = 24
+	return newFlowRouterWithConfig(t, svc, cfg)
+}
+
+func newFlowRouterWithConfig(t *testing.T, svc *fakeAuthService, cfg *config.Config) *gin.Engine {
+	t.Helper()
+	require.NoError(t, logger.Init("test"))
+	gin.SetMode(gin.TestMode)
 	h := NewAuthHandler(svc, cfg)
 
 	r := gin.New()
@@ -88,6 +104,7 @@ func newFlowRouter(t *testing.T, svc *fakeAuthService) *gin.Engine {
 	r.POST("/api/auth/logout", authed, h.Logout)
 	r.POST("/api/auth/change-password", authed, h.ChangePassword)
 	r.DELETE("/api/auth/sessions/:id", authed, h.DeleteSession)
+	r.GET("/api/auth/demo-accounts", h.GetDemoAccounts)
 	return r
 }
 
@@ -244,3 +261,45 @@ func TestDeleteSession_CurrentSession_Returns400WithCode(t *testing.T) {
 	code, _ := bodyField(t, w, "error")
 	assert.Equal(t, "CANNOT_TERMINATE_CURRENT_SESSION", code)
 }
+
+func TestGetDemoAccounts_DemoModeDisabled_Returns404(t *testing.T) {
+	cfg := &config.Config{}
+	cfg.Demo.Enabled = false
+	w := do(newFlowRouterWithConfig(t, &fakeAuthService{}, cfg), "GET", "/api/auth/demo-accounts", "", nil)
+
+	assert.Equal(t, http.StatusNotFound, w.Code)
+	code, _ := bodyField(t, w, "error")
+	assert.Equal(t, "DEMO_MODE_DISABLED", code)
+}
+
+func TestGetDemoAccounts_DemoModeEnabled_ReturnsAccounts(t *testing.T) {
+	cfg := &config.Config{}
+	cfg.Demo.Enabled = true
+	mockAccounts := []dto.DemoAccountResponse{
+		{Role: "admin", Label: "Demo Yönetici", Email: "demo.admin@mydreamcampus.com", Password: "demo.admin@mydreamcampus.com"},
+		{Role: "teacher", Label: "Demo Öğretmen", Email: "ahmet.yilmaz@uni.edu.tr", Password: "ahmet.yilmaz@uni.edu.tr"},
+		{Role: "student", Label: "Demo Öğrenci", Email: "zeynep.sahin@uni.edu.tr", Password: "zeynep.sahin@uni.edu.tr"},
+	}
+	svc := &fakeAuthService{demoAccounts: mockAccounts}
+	w := do(newFlowRouterWithConfig(t, svc, cfg), "GET", "/api/auth/demo-accounts", "", nil)
+
+	assert.Equal(t, http.StatusOK, w.Code)
+	var resp []dto.DemoAccountResponse
+	err := json.Unmarshal(w.Body.Bytes(), &resp)
+	require.NoError(t, err)
+	assert.Len(t, resp, 3)
+	assert.Equal(t, "admin", resp[0].Role)
+	assert.Equal(t, "Demo Yönetici", resp[0].Label)
+	assert.Equal(t, "demo.admin@mydreamcampus.com", resp[0].Email)
+	assert.Equal(t, "demo.admin@mydreamcampus.com", resp[0].Password)
+}
+
+func TestGetDemoAccounts_InternalError_Returns500(t *testing.T) {
+	cfg := &config.Config{}
+	cfg.Demo.Enabled = true
+	svc := &fakeAuthService{demoErr: sharedErrors.Wrap(sharedErrors.ErrInternal, assert.AnError)}
+	w := do(newFlowRouterWithConfig(t, svc, cfg), "GET", "/api/auth/demo-accounts", "", nil)
+
+	assert.Equal(t, http.StatusInternalServerError, w.Code)
+}
+

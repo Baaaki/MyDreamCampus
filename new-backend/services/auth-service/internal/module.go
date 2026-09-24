@@ -101,6 +101,7 @@ func (m *Module) RegisterRoutes(rg *gin.RouterGroup) {
 	rg.POST("/refresh", platformMiddleware.EndpointRateLimit("refresh"), m.handler.RefreshToken)
 	rg.POST("/request-password-reset", platformMiddleware.EndpointRateLimit("password"), m.handler.RequestPasswordReset)
 	rg.POST("/reset-password", platformMiddleware.EndpointRateLimit("password"), m.handler.ResetPassword)
+	rg.GET("/demo-accounts", m.handler.GetDemoAccounts)
 
 	// Protected — JWT + CSRF + per-user rate limit.
 	protected := rg.Group("")
@@ -134,6 +135,11 @@ func (m *Module) Bootstrap(ctx context.Context) error {
 	if err := m.authService.SeedAdmin(ctx); err != nil {
 		logger.Error("admin seed failed", zap.Error(err))
 		// Non-fatal: admin may already exist.
+	}
+
+	if err := m.authService.SeedDemoAdmin(ctx); err != nil {
+		logger.Error("demo admin seed failed", zap.Error(err))
+		// Non-fatal: demo admin may already exist.
 	}
 
 	m.authService.StartCleanupScheduler(ctx)

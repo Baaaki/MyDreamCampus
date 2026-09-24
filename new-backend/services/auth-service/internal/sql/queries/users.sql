@@ -66,3 +66,22 @@ SET token_version = token_version + 1,
     updated_at = NOW()
 WHERE id = $1 AND email != $2
 RETURNING token_version;
+
+-- name: GetActiveDemoUsers :many
+SELECT role, email
+FROM auth.users
+WHERE is_demo = true AND is_active = true AND deleted_at IS NULL
+ORDER BY CASE role
+    WHEN 'admin' THEN 1
+    WHEN 'teacher' THEN 2
+    WHEN 'student' THEN 3
+    ELSE 4
+END, email ASC;
+
+-- name: EnsureDemoUserFlags :exec
+UPDATE auth.users
+SET is_demo = true,
+    force_password_change = false,
+    updated_at = NOW()
+WHERE email = $1;
+

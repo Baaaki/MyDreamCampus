@@ -168,3 +168,20 @@ func (r *AuthRepository) SetSuperAdmin(ctx context.Context, email string) error 
 	return nil
 }
 
+// GetActiveDemoUsers retrieves active demo users
+func (r *AuthRepository) GetActiveDemoUsers(ctx context.Context) ([]db.GetActiveDemoUsersRow, error) {
+	rows, err := r.queries.GetActiveDemoUsers(ctx)
+	if err != nil {
+		return nil, fmt.Errorf("%w: failed to get active demo users: %v", sharedErrors.ErrQueryFailed, err)
+	}
+	return rows, nil
+}
+
+// EnsureDemoUserFlags sets is_demo = true and force_password_change = false for a user by email
+func (r *AuthRepository) EnsureDemoUserFlags(ctx context.Context, email string) error {
+	if err := r.queries.EnsureDemoUserFlags(ctx, email); err != nil {
+		return fmt.Errorf("%w: failed to ensure demo user flags: %v", sharedErrors.ErrQueryFailed, err)
+	}
+	return nil
+}
+

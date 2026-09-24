@@ -48,6 +48,7 @@ type authService interface {
 	ResetPassword(ctx context.Context, token, newPassword string) error
 	GetUserSessions(ctx context.Context, userID uuid.UUID, currentJTI string) (dto.SessionsResponse, error)
 	DeleteSession(ctx context.Context, sessionID, userID uuid.UUID, currentJTI string) error
+	GetDemoAccounts(ctx context.Context) ([]dto.DemoAccountResponse, error)
 }
 
 type AuthHandler struct {
@@ -467,4 +468,26 @@ func (h *AuthHandler) ResetPassword(c *gin.Context) {
 	audit.LogSecurityFromContextWithDetails(c, audit.EventPasswordChange, "success", "", "password reset", nil)
 	h.endSession(c)
 	c.JSON(http.StatusOK, dto.MessageResponse{Message: "Şifreniz güncellendi, yeni şifrenizle giriş yapabilirsiniz"})
+}
+
+// GetDemoAccounts returns public demo accounts when DEMO_MODE is enabled
+func (h *AuthHandler) GetDemoAccounts(c *gin.Context) {
+	if !h.config.Demo.Enabled {
+		c.JSON(http.StatusNotFound, dto.ErrorResponse{
+			Error:   "DEMO_MODE_DISABLED",
+			Message: "Demo modu aktif değil",
+		})
+		return
+	}
+
+	ctx, cancel := context.WithTimeout(c.Request.Context(), requestTimeout)
+	defer cancel()
+
+	accounts, err := h.authService.GetDemoAccounts(ctx)
+	if err != nil {
+		respondError(c, err)
+		return
+	}
+
+	c.JSON(http.StatusOK, accounts)
 }

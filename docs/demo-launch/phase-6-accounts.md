@@ -45,7 +45,7 @@
   - Testler.
   - **Commit:** `feat(auth): mark the super admin account`
 
-- [ ] **6.2 Demo hesapları**
+- [x] **6.2 Demo hesapları** (gemini ile yapıldı)
   - Config (`shared/config/config.go`): `DEMO_MODE` (bool),
     `DEMO_ADMIN_EMAIL`, `DEMO_TEACHER_EMAIL`, `DEMO_STUDENT_EMAIL`.
     Compose'da `x-service-env`'e ve `.env.example`'a ekle.

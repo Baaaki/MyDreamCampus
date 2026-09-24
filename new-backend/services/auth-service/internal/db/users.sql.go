@@ -121,6 +121,56 @@ func (q *Queries) DeactivateUser(ctx context.Context, id pgtype.UUID) (*int32, e
 	return token_version, err
 }
 
+const ensureDemoUserFlags = `-- name: EnsureDemoUserFlags :exec
+UPDATE auth.users
+SET is_demo = true,
+    force_password_change = false,
+    updated_at = NOW()
+WHERE email = $1
+`
+
+func (q *Queries) EnsureDemoUserFlags(ctx context.Context, email string) error {
+	_, err := q.db.Exec(ctx, ensureDemoUserFlags, email)
+	return err
+}
+
+const getActiveDemoUsers = `-- name: GetActiveDemoUsers :many
+SELECT role, email
+FROM auth.users
+WHERE is_demo = true AND is_active = true AND deleted_at IS NULL
+ORDER BY CASE role
+    WHEN 'admin' THEN 1
+    WHEN 'teacher' THEN 2
+    WHEN 'student' THEN 3
+    ELSE 4
+END, email ASC
+`
+
+type GetActiveDemoUsersRow struct {
+	Role  string `json:"role"`
+	Email string `json:"email"`
+}
+
+func (q *Queries) GetActiveDemoUsers(ctx context.Context) ([]GetActiveDemoUsersRow, error) {
+	rows, err := q.db.Query(ctx, getActiveDemoUsers)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	items := []GetActiveDemoUsersRow{}
+	for rows.Next() {
+		var i GetActiveDemoUsersRow
+		if err := rows.Scan(&i.Role, &i.Email); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
 const getUserByEmail = `-- name: GetUserByEmail :one
 SELECT id, email, password_hash, role, department, is_active, token_version,
        force_password_change, failed_login_attempts, locked_until,

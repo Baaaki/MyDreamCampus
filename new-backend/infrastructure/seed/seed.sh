@@ -216,6 +216,12 @@ done
 # exact seeded addresses only — a domain wildcard would reach real users too.
 q auth "UPDATE auth.users SET force_password_change = false WHERE email IN ($EMAILS)" >/dev/null
 
+# Mark demo teacher and demo student accounts
+DEMO_TEACHER="${DEMO_TEACHER_EMAIL:-ahmet.yilmaz@uni.edu.tr}"
+DEMO_STUDENT="${DEMO_STUDENT_EMAIL:-zeynep.sahin@uni.edu.tr}"
+q auth "UPDATE auth.users SET is_demo = true, force_password_change = false WHERE email IN ('$DEMO_TEACHER', '$DEMO_STUDENT')" >/dev/null
+
+
 # --- 10. scenario data, one database at a time ---
 # Semester names follow the seed day, in the backend's own format
 # (YYYY-YYYY-Fall|Spring — what catalog validates and the web enrollment page

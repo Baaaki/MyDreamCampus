@@ -5,6 +5,7 @@ import (
 	"crypto/sha256"
 	"encoding/hex"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"strings"
 	"time"
@@ -51,6 +52,8 @@ type userStore interface {
 	IncrementTokenVersion(ctx context.Context, userID uuid.UUID) (int32, error)
 	AdminExists(ctx context.Context) (bool, error)
 	SetSuperAdmin(ctx context.Context, email string) error
+	GetActiveDemoUsers(ctx context.Context) ([]db.GetActiveDemoUsersRow, error)
+	EnsureDemoUserFlags(ctx context.Context, email string) error
 }
 
 type sessionStore interface {
@@ -831,6 +834,87 @@ func (s *AuthService) SeedAdmin(ctx context.Context) error {
 	)
 
 	return nil
+}
+
+// SeedDemoAdmin creates the initial demo admin user if demo mode is enabled
+func (s *AuthService) SeedDemoAdmin(ctx context.Context) error {
+	if !s.config.Demo.Enabled || s.config.Demo.AdminEmail == "" {
+		return nil
+	}
+
+	// Check if user already exists
+	_, err := s.authRepo.GetUserByEmail(ctx, s.config.Demo.AdminEmail)
+	if err == nil {
+		if err := s.authRepo.EnsureDemoUserFlags(ctx, s.config.Demo.AdminEmail); err != nil {
+			logger.Warn("failed to ensure demo flags on existing demo admin", zap.Error(err))
+		}
+		logger.Info("demo admin user already exists", zap.String("email", s.config.Demo.AdminEmail))
+		return nil
+	}
+	if !errors.Is(err, serviceErrors.ErrUserNotFoundRepo) {
+		return fmt.Errorf("check demo admin user: %w", err)
+	}
+
+	// Hash password (password = email)
+	passwordHash, err := utils.HashPassword(s.config.Demo.AdminEmail)
+	if err != nil {
+		return fmt.Errorf("failed to hash demo admin password: %w", err)
+	}
+
+	demoAdminID := uuid.New()
+	_, err = s.authRepo.CreateUser(ctx, db.CreateUserParams{
+		ID:                  utils.UUIDToPgtype(demoAdminID),
+		Email:               s.config.Demo.AdminEmail,
+		PasswordHash:        passwordHash,
+		Role:                "admin",
+		Department:          nil,
+		IsActive:            utils.BoolPtr(true),
+		TokenVersion:        utils.Int32Ptr(1),
+		ForcePasswordChange: utils.BoolPtr(false),
+		IsSuperadmin:        utils.BoolPtr(false),
+		IsDemo:              utils.BoolPtr(true),
+	})
+	if err != nil {
+		return fmt.Errorf("failed to create demo admin user: %w", err)
+	}
+
+	logger.Info("demo admin user seeded successfully",
+		zap.String("email", s.config.Demo.AdminEmail),
+		zap.String("id", demoAdminID.String()),
+	)
+	return nil
+}
+
+// GetDemoAccounts returns active demo accounts
+func (s *AuthService) GetDemoAccounts(ctx context.Context) ([]dto.DemoAccountResponse, error) {
+	users, err := s.authRepo.GetActiveDemoUsers(ctx)
+	if err != nil {
+		return nil, sharedErrors.Wrap(sharedErrors.ErrInternal, err)
+	}
+
+	result := make([]dto.DemoAccountResponse, 0, len(users))
+	for _, u := range users {
+		var label string
+		switch u.Role {
+		case "admin":
+			label = "Demo Yönetici"
+		case "teacher":
+			label = "Demo Öğretmen"
+		case "student":
+			label = "Demo Öğrenci"
+		default:
+			label = "Demo Kullanıcı"
+		}
+
+		result = append(result, dto.DemoAccountResponse{
+			Role:     u.Role,
+			Label:    label,
+			Email:    u.Email,
+			Password: u.Email,
+		})
+	}
+
+	return result, nil
 }
 
 // StartCleanupScheduler starts background cleanup tasks

@@ -24,6 +24,7 @@ type Config struct {
 	RateLimit      RateLimitConfig
 	Timeout        TimeoutConfig
 	InternalClient InternalClientConfig
+	Demo           DemoConfig
 }
 
 type ServerConfig struct {
@@ -81,6 +82,13 @@ type JWTConfig struct {
 type AdminConfig struct {
 	Email           string `mapstructure:"ADMIN_EMAIL"`
 	InitialPassword string `mapstructure:"ADMIN_INITIAL_PASSWORD"`
+}
+
+type DemoConfig struct {
+	Enabled      bool   `mapstructure:"DEMO_MODE"`
+	AdminEmail   string `mapstructure:"DEMO_ADMIN_EMAIL"`
+	TeacherEmail string `mapstructure:"DEMO_TEACHER_EMAIL"`
+	StudentEmail string `mapstructure:"DEMO_STUDENT_EMAIL"`
 }
 
 // OutboxConfig governs the per-module outbox relay goroutines
@@ -237,6 +245,12 @@ func Load() (*Config, error) {
 				ConsecutiveFailures: viper.GetInt("CIRCUIT_BREAKER_CONSECUTIVE_FAILURES"),
 			},
 		},
+		Demo: DemoConfig{
+			Enabled:      viper.GetBool("DEMO_MODE"),
+			AdminEmail:   viper.GetString("DEMO_ADMIN_EMAIL"),
+			TeacherEmail: viper.GetString("DEMO_TEACHER_EMAIL"),
+			StudentEmail: viper.GetString("DEMO_STUDENT_EMAIL"),
+		},
 	}
 
 	if err := cfg.Validate(); err != nil {
@@ -270,6 +284,11 @@ func setDefaults() {
 
 	viper.SetDefault("ADMIN_EMAIL", "admin@university.edu.tr")
 	viper.SetDefault("ADMIN_INITIAL_PASSWORD", "Admin123!")
+
+	viper.SetDefault("DEMO_MODE", false)
+	viper.SetDefault("DEMO_ADMIN_EMAIL", "demo.admin@mydreamcampus.com")
+	viper.SetDefault("DEMO_TEACHER_EMAIL", "ahmet.yilmaz@uni.edu.tr")
+	viper.SetDefault("DEMO_STUDENT_EMAIL", "zeynep.sahin@uni.edu.tr")
 
 	viper.SetDefault("OUTBOX_POLL_INTERVAL_SECONDS", 5)
 	viper.SetDefault("OUTBOX_BATCH_SIZE", 10)

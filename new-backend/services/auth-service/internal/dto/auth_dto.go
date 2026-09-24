@@ -70,6 +70,14 @@ type UserResponse struct {
 	IsDemo       bool    `json:"is_demo,omitempty"`
 }
 
+// DemoAccountResponse represents a public demo account item
+type DemoAccountResponse struct {
+	Role     string `json:"role"`
+	Label    string `json:"label"`
+	Email    string `json:"email"`
+	Password string `json:"password"`
+}
+
 // SessionResponse represents a user session
 type SessionResponse struct {
 	ID         string    `json:"id"`
