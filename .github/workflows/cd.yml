@@ -105,7 +105,7 @@ jobs:
       # Build, scan, then push: scanning after the push only reports on an
       # image that is already in the registry under :latest.
       - name: Build for scanning
-        uses: docker/build-push-action@v6
+        uses: docker/build-push-action@v7
         with:
           # Repo root, matching compose: every service Dockerfile copies both
           # its own directory and new-backend/shared, so a context rooted at
@@ -151,7 +151,7 @@ jobs:
           ignore-unfixed: true
 
       - name: Push
-        uses: docker/build-push-action@v6
+        uses: docker/build-push-action@v7
         with:
           context: .
           file: ./new-backend/services/${{ matrix.service }}/Dockerfile
