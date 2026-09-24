@@ -184,13 +184,23 @@ Yalnız `card_brand` (prefix'ten: Visa, Mastercard, Amex, Troy `9792`) ve
   > servisler ve diyaloğun başarılı/reddedilen/geçersiz kart akışları;
   > Chromium'da API taklit edilerek masaüstü ve mobil genişlikte denendi.
 
-- [ ] **3.7 Mobil**
+- [x] **3.7 Mobil**
   - Yeni `mobile/services/paymentService.ts` ve testi.
   - `mobile/types/meal.types.ts`.
   - `mobile/hooks/useMeals.ts` (≈41'deki mock yorumunu güncelle).
   - `mobile/app/cafeteria.tsx`: toplu rezervasyondan sonra kart formu (modal
     veya ayrı ekran).
   - **Commit:** `feat(mobile): add card checkout for meal reservations`
+  > Not (24.09): Randevu sihirbazına 5. adım (Kart) eklendi; akış
+  > `components/CardCheckout.tsx`'te, doğrulama `lib/payment-card.ts`'te (web
+  > ile aynı kurallar). Rezerve edilmiş ama ödenmemiş toplu randevu sihirbaz
+  > kapatılınca silinmez, yeniden açılınca aynı ödemeden devam edilir. Eski
+  > "2,5 sn sonra listeyi yenile" mock kalıntısı kaldırıldı; sonuç yoklanırken
+  > randevu listesi de güncelleniyor. Temiz checkout'ta `tsc` TS2882 verdiği
+  > (gitignore'daki `expo-env.d.ts`) ve bu faz mobil CI job'ını ilk kez
+  > tetikleyeceği için `nativewind-env.d.ts`'e `expo/types` referansı ayrı
+  > commit'le eklendi. Cihazda manuel test bu ortamda yapılamadı; jest +
+  > `tsc` temiz.
 
 - [ ] **3.8 e2e**
   - CI golden path:

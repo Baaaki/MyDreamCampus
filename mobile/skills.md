@@ -40,6 +40,7 @@ mobile/
 ├── components/
 │   ├── ui/                    # tasarim sistemi primitifleri (text, button, card, input, badge)
 │   ├── ScreenHeader.tsx       # stack detay ekranlari icin geri+baslik cubugu
+│   ├── CardCheckout.tsx       # yemekhane: test kartiyla odeme adimi (form + sonuc)
 │   └── QuoteRotator.tsx       # ana sayfa: 2dk'da bir donen ilham sozu
 ├── contexts/                  # AuthContext, ThemeContext
 ├── hooks/                     # useAuth, useAttendance, useEnrollment, useGrades, useMeals, useHaptic
@@ -62,7 +63,7 @@ onayli program varsa gorunur.
 
 > **Backend yol tuzaklari** (dogrulanmis): notlar `/grades/my/grades` (NOT
 > `/grades/student/my`); yemekhane slug'i `meals` (`/meals/*`) ve yanitlar
-> `{success, data}` zarfli; aktif donem endpoint'i (`/catalog/...`) admin-only,
+> `{success, data}` zarfli; odeme (`/payments/*`) zarfsiz duz JSON; aktif donem endpoint'i (`/catalog/...`) admin-only,
 > ogrenci uygulamasi donemi `my-enrollments` yanitindan okur.
 
 **Route grup parantezleri** (Expo Router):

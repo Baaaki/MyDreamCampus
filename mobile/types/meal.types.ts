@@ -66,9 +66,10 @@ export interface CreateReservationRequest {
 
 export interface CreateReservationData {
   reservation_id: string;
-  payment_url: string;
+  payment_id: string;
   amount: number;
   currency: string;
+  expires_at: string;
   reservation: Reservation;
 }
 
@@ -84,10 +85,13 @@ export interface BatchReservationRequest {
   reservations: BatchReservationItem[];
 }
 
+// payment_id kart formunda onaylanir (/payments/:id/confirm); randevular
+// odeme onaylanana kadar `pending` kalir.
 export interface CreateBatchReservationData {
   batch_id: string;
-  payment_url: string;
+  payment_id: string;
   total_amount: number;
   currency: string;
+  expires_at: string;
   reservations: Reservation[];
 }

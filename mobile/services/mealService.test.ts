@@ -46,7 +46,7 @@ describe("mealService envelope unwrapping", () => {
     apiMock.post.mockResolvedValueOnce({
       data: {
         success: true,
-        data: { reservation_id: "r-1", payment_url: "u", amount: 0, currency: "TRY" },
+        data: { reservation_id: "r-1", payment_id: "p-1", amount: 0, currency: "TRY" },
       },
     });
 
