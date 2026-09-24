@@ -156,7 +156,7 @@ new-backend/
 │   ├── go.mod                       (modül: .../shared)
 │   ├── events/                      (mevcut)
 │   ├── platform/                    (tüm servislerin ortak altyapısı)
-│   │   ├── audit/ clock/ database/ dto/ errors/ handler/
+│   │   ├── audit/ clock/ clocksync/ database/ dto/ errors/ handler/
 │   │   ├── logger/ middleware/ rabbitmq/ redis/ repository/
 │   │   └── rules/ semester/ utils/
 │   ├── client/                      (internal REST client'ları)
@@ -218,6 +218,17 @@ Servise özel:
 **Not:** Rate limiting Redis tabanlı ve global middleware zincirinde. Tüm
 servisler Redis'e bağlanır. `auth` için Redis erişilemezliği **fatal**
 (fail-closed login), diğerlerinde fail-open.
+
+**Zaman makinesi:** İş kuralı saati (`platform/clock`) gerçek saat + ofset;
+ofset Redis'te `clock:state` anahtarında, değişiklik `clock:changed`
+kanalıyla duyurulur ve her servis 10 sn'de bir anahtarı yeniden okur
+(`platform/clocksync`). Redis yoksa servis gerçek saatte kalır. Token,
+oturum, rate limit, idempotency, outbox ve Redis TTL'leri her zaman gerçek
+saattedir. Her servis `GET /api/<prefix>/admin/time/status` (JWT + admin)
+sunar; ayar yalnız catalog'da:
+`POST /api/catalog/admin/time/simulate` (`{"time": "<RFC3339>"}`, en fazla
+±2 yıl) ve `POST /api/catalog/admin/time/reset`; ikisi de catalog audit
+log'una yazılır.
 
 Service URL formatı: `http://<servis-adı>:<port>` (compose DNS).
 

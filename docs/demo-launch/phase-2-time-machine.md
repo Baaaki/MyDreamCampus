@@ -126,7 +126,7 @@
   > tiplendi. sqlc v1.31.1 (üretilmiş dosyalardaki sürüm) ile üretildi;
   > değişiklik öncesi `make sqlc` fark üretmedi.
 
-- [ ] **2.5 Uçlar**
+- [x] **2.5 Uçlar**
   - **Durum:** her servis
     `GET /api/<prefix>/admin/time/status` (JWT + admin) sunar. Prefix'ler:
     `auth, staff, students, catalog, enrollment, attendance, grades, meals, payments`.
@@ -143,6 +143,17 @@
   - simulate/reset işlemlerini catalog audit log'una yaz.
   - Handler testleri.
   - **Commit:** `feat(catalog): expose cluster-wide time machine endpoints`
+  > Not (24.09): Durum ucu `httpserver.RegisterModules` içinde, modül
+  > rotalarından önce bağlanıyor (staff grubun kendisine `Use` çağırıyor;
+  > sonra bağlansa JWT ve rate limit iki kez çalışırdı). Yanıt:
+  > `service, active, current_time, real_time, offset_seconds, until?` —
+  > `current_time − real_time` tek anlık görüntüden, servisler arası sapma
+  > istek gecikmesinden bağımsız ölçülür. Simulate/reset yanıtı da aynı
+  > biçimde. K1 = Hayır olduğu için `until` hiç ayarlanmıyor. Redis yoksa
+  > veya yazılamazsa 503 (yalnız catalog'un saati kaymasın diye). Paylaşılan
+  > handler artık `TimeStatus` + `TimeControlHandler`; eski `TimeHandler`
+  > kaldırıldı. 8 servisin rotaları geçici bir testle çakışmasız bağlandı.
+  > `01-REFERANS-MIMARI.md` güncellendi.
 
 - [ ] **2.6 Görünürlük (K1)**
   - Shared middleware: saat simüle ise her yanıta `X-Simulated-Time` ve

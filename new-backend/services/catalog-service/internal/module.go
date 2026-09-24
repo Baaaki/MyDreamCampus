@@ -16,6 +16,7 @@ import (
 	"github.com/baaaki/mydreamcampus/shared/config"
 	"github.com/baaaki/mydreamcampus/shared/eventbus"
 	"github.com/baaaki/mydreamcampus/shared/platform/audit"
+	"github.com/baaaki/mydreamcampus/shared/platform/clocksync"
 	platformHandler "github.com/baaaki/mydreamcampus/shared/platform/handler"
 	platformMiddleware "github.com/baaaki/mydreamcampus/shared/platform/middleware"
 	"github.com/baaaki/mydreamcampus/shared/platform/rabbitmq"
@@ -48,20 +49,21 @@ type Module struct {
 	semesterStatusHandler *handler.SemesterStatusHandler
 	auditHandler          *handler.AuditHandler
 	periodHandler         *platformHandler.SimplePeriodHandler
-	timeHandler           *platformHandler.TimeHandler
+	timeHandler           *platformHandler.TimeControlHandler
 
 	auditConsumer *worker.AuditConsumer
 }
 
 // New constructs the catalog service. The staff and meal clients come from
 // main.go, so the wiring root owns the transports and this package only
-// sees interfaces.
+// sees interfaces. clockBackend is nil when Redis is unavailable.
 func New(
 	cfg *config.Config,
 	pool *pgxpool.Pool,
 	rabbitConn *rabbitmq.Connection,
 	staffClient service.StaffClient,
 	mealClient service.MealClient,
+	clockBackend clocksync.Backend,
 ) *Module {
 	catalogRepo := repository.NewCatalogRepository(pool)
 	semesterRepo := repository.NewSemesterRepository(pool)
@@ -103,7 +105,7 @@ func New(
 		auditHandler:  handler.NewAuditHandler(auditRepo),
 		auditConsumer: worker.NewAuditConsumer(rabbitmq.NewConsumer(rabbitConn), auditRepo),
 		periodHandler: platformHandler.NewSimplePeriodHandler(periodRepo, semesterStatusRepo, auditLogger),
-		timeHandler:   platformHandler.NewTimeHandler(),
+		timeHandler:   platformHandler.NewTimeControlHandler("catalog", clockBackend, auditLogger),
 	}
 }
 
@@ -140,7 +142,8 @@ func (m *Module) RegisterRoutes(rg *gin.RouterGroup) {
 		protected.POST("/courses", platformMiddleware.RequireAdmin(), m.catalogHandler.CreateCourse)
 		protected.PUT("/courses/:course_code", platformMiddleware.RequireAdmin(), m.catalogHandler.UpdateCourse)
 
-		// Admin-only group — Time Machine, periods, semester status, audit log.
+		// Admin-only group — time machine controls (every service serves its
+		// own status), periods, semester status, audit log.
 		admin := protected.Group("/admin")
 		admin.Use(platformMiddleware.RequireAdmin())
 		{
