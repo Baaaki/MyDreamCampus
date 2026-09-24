@@ -68,10 +68,14 @@ jobs:
     needs: changes
     if: needs.changes.outputs.services != '[]' && needs.changes.outputs.services != ''
     runs-on: ubuntu-latest
+    # A job-level block sets every unlisted scope to none, so upload-sarif
+    # needs security-events spelled out here.
     permissions:
+      actions: read
       contents: read
       packages: write
       id-token: write
+      security-events: write
     strategy:
       fail-fast: false
       matrix:
