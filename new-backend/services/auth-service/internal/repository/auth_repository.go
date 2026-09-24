@@ -159,3 +159,12 @@ func (r *AuthRepository) CheckEmailVersionSync(ctx context.Context, userID uuid.
 	}
 	return *version, nil
 }
+
+// SetSuperAdmin marks a user as superadmin by email or fixed admin ID
+func (r *AuthRepository) SetSuperAdmin(ctx context.Context, email string) error {
+	if err := r.queries.SetSuperAdmin(ctx, email); err != nil {
+		return fmt.Errorf("%w: failed to set superadmin: %v", sharedErrors.ErrQueryFailed, err)
+	}
+	return nil
+}
+

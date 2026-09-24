@@ -31,7 +31,7 @@ func TestLoginResponse_JSONShape(t *testing.T) {
 	for _, key := range []string{
 		"access_token", "refresh_token", "expires_in",
 		"user", "force_password_change", "message",
-		"u-1", "x@y.tr", "student",
+		"u-1", "x@y.tr", "student", "is_superadmin",
 	} {
 		assert.Contains(t, str, key, "missing field/value: %s", key)
 	}
@@ -47,6 +47,13 @@ func TestLoginResponse_OmitsEmptyMessage(t *testing.T) {
 	data, err := json.Marshal(resp)
 	require.NoError(t, err)
 	assert.NotContains(t, string(data), `"message"`)
+}
+
+func TestUserResponse_IncludesSuperAdmin(t *testing.T) {
+	u := UserResponse{ID: "1", Email: "admin@uni.edu.tr", Role: "admin", IsSuperadmin: true}
+	data, err := json.Marshal(u)
+	require.NoError(t, err)
+	assert.Contains(t, string(data), `"is_superadmin":true`)
 }
 
 func TestUserResponse_OmitsNilDepartment(t *testing.T) {

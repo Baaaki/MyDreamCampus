@@ -29,7 +29,7 @@
 
 ## Görevler
 
-- [ ] **6.1 auth şeması ve token**
+- [x] **6.1 auth şeması ve token** (gemini ile yapıldı)
   - Migration: `auth.users`'a
     - `is_superadmin boolean not null default false`
     - `is_demo boolean not null default false`

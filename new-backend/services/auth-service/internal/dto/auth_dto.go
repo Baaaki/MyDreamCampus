@@ -62,10 +62,12 @@ type ChangePasswordResponse struct {
 
 // UserResponse represents the user data in responses
 type UserResponse struct {
-	ID         string  `json:"id"`
-	Email      string  `json:"email"`
-	Role       string  `json:"role"`
-	Department *string `json:"department,omitempty"`
+	ID           string  `json:"id"`
+	Email        string  `json:"email"`
+	Role         string  `json:"role"`
+	Department   *string `json:"department,omitempty"`
+	IsSuperadmin bool    `json:"is_superadmin"`
+	IsDemo       bool    `json:"is_demo,omitempty"`
 }
 
 // SessionResponse represents a user session

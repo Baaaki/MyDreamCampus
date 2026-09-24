@@ -119,3 +119,41 @@ func TestRequireSelfOrRole_AllowedRole_Allows(t *testing.T) {
 func TestRequireSelfOrRole_MalformedTarget_Denies(t *testing.T) {
 	assert.Equal(t, 403, runSelfOrRole(t, "student", "", ""+"not-a-uuid"))
 }
+
+func TestRequireSuperAdmin(t *testing.T) {
+	runWithSuperAdmin := func(t *testing.T, isSuper any) *httptest.ResponseRecorder {
+		t.Helper()
+		require.NoError(t, logger.Init("test"))
+		gin.SetMode(gin.TestMode)
+		r := gin.New()
+		r.Use(func(c *gin.Context) {
+			if isSuper != nil {
+				c.Set("is_superadmin", isSuper)
+			}
+			c.Next()
+		})
+		r.Use(RequireSuperAdmin())
+		r.GET("/", func(c *gin.Context) { c.Status(200) })
+
+		req := httptest.NewRequest("GET", "/", nil)
+		w := httptest.NewRecorder()
+		r.ServeHTTP(w, req)
+		return w
+	}
+
+	t.Run("superadmin allowed", func(t *testing.T) {
+		w := runWithSuperAdmin(t, true)
+		assert.Equal(t, 200, w.Code)
+	})
+
+	t.Run("false denied", func(t *testing.T) {
+		w := runWithSuperAdmin(t, false)
+		assert.Equal(t, 403, w.Code)
+	})
+
+	t.Run("missing denied", func(t *testing.T) {
+		w := runWithSuperAdmin(t, nil)
+		assert.Equal(t, 403, w.Code)
+	})
+}
+

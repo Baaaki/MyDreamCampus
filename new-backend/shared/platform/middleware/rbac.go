@@ -91,3 +91,24 @@ func RequireTeacherOrAdmin() gin.HandlerFunc {
 func RequireStudent() gin.HandlerFunc {
 	return RequireRole("student")
 }
+
+// RequireSuperAdmin requires the caller to hold the super_admin claim.
+func RequireSuperAdmin() gin.HandlerFunc {
+	return func(c *gin.Context) {
+		isSuper, exists := c.Get("is_superadmin")
+		if !exists || isSuper != true {
+			logger.Warn("access denied - superadmin required",
+				zap.String("user_id", c.GetString("user_id")),
+				zap.String("path", c.Request.URL.Path),
+			)
+			c.JSON(403, gin.H{
+				"error":   errors.ErrForbidden.Code,
+				"message": "Bu işlem için süper admin yetkisi gerekiyor",
+			})
+			c.Abort()
+			return
+		}
+		c.Next()
+	}
+}
+

@@ -43,10 +43,10 @@ func (q *Queries) CheckEmailVersionSync(ctx context.Context, arg CheckEmailVersi
 }
 
 const createUser = `-- name: CreateUser :one
-INSERT INTO auth.users (id, email, password_hash, role, department, is_active, token_version, force_password_change)
-VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
+INSERT INTO auth.users (id, email, password_hash, role, department, is_active, token_version, force_password_change, is_superadmin, is_demo)
+VALUES ($1, $2, $3, $4, $5, $6, $7, $8, COALESCE($9::boolean, false), COALESCE($10::boolean, false))
 ON CONFLICT (id) DO NOTHING
-RETURNING id, email, role, department, is_active, force_password_change, created_at, updated_at
+RETURNING id, email, role, department, is_active, force_password_change, is_superadmin, is_demo, created_at, updated_at
 `
 
 type CreateUserParams struct {
@@ -58,6 +58,8 @@ type CreateUserParams struct {
 	IsActive            *bool       `json:"is_active"`
 	TokenVersion        *int32      `json:"token_version"`
 	ForcePasswordChange *bool       `json:"force_password_change"`
+	IsSuperadmin        *bool       `json:"is_superadmin"`
+	IsDemo              *bool       `json:"is_demo"`
 }
 
 type CreateUserRow struct {
@@ -67,6 +69,8 @@ type CreateUserRow struct {
 	Department          *string          `json:"department"`
 	IsActive            *bool            `json:"is_active"`
 	ForcePasswordChange *bool            `json:"force_password_change"`
+	IsSuperadmin        bool             `json:"is_superadmin"`
+	IsDemo              bool             `json:"is_demo"`
 	CreatedAt           pgtype.Timestamp `json:"created_at"`
 	UpdatedAt           pgtype.Timestamp `json:"updated_at"`
 }
@@ -81,6 +85,8 @@ func (q *Queries) CreateUser(ctx context.Context, arg CreateUserParams) (CreateU
 		arg.IsActive,
 		arg.TokenVersion,
 		arg.ForcePasswordChange,
+		arg.IsSuperadmin,
+		arg.IsDemo,
 	)
 	var i CreateUserRow
 	err := row.Scan(
@@ -90,6 +96,8 @@ func (q *Queries) CreateUser(ctx context.Context, arg CreateUserParams) (CreateU
 		&i.Department,
 		&i.IsActive,
 		&i.ForcePasswordChange,
+		&i.IsSuperadmin,
+		&i.IsDemo,
 		&i.CreatedAt,
 		&i.UpdatedAt,
 	)
@@ -116,7 +124,7 @@ func (q *Queries) DeactivateUser(ctx context.Context, id pgtype.UUID) (*int32, e
 const getUserByEmail = `-- name: GetUserByEmail :one
 SELECT id, email, password_hash, role, department, is_active, token_version,
        force_password_change, failed_login_attempts, locked_until,
-       created_at, updated_at, deleted_at
+       created_at, updated_at, deleted_at, is_superadmin, is_demo
 FROM auth.users
 WHERE email = $1 AND deleted_at IS NULL
 LIMIT 1
@@ -139,6 +147,8 @@ func (q *Queries) GetUserByEmail(ctx context.Context, email string) (User, error
 		&i.CreatedAt,
 		&i.UpdatedAt,
 		&i.DeletedAt,
+		&i.IsSuperadmin,
+		&i.IsDemo,
 	)
 	return i, err
 }
@@ -146,7 +156,7 @@ func (q *Queries) GetUserByEmail(ctx context.Context, email string) (User, error
 const getUserByID = `-- name: GetUserByID :one
 SELECT id, email, password_hash, role, department, is_active, token_version,
        force_password_change, failed_login_attempts, locked_until,
-       created_at, updated_at, deleted_at
+       created_at, updated_at, deleted_at, is_superadmin, is_demo
 FROM auth.users
 WHERE id = $1 AND deleted_at IS NULL
 LIMIT 1
@@ -169,6 +179,8 @@ func (q *Queries) GetUserByID(ctx context.Context, id pgtype.UUID) (User, error)
 		&i.CreatedAt,
 		&i.UpdatedAt,
 		&i.DeletedAt,
+		&i.IsSuperadmin,
+		&i.IsDemo,
 	)
 	return i, err
 }
@@ -186,6 +198,18 @@ func (q *Queries) IncrementTokenVersion(ctx context.Context, id pgtype.UUID) (*i
 	var token_version *int32
 	err := row.Scan(&token_version)
 	return token_version, err
+}
+
+const setSuperAdmin = `-- name: SetSuperAdmin :exec
+UPDATE auth.users
+SET is_superadmin = true,
+    updated_at = NOW()
+WHERE email = $1 OR id = '00000000-0000-0000-0000-000000000001'::uuid
+`
+
+func (q *Queries) SetSuperAdmin(ctx context.Context, email string) error {
+	_, err := q.db.Exec(ctx, setSuperAdmin, email)
+	return err
 }
 
 const updatePassword = `-- name: UpdatePassword :exec

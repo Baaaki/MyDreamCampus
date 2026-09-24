@@ -99,4 +99,6 @@ type User struct {
 	CreatedAt           pgtype.Timestamp `json:"created_at"`
 	UpdatedAt           pgtype.Timestamp `json:"updated_at"`
 	DeletedAt           pgtype.Timestamp `json:"deleted_at"`
+	IsSuperadmin        bool             `json:"is_superadmin"`
+	IsDemo              bool             `json:"is_demo"`
 }

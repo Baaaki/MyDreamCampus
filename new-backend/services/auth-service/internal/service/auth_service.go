@@ -50,6 +50,7 @@ type userStore interface {
 	UpdatePassword(ctx context.Context, userID uuid.UUID, passwordHash string, forcePasswordChange bool) error
 	IncrementTokenVersion(ctx context.Context, userID uuid.UUID) (int32, error)
 	AdminExists(ctx context.Context) (bool, error)
+	SetSuperAdmin(ctx context.Context, email string) error
 }
 
 type sessionStore interface {
@@ -210,10 +211,12 @@ func (s *AuthService) Login(ctx context.Context, req dto.LoginRequest, deviceInf
 		ExpiresIn:           s.config.JWT.AccessTokenExpiry * 60, // convert to seconds
 		ForcePasswordChange: utils.DerefBool(user.ForcePasswordChange, false),
 		User: dto.UserResponse{
-			ID:         utils.PgtypeToUUID(user.ID).String(),
-			Email:      user.Email,
-			Role:       user.Role,
-			Department: user.Department,
+			ID:           utils.PgtypeToUUID(user.ID).String(),
+			Email:        user.Email,
+			Role:         user.Role,
+			Department:   user.Department,
+			IsSuperadmin: user.IsSuperadmin,
+			IsDemo:       user.IsDemo,
 		},
 	}
 
@@ -786,7 +789,10 @@ func (s *AuthService) SeedAdmin(ctx context.Context) error {
 	}
 
 	if exists {
-		logger.Info("admin user already exists, skipping seed")
+		if err := s.authRepo.SetSuperAdmin(ctx, s.config.Admin.Email); err != nil {
+			logger.Warn("failed to set superadmin on existing admin user", zap.Error(err))
+		}
+		logger.Info("admin user already exists, ensured superadmin")
 		return nil
 	}
 
@@ -809,9 +815,15 @@ func (s *AuthService) SeedAdmin(ctx context.Context) error {
 		IsActive:            utils.BoolPtr(true),
 		TokenVersion:        utils.Int32Ptr(1),
 		ForcePasswordChange: utils.BoolPtr(true),
+		IsSuperadmin:        utils.BoolPtr(true),
+		IsDemo:              utils.BoolPtr(false),
 	})
 	if err != nil {
 		return fmt.Errorf("failed to create admin user: %w", err)
+	}
+
+	if err := s.authRepo.SetSuperAdmin(ctx, s.config.Admin.Email); err != nil {
+		logger.Warn("failed to set superadmin on newly seeded admin user", zap.Error(err))
 	}
 
 	logger.Info("admin user seeded successfully",
@@ -870,6 +882,9 @@ func (s *AuthService) generateAccessToken(user db.User) (string, error) {
 		"token_type":            string(utils.AccessToken),
 		"exp":                   expiresAt.Unix(),
 		"iat":                   now.Unix(),
+	}
+	if user.IsSuperadmin {
+		claims["super_admin"] = true
 	}
 
 	token := jwt.NewWithClaims(jwt.SigningMethodHS256, claims)

@@ -5,6 +5,8 @@ export interface User {
   email: string
   role: "admin" | "teacher" | "student"
   department?: string
+  is_superadmin?: boolean
+  is_demo?: boolean
 }
 
 export interface AuthResponse {

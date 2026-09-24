@@ -43,6 +43,7 @@ type Claims struct {
 	TokenType           string `json:"token_type"`
 	JTI                 string `json:"jti,omitempty"` // JWT ID for token blacklisting/revocation
 	ForcePasswordChange bool   `json:"force_password_change,omitempty"`
+	SuperAdmin          bool   `json:"super_admin,omitempty"`
 	jwt.RegisteredClaims
 }
 

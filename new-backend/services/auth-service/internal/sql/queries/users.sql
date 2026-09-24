@@ -1,7 +1,7 @@
 -- name: GetUserByEmail :one
 SELECT id, email, password_hash, role, department, is_active, token_version,
        force_password_change, failed_login_attempts, locked_until,
-       created_at, updated_at, deleted_at
+       created_at, updated_at, deleted_at, is_superadmin, is_demo
 FROM auth.users
 WHERE email = $1 AND deleted_at IS NULL
 LIMIT 1;
@@ -9,16 +9,22 @@ LIMIT 1;
 -- name: GetUserByID :one
 SELECT id, email, password_hash, role, department, is_active, token_version,
        force_password_change, failed_login_attempts, locked_until,
-       created_at, updated_at, deleted_at
+       created_at, updated_at, deleted_at, is_superadmin, is_demo
 FROM auth.users
 WHERE id = $1 AND deleted_at IS NULL
 LIMIT 1;
 
 -- name: CreateUser :one
-INSERT INTO auth.users (id, email, password_hash, role, department, is_active, token_version, force_password_change)
-VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
+INSERT INTO auth.users (id, email, password_hash, role, department, is_active, token_version, force_password_change, is_superadmin, is_demo)
+VALUES ($1, $2, $3, $4, $5, $6, $7, $8, COALESCE(sqlc.narg('is_superadmin')::boolean, false), COALESCE(sqlc.narg('is_demo')::boolean, false))
 ON CONFLICT (id) DO NOTHING
-RETURNING id, email, role, department, is_active, force_password_change, created_at, updated_at;
+RETURNING id, email, role, department, is_active, force_password_change, is_superadmin, is_demo, created_at, updated_at;
+
+-- name: SetSuperAdmin :exec
+UPDATE auth.users
+SET is_superadmin = true,
+    updated_at = NOW()
+WHERE email = $1 OR id = '00000000-0000-0000-0000-000000000001'::uuid;
 
 -- name: UpdatePassword :exec
 UPDATE auth.users

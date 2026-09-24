@@ -43,6 +43,29 @@ func TestGenerateAccessToken_PassesSharedAccessValidation(t *testing.T) {
 	require.NoError(t, err)
 	assert.Equal(t, string(utils.AccessToken), claims.TokenType)
 	assert.Equal(t, "student", claims.Role)
+	assert.False(t, claims.SuperAdmin)
+}
+
+func TestGenerateAccessToken_SuperAdminClaim(t *testing.T) {
+	s := newTokenTestService()
+
+	superUser := tokenTestUser()
+	superUser.IsSuperadmin = true
+	token, err := s.generateAccessToken(superUser)
+	require.NoError(t, err)
+
+	claims, err := utils.ValidateAccessTokenWithSecret(token, []byte(tokenTestSecret))
+	require.NoError(t, err)
+	assert.True(t, claims.SuperAdmin)
+
+	regularUser := tokenTestUser()
+	regularUser.IsSuperadmin = false
+	regToken, err := s.generateAccessToken(regularUser)
+	require.NoError(t, err)
+
+	regClaims, err := utils.ValidateAccessTokenWithSecret(regToken, []byte(tokenTestSecret))
+	require.NoError(t, err)
+	assert.False(t, regClaims.SuperAdmin)
 }
 
 func TestGenerateRefreshToken_RejectedAsAccessToken(t *testing.T) {
