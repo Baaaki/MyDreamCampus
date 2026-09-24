@@ -2,13 +2,12 @@
 -- menus and next week's demo reservations.
 \i /seed/sql/_staging-for-services.sql
 
+-- seed.sh passes data/cafeterias.json in as :'cafeterias'.
 INSERT INTO meal.cafeterias (name, location, has_vegan_menu, serves_dinner, is_active)
-SELECT v.name, v.location, v.has_vegan_menu, v.serves_dinner, true
-FROM (VALUES
-   ('Merkez Yemekhane', 'Ana Kampüs A Blok', true,  true),
-   ('Mühendislik Yemekhanesi', 'Mühendislik Fakültesi', false, false)
- ) AS v(name, location, has_vegan_menu, serves_dinner)
-WHERE NOT EXISTS (SELECT 1 FROM meal.cafeterias c WHERE c.name = v.name);
+SELECT c ->> 'name', c ->> 'location', (c ->> 'has_vegan_menu')::boolean,
+       (c ->> 'serves_dinner')::boolean, (c ->> 'is_active')::boolean
+FROM jsonb_array_elements(:'cafeterias'::jsonb) AS c
+WHERE NOT EXISTS (SELECT 1 FROM meal.cafeterias m WHERE m.name = c ->> 'name');
 
 INSERT INTO meal.students_view (id, student_number, first_name, last_name, is_active)
 SELECT id, student_number, first_name, last_name, is_active
@@ -60,7 +59,7 @@ ON CONFLICT (year, month) DO UPDATE
 -- flow which only books the coming week. next Monday = this week's Monday + 7.
 INSERT INTO meal.reservations (student_id, cafeteria_id, reservation_date, meal_time, menu_type, status)
 SELECT sv.id,
-       (SELECT id FROM meal.cafeterias WHERE name = 'Merkez Yemekhane' LIMIT 1),
+       (SELECT id FROM meal.cafeterias WHERE name = 'Merkez Kafeterya' LIMIT 1),
        (date_trunc('week', CURRENT_DATE)::date + 7) + d.n, 'lunch', 'normal', 'confirmed'
 FROM meal.students_view sv
 CROSS JOIN (VALUES (0), (1), (2)) AS d(n)

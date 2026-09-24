@@ -32,7 +32,7 @@ FROM _students st
 JOIN (VALUES
    ('2021510001', '3.50'),  -- Zeynep
    ('2021510002', '3.00'),  -- Emir
-   ('2022510010', '2.50'),  -- Elif
+   ('2022510010', '2.50'),  -- Eylül
    ('2022510011', '2.00')   -- Baran
  ) AS v(student_number, grade_point) ON v.student_number = st.student_number
 ON CONFLICT (student_id, course_code) DO NOTHING;

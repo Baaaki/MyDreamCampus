@@ -111,7 +111,7 @@
   > örnek haftalık menü havuzdaki yemeklerden oluşur. API yanıtı biçimindeki
   > not/yoklama/rezervasyon mock'ları 4.4'te SQL ile üretilir.
 
-- [ ] **4.3 seed.sh'i yeniden yaz**
+- [x] **4.3 seed.sh'i yeniden yaz**
   - Sıra:
     1. fakülte/bölüm (SQL, catalog)
     2. öğretmenler (API) ve profilleri (API)
@@ -127,6 +127,25 @@
   - Mevcut idempotency kontrolünü koru: sistem doluysa seed atlanır.
   - Seed süresini ölçüp görevin altına yaz.
   - **Commit:** `feat(infra): rewrite the demo seed around the full content set`
+  > Not (24.09): CI'daki `backend-e2e` Faz 3 sonundan beri kırmızıydı ("no
+  > administrative staff seeded"). Kök neden: Faz 1'den beri bootstrap
+  > admin'in `force_password_change` bayrağı JWT'de taşınıyor ve seed'in her
+  > API çağrısı 403 alıyordu; eski seed hataları yutup "tamamlandı" diyordu.
+  > Yeni seed bayrağı admin girişinden önce auth DB'de kapatıyor ve 409 dışı
+  > her API hatasında duruyor (409 = kayıt zaten var; yarıda kalan seed
+  > kaldığı yerden sürer). 429'da `Retry-After` kadar bekleyip tekrar
+  > deniyor: catalog'a ~100 çağrı gidiyor, IP sınırı dakikada 100.
+  > Sıra planla aynı; id'ler (öğretmen, ders, öğrenci) API'den sonra ilgili
+  > DB'den okunuyor. Öğretmen profilleri artık API'yle
+  > (`PUT /api/staff/:id/profile`) yazılıyor; `sql/01-staff.sql` kalktı (JSON
+  > alan adları DTO'yla uyuşmuyordu). İdari personel de idempotency
+  > kontrolünün arkasına alındı. Kontrol artık "student DB'de öğrenci var mı"
+  > (SQL): seed yalnız boş sistemde koşar. Catalog kuralına takılan 12 ön
+  > koşul bağlanmıyor, seed logunda tek tek listeleniyor.
+  > Demo ilişkisi: ahmet, zeynep dahil 14 öğrencinin danışmanı; onay bekleyen
+  > programlar 4.4'te (05-enrollment.sql). `CENG201/202` artık elif.aydin'in
+  > (ayse.demir mock'ta Matematik).
+  > Süre: yerelde (servisler host'ta, Caddy'siz) 34 sn; CI süresi 4.5'te.
 
 - [ ] **4.4 Tarihler ve rol senaryoları**
   - **Dönem adı** seed günündeki tarihten hesaplanır:

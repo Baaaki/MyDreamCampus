@@ -26,8 +26,8 @@ FROM course_catalog.course_catalog c
 JOIN (VALUES
    ('CENG101','ahmet.yilmaz@uni.edu.tr'),
    ('CENG102','ahmet.yilmaz@uni.edu.tr'),
-   ('CENG201','ayse.demir@uni.edu.tr'),
-   ('CENG202','ayse.demir@uni.edu.tr'),
+   ('CENG201','elif.aydin@uni.edu.tr'),
+   ('CENG202','elif.aydin@uni.edu.tr'),
    ('CENG301','mehmet.kaya@uni.edu.tr'),
    ('CENG350','mehmet.kaya@uni.edu.tr')
  ) AS m(course_code, email) ON m.course_code = c.course_code
@@ -46,7 +46,7 @@ ON CONFLICT (semester, course_code, department) DO NOTHING;
 --
 -- Expected behaviour when a student POSTs a program for '2025-2026 Bahar'
 -- containing the Bahar CENG201 offering:
---   accept  → Zeynep, Emir, Elif, Baran (passed CENG102, class_level ≥ 2)
+--   accept  → Zeynep, Emir, Eylül, Baran (passed CENG102, class_level ≥ 2)
 --   reject  → Deniz, Selin  (class_level 2, but never passed CENG102 →
 --             ErrPrerequisitesNotMet — the exact path this feature adds)
 --   reject  → Kerem, Naz    (class_level 1 < 2 → ErrInvalidClassLevel, a
@@ -75,6 +75,6 @@ SELECT '2025-2026 Bahar', c.course_code, c.department, c.credits, c.class_level,
          'course_name', 'Veri Yapıları')),
        '[{"slug":"midterm","name":"Vize","weight":40},{"slug":"final","name":"Final","weight":60}]'::jsonb
 FROM course_catalog.course_catalog c
-JOIN _staff s ON s.email = 'ayse.demir@uni.edu.tr'
+JOIN _staff s ON s.email = 'elif.aydin@uni.edu.tr'
 WHERE c.course_code = 'CENG201'
 ON CONFLICT (semester, course_code, department) DO NOTHING;
