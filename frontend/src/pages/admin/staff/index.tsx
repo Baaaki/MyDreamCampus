@@ -169,7 +169,9 @@ export default function StaffPage() {
   const totalPages = staffPage?.pagination.total_pages ?? 1
   const displayError =
     error ||
-    (listError ? apiErrorMessage(listError, "Personel listesi yüklenemedi") : "")
+    (listError
+      ? apiErrorMessage(listError, "Personel listesi yüklenemedi")
+      : "")
 
   // Sorting fonksiyonu
   const handleSort = (field: SortField) => {
