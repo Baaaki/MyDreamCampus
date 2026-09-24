@@ -55,7 +55,7 @@
   > boş açıklama alanı yanıtta yer almıyor. Tablolar yalnız seed ile dolar;
   > yazma ucu bu fazın kapsamında değil.
 
-- [ ] **4.2 Mock içeriğini seed verisine dönüştür**
+- [x] **4.2 Mock içeriğini seed verisine dönüştür**
   - **Dönüştürücü geçicidir ve repoya girmez.** Oturumun scratchpad dizininde
     bun ile yaz: `frontend/src/mock_data/*.ts` dosyalarını import edip
     `new-backend/infrastructure/seed/data/` altına JSON üretsin.
@@ -85,6 +85,31 @@
   - **Kontrol:** JSON'larda 19 fakülte, 111 ders ve tüm öğretmen profilleri
     var; sayıları görevin altına yaz.
   - **Commit:** `chore(infra): move demo content into seed data`
+  > Not (24.09): Sayılar: 19 fakülte, 103 bölüm; 91 ders (mock'ta 85 + seed'in
+  > 6 CENG dersi — plandaki "111", `catalog.ts`'teki `course_code:` satır
+  > sayısıydı: ön koşul referansları ve `mockAvailableCourses` dahil); 13
+  > öğretmen, 7 tam profil (kalan 6 öğretmenin mock'ta profili yok, profil
+  > kaydına yalnız fakülte yazılır: staff kaydında fakülte alanı yok); 52
+  > öğrenci (8 seed + 44 mock); 4 kafeterya; 149 normal + 62 vegan yemek
+  > (admin menü sayfasındaki iki havuz).
+  > Birleştirme kararları: seed'in 3 öğretmeni mock'ta da var, mock'un
+  > bilgileri alındı (ayse.demir → Fen/Matematik, mehmet.kaya → Bilgisayar
+  > Mühendisliği). `elif.aydin` hem mock öğretmeni hem seed öğrencisiydi;
+  > öğrenci `eylul.aydin` oldu. Mock'un kendi fakülte ağacında olmayan iki
+  > kayıt düzeltildi: esra.yavuz (İşletme Fak./YBS → İİBF/YBS), umut.yavuz ve
+  > ebru.sari ("Engineering Faculty/Computer Engineering" → Mühendislik/
+  > Bilgisayar Mühendisliği). Mock'un 4 kafeteryası seed'in aynı roldeki 2
+  > kafeteryasının yerini aldı. Ders koordinatörü e-postası da `uni.edu.tr`.
+  > Seed'e özel alanlar: `courses.json` ön koşulları id'siz
+  > (`course_code` + `course_name`; id'yi 4.3 çözer), `students.json`'da
+  > `advisor_email` ve aktif olmayanlar için `status`. 24 ön koşuldan 12'si
+  > catalog'un "ön koşulun sınıf seviyesi daha düşük olmalı" kuralına
+  > takılıyor (örn. MAT 1010 ← MAT 1009, ikisi de 1. sınıf); veride
+  > duruyorlar, uygulama kararı 4.3'te.
+  > Taşınmayanlar: `auth.ts` (`mockUsers`, `mockSessions`) ve `teacher.ts`
+  > gerçek auth ve ders verisinden gelir; öğrenci kafeterya sayfasındaki
+  > örnek haftalık menü havuzdaki yemeklerden oluşur. API yanıtı biçimindeki
+  > not/yoklama/rezervasyon mock'ları 4.4'te SQL ile üretilir.
 
 - [ ] **4.3 seed.sh'i yeniden yaz**
   - Sıra:

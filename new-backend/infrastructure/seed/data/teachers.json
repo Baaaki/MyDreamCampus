@@ -1,5 +1,119 @@
 [
-  { "email": "ahmet.yilmaz@uni.edu.tr", "first_name": "Ahmet", "last_name": "Yılmaz", "role": "teacher", "department": "Bilgisayar Mühendisliği", "phone": "+90 212 555 0101", "office_location": "A-201" },
-  { "email": "ayse.demir@uni.edu.tr", "first_name": "Ayşe", "last_name": "Demir", "role": "teacher", "department": "Bilgisayar Mühendisliği", "phone": "+90 212 555 0102", "office_location": "A-202" },
-  { "email": "mehmet.kaya@uni.edu.tr", "first_name": "Mehmet", "last_name": "Kaya", "role": "teacher", "department": "Elektrik-Elektronik Mühendisliği", "phone": "+90 212 555 0103", "office_location": "B-110" }
+  {
+    "email": "ahmet.yilmaz@uni.edu.tr",
+    "first_name": "Ahmet",
+    "last_name": "Yılmaz",
+    "role": "teacher",
+    "department": "Bilgisayar Mühendisliği",
+    "phone": "+90 532 111 2233",
+    "office_location": "Mühendislik Fakültesi A-301"
+  },
+  {
+    "email": "mehmet.kaya@uni.edu.tr",
+    "first_name": "Mehmet",
+    "last_name": "Kaya",
+    "role": "teacher",
+    "department": "Bilgisayar Mühendisliği",
+    "phone": "+90 532 222 3344",
+    "office_location": "Mühendislik Fakültesi A-305"
+  },
+  {
+    "email": "ayse.demir@uni.edu.tr",
+    "first_name": "Ayşe",
+    "last_name": "Demir",
+    "role": "teacher",
+    "department": "Matematik",
+    "phone": "+90 532 333 4455",
+    "office_location": "Fen Fakültesi B-201"
+  },
+  {
+    "email": "fatma.sahin@uni.edu.tr",
+    "first_name": "Fatma",
+    "last_name": "Şahin",
+    "role": "teacher",
+    "department": "Fizik",
+    "phone": "+90 532 444 5566",
+    "office_location": "Fen Fakültesi C-105"
+  },
+  {
+    "email": "mustafa.ozdemir@uni.edu.tr",
+    "first_name": "Mustafa",
+    "last_name": "Özdemir",
+    "role": "teacher",
+    "department": "Elektrik-Elektronik Mühendisliği",
+    "phone": "+90 532 555 6677",
+    "office_location": "Mühendislik Fakültesi D-210"
+  },
+  {
+    "email": "elif.aydin@uni.edu.tr",
+    "first_name": "Elif",
+    "last_name": "Aydın",
+    "role": "teacher",
+    "department": "Bilgisayar Mühendisliği",
+    "phone": "+90 532 666 7788",
+    "office_location": "Mühendislik Fakültesi A-108"
+  },
+  {
+    "email": "zeynep.koc@uni.edu.tr",
+    "first_name": "Zeynep",
+    "last_name": "Koç",
+    "role": "teacher",
+    "department": "Kimya",
+    "phone": "+90 532 777 8899",
+    "office_location": "Fen Fakültesi B-305"
+  },
+  {
+    "email": "can.arslan@uni.edu.tr",
+    "first_name": "Can",
+    "last_name": "Arslan",
+    "role": "teacher",
+    "department": "Biyoloji",
+    "phone": "+90 532 888 9900",
+    "office_location": "Fen Fakültesi C-210"
+  },
+  {
+    "email": "emre.celik@uni.edu.tr",
+    "first_name": "Emre",
+    "last_name": "Çelik",
+    "role": "teacher",
+    "department": "Makina Mühendisliği",
+    "phone": "+90 532 999 0011",
+    "office_location": "Mühendislik Fakültesi E-101"
+  },
+  {
+    "email": "selin.yildirim@uni.edu.tr",
+    "first_name": "Selin",
+    "last_name": "Yıldırım",
+    "role": "teacher",
+    "department": "İnşaat Mühendisliği",
+    "phone": "+90 532 000 1122",
+    "office_location": "Mühendislik Fakültesi F-205"
+  },
+  {
+    "email": "burak.ozturk@uni.edu.tr",
+    "first_name": "Burak",
+    "last_name": "Öztürk",
+    "role": "teacher",
+    "department": "İktisat",
+    "phone": "+90 532 111 2233",
+    "office_location": "İşletme Fakültesi G-102"
+  },
+  {
+    "email": "deniz.kaya@uni.edu.tr",
+    "first_name": "Deniz",
+    "last_name": "Kaya",
+    "role": "teacher",
+    "department": "İşletme",
+    "phone": "+90 532 222 3344",
+    "office_location": "İşletme Fakültesi G-205"
+  },
+  {
+    "email": "esra.yavuz@uni.edu.tr",
+    "first_name": "Esra",
+    "last_name": "Yavuz",
+    "role": "teacher",
+    "department": "Yönetim Bilişim Sistemleri",
+    "phone": "+90 532 333 4455",
+    "office_location": "İşletme Fakültesi H-110"
+  }
 ]

@@ -1,0 +1,30 @@
+[
+  {
+    "name": "Merkez Kafeterya",
+    "location": "Ana Kampüs - A Blok Zemin Kat",
+    "has_vegan_menu": true,
+    "serves_dinner": true,
+    "is_active": true
+  },
+  {
+    "name": "Mühendislik Kafeterya",
+    "location": "Mühendislik Fakültesi - C Blok 1. Kat",
+    "has_vegan_menu": true,
+    "serves_dinner": false,
+    "is_active": true
+  },
+  {
+    "name": "Sosyal Tesis Kafeterya",
+    "location": "Sosyal Tesisler Binası",
+    "has_vegan_menu": false,
+    "serves_dinner": true,
+    "is_active": true
+  },
+  {
+    "name": "Yemekhane (Eski)",
+    "location": "Eski Kampüs",
+    "has_vegan_menu": false,
+    "serves_dinner": false,
+    "is_active": false
+  }
+]

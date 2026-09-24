@@ -1,0 +1,1061 @@
+{
+  "normal": [
+    {
+      "name": "MERCİMEK ÇORBASI",
+      "calories": 120,
+      "category": "soup"
+    },
+    {
+      "name": "YEŞİL MERCİMEK ÇORBASI",
+      "calories": 125,
+      "category": "soup"
+    },
+    {
+      "name": "KIRMIZI MERCİMEK ÇORBASI",
+      "calories": 118,
+      "category": "soup"
+    },
+    {
+      "name": "EZOGELİN ÇORBASI",
+      "calories": 130,
+      "category": "soup"
+    },
+    {
+      "name": "DOMATES ÇORBASI",
+      "calories": 85,
+      "category": "soup"
+    },
+    {
+      "name": "TARHANA ÇORBASI",
+      "calories": 110,
+      "category": "soup"
+    },
+    {
+      "name": "YAYLA ÇORBASI",
+      "calories": 95,
+      "category": "soup"
+    },
+    {
+      "name": "TUTMAÇ ÇORBASI",
+      "calories": 140,
+      "category": "soup"
+    },
+    {
+      "name": "DÜĞÜN ÇORBASI",
+      "calories": 150,
+      "category": "soup"
+    },
+    {
+      "name": "ŞEHRİYE ÇORBASI",
+      "calories": 90,
+      "category": "soup"
+    },
+    {
+      "name": "PİRİNÇ ÇORBASI",
+      "calories": 100,
+      "category": "soup"
+    },
+    {
+      "name": "SEBZE ÇORBASI",
+      "calories": 75,
+      "category": "soup"
+    },
+    {
+      "name": "TAVUK SUYU ÇORBASI",
+      "calories": 80,
+      "category": "soup"
+    },
+    {
+      "name": "İŞKEMBE ÇORBASI",
+      "calories": 160,
+      "category": "soup"
+    },
+    {
+      "name": "PAÇA ÇORBASI",
+      "calories": 170,
+      "category": "soup"
+    },
+    {
+      "name": "KREMALI MANTAR ÇORBASI",
+      "calories": 145,
+      "category": "soup"
+    },
+    {
+      "name": "KREMALI BROKOLI ÇORBASI",
+      "calories": 130,
+      "category": "soup"
+    },
+    {
+      "name": "BALKABAĞI ÇORBASI",
+      "calories": 95,
+      "category": "soup"
+    },
+    {
+      "name": "PATATES ÇORBASI",
+      "calories": 115,
+      "category": "soup"
+    },
+    {
+      "name": "UN ÇORBASI",
+      "calories": 105,
+      "category": "soup"
+    },
+    {
+      "name": "KURU FASULYE",
+      "calories": 280,
+      "category": "main"
+    },
+    {
+      "name": "NOHUT YEMEĞİ",
+      "calories": 260,
+      "category": "main"
+    },
+    {
+      "name": "ETLİ NOHUT",
+      "calories": 320,
+      "category": "main"
+    },
+    {
+      "name": "ETLİ KURU FASULYE",
+      "calories": 340,
+      "category": "main"
+    },
+    {
+      "name": "BARBUNYA PİLAKİ",
+      "calories": 245,
+      "category": "main"
+    },
+    {
+      "name": "KARNIYARIK",
+      "calories": 380,
+      "category": "main"
+    },
+    {
+      "name": "İMAM BAYILDI",
+      "calories": 290,
+      "category": "main"
+    },
+    {
+      "name": "MUSAKKA",
+      "calories": 350,
+      "category": "main"
+    },
+    {
+      "name": "TÜRLÜ",
+      "calories": 220,
+      "category": "main"
+    },
+    {
+      "name": "GÜVEÇ",
+      "calories": 310,
+      "category": "main"
+    },
+    {
+      "name": "ETLİ GÜVEÇ",
+      "calories": 380,
+      "category": "main"
+    },
+    {
+      "name": "TAVUK GÜVEÇ",
+      "calories": 340,
+      "category": "main"
+    },
+    {
+      "name": "TAVUK SOTE",
+      "calories": 320,
+      "category": "main"
+    },
+    {
+      "name": "ET SOTE",
+      "calories": 380,
+      "category": "main"
+    },
+    {
+      "name": "MANTARLI ET SOTE",
+      "calories": 395,
+      "category": "main"
+    },
+    {
+      "name": "ANKARA TAVASI",
+      "calories": 420,
+      "category": "main"
+    },
+    {
+      "name": "İZMİR KÖFTE",
+      "calories": 400,
+      "category": "main"
+    },
+    {
+      "name": "KÖFTE",
+      "calories": 350,
+      "category": "main"
+    },
+    {
+      "name": "KADINBUDU KÖFTE",
+      "calories": 380,
+      "category": "main"
+    },
+    {
+      "name": "PATATES OTURTMA",
+      "calories": 320,
+      "category": "main"
+    },
+    {
+      "name": "BEĞENDI",
+      "calories": 340,
+      "category": "main"
+    },
+    {
+      "name": "HÜNKARBEĞENDİ",
+      "calories": 420,
+      "category": "main"
+    },
+    {
+      "name": "ALİ NAZİK",
+      "calories": 400,
+      "category": "main"
+    },
+    {
+      "name": "TAVUKLU PİLAV",
+      "calories": 380,
+      "category": "main"
+    },
+    {
+      "name": "PİLİÇ FIRINDA",
+      "calories": 360,
+      "category": "main"
+    },
+    {
+      "name": "TAVUK ŞNİTZEL",
+      "calories": 420,
+      "category": "main"
+    },
+    {
+      "name": "ET ŞNİTZEL",
+      "calories": 450,
+      "category": "main"
+    },
+    {
+      "name": "BALIK TAVA",
+      "calories": 380,
+      "category": "main"
+    },
+    {
+      "name": "BALIK IZGARA",
+      "calories": 320,
+      "category": "main"
+    },
+    {
+      "name": "HAMSI TAVA",
+      "calories": 340,
+      "category": "main"
+    },
+    {
+      "name": "PALAMUT TAVA",
+      "calories": 360,
+      "category": "main"
+    },
+    {
+      "name": "SULU KÖFTE",
+      "calories": 290,
+      "category": "main"
+    },
+    {
+      "name": "ANA YEMEK",
+      "calories": 350,
+      "category": "main"
+    },
+    {
+      "name": "MANTARLI TAVUK",
+      "calories": 340,
+      "category": "main"
+    },
+    {
+      "name": "SEBZELI TAVUK",
+      "calories": 310,
+      "category": "main"
+    },
+    {
+      "name": "BAMYA YEMEĞİ",
+      "calories": 180,
+      "category": "main"
+    },
+    {
+      "name": "ETLİ BAMYA",
+      "calories": 280,
+      "category": "main"
+    },
+    {
+      "name": "PATLICAN KEBABI",
+      "calories": 390,
+      "category": "main"
+    },
+    {
+      "name": "ADANA KEBAP",
+      "calories": 420,
+      "category": "main"
+    },
+    {
+      "name": "URFA KEBAP",
+      "calories": 400,
+      "category": "main"
+    },
+    {
+      "name": "ÇOP ŞİŞ",
+      "calories": 380,
+      "category": "main"
+    },
+    {
+      "name": "TAVUK ŞİŞ",
+      "calories": 320,
+      "category": "main"
+    },
+    {
+      "name": "DÖNER",
+      "calories": 400,
+      "category": "main"
+    },
+    {
+      "name": "TAVUK DÖNER",
+      "calories": 350,
+      "category": "main"
+    },
+    {
+      "name": "PİRİNÇ PİLAVI",
+      "calories": 200,
+      "category": "side"
+    },
+    {
+      "name": "BULGUR PİLAVI",
+      "calories": 180,
+      "category": "side"
+    },
+    {
+      "name": "ŞEHRİYELİ PİRİNÇ PİLAVI",
+      "calories": 220,
+      "category": "side"
+    },
+    {
+      "name": "NOHUTlu PİLAV",
+      "calories": 240,
+      "category": "side"
+    },
+    {
+      "name": "İÇ PİLAV",
+      "calories": 260,
+      "category": "side"
+    },
+    {
+      "name": "MAKARNA",
+      "calories": 220,
+      "category": "side"
+    },
+    {
+      "name": "SOSLU MAKARNA",
+      "calories": 280,
+      "category": "side"
+    },
+    {
+      "name": "DOMATES SOSLU MAKARNA",
+      "calories": 260,
+      "category": "side"
+    },
+    {
+      "name": "KIYMALIMAKARNA",
+      "calories": 340,
+      "category": "side"
+    },
+    {
+      "name": "FIRIN MAKARNA",
+      "calories": 320,
+      "category": "side"
+    },
+    {
+      "name": "ERİŞTE",
+      "calories": 230,
+      "category": "side"
+    },
+    {
+      "name": "YOĞURTLU ERİŞTE",
+      "calories": 280,
+      "category": "side"
+    },
+    {
+      "name": "MANTI",
+      "calories": 350,
+      "category": "side"
+    },
+    {
+      "name": "ISPANAK",
+      "calories": 80,
+      "category": "side"
+    },
+    {
+      "name": "PİRİNÇLİ ISPANAK",
+      "calories": 140,
+      "category": "side"
+    },
+    {
+      "name": "YEŞİL FASULYE",
+      "calories": 90,
+      "category": "side"
+    },
+    {
+      "name": "ZEYTİNYAĞLI YEŞİL FASULYE",
+      "calories": 120,
+      "category": "side"
+    },
+    {
+      "name": "BEZELYE",
+      "calories": 100,
+      "category": "side"
+    },
+    {
+      "name": "ETLİ BEZELYE",
+      "calories": 200,
+      "category": "side"
+    },
+    {
+      "name": "HAVUÇLU BEZELYE",
+      "calories": 130,
+      "category": "side"
+    },
+    {
+      "name": "PATATES PÜRESİ",
+      "calories": 180,
+      "category": "side"
+    },
+    {
+      "name": "PATATES KIZARTMASI",
+      "calories": 280,
+      "category": "side"
+    },
+    {
+      "name": "FIRINDA PATATES",
+      "calories": 200,
+      "category": "side"
+    },
+    {
+      "name": "KABAK MÜCVER",
+      "calories": 220,
+      "category": "side"
+    },
+    {
+      "name": "KIZARTMA",
+      "calories": 250,
+      "category": "side"
+    },
+    {
+      "name": "SALÇALI PATATES",
+      "calories": 190,
+      "category": "side"
+    },
+    {
+      "name": "ZEYTINYAĞLI PATLICAN",
+      "calories": 150,
+      "category": "side"
+    },
+    {
+      "name": "ZEYTINYAĞLI BİBER DOLMASI",
+      "calories": 170,
+      "category": "side"
+    },
+    {
+      "name": "ZEYTİNYAĞLI YAPRAK SARMASI",
+      "calories": 180,
+      "category": "side"
+    },
+    {
+      "name": "ETLİ YAPRAK SARMASI",
+      "calories": 280,
+      "category": "side"
+    },
+    {
+      "name": "LAHANA SARMASI",
+      "calories": 250,
+      "category": "side"
+    },
+    {
+      "name": "TATLI",
+      "calories": 200,
+      "category": "dessert"
+    },
+    {
+      "name": "SÜTLAÇ",
+      "calories": 180,
+      "category": "dessert"
+    },
+    {
+      "name": "KAZANDIBI",
+      "calories": 220,
+      "category": "dessert"
+    },
+    {
+      "name": "TAVUK GÖĞSÜ",
+      "calories": 210,
+      "category": "dessert"
+    },
+    {
+      "name": "MUHALLEBI",
+      "calories": 170,
+      "category": "dessert"
+    },
+    {
+      "name": "PUDING",
+      "calories": 190,
+      "category": "dessert"
+    },
+    {
+      "name": "ÇİKOLATALI PUDING",
+      "calories": 220,
+      "category": "dessert"
+    },
+    {
+      "name": "KESMEBİR",
+      "calories": 200,
+      "category": "dessert"
+    },
+    {
+      "name": "BAKLAVA",
+      "calories": 350,
+      "category": "dessert"
+    },
+    {
+      "name": "KADAYIF",
+      "calories": 320,
+      "category": "dessert"
+    },
+    {
+      "name": "KÜNEFE",
+      "calories": 380,
+      "category": "dessert"
+    },
+    {
+      "name": "REVANI",
+      "calories": 280,
+      "category": "dessert"
+    },
+    {
+      "name": "ŞAMBALI",
+      "calories": 290,
+      "category": "dessert"
+    },
+    {
+      "name": "TULUMBA TATLISI",
+      "calories": 300,
+      "category": "dessert"
+    },
+    {
+      "name": "LOKMA TATLISI",
+      "calories": 280,
+      "category": "dessert"
+    },
+    {
+      "name": "KEMALPAŞA TATLISI",
+      "calories": 260,
+      "category": "dessert"
+    },
+    {
+      "name": "UN HELVASI",
+      "calories": 320,
+      "category": "dessert"
+    },
+    {
+      "name": "İRMİK HELVASI",
+      "calories": 300,
+      "category": "dessert"
+    },
+    {
+      "name": "AŞURE",
+      "calories": 250,
+      "category": "dessert"
+    },
+    {
+      "name": "GÜLLAÇ",
+      "calories": 200,
+      "category": "dessert"
+    },
+    {
+      "name": "KOMPOSTO",
+      "calories": 80,
+      "category": "dessert"
+    },
+    {
+      "name": "MEYVE",
+      "calories": 60,
+      "category": "dessert"
+    },
+    {
+      "name": "MEVSIM MEYVE",
+      "calories": 65,
+      "category": "dessert"
+    },
+    {
+      "name": "KARPUZ",
+      "calories": 45,
+      "category": "dessert"
+    },
+    {
+      "name": "KAVUN",
+      "calories": 50,
+      "category": "dessert"
+    },
+    {
+      "name": "PORTAKAL",
+      "calories": 55,
+      "category": "dessert"
+    },
+    {
+      "name": "ELMA",
+      "calories": 60,
+      "category": "dessert"
+    },
+    {
+      "name": "MUZ",
+      "calories": 90,
+      "category": "dessert"
+    },
+    {
+      "name": "DONDURMA",
+      "calories": 180,
+      "category": "dessert"
+    },
+    {
+      "name": "PASTA",
+      "calories": 350,
+      "category": "dessert"
+    },
+    {
+      "name": "KEK",
+      "calories": 280,
+      "category": "dessert"
+    },
+    {
+      "name": "CACIK",
+      "calories": 80,
+      "category": "other"
+    },
+    {
+      "name": "YOĞURT",
+      "calories": 90,
+      "category": "other"
+    },
+    {
+      "name": "AYRAN",
+      "calories": 60,
+      "category": "other"
+    },
+    {
+      "name": "ÇOBAN SALATA",
+      "calories": 70,
+      "category": "other"
+    },
+    {
+      "name": "MEVSİM SALATA",
+      "calories": 50,
+      "category": "other"
+    },
+    {
+      "name": "KARIŞIK SALATA",
+      "calories": 60,
+      "category": "other"
+    },
+    {
+      "name": "AKDENIZ SALATASI",
+      "calories": 90,
+      "category": "other"
+    },
+    {
+      "name": "ROKA SALATA",
+      "calories": 45,
+      "category": "other"
+    },
+    {
+      "name": "HAVUÇ SALATA",
+      "calories": 55,
+      "category": "other"
+    },
+    {
+      "name": "LAHANA SALATA",
+      "calories": 40,
+      "category": "other"
+    },
+    {
+      "name": "TURŞU",
+      "calories": 25,
+      "category": "other"
+    },
+    {
+      "name": "ZEYTİN",
+      "calories": 50,
+      "category": "other"
+    },
+    {
+      "name": "BEYAZ PEYNİR",
+      "calories": 100,
+      "category": "other"
+    },
+    {
+      "name": "KAŞAR PEYNİR",
+      "calories": 120,
+      "category": "other"
+    },
+    {
+      "name": "HAYDARİ",
+      "calories": 110,
+      "category": "other"
+    },
+    {
+      "name": "ATOM",
+      "calories": 90,
+      "category": "other"
+    },
+    {
+      "name": "ACILI EZME",
+      "calories": 70,
+      "category": "other"
+    },
+    {
+      "name": "HUMUS",
+      "calories": 130,
+      "category": "other"
+    },
+    {
+      "name": "FAVA",
+      "calories": 120,
+      "category": "other"
+    },
+    {
+      "name": "PATLICAN SALATASI",
+      "calories": 100,
+      "category": "other"
+    },
+    {
+      "name": "KÖZLENMIŞ BİBER",
+      "calories": 40,
+      "category": "other"
+    },
+    {
+      "name": "SÖGÜŞ",
+      "calories": 30,
+      "category": "other"
+    },
+    {
+      "name": "EKMEK",
+      "calories": 136,
+      "category": "other"
+    }
+  ],
+  "vegan": [
+    {
+      "name": "MERCİMEK ÇORBASI",
+      "calories": 120,
+      "category": "soup"
+    },
+    {
+      "name": "SEBZE ÇORBASI",
+      "calories": 75,
+      "category": "soup"
+    },
+    {
+      "name": "DOMATES ÇORBASI",
+      "calories": 85,
+      "category": "soup"
+    },
+    {
+      "name": "EZOGELİN ÇORBASI",
+      "calories": 130,
+      "category": "soup"
+    },
+    {
+      "name": "TARHANA ÇORBASI (VEGAN)",
+      "calories": 100,
+      "category": "soup"
+    },
+    {
+      "name": "BALKABAGI ÇORBASI",
+      "calories": 95,
+      "category": "soup"
+    },
+    {
+      "name": "BROKOLI ÇORBASI",
+      "calories": 80,
+      "category": "soup"
+    },
+    {
+      "name": "ISPANAK ÇORBASI",
+      "calories": 70,
+      "category": "soup"
+    },
+    {
+      "name": "KARNABAHAR ÇORBASI",
+      "calories": 65,
+      "category": "soup"
+    },
+    {
+      "name": "PATATES ÇORBASI",
+      "calories": 115,
+      "category": "soup"
+    },
+    {
+      "name": "HAVUÇ ÇORBASI",
+      "calories": 60,
+      "category": "soup"
+    },
+    {
+      "name": "MANTAR ÇORBASI (VEGAN)",
+      "calories": 90,
+      "category": "soup"
+    },
+    {
+      "name": "NOHUT YEMEĞİ",
+      "calories": 260,
+      "category": "main"
+    },
+    {
+      "name": "KURU FASULYE",
+      "calories": 280,
+      "category": "main"
+    },
+    {
+      "name": "BARBUNYA PİLAKİ",
+      "calories": 245,
+      "category": "main"
+    },
+    {
+      "name": "MERCİMEK KÖFTE",
+      "calories": 180,
+      "category": "main"
+    },
+    {
+      "name": "ZEYTİNYAĞLI FASULYE",
+      "calories": 150,
+      "category": "main"
+    },
+    {
+      "name": "ZEYTİNYAĞLI ENGINAR",
+      "calories": 140,
+      "category": "main"
+    },
+    {
+      "name": "ZEYTİNYAĞLI BAKLA",
+      "calories": 160,
+      "category": "main"
+    },
+    {
+      "name": "ZEYTİNYAĞLI PAZI",
+      "calories": 100,
+      "category": "main"
+    },
+    {
+      "name": "İMAM BAYILDI",
+      "calories": 290,
+      "category": "main"
+    },
+    {
+      "name": "TÜRLÜ",
+      "calories": 220,
+      "category": "main"
+    },
+    {
+      "name": "SEBZE GÜVEÇ",
+      "calories": 180,
+      "category": "main"
+    },
+    {
+      "name": "PATLICAN MUSAKKA (VEGAN)",
+      "calories": 200,
+      "category": "main"
+    },
+    {
+      "name": "KABAK DOLMASI",
+      "calories": 170,
+      "category": "main"
+    },
+    {
+      "name": "BİBER DOLMASI",
+      "calories": 180,
+      "category": "main"
+    },
+    {
+      "name": "YAPRAK SARMASI",
+      "calories": 190,
+      "category": "main"
+    },
+    {
+      "name": "MANTARLI SEBZE SOTE",
+      "calories": 150,
+      "category": "main"
+    },
+    {
+      "name": "SEBZELI NOHUT",
+      "calories": 240,
+      "category": "main"
+    },
+    {
+      "name": "VEGAN KÖFTE",
+      "calories": 200,
+      "category": "main"
+    },
+    {
+      "name": "PİRİNÇ PİLAVI",
+      "calories": 200,
+      "category": "side"
+    },
+    {
+      "name": "BULGUR PİLAVI",
+      "calories": 180,
+      "category": "side"
+    },
+    {
+      "name": "SOSLU MAKARNA",
+      "calories": 240,
+      "category": "side"
+    },
+    {
+      "name": "ISPANAK",
+      "calories": 80,
+      "category": "side"
+    },
+    {
+      "name": "ZEYTİNYAĞLI YEŞİL FASULYE",
+      "calories": 120,
+      "category": "side"
+    },
+    {
+      "name": "HAVUÇLU BEZELYE",
+      "calories": 130,
+      "category": "side"
+    },
+    {
+      "name": "PATATES PÜRESİ (VEGAN)",
+      "calories": 160,
+      "category": "side"
+    },
+    {
+      "name": "FIRINDA PATATES",
+      "calories": 200,
+      "category": "side"
+    },
+    {
+      "name": "KABAK MÜCVER (VEGAN)",
+      "calories": 180,
+      "category": "side"
+    },
+    {
+      "name": "ZEYTİNYAĞLI PATLICAN",
+      "calories": 150,
+      "category": "side"
+    },
+    {
+      "name": "KINOA SALATASI",
+      "calories": 170,
+      "category": "side"
+    },
+    {
+      "name": "MEYVE",
+      "calories": 60,
+      "category": "dessert"
+    },
+    {
+      "name": "MEVSİM MEYVE",
+      "calories": 65,
+      "category": "dessert"
+    },
+    {
+      "name": "KOMPOSTO",
+      "calories": 80,
+      "category": "dessert"
+    },
+    {
+      "name": "AŞURE",
+      "calories": 250,
+      "category": "dessert"
+    },
+    {
+      "name": "KABAK TATLISI",
+      "calories": 180,
+      "category": "dessert"
+    },
+    {
+      "name": "AYVA TATLISI",
+      "calories": 160,
+      "category": "dessert"
+    },
+    {
+      "name": "İNCİR TATLISI",
+      "calories": 170,
+      "category": "dessert"
+    },
+    {
+      "name": "HURMA",
+      "calories": 100,
+      "category": "dessert"
+    },
+    {
+      "name": "CEVİZLİ İNCİR",
+      "calories": 150,
+      "category": "dessert"
+    },
+    {
+      "name": "MEYVE SALATASI",
+      "calories": 90,
+      "category": "dessert"
+    },
+    {
+      "name": "ÇOBAN SALATA",
+      "calories": 70,
+      "category": "other"
+    },
+    {
+      "name": "MEVSİM SALATA",
+      "calories": 50,
+      "category": "other"
+    },
+    {
+      "name": "AKDENIZ SALATASI",
+      "calories": 90,
+      "category": "other"
+    },
+    {
+      "name": "ROKA SALATA",
+      "calories": 45,
+      "category": "other"
+    },
+    {
+      "name": "HUMUS",
+      "calories": 130,
+      "category": "other"
+    },
+    {
+      "name": "FAVA",
+      "calories": 120,
+      "category": "other"
+    },
+    {
+      "name": "TURŞU",
+      "calories": 25,
+      "category": "other"
+    },
+    {
+      "name": "ZEYTİN",
+      "calories": 50,
+      "category": "other"
+    },
+    {
+      "name": "ACILI EZME",
+      "calories": 70,
+      "category": "other"
+    },
+    {
+      "name": "PATLICAN SALATASI",
+      "calories": 100,
+      "category": "other"
+    },
+    {
+      "name": "EKMEK",
+      "calories": 136,
+      "category": "other"
+    }
+  ]
+}

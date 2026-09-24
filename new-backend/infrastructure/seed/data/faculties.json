@@ -1,0 +1,778 @@
+[
+  {
+    "slug": "fac-egitim",
+    "code": "BEF",
+    "name": "Eğitim Fakültesi",
+    "sort_order": 1,
+    "departments": [
+      {
+        "slug": "dept-bote",
+        "code": "BOTE",
+        "name": "Bilgisayar ve Öğretim Teknolojileri Öğretmenliği",
+        "sort_order": 1
+      },
+      {
+        "slug": "dept-rpd",
+        "code": "RPD",
+        "name": "Rehberlik ve Psikolojik Danışmanlık",
+        "sort_order": 2
+      },
+      {
+        "slug": "dept-muzik-ogr",
+        "code": "MUZ",
+        "name": "Müzik Öğretmenliği",
+        "sort_order": 3
+      },
+      {
+        "slug": "dept-resim-ogr",
+        "code": "RES",
+        "name": "Resim-İş Öğretmenliği",
+        "sort_order": 4
+      },
+      {
+        "slug": "dept-biyoloji-ogr",
+        "code": "BIYO",
+        "name": "Biyoloji Öğretmenliği",
+        "sort_order": 5
+      },
+      {
+        "slug": "dept-fen-ogr",
+        "code": "FEN",
+        "name": "Fen Bilgisi Öğretmenliği",
+        "sort_order": 6
+      },
+      {
+        "slug": "dept-fizik-ogr",
+        "code": "FIZ",
+        "name": "Fizik Öğretmenliği",
+        "sort_order": 7
+      },
+      {
+        "slug": "dept-ilkmat-ogr",
+        "code": "IMAT",
+        "name": "İlköğretim Matematik Öğretmenliği",
+        "sort_order": 8
+      },
+      {
+        "slug": "dept-kimya-ogr",
+        "code": "KIM",
+        "name": "Kimya Öğretmenliği",
+        "sort_order": 9
+      },
+      {
+        "slug": "dept-mat-ogr",
+        "code": "MAT",
+        "name": "Matematik Öğretmenliği",
+        "sort_order": 10
+      },
+      {
+        "slug": "dept-ozel-egitim",
+        "code": "OZE",
+        "name": "Özel Eğitim Öğretmenliği",
+        "sort_order": 11
+      },
+      {
+        "slug": "dept-okul-oncesi",
+        "code": "OKO",
+        "name": "Okul Öncesi Öğretmenliği",
+        "sort_order": 12
+      },
+      {
+        "slug": "dept-sinif-ogr",
+        "code": "SNF",
+        "name": "Sınıf Öğretmenliği",
+        "sort_order": 13
+      },
+      {
+        "slug": "dept-cografya-ogr",
+        "code": "COG",
+        "name": "Coğrafya Öğretmenliği",
+        "sort_order": 14
+      },
+      {
+        "slug": "dept-sosyal-ogr",
+        "code": "SOS",
+        "name": "Sosyal Bilgiler Öğretmenliği",
+        "sort_order": 15
+      },
+      {
+        "slug": "dept-tarih-ogr",
+        "code": "TAR",
+        "name": "Tarih Öğretmenliği",
+        "sort_order": 16
+      },
+      {
+        "slug": "dept-turk-edebiyat-ogr",
+        "code": "TDE",
+        "name": "Türk Dili ve Edebiyatı Öğretmenliği",
+        "sort_order": 17
+      },
+      {
+        "slug": "dept-turkce-ogr",
+        "code": "TUR",
+        "name": "Türkçe Öğretmenliği",
+        "sort_order": 18
+      },
+      {
+        "slug": "dept-almanca-ogr",
+        "code": "ALM",
+        "name": "Almanca Öğretmenliği",
+        "sort_order": 19
+      },
+      {
+        "slug": "dept-fransizca-ogr",
+        "code": "FRA",
+        "name": "Fransızca Öğretmenliği",
+        "sort_order": 20
+      },
+      {
+        "slug": "dept-ingilizce-ogr",
+        "code": "ING",
+        "name": "İngilizce Öğretmenliği",
+        "sort_order": 21
+      }
+    ]
+  },
+  {
+    "slug": "fac-denizcilik",
+    "code": "DNZ",
+    "name": "Denizcilik Fakültesi",
+    "sort_order": 2,
+    "departments": [
+      {
+        "slug": "dept-deniz-ulastirma",
+        "code": "DUI",
+        "name": "Deniz Ulaştırma İşletme Mühendisliği",
+        "sort_order": 1
+      },
+      {
+        "slug": "dept-denizcilik-isl",
+        "code": "DIY",
+        "name": "Denizcilik İşletmeleri Yönetimi",
+        "sort_order": 2
+      },
+      {
+        "slug": "dept-gemi-makineleri",
+        "code": "GMI",
+        "name": "Gemi Makineleri İşletme Mühendisliği",
+        "sort_order": 3
+      },
+      {
+        "slug": "dept-lojistik",
+        "code": "LOJ",
+        "name": "Lojistik Yönetimi",
+        "sort_order": 4
+      }
+    ]
+  },
+  {
+    "slug": "fac-konservatuar",
+    "code": "KNS",
+    "name": "Devlet Konservatuvarı",
+    "sort_order": 3,
+    "departments": [
+      {
+        "slug": "dept-kompozisyon",
+        "code": "KOM",
+        "name": "Kompozisyon ve Orkestra Şefliği",
+        "sort_order": 1
+      },
+      {
+        "slug": "dept-piyano",
+        "code": "PYN",
+        "name": "Piyano",
+        "sort_order": 2
+      },
+      {
+        "slug": "dept-uflemeli",
+        "code": "UFC",
+        "name": "Üflemeli ve Vurmalı Çalgılar",
+        "sort_order": 3
+      },
+      {
+        "slug": "dept-yayli",
+        "code": "YAY",
+        "name": "Yaylı Çalgılar",
+        "sort_order": 4
+      },
+      {
+        "slug": "dept-bale",
+        "code": "BAL",
+        "name": "Bale",
+        "sort_order": 5
+      },
+      {
+        "slug": "dept-opera",
+        "code": "OPR",
+        "name": "Opera",
+        "sort_order": 6
+      }
+    ]
+  },
+  {
+    "slug": "fac-dis",
+    "code": "DIS",
+    "name": "Diş Hekimliği Fakültesi",
+    "sort_order": 4,
+    "departments": [
+      {
+        "slug": "dept-dis-hekimligi",
+        "code": "DSH",
+        "name": "Diş Hekimliği",
+        "sort_order": 1
+      }
+    ]
+  },
+  {
+    "slug": "fac-edebiyat",
+    "code": "EDB",
+    "name": "Edebiyat Fakültesi",
+    "sort_order": 5,
+    "departments": [
+      {
+        "slug": "dept-amerikan",
+        "code": "AMR",
+        "name": "Amerikan Kültürü ve Edebiyatı",
+        "sort_order": 1
+      },
+      {
+        "slug": "dept-arkeoloji",
+        "code": "ARK",
+        "name": "Arkeoloji",
+        "sort_order": 2
+      },
+      {
+        "slug": "dept-dilbilimi",
+        "code": "DIL",
+        "name": "Dilbilimi",
+        "sort_order": 3
+      },
+      {
+        "slug": "dept-felsefe",
+        "code": "FLS",
+        "name": "Felsefe",
+        "sort_order": 4
+      },
+      {
+        "slug": "dept-ing-mutercim",
+        "code": "IMT",
+        "name": "İngilizce Mütercim ve Tercümanlık",
+        "sort_order": 5
+      },
+      {
+        "slug": "dept-karsil-edebiyat",
+        "code": "KRE",
+        "name": "Karşılaştırmalı Edebiyat",
+        "sort_order": 6
+      },
+      {
+        "slug": "dept-muzecilik",
+        "code": "MZC",
+        "name": "Müzecilik",
+        "sort_order": 7
+      },
+      {
+        "slug": "dept-psikoloji",
+        "code": "PSK",
+        "name": "Psikoloji",
+        "sort_order": 8
+      },
+      {
+        "slug": "dept-rus",
+        "code": "RUS",
+        "name": "Rus Dili ve Edebiyatı",
+        "sort_order": 9
+      },
+      {
+        "slug": "dept-sosyoloji",
+        "code": "SOS",
+        "name": "Sosyoloji",
+        "sort_order": 10
+      },
+      {
+        "slug": "dept-tarih",
+        "code": "TAR",
+        "name": "Tarih",
+        "sort_order": 11
+      },
+      {
+        "slug": "dept-turk-dili-edebiyati",
+        "code": "TDE",
+        "name": "Türk Dili ve Edebiyatı",
+        "sort_order": 12
+      }
+    ]
+  },
+  {
+    "slug": "fac-fen",
+    "code": "FEN",
+    "name": "Fen Fakültesi",
+    "sort_order": 6,
+    "departments": [
+      {
+        "slug": "dept-bil",
+        "code": "BIL",
+        "name": "Bilgisayar Bilimleri",
+        "sort_order": 1,
+        "description": "Bilgisayar Bilimleri Lisans Programı"
+      },
+      {
+        "slug": "dept-biyoloji",
+        "code": "BYO",
+        "name": "Biyoloji",
+        "sort_order": 2
+      },
+      {
+        "slug": "dept-fizik",
+        "code": "FIZ",
+        "name": "Fizik",
+        "sort_order": 3,
+        "description": "Fizik Lisans Programı"
+      },
+      {
+        "slug": "dept-istatistik",
+        "code": "IST",
+        "name": "İstatistik",
+        "sort_order": 4
+      },
+      {
+        "slug": "dept-kimya",
+        "code": "KIM",
+        "name": "Kimya",
+        "sort_order": 5
+      },
+      {
+        "slug": "dept-matematik",
+        "code": "MAT",
+        "name": "Matematik",
+        "sort_order": 6,
+        "description": "Matematik Lisans Programı"
+      }
+    ]
+  },
+  {
+    "slug": "fac-fizik-tedavi",
+    "code": "FTR",
+    "name": "Fizik Tedavi ve Rehabilitasyon Fakültesi",
+    "sort_order": 7,
+    "departments": [
+      {
+        "slug": "dept-fizyoterapi",
+        "code": "FZY",
+        "name": "Fizyoterapi ve Rehabilitasyon",
+        "sort_order": 1
+      }
+    ]
+  },
+  {
+    "slug": "fac-guzel-sanatlar",
+    "code": "GSF",
+    "name": "Güzel Sanatlar Fakültesi",
+    "sort_order": 8,
+    "departments": [
+      {
+        "slug": "dept-cizgi-film",
+        "code": "CFA",
+        "name": "Çizgi Film ve Animasyon",
+        "sort_order": 1
+      },
+      {
+        "slug": "dept-film-tasarim",
+        "code": "FTY",
+        "name": "Film Tasarımı ve Yönetmenliği",
+        "sort_order": 2
+      },
+      {
+        "slug": "dept-fotograf",
+        "code": "FOT",
+        "name": "Fotoğraf",
+        "sort_order": 3
+      },
+      {
+        "slug": "dept-geleneksel",
+        "code": "GTS",
+        "name": "Geleneksel Türk Sanatları",
+        "sort_order": 4
+      },
+      {
+        "slug": "dept-grafik",
+        "code": "GRF",
+        "name": "Grafik Sanatlar",
+        "sort_order": 5
+      },
+      {
+        "slug": "dept-heykel",
+        "code": "HYK",
+        "name": "Heykel",
+        "sort_order": 6
+      },
+      {
+        "slug": "dept-kurgu",
+        "code": "KSG",
+        "name": "Kurgu, Ses ve Görüntü Yönetimi",
+        "sort_order": 7
+      },
+      {
+        "slug": "dept-moda",
+        "code": "MGT",
+        "name": "Moda Giyim Tasarımı",
+        "sort_order": 8
+      },
+      {
+        "slug": "dept-muzikoloji",
+        "code": "MZK",
+        "name": "Müzikoloji",
+        "sort_order": 9
+      },
+      {
+        "slug": "dept-resim",
+        "code": "RSM",
+        "name": "Resim",
+        "sort_order": 10
+      },
+      {
+        "slug": "dept-sahne",
+        "code": "SHS",
+        "name": "Sahne Sanatları",
+        "sort_order": 11
+      },
+      {
+        "slug": "dept-seramik",
+        "code": "SRC",
+        "name": "Seramik ve Cam",
+        "sort_order": 12
+      },
+      {
+        "slug": "dept-tekstil-moda",
+        "code": "TMT",
+        "name": "Tekstil ve Moda Tasarımı",
+        "sort_order": 13
+      }
+    ]
+  },
+  {
+    "slug": "fac-hemsirelik",
+    "code": "HMS",
+    "name": "Hemşirelik Fakültesi",
+    "sort_order": 9,
+    "departments": [
+      {
+        "slug": "dept-hemsirelik",
+        "code": "HEM",
+        "name": "Hemşirelik",
+        "sort_order": 1
+      }
+    ]
+  },
+  {
+    "slug": "fac-hukuk",
+    "code": "HKK",
+    "name": "Hukuk Fakültesi",
+    "sort_order": 10,
+    "departments": [
+      {
+        "slug": "dept-hukuk",
+        "code": "HUK",
+        "name": "Hukuk",
+        "sort_order": 1
+      }
+    ]
+  },
+  {
+    "slug": "fac-iibf",
+    "code": "IIB",
+    "name": "İktisadi ve İdari Bilimler Fakültesi",
+    "sort_order": 11,
+    "departments": [
+      {
+        "slug": "dept-calisma-eko",
+        "code": "CEE",
+        "name": "Çalışma Ekonomisi ve Endüstri İlişkileri",
+        "sort_order": 1
+      },
+      {
+        "slug": "dept-ekonometri",
+        "code": "EKO",
+        "name": "Ekonometri",
+        "sort_order": 2
+      },
+      {
+        "slug": "dept-iktisat",
+        "code": "IKT",
+        "name": "İktisat",
+        "sort_order": 3
+      },
+      {
+        "slug": "dept-isletme",
+        "code": "ISL",
+        "name": "İşletme",
+        "sort_order": 4
+      },
+      {
+        "slug": "dept-kamu",
+        "code": "KAM",
+        "name": "Kamu Yönetimi",
+        "sort_order": 5
+      },
+      {
+        "slug": "dept-maliye",
+        "code": "MLY",
+        "name": "Maliye",
+        "sort_order": 6
+      },
+      {
+        "slug": "dept-ybs",
+        "code": "YBS",
+        "name": "Yönetim Bilişim Sistemleri",
+        "sort_order": 7
+      }
+    ]
+  },
+  {
+    "slug": "fac-ilahiyat",
+    "code": "ILH",
+    "name": "İlahiyat Fakültesi",
+    "sort_order": 12,
+    "departments": [
+      {
+        "slug": "dept-ilahiyat",
+        "code": "ILA",
+        "name": "İlahiyat",
+        "sort_order": 1
+      },
+      {
+        "slug": "dept-din-kulturu-ogr",
+        "code": "DKO",
+        "name": "İlköğretim Din Kültürü ve Ahlak Bilgisi Öğretmenliği",
+        "sort_order": 2
+      }
+    ]
+  },
+  {
+    "slug": "fac-isletme",
+    "code": "ISF",
+    "name": "İşletme Fakültesi",
+    "sort_order": 13,
+    "departments": [
+      {
+        "slug": "dept-isf-iktisat",
+        "code": "IKT",
+        "name": "İktisat",
+        "sort_order": 1
+      },
+      {
+        "slug": "dept-isf-isletme",
+        "code": "ISL",
+        "name": "İşletme",
+        "sort_order": 2
+      },
+      {
+        "slug": "dept-siyaset",
+        "code": "SBU",
+        "name": "Siyaset Bilimi ve Uluslararası İlişkiler",
+        "sort_order": 3
+      },
+      {
+        "slug": "dept-turizm-isl",
+        "code": "TUR",
+        "name": "Turizm İşletmeciliği",
+        "sort_order": 4
+      },
+      {
+        "slug": "dept-uluslar-iliski",
+        "code": "UIL",
+        "name": "Uluslararası İlişkiler",
+        "sort_order": 5
+      },
+      {
+        "slug": "dept-uluslar-ticaret",
+        "code": "UIT",
+        "name": "Uluslararası İşletmecilik ve Ticaret",
+        "sort_order": 6
+      }
+    ]
+  },
+  {
+    "slug": "fac-mimarlik",
+    "code": "MIM",
+    "name": "Mimarlık Fakültesi",
+    "sort_order": 14,
+    "departments": [
+      {
+        "slug": "dept-mimarlik",
+        "code": "MIM",
+        "name": "Mimarlık",
+        "sort_order": 1
+      },
+      {
+        "slug": "dept-sehir-planlama",
+        "code": "SBP",
+        "name": "Şehir ve Bölge Planlama",
+        "sort_order": 2
+      }
+    ]
+  },
+  {
+    "slug": "fac-muhendislik",
+    "code": "MUH",
+    "name": "Mühendislik Fakültesi",
+    "sort_order": 15,
+    "departments": [
+      {
+        "slug": "dept-bilgisayar-muh",
+        "code": "BMH",
+        "name": "Bilgisayar Mühendisliği",
+        "sort_order": 1,
+        "description": "Bilgisayar Mühendisliği Lisans Programı"
+      },
+      {
+        "slug": "dept-cevre-muh",
+        "code": "CEV",
+        "name": "Çevre Mühendisliği",
+        "sort_order": 2
+      },
+      {
+        "slug": "dept-elektrik-muh",
+        "code": "ELK",
+        "name": "Elektrik-Elektronik Mühendisliği",
+        "sort_order": 3,
+        "description": "Elektrik-Elektronik Mühendisliği Lisans Programı"
+      },
+      {
+        "slug": "dept-elektronik-hab",
+        "code": "EHM",
+        "name": "Elektronik ve Haberleşme Mühendisliği",
+        "sort_order": 4
+      },
+      {
+        "slug": "dept-endustri-muh",
+        "code": "END",
+        "name": "Endüstri Mühendisliği",
+        "sort_order": 5
+      },
+      {
+        "slug": "dept-insaat-muh",
+        "code": "INS",
+        "name": "İnşaat Mühendisliği",
+        "sort_order": 6
+      },
+      {
+        "slug": "dept-jeofizik-muh",
+        "code": "JFZ",
+        "name": "Jeofizik Mühendisliği",
+        "sort_order": 7
+      },
+      {
+        "slug": "dept-jeoloji-muh",
+        "code": "JEO",
+        "name": "Jeoloji Mühendisliği",
+        "sort_order": 8
+      },
+      {
+        "slug": "dept-maden-muh",
+        "code": "MAD",
+        "name": "Maden Mühendisliği",
+        "sort_order": 9
+      },
+      {
+        "slug": "dept-makina-muh",
+        "code": "MAK",
+        "name": "Makina Mühendisliği",
+        "sort_order": 10,
+        "description": "Makina Mühendisliği Lisans Programı"
+      },
+      {
+        "slug": "dept-metalurji-muh",
+        "code": "MET",
+        "name": "Metalurji ve Malzeme Mühendisliği",
+        "sort_order": 11
+      },
+      {
+        "slug": "dept-tekstil-muh",
+        "code": "TKS",
+        "name": "Tekstil Mühendisliği",
+        "sort_order": 12
+      }
+    ]
+  },
+  {
+    "slug": "fac-spor",
+    "code": "SPR",
+    "name": "Spor Bilimleri Fakültesi",
+    "sort_order": 16,
+    "departments": [
+      {
+        "slug": "dept-antrenorluk",
+        "code": "ANT",
+        "name": "Antrenörlük Eğitimi",
+        "sort_order": 1
+      },
+      {
+        "slug": "dept-beden-ogr",
+        "code": "BES",
+        "name": "Beden Eğitimi ve Spor Öğretmenliği",
+        "sort_order": 2
+      },
+      {
+        "slug": "dept-rekreasyon",
+        "code": "REK",
+        "name": "Rekreasyon",
+        "sort_order": 3
+      },
+      {
+        "slug": "dept-spor-yonetim",
+        "code": "SPY",
+        "name": "Spor Yöneticiliği",
+        "sort_order": 4
+      }
+    ]
+  },
+  {
+    "slug": "fac-tip",
+    "code": "TIP",
+    "name": "Tıp Fakültesi",
+    "sort_order": 17,
+    "departments": [
+      {
+        "slug": "dept-tip",
+        "code": "TIP",
+        "name": "Tıp",
+        "sort_order": 1
+      }
+    ]
+  },
+  {
+    "slug": "fac-turizm",
+    "code": "TRZ",
+    "name": "Turizm Fakültesi",
+    "sort_order": 18,
+    "departments": [
+      {
+        "slug": "dept-gastronomi",
+        "code": "GMS",
+        "name": "Gastronomi ve Mutfak Sanatları",
+        "sort_order": 1
+      },
+      {
+        "slug": "dept-turizm-isletme",
+        "code": "TUR",
+        "name": "Turizm İşletmeciliği",
+        "sort_order": 2
+      }
+    ]
+  },
+  {
+    "slug": "fac-veteriner",
+    "code": "VET",
+    "name": "Veteriner Fakültesi",
+    "sort_order": 19,
+    "departments": [
+      {
+        "slug": "dept-veteriner",
+        "code": "VET",
+        "name": "Veteriner Hekimliği",
+        "sort_order": 1
+      }
+    ]
+  }
+]
