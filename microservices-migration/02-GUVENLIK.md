@@ -115,8 +115,8 @@ servisler denetimsiz kalır.
 
 - `.github/workflows/security.yml` → `gosec` ve `govulncheck` artık
   `./services/...` ve `./shared/...` üzerinde koşmalı (Faz 8, B2).
-- `.github/dependabot.yml` → her servis dizini için `gomod` girdisi.
-  **11 girdi**, tek girdi değil.
+- Dependabot 24.09.2026'da kaldırıldı (projede tek dal: `main`). Bağımlılık
+  açıkları haftalık `govulncheck` ile izleniyor; sürüm yükseltmeleri elle.
 - Bağımlılık sürümleri servisler arası **sapmamalı** — `go.work` lokal
   geliştirmede aynı sürümü zorlar ama Docker build `GOWORK=off` ile çalışıyor.
   Faz 8'de tüm `go.mod`'ların ortak bağımlılık sürümlerini karşılaştır.
@@ -211,4 +211,4 @@ Her fazın bitiş kriterine ek olarak buradaki maddeler:
 | 5 | Caddyfile'da `/internal` yok (A01) |
 | 6 | Servisler host portu publish etmiyor (A05) |
 | 7 | Blacklist testi, DB izolasyon testi, internal erişilemezlik testi geçiyor |
-| 8 | `gosec`/`govulncheck`/dependabot 11 modülü kapsıyor (A06) |
+| 8 | `gosec`/`govulncheck` 11 modülü kapsıyor (A06) |

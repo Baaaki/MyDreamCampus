@@ -124,7 +124,7 @@ make test-backend    # shared + 10 servis, -race
 4. Kayit yerleri — **hepsi**: `go.work`, `infrastructure/docker-compose.yml`,
    `infrastructure/migrate/Dockerfile`, `infrastructure/postgres/init-databases.sh`
    (DB + rol), `frontend/Caddyfile` (path prefix), `.github/workflows/ci.yml`
-   matrisi, `.github/workflows/cd.yml` + `dependabot.yml`.
+   matrisi, `.github/workflows/cd.yml`.
 
 ---
 
