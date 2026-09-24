@@ -4,28 +4,33 @@ import (
 	"context"
 
 	"github.com/baaaki/mydreamcampus/payment/internal/handler"
+	"github.com/baaaki/mydreamcampus/payment/internal/repository"
 	"github.com/baaaki/mydreamcampus/payment/internal/service"
 	"github.com/baaaki/mydreamcampus/shared/config"
+	"github.com/baaaki/mydreamcampus/shared/eventbus"
 	platformMiddleware "github.com/baaaki/mydreamcampus/shared/platform/middleware"
 	"github.com/baaaki/mydreamcampus/shared/platform/rabbitmq"
 	"github.com/gin-gonic/gin"
+	"github.com/jackc/pgx/v5/pgxpool"
 	"go.uber.org/zap"
 )
 
 type Module struct {
 	cfg            *config.Config
 	logger         *zap.Logger
+	pool           *pgxpool.Pool
 	paymentService *service.PaymentService
 	paymentHandler *handler.PaymentHandler
 }
 
-func New(cfg *config.Config, logger *zap.Logger, rabbitConn *rabbitmq.Connection) *Module {
+func New(cfg *config.Config, logger *zap.Logger, pool *pgxpool.Pool, rabbitConn *rabbitmq.Connection) *Module {
 	publisher := rabbitmq.NewPublisher(rabbitConn)
 	paymentSvc := service.NewPaymentService(publisher, logger)
 
 	return &Module{
 		cfg:            cfg,
 		logger:         logger,
+		pool:           pool,
 		paymentService: paymentSvc,
 		paymentHandler: handler.NewPaymentHandler(paymentSvc),
 	}
@@ -39,6 +44,16 @@ func (m *Module) Name() string {
 func (m *Module) Bootstrap(ctx context.Context) error {
 	m.logger.Info("bootstrapping mock payment module")
 	return nil
+}
+
+// OutboxStore feeds the shared relay that publishes payment.events.
+func (m *Module) OutboxStore() eventbus.OutboxStore {
+	return repository.NewOutboxStore(repository.NewOutboxRepository(m.pool))
+}
+
+// RetentionStore lets the shared retention worker prune relayed events.
+func (m *Module) RetentionStore() eventbus.RetentionStore {
+	return repository.NewRetentionStore(m.pool)
 }
 
 // RegisterRoutes mounts nothing under /api — payment has no user-facing

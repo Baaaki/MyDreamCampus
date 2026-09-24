@@ -22,7 +22,7 @@
 | attendance | `services/attendance-service/` | 8086 | `attendance` | `attendance` | `/api/attendance` |
 | grades | `services/grades-service/` | 8087 | `grades` | `grades` | `/api/grades` |
 | meal | `services/meal-service/` | 8088 | `meal` | `meal` | `/api/meals` |
-| payment | `services/payment-service/` | 8089 | — (stateless) | — | `/api/payments` |
+| payment | `services/payment-service/` | 8089 | `payment` | `payment` | `/api/payments` |
 | notification | `services/notification-service/` | 9090 | `notification` | `public` | — (sadece consumer) |
 
 **Dikkat:** catalog servisinin DB adı `catalog`, schema adı `course_catalog`.

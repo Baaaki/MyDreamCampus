@@ -8,18 +8,20 @@ import (
 )
 
 func main() {
-	// Payment is the one service without a database: it is a mock provider
-	// that answers over internal REST and publishes payment.* directly. With
-	// no schema there is no outbox table and nothing to retain.
 	rt := bootstrap.Init(bootstrap.Options{
 		Service:       "payment",
-		NeedsDatabase: false,
+		NeedsDatabase: true,
 	})
 
-	module := payment.New(rt.Cfg, logger.Log, rt.Rabbit)
+	// Payment consumes nothing: meal calls it over internal REST and learns
+	// the outcome from payment.* events. No queues to declare.
+	module := payment.New(rt.Cfg, logger.Log, rt.Pool, rt.Rabbit)
 	if err := module.Bootstrap(rt.Ctx); err != nil {
 		logger.Fatal("failed to bootstrap payment module", zap.Error(err))
 	}
+
+	rt.StartOutbox("payment.events", module.OutboxStore())
+	rt.StartRetention(module.RetentionStore())
 
 	logger.Info("payment service ready", zap.String("port", rt.Cfg.Server.Port))
 	rt.Run(module)

@@ -341,8 +341,8 @@ func (c *Config) Validate() error {
 	if c.Server.Port == "" {
 		return fmt.Errorf("PORT is required")
 	}
-	// DB_URL is not checked here — payment owns no schema and starts without
-	// one. Services that need a pool assert it during bootstrap.
+	// DB_URL is not checked here: bootstrap asserts it for the services that
+	// open a pool (Options.NeedsDatabase).
 	if c.RabbitMQ.URL == "" {
 		return fmt.Errorf("RABBITMQ_URL is required")
 	}

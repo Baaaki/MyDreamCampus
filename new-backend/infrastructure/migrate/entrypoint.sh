@@ -36,25 +36,32 @@ svc_url() {
 
 wait_for_db "postgres server" "$(svc_url auth)"
 
-# pg_isready only proves the SERVER is up — it neither authenticates nor checks
-# that the database exists. The service databases are created by
-# postgres/init-databases.sh, which the Postgres entrypoint runs ONLY on an
-# empty volume, so on an upgraded stack they are simply absent and goose's bare
-# error would not say why.
-if ! psql "$(svc_url auth)" -c 'SELECT 1' >/dev/null 2>&1; then
-	echo "!! cannot open the auth database as auth_svc."
-	echo "   The per-service databases are provisioned on the FIRST boot of an"
-	echo "   empty postgres volume. On an existing volume, run it by hand:"
-	echo "     docker cp new-backend/infrastructure/postgres/init-databases.sh mydreamcampus-postgres:/tmp/"
-	echo "     docker exec -e SERVICE_DB_PASSWORD=<password> -e POSTGRES_USER=postgres \\"
-	echo "       mydreamcampus-postgres bash /tmp/init-databases.sh"
-	exit 1
-fi
-
 # module directory : target database. catalog is the one pair where the two
 # differ — schema `course_catalog` lives in database `catalog`.
 migrate_pairs="auth:auth staff:staff student:student course_catalog:catalog \
-enrollment:enrollment attendance:attendance grades:grades meal:meal"
+enrollment:enrollment attendance:attendance grades:grades meal:meal payment:payment"
+
+# pg_isready only proves the SERVER is up — it neither authenticates nor checks
+# that the database exists. The service databases are created by
+# postgres/init-databases.sh, which the Postgres entrypoint runs ONLY on an
+# empty volume, so on an upgraded stack some are simply absent — all of them
+# after the move off the monolith, one after a service gains its first
+# table — and goose's bare error would not say why.
+missing=""
+for pair in $migrate_pairs notification:notification; do
+	db="${pair##*:}"
+	psql "$(svc_url "$db")" -c 'SELECT 1' >/dev/null 2>&1 || missing="$missing $db"
+done
+if [ -n "$missing" ]; then
+	missing="${missing# }"
+	echo "!! cannot open these databases as their service roles: $missing"
+	echo "   The per-service databases are provisioned on the FIRST boot of an"
+	echo "   empty postgres volume. On an existing volume, add them by hand:"
+	echo "     docker cp new-backend/infrastructure/postgres/init-databases.sh mydreamcampus-postgres:/tmp/"
+	echo "     docker exec -e SERVICE_DB_PASSWORD=<password> -e POSTGRES_USER=postgres \\"
+	echo "       -e PROVISION_ONLY=\"$missing\" mydreamcampus-postgres bash /tmp/init-databases.sh"
+	exit 1
+fi
 
 for pair in $migrate_pairs; do
 	module="${pair%%:*}"

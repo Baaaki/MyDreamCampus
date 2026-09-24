@@ -55,7 +55,7 @@ Yalnız `card_brand` (prefix'ten: Visa, Mastercard, Amex, Troy `9792`) ve
 
 ## Görevler
 
-- [ ] **3.1 payment veritabanı altyapısı**
+- [x] **3.1 payment veritabanı altyapısı**
   - `new-backend/infrastructure/postgres/init-databases.sh`:
     `create_service_db payment payment`.
   - `new-backend/infrastructure/migrate/Dockerfile` ve `entrypoint.sh`:
@@ -74,6 +74,15 @@ Yalnız `card_brand` (prefix'ten: Visa, Mastercard, Amex, Troy `9792`) ve
     kullanıcıya elle provision komutunu göster (`migrate/entrypoint.sh`'in
     hata mesajındaki gibi). Migration'ı kendin ÇALIŞTIRMA.
   - **Commit:** `chore(payment): give the payment service its own database`
+  > Not (24.09): `StartOutbox` outbox tablosu olmadan çalışamadığı için
+  > `payment.outbox_events` (migration, sorgular, repository/store/retention)
+  > bu göreve alındı; 3.2'de yalnız `payment.payments` kaldı.
+  > `payment.processed_events` eklenmedi: payment event tüketmiyor (staff ile
+  > aynı durum), retention'daki karşılığı no-op. Mevcut volume için
+  > `init-databases.sh` artık `PROVISION_ONLY="payment"` ile yalnız istenen
+  > veritabanını kurabiliyor; migrate eksik veritabanlarını bu komutla
+  > listeliyor (DEPLOY.md sorun giderme). CI matrisinde payment zaten var;
+  > CI'da sqlc adımı yok, migration e2e'deki migrate konteyneriyle koşuyor.
 
 - [ ] **3.2 Şema**
   - `payment.payments`:

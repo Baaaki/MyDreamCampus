@@ -4,6 +4,9 @@
 # Runs from the Postgres entrypoint (/docker-entrypoint-initdb.d), which fires
 # ONLY on an empty data volume. An existing volume skips this file entirely —
 # provision it by hand, see the command migrate/entrypoint.sh prints on failure.
+# PROVISION_ONLY="payment" limits a manual run to the named databases: on a
+# volume that already holds the others, a full run stops at the first
+# CREATE DATABASE that exists.
 #
 # A .sh and not a .sql because the entrypoint passes environment variables to
 # shell scripts only, and the role passwords come from the environment.
@@ -20,10 +23,18 @@ set -e
 # knowing it, because CONNECT is granted per database.
 SVC_PASSWORD="${SERVICE_DB_PASSWORD:?SERVICE_DB_PASSWORD is required}"
 
+wanted() {
+	[ -z "${PROVISION_ONLY:-}" ] && return 0
+	case " $PROVISION_ONLY " in *" $1 "*) return 0 ;; esac
+	return 1
+}
+
 create_service_db() {
 	db="$1"
 	schema="$2"
 	user="${1}_svc"
+
+	wanted "$db" || return 0
 
 	# :'pw' lets psql quote the literal, so a password containing a quote
 	# cannot break out of the statement.
@@ -59,21 +70,24 @@ create_service_db enrollment  enrollment
 create_service_db attendance  attendance
 create_service_db grades      grades
 create_service_db meal        meal
-
-# payment keeps no database — it is a stateless mock with no migrations.
+create_service_db payment     payment
 
 # notification is the one service whose tables live in `public` rather than a
 # named schema, so its role owns that schema outright instead of a service one.
-psql -v ON_ERROR_STOP=1 -v pw="$SVC_PASSWORD" -U "$POSTGRES_USER" -d postgres <<-EOSQL
-	CREATE DATABASE "notification";
-	CREATE USER "notification_svc" WITH PASSWORD :'pw';
-	REVOKE CONNECT ON DATABASE "notification" FROM PUBLIC;
-	GRANT CONNECT, TEMPORARY ON DATABASE "notification" TO "notification_svc";
-EOSQL
+# `if`, not an early exit: the Postgres entrypoint may source this file, and
+# an exit there would end the entrypoint itself.
+if wanted notification; then
+	psql -v ON_ERROR_STOP=1 -v pw="$SVC_PASSWORD" -U "$POSTGRES_USER" -d postgres <<-EOSQL
+		CREATE DATABASE "notification";
+		CREATE USER "notification_svc" WITH PASSWORD :'pw';
+		REVOKE CONNECT ON DATABASE "notification" FROM PUBLIC;
+		GRANT CONNECT, TEMPORARY ON DATABASE "notification" TO "notification_svc";
+	EOSQL
 
-psql -v ON_ERROR_STOP=1 -U "$POSTGRES_USER" -d notification <<-EOSQL
-	CREATE EXTENSION IF NOT EXISTS "pgcrypto";
-	ALTER SCHEMA public OWNER TO "notification_svc";
-EOSQL
+	psql -v ON_ERROR_STOP=1 -U "$POSTGRES_USER" -d notification <<-EOSQL
+		CREATE EXTENSION IF NOT EXISTS "pgcrypto";
+		ALTER SCHEMA public OWNER TO "notification_svc";
+	EOSQL
 
-echo ">> provisioned db:notification schema:public user:notification_svc"
+	echo ">> provisioned db:notification schema:public user:notification_svc"
+fi

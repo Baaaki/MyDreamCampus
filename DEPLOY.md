@@ -621,6 +621,7 @@ Kalıcı olsun istersen `~/.bashrc`'ye ekle.
 | Loglarda `circuit breaker state change ... to: open` | Çağrılan servis düşmüş; onu düzelt. Breaker 30 sn sonra kendini dener, eşiği gevşetme. |
 | Sertifika uyarısı | Caddy henüz cert almadı: `logs caddy`. 80/443 firewall'da açık mı? `PUBLIC_HOST` gerçekten IP'ye çözülüyor mu (`dig 203-0-113-5.sslip.io`)? |
 | `migrate` exit code ≠ 0 | `logs migrate`. DB henüz hazır değilse tekrar: `docker compose up -d migrate`. |
+| `migrate` logunda `cannot open these databases` | Mevcut volume'a sonradan veritabanı eklenmiş (ör. `payment`); `init-databases.sh` yalnız boş volume'da çalışır. Logdaki `PROVISION_ONLY=...` komutunu çalıştır, sonra `make deploy`. |
 | Login 500 / CORS | `.env`'de `PUBLIC_ORIGIN` tam `https://<host>` mi (sonda `/` yok)? |
 | Build OOM (2GB) | Adım 4b swap ekle veya droplet'i 4GB'a resize et. |
 | `rabbitmq` açılmıyor, logda `feature flag` / `incompatible` | Broker yeni bir sürüm serisine, eski sürümde kapalı kalmış feature flag'lerle geçmiş. Aşağıdaki "RabbitMQ sürüm yükseltmesi" bölümüne bak. |

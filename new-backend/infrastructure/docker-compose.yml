@@ -320,7 +320,6 @@ services:
     expose:
       - "8088"
 
-  # Stateless mock: no database, so no migrate/postgres dependency either.
   payment-service:
     <<: *service
     build:
@@ -332,13 +331,9 @@ services:
     environment:
       <<: *service-env
       PORT: "8089"
+      DB_URL: postgres://payment_svc:${SERVICE_DB_PASSWORD:?}@postgres:5432/payment?sslmode=disable
     expose:
       - "8089"
-    depends_on:
-      redis:
-        condition: service_healthy
-      rabbitmq:
-        condition: service_healthy
 
   notification:
     <<: *service

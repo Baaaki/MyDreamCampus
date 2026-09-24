@@ -36,7 +36,7 @@ import (
 type Options struct {
 	// Service is the log field and the outbox worker's name, e.g. "grades".
 	Service string
-	// NeedsDatabase is false only for payment, which owns no schema.
+	// NeedsDatabase opens a Postgres pool from DB_URL.
 	NeedsDatabase bool
 	// RedisFatal makes an unreachable Redis stop the service. Auth sets it:
 	// its login rate limit and token blacklist are fail-closed, so running
@@ -120,8 +120,8 @@ func Init(opts Options) *Runtime {
 	rt.defer_(audit.SyncSecurity)
 
 	if opts.NeedsDatabase {
-		// Checked here rather than in config.Validate: payment owns no schema
-		// and a required DB_URL would stop it from starting at all.
+		// Checked here rather than in config.Validate, so only the services
+		// that open a pool require it.
 		if cfg.Database.URL == "" {
 			logger.Fatal("DB_URL is required")
 		}

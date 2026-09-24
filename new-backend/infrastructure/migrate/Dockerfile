@@ -31,6 +31,7 @@ COPY new-backend/services/enrollment-service/internal/sql/migrations /migrations
 COPY new-backend/services/attendance-service/internal/sql/migrations /migrations/modules/attendance
 COPY new-backend/services/grades-service/internal/sql/migrations     /migrations/modules/grades
 COPY new-backend/services/meal-service/internal/sql/migrations       /migrations/modules/meal
+COPY new-backend/services/payment-service/internal/sql/migrations    /migrations/modules/payment
 
 # Notification service (separate database).
 COPY new-backend/services/notification-service/sql/migrations        /migrations/notification
