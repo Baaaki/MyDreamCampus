@@ -574,6 +574,145 @@ docker compose logs seed        # ">> seed complete" görmelisin
 
 ---
 
+## C. Canlı Demo Kurulumu (Ev Sunucusu + Cloudflare Tunnel)
+
+Bu senaryoda proje, kullanıcının ev sunucusunda çalışır ve Cloudflare Tunnel
+aracılığıyla dış dünyaya (`https://mydreamcampus.madebybaki.com`) açılır.
+
+- **Dışarıya açık port yok:** Caddy'nin host portları iptal edilir (`docker-compose.tunnel.yml`).
+  İstekler Cloudflare'in sunucuya kurduğu tünel konteyneri (`cloudflared`) üzerinden
+  dahili Docker ağıyla Caddy'ye (`http://caddy:80`) ulaşır.
+- **Güvenli ve İzole:** Statik varlıklar Cloudflare tarafından önbelleğe alınır,
+  yönetim uçları Cloudflare Access ile korunur, gece 04:00'te sistem otomatik olarak
+  süper adminin kaydettiği kalıcı duruma döner.
+
+---
+
+### Adım Adım Kurulum
+
+#### 1. Repoyu al
+```bash
+git clone <REPO_URL> mydreamcampus
+cd mydreamcampus
+```
+
+#### 2. Ortam Değişkenlerini (`.env`) Doldur
+```bash
+cp new-backend/infrastructure/.env.example new-backend/infrastructure/.env
+nano new-backend/infrastructure/.env
+```
+Gereken temel değerler:
+- Tüm secret'ları `openssl rand -base64 48` ile üret (`SERVICE_DB_PASSWORD` için `openssl rand -hex 32`).
+- `ADMIN_EMAIL`: Tahmin edilemez gerçek süper admin e-postası.
+- `ADMIN_INITIAL_PASSWORD`: Güçlü geçici ilk şifre (ilk girişte değiştirilmesi zorunludur).
+- `DEMO_MODE=true`
+- `SEED_DEMO=true`
+- `DEMO_ADMIN_EMAIL=demo.admin@mydreamcampus.com`
+- `DEMO_TEACHER_EMAIL=ahmet.yilmaz@uni.edu.tr`
+- `DEMO_STUDENT_EMAIL=zeynep.sahin@uni.edu.tr`
+- `NIGHTLY_RESET_AT=04:00`
+- `BASELINE_KEEP=7`
+- `TUNNEL_TOKEN`: Cloudflare Zero Trust panelinden alınan tünel token'ı (aşağıdaki Cloudflare adımlarına bak).
+- `PUBLIC_HOST=:80`
+- `PUBLIC_ORIGIN=https://mydreamcampus.madebybaki.com`
+
+> **Alternatif (Host Seviyesinde Cloudflared):** Eğer sunucuda zaten Docker dışında
+> bağımsız çalışan bir `cloudflared` varsa, stack'i `EDGE=tunnel` ile başlatmak yerine
+> normal `make deploy` ile başlatabilirsin. Bu durumda `.env`'de `HTTP_PORT=8080` tanımlanır,
+> Caddy host'ta `127.0.0.1:8080` dinler ve host'taki `~/.cloudflared/config.yml` ingress kuralına
+> `service: http://127.0.0.1:8080` yazılır.
+
+#### 3. Stack'i Başlat
+```bash
+EDGE=tunnel make deploy
+```
+Bu komut `docker-compose.yml` ve `docker-compose.tunnel.yml` katmanlarını birlikte yükler.
+Caddy'nin host portları kalkar, `cloudflared` konteyneri ayağa kalkıp tüneli kurar.
+
+#### 4. Seed ve İlk Kalıcı Durumu Doğrula
+```bash
+# Seed işlemini kontrol et
+docker compose logs seed | grep "seed complete"
+
+# demo-ops konteynerinin ilk kalıcı durumu kaydettiğini kontrol et
+docker compose logs demo-ops | grep "baseline"
+```
+
+#### 5. Süper Admin İlk Girişi ve Doğrulama
+1. Tarayıcıda `https://mydreamcampus.madebybaki.com` adresini aç.
+2. `ADMIN_EMAIL` ve `ADMIN_INITIAL_PASSWORD` ile giriş yap.
+3. Sunucu seni otomatik olarak `/change-password` ekranına yönlendirecektir; güçlü yeni şifreni belirle.
+4. `/system/baseline` ("Kalıcı Veri") sayfasına git ve ilk kalıcı durumun (v1) başarıyla listelendiğini gör.
+
+#### 6. Otomatik Deploy'u Kur
+```bash
+make autodeploy-install
+```
+`origin/main` dalını 2 dakikada bir kontrol eden systemd user timer'ı kurulur.
+Yeni commit geldiğinde GitHub API üzerinden `ci-passed` kontrolünün başarılı olduğunu
+doğrular ve yalnızca CI'dan geçmiş sürümleri `EDGE=tunnel` ile deploy eder.
+
+---
+
+### Cloudflare ve Yayın Adımları
+
+1. **Cloudflare Tunnel (Zero Trust):**
+   - Cloudflare One (Zero Trust) -> Networks -> Tunnels -> **Create a tunnel**.
+   - Connector tipi olarak **Cloudflared / Docker** seç.
+   - Verilen komuttaki `--token <TOKEN>` değerini kopyalayıp sunucudaki `.env` dosyasındaki `TUNNEL_TOKEN` alanına yapıştır.
+   - **Public Hostname:**
+     - Subdomain / Domain: `mydreamcampus.madebybaki.com`
+     - Service Type: `HTTP`
+     - URL: `caddy:80` (DİKKAT: localhost değil! cloudflared konteyneri Caddy'ye Docker ağı üzerinden `caddy` adıyla bağlanır).
+
+2. **SSL / TLS Ayarları:**
+   - Cloudflare Dashboard -> SSL/TLS -> Edge Certificates.
+   - **"Always Use HTTPS"** özelliğini aktif et.
+
+3. **WAF & Rate Limiting:**
+   - Security -> WAF -> Rate limiting rules -> **Create rule**:
+     - Kural Adı: `Rate limit login`
+     - If incoming requests match: `URI Path equals /api/auth/login`
+     - Rate: `10 requests per 1 minute` (IP başına).
+     - Action: `Block` (veya Managed Challenge), Süre: `10 minutes`.
+
+4. **Kalıcı Veri Uçlarını Koruma (K4 Kararı — Cloudflare Access):**
+   - Zero Trust -> Access -> Applications -> **Add an Application** -> **Self-hosted**:
+     - Application Name: `MyDreamCampus Baseline Ops`
+     - Application Domain: `mydreamcampus.madebybaki.com`
+     - Path: `/api/catalog/admin/ops*`
+     - Policy: Rule name: `Superadmin Only`, Action: `Allow`.
+     - Include Selector: `Emails` -> Kullanıcının kendi şahsi e-posta adresi (One-time PIN ile doğrulanır).
+   - Böylece kalıcı veri alma ve düzenleme moduna geçme uçları internetten gelebilecek yetkisiz taramalara karşı Cloudflare seviyesinde korunur.
+
+5. **GitHub Dal Koruması:**
+   - GitHub Repository -> Settings -> Branches -> Add branch protection rule (`main`):
+     - `Require a pull request before merging`
+     - `Require status checks to pass before merging` -> `ci-passed` seç.
+
+6. **Uptime İzleme (UptimeRobot - Ücretsiz):**
+   - Yeni monitor ekle: Type `HTTP(s)`, URL `https://mydreamcampus.madebybaki.com/health`, Interval `5 minutes`.
+   - Caddy `/health` isteğini `auth-service`'e iletir; auth-service Postgres, Redis ve RabbitMQ sağlığını doğrulayarak yanıt verir.
+
+7. **Mobil Yayın (EAS Build Preview):**
+   ```bash
+   cd mobile
+   npx eas-cli login
+   npx eas-cli init    # app.json içerisindeki projectId'yi günceller
+   npx eas-cli build -p android --profile preview
+   ```
+   EAS tarafından üretilen APK indirme bağlantısını projenin dokümantasyonuna veya README'sine ekleyebilirsin.
+
+8. **(İsteğe bağlı) Sunucu Dışı Yedek:**
+   Sunucuya `rclone` kurup harici bir bulut depolama (Google Drive, AWS S3 vb.) bağla.
+   `.env` dosyasında `BASELINE_OFFSITE_CMD` değişkenine yedekleme komutunu gir:
+   ```bash
+   BASELINE_OFFSITE_CMD="rclone copy /baselines remote:mydreamcampus-backups"
+   ```
+   Her yeni kalıcı durum alındığında `demo-ops` bu komutu otomatik çalıştıracaktır.
+
+---
+
 ## Günlük komutlar
 
 Hepsi **repo kökünden** çalışır — dizin değiştirmene gerek yok:
@@ -632,6 +771,11 @@ Kalıcı olsun istersen `~/.bashrc`'ye ekle.
 | Login 500 / CORS | `.env`'de `PUBLIC_ORIGIN` tam `https://<host>` mi (sonda `/` yok)? |
 | Build OOM (2GB) | Adım 4b swap ekle veya droplet'i 4GB'a resize et. |
 | `rabbitmq` açılmıyor, logda `feature flag` / `incompatible` | Broker yeni bir sürüm serisine, eski sürümde kapalı kalmış feature flag'lerle geçmiş. Aşağıdaki "RabbitMQ sürüm yükseltmesi" bölümüne bak. |
+| Tunnel bağlanmıyor | `docker compose logs cloudflared`. `TUNNEL_TOKEN` değerinin `.env`'de doğru olduğunu kontrol et. Cloudflare Zero Trust'ta Public Hostname hedefinin `caddy:80` (HTTP) olarak yazıldığından emin ol (localhost:80 container içinden host'a değil container'ın kendisine bakar). |
+| Loglarda gerçek IP görünmüyor | `frontend/Caddyfile`'daki `trusted_proxies` bloğunun Docker ağını (`172.16.0.0/12`) kapsadığından emin ol. Compose ağı `172.28.0.0/16` olarak sabitlenmiştir. |
+| Geri dönüş (restore) hatası | `docker compose logs demo-ops`. Veritabanı şifrelerinin `.env` ile uyumunu doğrula. `docker exec mydreamcampus-demo-ops ls -la /baselines` ile geçerli dump dosyalarını kontrol et. |
+| Kilit takılı kaldı (503 SYSTEM_EDITING) | Süper admin düzenleme modundayken oturum kapandıysa veya demo-ops zaman aşımından önce çöktüyse: `docker exec mydreamcampus-redis redis-cli -a "$REDIS_PASSWORD" DEL system:editing_lock system:editing_until` çalıştır veya Kalıcı Veri sayfasında "İptal Et" butonuna bas. |
+
 
 ### RabbitMQ sürüm yükseltmesi
 

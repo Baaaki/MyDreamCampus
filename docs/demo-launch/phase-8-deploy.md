@@ -73,7 +73,7 @@
     kullanıcıdan al).
   - **Commit:** `chore(mobile): prepare release build settings`
 
-- [ ] **8.5 DEPLOY.md'ye "Demo kurulumu" bölümü**
+- [x] **8.5 DEPLOY.md'ye "Demo kurulumu" bölümü** (gemini ile yapıldı)
   - Sunucuda adım adım:
     1. repoyu al,
     2. `.env`'i doldur,
