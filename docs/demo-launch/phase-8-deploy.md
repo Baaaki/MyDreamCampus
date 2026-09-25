@@ -63,11 +63,12 @@
     "Bekliyor" ve "başarısız" durumlarını logla.
   - auto-deploy `EDGE=tunnel` ile çalışsın (systemd unit veya `.env`).
   - **Commit:** `fix(infra): deploy only commits that passed CI`
-  > ENGEL (25.09): `backend-e2e` son 11 CI koşusunun hiçbirinde geçmedi;
-  > çoğu "Start the stack" (`up -d --build`) adımında 30 dk zaman aşımına
-  > takılıyor. `ci-passed` kırmızı kaldıkça auto-deploy backend'e dokunan
-  > hiçbir commit'i deploy etmez ve 8.6'daki dal koruması merge'ü kilitler.
-  > Düzeltmesi CI'da denenmeli (push izni gerekir).
+  > Not (25.09): `backend-e2e` son 11 CI koşusunun hiçbirinde geçmemişti —
+  > tüm imajlar aynı anda soğuk derleniyor, adım 30 dk'yı aşıyordu (runner
+  > benzeri 4 CPU/16 GB builder'da 9 dk/10 GB; önce auth-service ile 2,5
+  > dk/2,5 GB). Derleme ayrı adıma alındı; e2e golden path yerelde temiz
+  > yığında baştan sona yeşil, geri dönüş sonrası catalog 500'ü de giderildi.
+  > CI'da doğrulanması push'a bağlı.
 
 - [x] **8.4 Mobil yayın ayarları** (gemini ile yapıldı) — `e47b63c`
   - `mobile/app.json`: `name: "MyDreamCampus"`, anlamlı bir `slug` ve
