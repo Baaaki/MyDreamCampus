@@ -2,6 +2,7 @@ import { useState } from "react"
 import { useParams, useNavigate, useLocation } from "react-router"
 import { useQuery, useQueryClient } from "@tanstack/react-query"
 import { attendanceApiSafe } from "@/lib/api-client"
+import { apiErrorMessage } from "@/lib/api-error"
 import { catalogService } from "@/lib/services/catalog-service"
 import type {
   SessionRecordsResponse,
@@ -28,7 +29,7 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog"
-import { ChevronLeft } from "lucide-react"
+import { AlertCircle, ChevronLeft } from "lucide-react"
 
 export default function AdminAttendanceSessionPage() {
   const { sessionId } = useParams<{ sessionId: string }>()
@@ -72,10 +73,12 @@ export default function AdminAttendanceSessionPage() {
 
   const [studentToMark, setStudentToMark] = useState<string | null>(null)
   const [isMarking, setIsMarking] = useState(false)
+  const [markError, setMarkError] = useState<string | null>(null)
 
   const confirmMarkPresent = async () => {
     if (!studentToMark || !sessionId) return
     setIsMarking(true)
+    setMarkError(null)
     try {
       await attendanceApiSafe.post(`sessions/${sessionId}/manual`, {
         json: {
@@ -88,7 +91,7 @@ export default function AdminAttendanceSessionPage() {
         queryKey: ["admin-session-records", sessionId],
       })
     } catch (err) {
-      console.error("Manuel yoklama eklenemedi:", err)
+      setMarkError(apiErrorMessage(err, "Öğrenci yoklamaya eklenemedi."))
     } finally {
       setIsMarking(false)
       setStudentToMark(null)
@@ -116,6 +119,16 @@ export default function AdminAttendanceSessionPage() {
           </div>
         </div>
       </div>
+
+      {markError && (
+        <div
+          role="alert"
+          className="flex items-center gap-2 rounded-lg border border-destructive/30 bg-destructive/10 px-4 py-3 text-sm text-destructive"
+        >
+          <AlertCircle className="h-4 w-4 shrink-0" />
+          {markError}
+        </div>
+      )}
 
       <div className="grid grid-cols-1 gap-6 lg:grid-cols-3">
         {/* Ders Bilgileri Sidebar */}
