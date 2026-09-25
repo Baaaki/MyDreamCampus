@@ -6,7 +6,9 @@ services:
     ports: !reset []
 
   cloudflared:
-    image: cloudflare/cloudflared:2024.12.2
+    # Pinned, but Cloudflare only supports releases younger than a year:
+    # an older connector may stop reaching the edge. Bump at least yearly.
+    image: cloudflare/cloudflared:2026.9.3
     container_name: mydreamcampus-cloudflared
     restart: unless-stopped
     command: tunnel --no-autoupdate run
