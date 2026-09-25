@@ -100,6 +100,7 @@
 
 - [ ] **8.6 Kullanıcının yapacakları**
   Hesap veya erişim gerektirir; kullanıcı yapar, sen işaretlersin.
+  Adım adım sıra: [server-setup.md](server-setup.md).
   - [ ] Cloudflare'de alan adı. Zero Trust → Networks → Tunnels → yeni tunnel
     (Docker). Token → `.env` `TUNNEL_TOKEN`. Public hostname:
     `mydreamcampus.madebybaki.com` → `http://caddy:80`.
