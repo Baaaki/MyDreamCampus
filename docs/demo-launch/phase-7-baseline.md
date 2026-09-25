@@ -117,7 +117,7 @@ gerekiyorsa kilidi yeniden yazar.
       duruyor.
   - **Commit:** `feat(infra): restore the permanent state`
 
-- [ ] **7.4 Zamanlama ve ilk kalıcı durum**
+- [x] **7.4 Zamanlama ve ilk kalıcı durum** (gemini ile yapıldı)
   - Açılışta `/baselines/current` yoksa seed bitmiş demektir; hemen ilk
     kalıcı durumu al.
   - Döngü her dakika kontrol eder:
