@@ -45,8 +45,9 @@ restore_to() {
 }
 
 # ensure_baseline takes the first permanent state right after the seed, and
-# keeps retrying every 5 minutes if that failed: without a baseline neither
-# the nightly restore nor editing can work.
+# keeps retrying every minute if that failed: without a baseline neither the
+# nightly restore nor editing can work. The first try often meets the
+# events the seed and the first visitors are still producing.
 LAST_BASELINE_ATTEMPT=0
 ensure_baseline() {
     current=$(get_current_version)
@@ -54,7 +55,7 @@ ensure_baseline() {
         return 0
     fi
     now=$(date +%s)
-    [ $((now - LAST_BASELINE_ATTEMPT)) -ge 300 ] || return 1
+    [ $((now - LAST_BASELINE_ATTEMPT)) -ge 60 ] || return 1
     LAST_BASELINE_ATTEMPT=$now
 
     echo ">> [demo-ops] No baseline found. Creating one from the current databases..."
@@ -202,7 +203,7 @@ prev_deadline=$(status_field edit_deadline)
 prev_error=$(status_field last_error)
 
 if ! ensure_baseline; then
-    echo "!! [demo-ops] Initial baseline snapshot failed; retrying every 5 minutes"
+    echo "!! [demo-ops] Initial baseline snapshot failed; retrying every minute"
     prev_error=$(status_field last_error)
 fi
 
