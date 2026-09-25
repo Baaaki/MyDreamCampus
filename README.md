@@ -103,7 +103,7 @@ veri ve SPA'yı sunan Caddy dahil:
 
 ```bash
 cp new-backend/infrastructure/.env.example new-backend/infrastructure/.env
-# .env içindeki CHANGE_ME değerlerini doldurun: openssl rand -base64 48
+# .env içindeki CHANGE_ME değerlerini doldurun: openssl rand -hex 32
 make deploy
 ```
 

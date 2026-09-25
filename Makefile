@@ -135,7 +135,7 @@ check-env:
 		exit 1; }
 	@grep -q 'CHANGE_ME' $(INFRA)/.env && { \
 		echo "HATA: $(INFRA)/.env icinde hala CHANGE_ME var — secret'lari doldur."; \
-		echo "  openssl rand -base64 48"; \
+		echo "  openssl rand -hex 32"; \
 		exit 1; } || true
 	@if grep -qE '^[[:space:]]*DEMO_MODE[[:space:]]*=[[:space:]]*"?true"?' $(INFRA)/.env; then \
 		for var in DEMO_ADMIN_EMAIL DEMO_TEACHER_EMAIL DEMO_STUDENT_EMAIL; do \

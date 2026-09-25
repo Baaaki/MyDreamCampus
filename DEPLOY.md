@@ -135,7 +135,9 @@ cp new-backend/infrastructure/.env.example new-backend/infrastructure/.env
 nano new-backend/infrastructure/.env
 ```
 
-Her `CHANGE_ME` için ayrı ayrı `openssl rand -base64 48` çalıştırıp yapıştır.
+Her `CHANGE_ME` için ayrı ayrı `openssl rand -hex 32` çalıştırıp yapıştır. Base64 kullanma:
+`RABBITMQ_PASSWORD` ve `SERVICE_DB_PASSWORD` bağlantı URL'lerine gömülüyor, base64'ün `/`
+karakteri URL'i bozar ve servisler bağlanamaz.
 Adres satırları A1'de seçtiğin kuruluma göre — IP'yi kendi LAN IP'nle değiştir:
 
 **Rootless, yüksek port (varsayılan öneri):**
@@ -496,7 +498,7 @@ cp .env.example .env
 Secret üretmek için (her biri için ayrı çalıştır, çıktıyı yapıştır):
 
 ```bash
-openssl rand -base64 48
+openssl rand -hex 32
 ```
 
 Doldurulacaklar: `POSTGRES_PASSWORD`, `SERVICE_DB_PASSWORD`, `REDIS_PASSWORD`, `RABBITMQ_PASSWORD`,
@@ -623,7 +625,7 @@ cp new-backend/infrastructure/.env.example new-backend/infrastructure/.env
 nano new-backend/infrastructure/.env
 ```
 Gereken temel değerler:
-- Tüm secret'ları `openssl rand -base64 48` ile üret (`SERVICE_DB_PASSWORD` için `openssl rand -hex 32`).
+- Tüm secret'ları `openssl rand -hex 32` ile üret (base64 değil: `/` karakteri RabbitMQ ve Postgres URL'lerini bozar).
 - `ADMIN_EMAIL`: Tahmin edilemez gerçek süper admin e-postası.
 - `ADMIN_INITIAL_PASSWORD`: Güçlü geçici ilk şifre (ilk girişte değiştirilmesi zorunludur).
 - `DEMO_MODE=true`
