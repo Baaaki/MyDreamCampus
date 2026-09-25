@@ -123,6 +123,7 @@ export default function BaselinePage() {
   const {
     data: status,
     isLoading,
+    error: statusError,
     refetch,
     isFetching,
   } = useQuery<BaselineStatus>({
@@ -137,6 +138,11 @@ export default function BaselinePage() {
     },
   })
   const isProcessing = status?.mode === "busy" || isWaitingFor(status)
+  // Empty when the backend never answered: behind Cloudflare Access the
+  // request is redirected to Access's login page on another origin, which
+  // fetch cannot follow. Opening the endpoint itself lets Access ask for the
+  // code and set its cookie.
+  const statusErrorMessage = statusError ? apiErrorMessage(statusError, "") : ""
 
   const countdown = useCountdown(status?.edit_deadline)
 
@@ -294,6 +300,34 @@ export default function BaselinePage() {
           Yenile
         </Button>
       </div>
+
+      {statusError && (
+        <div
+          role="alert"
+          className="flex items-start gap-3 rounded-lg border border-amber-200 bg-amber-50 p-4 text-amber-900 dark:border-amber-900 dark:bg-amber-950/40 dark:text-amber-200"
+        >
+          <AlertTriangle className="mt-0.5 h-5 w-5 shrink-0 text-amber-600 dark:text-amber-400" />
+          <div className="space-y-1 text-sm">
+            <p className="font-semibold">Sistem durumu okunamadı</p>
+            {statusErrorMessage ? (
+              <p>{statusErrorMessage}</p>
+            ) : (
+              <p>
+                Bu uçlar Cloudflare Access arkasındaysa önce doğrulama gerekir:{" "}
+                <a
+                  href="/api/catalog/admin/ops/status"
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="font-medium underline"
+                >
+                  doğrulama sayfasını yeni sekmede aç
+                </a>
+                , kodu gir, sonra burada &quot;Yenile&quot;ye bas.
+              </p>
+            )}
+          </div>
+        </div>
+      )}
 
       {status?.last_error && (
         <div

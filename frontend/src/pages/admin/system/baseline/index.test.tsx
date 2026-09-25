@@ -2,6 +2,7 @@ import { describe, it, expect, vi, beforeEach } from "vitest"
 import { render, screen, waitFor } from "@testing-library/react"
 import userEvent from "@testing-library/user-event"
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query"
+import ky, { HTTPError } from "ky"
 import BaselinePage from "./index"
 import * as baselineService from "@/lib/services/baseline-service"
 
@@ -29,9 +30,63 @@ function renderComponent() {
   )
 }
 
+// ky fills HTTPError.data while handling the response, so the error has to
+// come out of a real request rather than the constructor.
+async function httpError(body: string, status: number): Promise<HTTPError> {
+  const fetch = async () =>
+    new Response(body, {
+      status,
+      headers: { "Content-Type": "application/json" },
+    })
+  try {
+    await ky.get("http://localhost/api/catalog/admin/ops/status", {
+      fetch,
+      retry: 0,
+    })
+  } catch (err) {
+    if (err instanceof HTTPError) return err
+    throw err
+  }
+  throw new Error("expected an HTTPError")
+}
+
 describe("BaselinePage", () => {
   beforeEach(() => {
     vi.clearAllMocks()
+  })
+
+  it("points to Cloudflare Access when the status request never reaches the backend", async () => {
+    // What fetch throws when Access redirects it to its login page.
+    vi.mocked(baselineService.getBaselineStatus).mockRejectedValue(
+      new TypeError("Failed to fetch")
+    )
+
+    renderComponent()
+
+    const link = await screen.findByRole("link", {
+      name: "doğrulama sayfasını yeni sekmede aç",
+    })
+    expect(link).toHaveAttribute("href", "/api/catalog/admin/ops/status")
+    expect(screen.getByText("Sistem durumu okunamadı")).toBeInTheDocument()
+  })
+
+  it("shows the backend's message when the status request is refused", async () => {
+    vi.mocked(baselineService.getBaselineStatus).mockRejectedValue(
+      await httpError(
+        JSON.stringify({
+          error: "Bu işlem için yetkiniz yok",
+          code: "FORBIDDEN",
+        }),
+        403
+      )
+    )
+
+    renderComponent()
+
+    expect(
+      await screen.findByText("Bu işlem için yetkiniz yok")
+    ).toBeInTheDocument()
+    expect(screen.queryByRole("link")).not.toBeInTheDocument()
   })
 
   it("renders normal status correctly", async () => {
