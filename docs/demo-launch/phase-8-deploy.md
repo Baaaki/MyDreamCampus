@@ -18,7 +18,7 @@
 
 ## Görevler
 
-- [x] **8.1 Tunnel compose katmanı** (gemini ile yapıldı)
+- [x] **8.1 Tunnel compose katmanı** (gemini ile yapıldı) — `3f39fea`
   - Yeni `new-backend/infrastructure/docker-compose.tunnel.yml`:
     - `cloudflared` servisi: `cloudflare/cloudflared`, **sabit sürüm
       etiketi**; `command: tunnel --no-autoupdate run`; env `TUNNEL_TOKEN`;
@@ -37,7 +37,7 @@
     DEPLOY.md'de anlat.
   - **Commit:** `feat(infra): add a Cloudflare Tunnel compose layer`
 
-- [x] **8.2 Ortam değişkenleri** (gemini ile yapıldı)
+- [x] **8.2 Ortam değişkenleri** (gemini ile yapıldı) — `ffdd178`
   - `new-backend/infrastructure/.env.example`'a ekle:
     - `DEMO_MODE=true`, `DEMO_ADMIN_EMAIL`, `DEMO_TEACHER_EMAIL`,
       `DEMO_STUDENT_EMAIL`
@@ -55,7 +55,7 @@
     Cloudflare önbelleği için).
   - **Commit:** `chore(infra): add demo environment settings`
 
-- [x] **8.3 Otomatik deploy için CI kapısı** (gemini ile yapıldı)
+- [x] **8.3 Otomatik deploy için CI kapısı** (gemini ile yapıldı) — `f97dcd5`
   - `scripts/auto-deploy.sh`: `git pull` + `make deploy` öncesinde
     `origin/main` commit'inin `ci-passed` check-run'ının başarılı olduğunu
     kontrol et (GitHub API; repo public ise token'sız, değilse
@@ -64,16 +64,15 @@
   - auto-deploy `EDGE=tunnel` ile çalışsın (systemd unit veya `.env`).
   - **Commit:** `fix(infra): deploy only commits that passed CI`
 
-- [x] **8.4 Mobil yayın ayarları** (gemini ile yapıldı)
+- [x] **8.4 Mobil yayın ayarları** (gemini ile yapıldı) — `e47b63c`
   - `mobile/app.json`: `name: "MyDreamCampus"`, anlamlı bir `slug` ve
     `scheme`. `extra.eas.projectId` kullanıcıdan gelecek; şimdilik yer tutucu
     kalsın ve not düş.
   - `mobile/eas.json` `preview` profili:
-    `env.EXPO_PUBLIC_API_URL = https://<alan-adı>/api` (alan adını
-    kullanıcıdan al).
+    `env.EXPO_PUBLIC_API_URL = https://mydreamcampus.madebybaki.com/api`.
   - **Commit:** `chore(mobile): prepare release build settings`
 
-- [x] **8.5 DEPLOY.md'ye "Demo kurulumu" bölümü** (gemini ile yapıldı)
+- [x] **8.5 DEPLOY.md'ye "Demo kurulumu" bölümü** (gemini ile yapıldı) — `25d8378`
   - Sunucuda adım adım:
     1. repoyu al,
     2. `.env`'i doldur,
@@ -93,16 +92,16 @@
   Hesap veya erişim gerektirir; kullanıcı yapar, sen işaretlersin.
   - [ ] Cloudflare'de alan adı. Zero Trust → Networks → Tunnels → yeni tunnel
     (Docker). Token → `.env` `TUNNEL_TOKEN`. Public hostname:
-    `<alan-adı>` → `http://caddy:80`.
+    `mydreamcampus.madebybaki.com` → `http://caddy:80`.
   - [ ] SSL/TLS → Edge Certificates → "Always Use HTTPS" açık.
   - [ ] Security → WAF → Rate limiting rule: `/api/auth/login` için IP
     başına dakikada 10 istek.
   - [ ] (K4) Zero Trust → Access → Applications → Self-hosted:
-    `<alan-adı>/api/catalog/admin/ops*`. Policy: yalnız kullanıcının
+    `mydreamcampus.madebybaki.com/api/catalog/admin/ops*`. Policy: yalnız kullanıcının
     e-postası (One-time PIN).
   - [ ] GitHub → Settings → Branches: `main` koruması (PR zorunlu ve
     `ci-passed` status check).
-  - [ ] UptimeRobot (ücretsiz): `https://<alan-adı>/health`, 5 dakikada bir.
+  - [ ] UptimeRobot (ücretsiz): `https://mydreamcampus.madebybaki.com/health`, 5 dakikada bir.
   - [ ] Sunucuda `.env`:
     - her secret `openssl rand -base64 48` ile üretilmiş;
     - `ADMIN_EMAIL` tahmin edilemez bir adres;
@@ -115,6 +114,7 @@
     `eas build -p android --profile preview`. APK linkini README'ye ekle.
   - [ ] (İsteğe bağlı) Sunucu dışı yedek: rclone kur ve
     `BASELINE_OFFSITE_CMD`'yi ayarla.
+
 
 ## Faz sonu
 - README §5 yeşil olmalı.
