@@ -171,12 +171,19 @@ rabbitmq-feature-flags:
 # running and keeps holding its host ports, so the next `up` fails on a port
 # that looks free. Only on the two whole-stack targets — a single-service
 # target must never sweep.
+#
+# One Go service is built before the rest: all at once, every Go image starts
+# a cold compile of the same dependency tree side by side (measured on 4 CPUs:
+# 9 min and 10 GB, against 2.5 min and 2.5 GB this way). Once the BuildKit
+# cache mounts are warm the extra build is a cache hit.
 deploy: check-env rabbitmq-feature-flags
+	$(SUDO) docker compose $(COMPOSE) build auth-service
 	$(SUDO) docker compose $(COMPOSE) up -d --build --remove-orphans
 
 deploy-update: check-env
 	git pull
 	@$(MAKE) --no-print-directory rabbitmq-feature-flags
+	$(SUDO) docker compose $(COMPOSE) build auth-service
 	$(SUDO) docker compose $(COMPOSE) up -d --build --remove-orphans
 
 deploy-logs:
