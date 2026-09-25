@@ -92,6 +92,11 @@ fi
 for db in $ALL_DBS; do
     terminate_connections "$db" || echo "!! [restore] Could not end old sessions on $db; its service may answer 500 until they close"
 done
+# pgxpool pings only a connection that sat idle for over a second, so one
+# used just before the termination above is still handed out dead for that
+# long (57P01, a 500 to whoever gets it). Past the second every dead one is
+# pinged and replaced, so the restore is not reported done before then.
+sleep 2
 
 # 4. Purge RabbitMQ queues
 purge_rabbitmq_queues
