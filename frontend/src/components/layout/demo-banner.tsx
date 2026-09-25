@@ -1,9 +1,15 @@
 import { AlertTriangle } from "lucide-react"
+import { SystemEditingBanner } from "@/components/layout/system-editing-banner"
+import { useIsSystemEditing } from "@/lib/services/baseline-service"
 import { useIsDemoMode } from "@/lib/services/demo-service"
 
 export function DemoBanner() {
   const isDemo = useIsDemoMode()
+  const isEditing = useIsSystemEditing()
 
+  // Both notices use the strip the layouts leave room for; while the super
+  // admin edits, that notice takes the demo notice's place.
+  if (isEditing) return <SystemEditingBanner />
   if (!isDemo) return null
 
   return (

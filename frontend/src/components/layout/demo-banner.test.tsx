@@ -1,7 +1,8 @@
 import { describe, it, expect, beforeEach, afterEach, vi } from "vitest"
-import { render, screen } from "@testing-library/react"
+import { act, render, screen } from "@testing-library/react"
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query"
 import { DemoBanner } from "./demo-banner"
+import { setSystemEditing } from "@/lib/services/baseline-service"
 
 function renderBanner() {
   const queryClient = new QueryClient({
@@ -34,6 +35,9 @@ beforeEach(() => {
 afterEach(() => {
   vi.unstubAllGlobals()
   vi.resetAllMocks()
+  act(() => {
+    setSystemEditing(false)
+  })
 })
 
 describe("DemoBanner", () => {
@@ -79,5 +83,33 @@ describe("DemoBanner", () => {
     expect(
       screen.queryByText(/Bu bir demo\. Yaptığınız değişiklikler/i)
     ).not.toBeInTheDocument()
+  })
+
+  it("shows the editing notice in place of the demo notice", async () => {
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(async () =>
+        jsonResponse([
+          {
+            role: "admin",
+            label: "Demo Yönetici",
+            email: "demo.admin@mydreamcampus.com",
+            password: "demo.admin@mydreamcampus.com",
+          },
+        ])
+      )
+    )
+
+    renderBanner()
+    await screen.findByText(/Bu bir demo\./i)
+
+    act(() => {
+      setSystemEditing(true)
+    })
+
+    expect(
+      screen.getByText("Sistem güncelleniyor, şu an değişiklik yapılamaz.")
+    ).toBeInTheDocument()
+    expect(screen.queryByText(/Bu bir demo\./i)).not.toBeInTheDocument()
   })
 })
