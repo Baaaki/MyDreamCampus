@@ -14,6 +14,7 @@ cd "$(dirname "$0")/.."
 
 BRANCH="${DEPLOY_BRANCH:-main}"
 STATE=".git/last-deployed-sha"
+export EDGE="${EDGE:-tunnel}"
 
 git fetch --quiet origin "$BRANCH"
 
@@ -27,7 +28,57 @@ if [ "$remote" = "$last" ]; then
 	exit 0
 fi
 
-echo ">> deploying ${last:0:7} -> ${remote:0:7}"
+# Gating: deploy only commits where CI has passed
+if [ -z "${GITHUB_REPOSITORY:-}" ]; then
+	origin_url=$(git config --get remote.origin.url || true)
+	GITHUB_REPOSITORY=$(echo "$origin_url" | sed -E -n 's#.*github\.com[:/]([^/]+/[^/.]+)(\.git)?.*#\1#p')
+fi
+
+if [ -n "$GITHUB_REPOSITORY" ]; then
+	auth_args=()
+	if [ -n "${GITHUB_TOKEN:-}" ]; then
+		auth_args=(-H "Authorization: Bearer $GITHUB_TOKEN")
+	fi
+
+	api_url="https://api.github.com/repos/${GITHUB_REPOSITORY}/commits/${remote}/check-runs?check_name=ci-passed"
+	resp=$(curl -sS -w "\n%{http_code}" "${auth_args[@]}" \
+		-H "Accept: application/vnd.github+json" \
+		-H "X-GitHub-Api-Version: 2022-11-28" \
+		"$api_url" 2>/dev/null || true)
+
+	http_code=$(echo "$resp" | tail -n1)
+	body=$(echo "$resp" | sed '$d')
+
+	if [ "$http_code" != "200" ]; then
+		echo ">> commit ${remote:0:7}: GitHub API kontrolu basarisiz (HTTP $http_code). Sonraki turda tekrar denenecek."
+		exit 0
+	fi
+
+	count=$(echo "$body" | jq -r '.total_count // 0' 2>/dev/null || echo 0)
+	if [ "$count" -eq 0 ]; then
+		echo ">> commit ${remote:0:7}: CI bekliyor (ci-passed henuz olusmadi)"
+		exit 0
+	fi
+
+	status=$(echo "$body" | jq -r '.check_runs | sort_by(.id) | reverse | .[0].status // empty' 2>/dev/null)
+	conclusion=$(echo "$body" | jq -r '.check_runs | sort_by(.id) | reverse | .[0].conclusion // empty' 2>/dev/null)
+
+	if [ "$status" != "completed" ]; then
+		echo ">> commit ${remote:0:7}: CI bekliyor (ci-passed durumu: $status)"
+		exit 0
+	fi
+
+	if [ "$conclusion" != "success" ]; then
+		echo ">> commit ${remote:0:7}: CI basarisiz (ci-passed sonucu: $conclusion)"
+		exit 0
+	fi
+
+	echo ">> commit ${remote:0:7}: CI basarili (ci-passed: success)"
+else
+	echo ">> uyari: GITHUB_REPOSITORY cozumlenemedi, CI kontrolu atlandi."
+fi
+
+echo ">> deploying ${last:0:7} -> ${remote:0:7} (EDGE=${EDGE})"
 
 # --ff-only: never invent a merge commit on the server. Local edits there are
 # a mistake worth failing loudly on.
@@ -36,3 +87,4 @@ make deploy
 
 echo "$remote" >"$STATE"
 echo ">> deploy complete: $(git log -1 --oneline)"
+

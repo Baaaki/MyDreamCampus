@@ -55,7 +55,7 @@
     Cloudflare önbelleği için).
   - **Commit:** `chore(infra): add demo environment settings`
 
-- [ ] **8.3 Otomatik deploy için CI kapısı**
+- [x] **8.3 Otomatik deploy için CI kapısı** (gemini ile yapıldı)
   - `scripts/auto-deploy.sh`: `git pull` + `make deploy` öncesinde
     `origin/main` commit'inin `ci-passed` check-run'ının başarılı olduğunu
     kontrol et (GitHub API; repo public ise token'sız, değilse

@@ -10,6 +10,7 @@ Wants=network-online.target
 Type=oneshot
 WorkingDirectory=@REPO@
 Environment=DOCKER_HOST=unix:///run/user/@UID@/docker.sock
+Environment=EDGE=tunnel
 ExecStart=@REPO@/scripts/auto-deploy.sh
 
 # A hung build must not block every later tick.
