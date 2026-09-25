@@ -7,10 +7,20 @@
 INFRA        := new-backend/infrastructure
 COMPOSE_FILE := $(INFRA)/docker-compose.yml
 
+# EDGE comes from .env so a hand-typed `make deploy`, `make autodeploy-now`
+# and the systemd timer all land on the same edge: forgetting it on a tunnel
+# server would load the standalone overlay, and --remove-orphans would take
+# cloudflared down with it. EDGE in the environment or on the command line
+# still wins.
+ifeq ($(origin EDGE),undefined)
+EDGE := $(shell awk -F= '/^[[:space:]]*EDGE[[:space:]]*=/ { v = $$2 } END { gsub(/["\r]/, "", v); split(v, w, " "); print w[1] }' $(INFRA)/.env 2>/dev/null)
+endif
+
 # The base file publishes only caddy's :80 — the single port an outer edge
 # (Cloudflare Tunnel, a VPS reverse proxy) needs to reach. The standalone
 # overlay adds caddy's :443 and the infra loopback ports back for running
-# without such an edge. Every target here loads both.
+# without such an edge; EDGE=tunnel swaps it for the cloudflared overlay,
+# which publishes nothing.
 #
 # A Prometheus/Grafana/Loki stack is out of scope for now, but it slots in as a
 # third overlay without rethinking this variable:
@@ -21,7 +31,6 @@ COMPOSE := -f $(COMPOSE_FILE) -f $(INFRA)/docker-compose.tunnel.yml
 else
 COMPOSE := -f $(COMPOSE_FILE) -f $(INFRA)/docker-compose.standalone.yml
 endif
-
 
 # The four containers a locally-run service needs, plus the one-shot migrator.
 INFRA_SERVICES := postgres redis rabbitmq mailhog migrate
@@ -137,6 +146,9 @@ check-env:
 			fi; \
 		done; \
 	fi
+	@case "$(EDGE)" in ""|tunnel) ;; *) \
+		echo "HATA: EDGE='$(EDGE)' taninmiyor — bos birak ya da tunnel yaz."; \
+		exit 1;; esac
 	@if [ "$(EDGE)" = "tunnel" ]; then \
 		val=$$(grep -E '^[[:space:]]*TUNNEL_TOKEN[[:space:]]*=' $(INFRA)/.env | head -1 | cut -d'=' -f2- | tr -d '\"'\''[:space:]'); \
 		if [ -z "$$val" ] && [ -z "$$TUNNEL_TOKEN" ]; then \

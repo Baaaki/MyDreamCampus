@@ -612,6 +612,8 @@ Gereken temel değerler:
 - `DEMO_STUDENT_EMAIL=zeynep.sahin@uni.edu.tr`
 - `NIGHTLY_RESET_AT=04:00`
 - `BASELINE_KEEP=7`
+- `EDGE=tunnel`: Her `make` hedefi ve otomatik deploy bunu `.env`'den okur. Yazmazsan elle
+  çalıştırılan bir `make deploy` standalone katmanına döner ve `cloudflared`'ı kaldırır.
 - `TUNNEL_TOKEN`: Cloudflare Zero Trust panelinden alınan tünel token'ı (aşağıdaki Cloudflare adımlarına bak).
 - `PUBLIC_HOST=:80`
 - `PUBLIC_ORIGIN=https://mydreamcampus.madebybaki.com`
@@ -624,9 +626,10 @@ Gereken temel değerler:
 
 #### 3. Stack'i Başlat
 ```bash
-EDGE=tunnel make deploy
+make deploy
 ```
-Bu komut `docker-compose.yml` ve `docker-compose.tunnel.yml` katmanlarını birlikte yükler.
+`.env`'deki `EDGE=tunnel` sayesinde bu komut `docker-compose.yml` ve `docker-compose.tunnel.yml`
+katmanlarını birlikte yükler.
 Caddy'nin host portları kalkar, `cloudflared` konteyneri ayağa kalkıp tüneli kurar.
 
 #### 4. Seed ve İlk Kalıcı Durumu Doğrula
@@ -650,7 +653,7 @@ make autodeploy-install
 ```
 `origin/main` dalını 2 dakikada bir kontrol eden systemd user timer'ı kurulur.
 Yeni commit geldiğinde GitHub API üzerinden `ci-passed` kontrolünün başarılı olduğunu
-doğrular ve yalnızca CI'dan geçmiş sürümleri `EDGE=tunnel` ile deploy eder.
+doğrular ve yalnızca CI'dan geçmiş sürümleri deploy eder; katmanı yine `.env`'deki `EDGE` belirler.
 
 ---
 

@@ -14,7 +14,6 @@ cd "$(dirname "$0")/.."
 
 BRANCH="${DEPLOY_BRANCH:-main}"
 STATE=".git/last-deployed-sha"
-export EDGE="${EDGE:-tunnel}"
 
 git fetch --quiet origin "$BRANCH"
 
@@ -78,7 +77,7 @@ else
 	echo ">> uyari: GITHUB_REPOSITORY cozumlenemedi, CI kontrolu atlandi."
 fi
 
-echo ">> deploying ${last:0:7} -> ${remote:0:7} (EDGE=${EDGE})"
+echo ">> deploying ${last:0:7} -> ${remote:0:7}"
 
 # --ff-only: never invent a merge commit on the server. Local edits there are
 # a mistake worth failing loudly on.
