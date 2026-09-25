@@ -110,7 +110,7 @@ func New(
 		),
 		auditHandler:  handler.NewAuditHandler(auditRepo),
 		auditConsumer: worker.NewAuditConsumer(rabbitmq.NewConsumer(rabbitConn), auditRepo),
-		periodHandler: platformHandler.NewSimplePeriodHandler(periodRepo, semesterStatusRepo, auditLogger),
+		periodHandler: platformHandler.NewSimplePeriodHandler(periodRepo, handler.PeriodEvents{}, semesterStatusRepo, auditLogger),
 		timeHandler:   platformHandler.NewTimeControlHandler("catalog", clockBackend, auditLogger),
 		opsHandler:    handler.NewOpsHandler(opsBackend, auditLogger),
 	}

@@ -22,7 +22,7 @@ func init() {
 }
 
 func TestSimplePeriodHandler_Validation(t *testing.T) {
-	h := NewSimplePeriodHandler(nil, nil, nil)
+	h := NewSimplePeriodHandler(nil, nil, nil, nil)
 	r := gin.New()
 	r.POST("/periods", h.CreatePeriod)
 

@@ -2,7 +2,7 @@ package handler
 
 import (
 	"context"
-	"encoding/json"
+	"errors"
 	"fmt"
 	"net/http"
 	"time"
@@ -13,23 +13,33 @@ import (
 	"github.com/baaaki/mydreamcampus/shared/platform/logger"
 	"github.com/baaaki/mydreamcampus/shared/platform/repository"
 	"github.com/baaaki/mydreamcampus/shared/platform/semester"
-	"github.com/baaaki/mydreamcampus/shared/platform/utils"
 	"github.com/gin-gonic/gin"
 	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5"
 	"go.uber.org/zap"
 )
 
+// PeriodEventQueuer writes the projection event of a period change inside the
+// caller's transaction. The service owning the periods provides it: shared
+// code does not know that service's outbox table.
+type PeriodEventQueuer interface {
+	QueuePeriodEvent(ctx context.Context, tx pgx.Tx, p *repository.SimplePeriod, action string) error
+	QueuePeriodDeletedEvent(ctx context.Context, tx pgx.Tx, semester, periodType string) error
+}
+
 // SimplePeriodHandler provides admin endpoints for managing academic periods
 // across all four period types (catalog, enrollment, grading, attendance).
 type SimplePeriodHandler struct {
 	repo            *repository.SimplePeriodRepository
+	events          PeriodEventQueuer
 	semesterChecker semester.Checker
 	auditLogger     audit.Logger
 }
 
-func NewSimplePeriodHandler(repo *repository.SimplePeriodRepository, checker semester.Checker, auditLogger audit.Logger) *SimplePeriodHandler {
-	return &SimplePeriodHandler{repo: repo, semesterChecker: checker, auditLogger: auditLogger}
+// events may be nil for a repository without period types; periods of the
+// projected types cannot be managed without it.
+func NewSimplePeriodHandler(repo *repository.SimplePeriodRepository, events PeriodEventQueuer, checker semester.Checker, auditLogger audit.Logger) *SimplePeriodHandler {
+	return &SimplePeriodHandler{repo: repo, events: events, semesterChecker: checker, auditLogger: auditLogger}
 }
 
 // RegisterRoutes mounts period CRUD endpoints under the given router group.
@@ -127,7 +137,7 @@ func (h *SimplePeriodHandler) CreatePeriod(c *gin.Context) {
 		}
 
 		if periodType != repository.PeriodTypeCatalog {
-			if err := queuePeriodEvent(c.Request.Context(), tx, period, periodType, events.PeriodActionCreated); err != nil {
+			if err := h.queuePeriodEvent(c.Request.Context(), tx, period, events.PeriodActionCreated); err != nil {
 				logger.Error("failed to queue period event", zap.Error(err))
 				c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to queue event", "code": "INTERNAL_ERROR"})
 				return
@@ -298,7 +308,7 @@ func (h *SimplePeriodHandler) UpdatePeriod(c *gin.Context) {
 		}
 
 		if period.PeriodType != "" && period.PeriodType != repository.PeriodTypeCatalog {
-			if err := queuePeriodEvent(c.Request.Context(), tx, period, period.PeriodType, events.PeriodActionUpdated); err != nil {
+			if err := h.queuePeriodEvent(c.Request.Context(), tx, period, events.PeriodActionUpdated); err != nil {
 				logger.Error("failed to queue period update event", zap.Error(err))
 				c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to queue event", "code": "INTERNAL_ERROR"})
 				return
@@ -429,7 +439,7 @@ func (h *SimplePeriodHandler) DeletePeriod(c *gin.Context) {
 		}
 
 		if existing.PeriodType != "" && existing.PeriodType != repository.PeriodTypeCatalog {
-			if err := queuePeriodDeletedEvent(c.Request.Context(), tx, existing.Semester, existing.PeriodType); err != nil {
+			if err := h.queuePeriodDeletedEvent(c.Request.Context(), tx, existing.Semester, existing.PeriodType); err != nil {
 				logger.Error("failed to queue period deletion event", zap.Error(err))
 				c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to queue event", "code": "INTERNAL_ERROR"})
 				return
@@ -496,42 +506,20 @@ func (h *SimplePeriodHandler) DeletePeriod(c *gin.Context) {
 	})
 }
 
-func queuePeriodEvent(ctx context.Context, tx pgx.Tx, p *repository.SimplePeriod, periodType, action string) error {
-	payload, err := json.Marshal(map[string]any{
-		"id":           p.ID.String(),
-		"semester":     p.Semester,
-		"period_type":  periodType,
-		"period_start": p.PeriodStart.Format(time.RFC3339),
-		"period_end":   p.PeriodEnd.Format(time.RFC3339),
-		"is_active":    p.IsActive,
-	})
-	if err != nil {
-		return fmt.Errorf("marshal period event payload: %w", err)
+var errNoPeriodEvents = errors.New("no period event queuer configured")
+
+func (h *SimplePeriodHandler) queuePeriodEvent(ctx context.Context, tx pgx.Tx, p *repository.SimplePeriod, action string) error {
+	if h.events == nil {
+		return errNoPeriodEvents
 	}
-	eventType := events.PeriodEventType(periodType, action)
-	correlationID := utils.CorrelationIDFromContext(ctx)
-	_, err = tx.Exec(ctx, `
-		INSERT INTO course_catalog.outbox_events (event_type, routing_key, payload, correlation_id)
-		VALUES ($1, $2, $3, $4)
-	`, eventType, eventType, payload, correlationID)
-	return err
+	return h.events.QueuePeriodEvent(ctx, tx, p, action)
 }
 
-func queuePeriodDeletedEvent(ctx context.Context, tx pgx.Tx, semester, periodType string) error {
-	payload, err := json.Marshal(map[string]any{
-		"semester":    semester,
-		"period_type": periodType,
-	})
-	if err != nil {
-		return fmt.Errorf("marshal period event payload: %w", err)
+func (h *SimplePeriodHandler) queuePeriodDeletedEvent(ctx context.Context, tx pgx.Tx, semester, periodType string) error {
+	if h.events == nil {
+		return errNoPeriodEvents
 	}
-	eventType := events.PeriodEventType(periodType, events.PeriodActionDeleted)
-	correlationID := utils.CorrelationIDFromContext(ctx)
-	_, err = tx.Exec(ctx, `
-		INSERT INTO course_catalog.outbox_events (event_type, routing_key, payload, correlation_id)
-		VALUES ($1, $2, $3, $4)
-	`, eventType, eventType, payload, correlationID)
-	return err
+	return h.events.QueuePeriodDeletedEvent(ctx, tx, semester, periodType)
 }
 
 func toSimplePeriodResponse(p *repository.SimplePeriod) dto.SimplePeriodResponse {
