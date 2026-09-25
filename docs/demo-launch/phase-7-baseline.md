@@ -166,7 +166,7 @@ gerekiyorsa kilidi yeniden yazar.
     an değişiklik yapılamaz."
   - **Commit:** `feat(frontend): add the permanent state page for the super admin`
 
-- [ ] **7.8 e2e (önerilir)**
+- [x] **7.8 e2e (önerilir)** (gemini ile yapıldı)
   - CI `backend-e2e`'ye ekle:
     1. demo-ops ayakta;
     2. begin-edit;
