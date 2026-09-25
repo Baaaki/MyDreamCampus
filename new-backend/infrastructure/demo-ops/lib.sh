@@ -131,6 +131,14 @@ update_status() {
         err_json=$(printf '%s' "$last_error" | jq -R .)
     fi
 
+    # The command being handled, so the panel can tell its own request was
+    # picked up from a status written before it.
+    if [ -z "${COMMAND_ID:-}" ]; then
+        command_json="null"
+    else
+        command_json=$(printf '%s' "$COMMAND_ID" | jq -R .)
+    fi
+
     action_json=$(printf '%s' "$last_action" | jq -R .)
     current_json=$(printf '%s' "$current" | jq -R .)
 
@@ -141,6 +149,7 @@ update_status() {
   "versions": $versions,
   "edit_deadline": $deadline_json,
   "last_action": $action_json,
+  "last_command_id": $command_json,
   "last_error": $err_json,
   "updated_at": "$now"
 }
@@ -172,4 +181,12 @@ purge_rabbitmq_queues() {
         echo "   Purging queue: $q"
         curl -s -X DELETE -u "$RABBITMQ_USER:$RABBITMQ_PASSWORD" "http://$RABBITMQ_HOST:$RABBITMQ_PORT/api/queues/%2f/$q/contents" >/dev/null 2>&1 || true
     done
+}
+
+# reset_redis drops every key except ops:* — the status, the queued commands
+# and the write lock belong to demo-ops and must outlive the reset; FLUSHDB
+# made the panel read "normal" mid-restore and lost queued commands. One Lua
+# call keeps it atomic.
+reset_redis() {
+    redis_cmd EVAL "local c = '0' local n = 0 repeat local r = redis.call('SCAN', c, 'COUNT', 1000) c = r[1] for _, k in ipairs(r[2]) do if string.sub(k, 1, 4) ~= 'ops:' then redis.call('DEL', k) n = n + 1 end end until c == '0' return n" 0
 }

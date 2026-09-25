@@ -139,6 +139,61 @@ check_edit_timeout() {
     restore_to "" "timeout_cancel_edit"
 }
 
+# reject <action> <reason> leaves mode and deadline as they are and shows why
+# the command was not run.
+reject() {
+    echo "!! [demo-ops] Rejected $1: $2"
+    mode=$(status_field mode)
+    update_status "${mode:-normal}" "$1" "$2" "$(status_field edit_deadline)"
+}
+
+# Only the moves the panel offers are run. The API accepts any command from
+# the super admin, but a save outside an edit session would make the
+# visitors' changes permanent, and a begin_edit or restore inside one would
+# throw the unsaved work away.
+handle_command() {
+    mode=$(status_field mode)
+    case "$1" in
+        begin_edit)
+            if [ "$mode" = "editing" ]; then
+                reject "$1" "Düzenleme modu zaten açık."
+                return
+            fi
+            begin_edit
+            ;;
+        save)
+            if [ "$mode" != "editing" ]; then
+                reject "$1" "Kaydetmek için önce düzenleme modunu başlatın."
+                return
+            fi
+            save "$2"
+            ;;
+        cancel_edit)
+            if [ "$mode" != "editing" ]; then
+                reject "$1" "Vazgeçilecek bir düzenleme yok."
+                return
+            fi
+            restore_to "" "cancel_edit"
+            ;;
+        restore_now | restore_version)
+            if [ "$mode" = "editing" ]; then
+                reject "$1" "Düzenleme sürerken geri dönülemez; önce kaydedin ya da vazgeçin."
+                return
+            fi
+            if [ "$1" = "restore_now" ]; then
+                restore_to "" "restore_now"
+            elif printf '%s' "$3" | grep -Eq '^[0-9]{8}-[0-9]{6}$' && [ -d "$BASELINE_DIR/$3" ]; then
+                restore_to "$3" "restore_version"
+            else
+                reject "$1" "Sürüm bulunamadı: $3"
+            fi
+            ;;
+        *)
+            reject "${1:-unknown}" "Bilinmeyen işlem."
+            ;;
+    esac
+}
+
 # A restart must not end an edit session, so editing keeps its deadline and
 # lock. A restart in the middle of an operation cannot tell how far it got,
 # and says so instead of reading as success.
@@ -179,38 +234,11 @@ while true; do
         action=$(echo "$cmd_json" | jq -r '.action // empty' 2>/dev/null || true)
         req_by=$(echo "$cmd_json" | jq -r '.requested_by // "superadmin"' 2>/dev/null || true)
         target_ver=$(echo "$cmd_json" | jq -r '.version // empty' 2>/dev/null || true)
+        COMMAND_ID=$(echo "$cmd_json" | jq -r '.id // empty' 2>/dev/null || true)
 
-        echo ">> [demo-ops] Received command: action=$action requested_by=$req_by version=$target_ver"
-
-        case "$action" in
-            begin_edit)
-                begin_edit
-                ;;
-
-            save)
-                save "$req_by"
-                ;;
-
-            cancel_edit)
-                restore_to "" "cancel_edit"
-                ;;
-
-            restore_now)
-                restore_to "" "restore_now"
-                ;;
-
-            restore_version)
-                if [ -n "$target_ver" ] && [ -d "$BASELINE_DIR/$target_ver" ]; then
-                    restore_to "$target_ver" "restore_version"
-                else
-                    update_status "normal" "restore_version" "Sürüm bulunamadı: $target_ver" ""
-                fi
-                ;;
-
-            *)
-                echo "!! [demo-ops] Unknown action: $action"
-                ;;
-        esac
+        echo ">> [demo-ops] Received command: id=$COMMAND_ID action=$action requested_by=$req_by version=$target_ver"
+        handle_command "$action" "$req_by" "$target_ver"
+        COMMAND_ID=""
     fi
 
     ensure_baseline || true
