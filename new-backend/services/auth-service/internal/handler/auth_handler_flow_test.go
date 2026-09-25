@@ -302,4 +302,3 @@ func TestGetDemoAccounts_InternalError_Returns500(t *testing.T) {
 
 	assert.Equal(t, http.StatusInternalServerError, w.Code)
 }
-

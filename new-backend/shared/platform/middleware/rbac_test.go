@@ -156,4 +156,3 @@ func TestRequireSuperAdmin(t *testing.T) {
 		assert.Equal(t, 403, w.Code)
 	})
 }
-

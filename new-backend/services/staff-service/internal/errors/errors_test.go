@@ -13,19 +13,19 @@ func TestStaffErrors_HTTPStatuses(t *testing.T) {
 		err  *sharedErrors.AppError
 		want int
 	}{
-		"STAFF_NOT_FOUND":           {ErrStaffNotFound, http.StatusNotFound},
-		"STAFF_EXISTS":              {ErrStaffExists, http.StatusConflict},
-		"EMAIL_EXISTS":              {ErrEmailExists, http.StatusConflict},
-		"CANNOT_CREATE_ADMIN":       {ErrCannotCreateAdmin, http.StatusBadRequest},
-		"INVALID_ROLE":              {ErrInvalidRole, http.StatusBadRequest},
-		"ADVISOR_NOT_QUALIFIED":     {ErrAdvisorNotQualified, http.StatusBadRequest},
-		"ADVISOR_OVERLOADED":        {ErrAdvisorHasTooManyStudents, http.StatusConflict},
-		"TEACHER_PROFILE_NOT_FOUND": {ErrTeacherProfileNotFound, http.StatusNotFound},
+		"STAFF_NOT_FOUND":                          {ErrStaffNotFound, http.StatusNotFound},
+		"STAFF_EXISTS":                             {ErrStaffExists, http.StatusConflict},
+		"EMAIL_EXISTS":                             {ErrEmailExists, http.StatusConflict},
+		"CANNOT_CREATE_ADMIN":                      {ErrCannotCreateAdmin, http.StatusBadRequest},
+		"INVALID_ROLE":                             {ErrInvalidRole, http.StatusBadRequest},
+		"ADVISOR_NOT_QUALIFIED":                    {ErrAdvisorNotQualified, http.StatusBadRequest},
+		"ADVISOR_OVERLOADED":                       {ErrAdvisorHasTooManyStudents, http.StatusConflict},
+		"TEACHER_PROFILE_NOT_FOUND":                {ErrTeacherProfileNotFound, http.StatusNotFound},
 		"NOT_A_TEACHER":                            {ErrNotATeacher, http.StatusBadRequest},
 		"ADMIN_STAFF_NOT_FOUND":                    {ErrAdminStaffNotFound, http.StatusNotFound},
 		"PROTECTED_ACCOUNT_DELETION_FORBIDDEN":     {ErrProtectedAccountDeletionForbidden, http.StatusForbidden},
 		"PROTECTED_ACCOUNT_DEACTIVATION_FORBIDDEN": {ErrProtectedAccountDeactivationForbidden, http.StatusForbidden},
-		"PROTECTED_ACCOUNT_EMAIL_CHANGE_FORBIDDEN":  {ErrProtectedAccountEmailChangeForbidden, http.StatusForbidden},
+		"PROTECTED_ACCOUNT_EMAIL_CHANGE_FORBIDDEN": {ErrProtectedAccountEmailChangeForbidden, http.StatusForbidden},
 	}
 	for code, c := range cases {
 		assert.Equal(t, code, c.err.Code)

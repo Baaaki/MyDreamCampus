@@ -111,4 +111,3 @@ func RequireSuperAdmin() gin.HandlerFunc {
 		c.Next()
 	}
 }
-

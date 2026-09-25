@@ -13,18 +13,18 @@ func TestStudentErrors_HTTPStatuses(t *testing.T) {
 		err  *sharedErrors.AppError
 		want int
 	}{
-		"STUDENT_NOT_FOUND":         {ErrStudentNotFound, http.StatusNotFound},
-		"STUDENT_NUMBER_EXISTS":     {ErrStudentNumberExists, http.StatusConflict},
-		"STUDENT_EMAIL_EXISTS":      {ErrStudentEmailExists, http.StatusConflict},
-		"ADVISOR_NOT_FOUND":         {ErrAdvisorNotFound, http.StatusNotFound},
-		"INVALID_CSV_FORMAT":        {ErrInvalidCSVFormat, http.StatusBadRequest},
-		"STAFF_SERVICE_UNAVAILABLE": {ErrStaffServiceUnavailable, http.StatusServiceUnavailable},
-		"ALREADY_ENROLLED":          {ErrStudentAlreadyEnrolled, http.StatusConflict},
-		"GPA_TOO_LOW":               {ErrStudentGPALow, http.StatusBadRequest},
+		"STUDENT_NOT_FOUND":                        {ErrStudentNotFound, http.StatusNotFound},
+		"STUDENT_NUMBER_EXISTS":                    {ErrStudentNumberExists, http.StatusConflict},
+		"STUDENT_EMAIL_EXISTS":                     {ErrStudentEmailExists, http.StatusConflict},
+		"ADVISOR_NOT_FOUND":                        {ErrAdvisorNotFound, http.StatusNotFound},
+		"INVALID_CSV_FORMAT":                       {ErrInvalidCSVFormat, http.StatusBadRequest},
+		"STAFF_SERVICE_UNAVAILABLE":                {ErrStaffServiceUnavailable, http.StatusServiceUnavailable},
+		"ALREADY_ENROLLED":                         {ErrStudentAlreadyEnrolled, http.StatusConflict},
+		"GPA_TOO_LOW":                              {ErrStudentGPALow, http.StatusBadRequest},
 		"ENROLLMENT_FULL":                          {ErrEnrollmentCapacity, http.StatusConflict},
 		"PROTECTED_ACCOUNT_DELETION_FORBIDDEN":     {ErrProtectedAccountDeletionForbidden, http.StatusForbidden},
 		"PROTECTED_ACCOUNT_DEACTIVATION_FORBIDDEN": {ErrProtectedAccountDeactivationForbidden, http.StatusForbidden},
-		"PROTECTED_ACCOUNT_EMAIL_CHANGE_FORBIDDEN":  {ErrProtectedAccountEmailChangeForbidden, http.StatusForbidden},
+		"PROTECTED_ACCOUNT_EMAIL_CHANGE_FORBIDDEN": {ErrProtectedAccountEmailChangeForbidden, http.StatusForbidden},
 	}
 	for code, c := range cases {
 		assert.Equal(t, code, c.err.Code, "code mismatch")

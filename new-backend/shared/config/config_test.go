@@ -156,4 +156,3 @@ func TestConfig_IsProtectedEmail(t *testing.T) {
 	assert.True(t, customCfg.IsProtectedEmail("special@campus.local"))
 	assert.False(t, customCfg.IsProtectedEmail("random@campus.local"))
 }
-

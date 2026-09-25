@@ -11,19 +11,19 @@ import (
 // Config holds one service's configuration. Every service loads the same
 // struct from its own environment; there is no per-service config type.
 type Config struct {
-	Server         ServerConfig
-	Database       DatabaseConfig
-	RabbitMQ       RabbitMQConfig
-	Redis          RedisConfig
-	JWT            JWTConfig
-	Admin          AdminConfig
-	Outbox         OutboxConfig
-	QR             QRConfig
-	Reservation    ReservationConfig
-	MealTime       MealTimeConfig
-	RateLimit      RateLimitConfig
-	Timeout        TimeoutConfig
-	InternalClient InternalClientConfig
+	Server                 ServerConfig
+	Database               DatabaseConfig
+	RabbitMQ               RabbitMQConfig
+	Redis                  RedisConfig
+	JWT                    JWTConfig
+	Admin                  AdminConfig
+	Outbox                 OutboxConfig
+	QR                     QRConfig
+	Reservation            ReservationConfig
+	MealTime               MealTimeConfig
+	RateLimit              RateLimitConfig
+	Timeout                TimeoutConfig
+	InternalClient         InternalClientConfig
 	Demo                   DemoConfig
 	ProtectedAccountEmails []string
 }

@@ -201,5 +201,3 @@ func (c *ClientWrapper) PushOpsCommand(ctx context.Context, cmdJSON string) erro
 	}
 	return c.client.LPush(ctx, "ops:commands", cmdJSON).Err()
 }
-
-

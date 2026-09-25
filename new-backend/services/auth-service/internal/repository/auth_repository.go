@@ -184,4 +184,3 @@ func (r *AuthRepository) EnsureDemoUserFlags(ctx context.Context, email string) 
 	}
 	return nil
 }
-
