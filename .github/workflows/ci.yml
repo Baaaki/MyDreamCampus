@@ -147,8 +147,25 @@ jobs:
           PUBLIC_ORIGIN=http://localhost
           EOF
 
+      - name: Build images
+        # One Go service first, then the rest. Built all at once on a fresh
+        # runner, every Go image starts a cold compile of the same dependency
+        # tree side by side: on a builder capped like the runner (4 CPUs,
+        # 16 GB) that took 9 minutes and 10 GB, and here the step ran past
+        # the job timeout in most runs. auth-service fills the shared BuildKit
+        # cache mounts, so the rest compile only their own packages: 2.5
+        # minutes and 2.5 GB on the same builder.
+        timeout-minutes: 15
+        run: |
+          docker compose -f docker-compose.yml --progress plain build auth-service
+          docker compose -f docker-compose.yml --progress plain build
+
       - name: Start the stack
-        run: docker compose -f docker-compose.yml up -d --build
+        # up waits for the seed to exit, since demo-ops starts after it. A
+        # seed that hangs has to fail this step, which collects the logs,
+        # instead of using up the job.
+        timeout-minutes: 10
+        run: docker compose -f docker-compose.yml up -d
 
       - name: Wait for the edge
         run: |
@@ -474,7 +491,11 @@ jobs:
 
       - name: Collect logs on failure
         if: failure()
-        run: docker compose -f docker-compose.yml logs --no-color --tail=400 > compose-logs.txt
+        run: |
+          {
+            docker compose -f docker-compose.yml ps -a
+            docker compose -f docker-compose.yml logs --no-color --tail=400
+          } > compose-logs.txt
 
       - name: Upload logs
         if: failure()
