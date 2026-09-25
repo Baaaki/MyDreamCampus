@@ -71,6 +71,16 @@ psql_super() {
     PGPASSWORD="$POSTGRES_PASSWORD" psql -h "$PG_HOST" -U "$POSTGRES_USER" -d "$db" -q -t -A "$@"
 }
 
+# Ends every other session on database $1. pg_restore --clean recreates the
+# tables and enum types under new OIDs, and a service connection that
+# prepared a statement before the restore then fails it with "cached plan
+# must not change result type" (0A000) for as long as the connection lives.
+# pgxpool pings a connection idle for over a second before handing it out,
+# so the services replace the dropped ones on their own.
+terminate_connections() {
+    psql_super "$1" -c "SELECT pg_terminate_backend(pid) FROM pg_stat_activity WHERE datname = current_database() AND pid <> pg_backend_pid();" >/dev/null
+}
+
 svc_url() {
     db="$1"
     echo "postgres://${db}_svc:${SERVICE_DB_PASSWORD}@${PG_HOST}:5432/${db}?sslmode=disable"

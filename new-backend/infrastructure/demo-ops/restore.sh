@@ -59,6 +59,8 @@ for db in $ALL_DBS; do
             "Geri dönüş $db veritabanında başarısız oldu; veritabanları birbiriyle tutarsız olabilir. Geri dönüşü tekrarlayın."
     fi
 
+    terminate_connections "$db" || echo "!! [restore] Could not end old sessions on $db; its service may answer 500 until they close"
+
     # Ensure schema ownership belongs to service role
     schema="$db"
     [ "$db" = "catalog" ] && schema="course_catalog"
@@ -84,6 +86,12 @@ if [ -d "/migrations/notification" ]; then
         || fail "[restore] goose up failed for notification" \
             "Geri dönüş sonrası notification migration'ları uygulanamadı."
 fi
+
+# A migration may have altered what a service re-prepared since its
+# database came back.
+for db in $ALL_DBS; do
+    terminate_connections "$db" || echo "!! [restore] Could not end old sessions on $db; its service may answer 500 until they close"
+done
 
 # 4. Purge RabbitMQ queues
 purge_rabbitmq_queues
