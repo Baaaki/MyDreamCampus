@@ -55,7 +55,7 @@ gerekiyorsa kilidi yeniden yazar.
 
 ## Görevler
 
-- [x] **7.1 demo-ops konteyneri** (gemini ile yapıldı)
+- [x] **7.1 demo-ops konteyneri** (gemini ile yapıldı) — `35aef09`
   - Yeni dizin `new-backend/infrastructure/demo-ops/`:
     - `Dockerfile`: `FROM postgres:18-alpine`. `pg_dump` sürümü sunucuyla aynı
       olmalı; migrate imajındaki alpine istemcisi 16 sürümünde, bu yüzden o
@@ -79,7 +79,7 @@ gerekiyorsa kilidi yeniden yazar.
     compose profile `demo` kullan; hangisini seçtiğini not et).
   - **Commit:** `feat(infra): add the demo-ops container`
 
-- [x] **7.2 Anlık görüntü (save)** (gemini ile yapıldı)
+- [x] **7.2 Anlık görüntü (save)** (gemini ile yapıldı) — `2ce3c7f`
   - Veritabanları: `auth staff student catalog enrollment attendance grades meal payment notification`.
   - Boşalmayı bekle (en fazla 60 sn):
     - her DB'de outbox tablosunda `pending` satır sayısı 0 (tablo adlarını her
@@ -96,7 +96,7 @@ gerekiyorsa kilidi yeniden yazar.
     kayıttan sonra çalıştır (örn. rclone); boşsa atla.
   - **Commit:** `feat(infra): snapshot the permanent state`
 
-- [x] **7.3 Geri dönüş (restore)** (gemini ile yapıldı)
+- [x] **7.3 Geri dönüş (restore)** (gemini ile yapıldı) — `de5745c`
   - Sıra:
     1. Yazma kilidini koy.
     2. Her DB için `pg_restore --clean --if-exists --single-transaction`
@@ -117,7 +117,7 @@ gerekiyorsa kilidi yeniden yazar.
       duruyor.
   - **Commit:** `feat(infra): restore the permanent state`
 
-- [x] **7.4 Zamanlama ve ilk kalıcı durum** (gemini ile yapıldı)
+- [x] **7.4 Zamanlama ve ilk kalıcı durum** (gemini ile yapıldı) — `d3a25fd`
   - Açılışta `/baselines/current` yoksa seed bitmiş demektir; hemen ilk
     kalıcı durumu al.
   - Döngü her dakika kontrol eder:
@@ -126,7 +126,7 @@ gerekiyorsa kilidi yeniden yazar.
     - düzenleme süresi dolduysa `cancel_edit` uygula.
   - **Commit:** `feat(infra): schedule the nightly restore`
 
-- [x] **7.5 Yazma kilidi middleware'i (K3)** (gemini ile yapıldı)
+- [x] **7.5 Yazma kilidi middleware'i (K3)** (gemini ile yapıldı) — `c4c2784`
   - Yeni `shared/platform/middleware/writelock.go`. Global zincire ekle
     (`shared/httpserver/server.go` `NewServer`, rate limit'ten sonra).
   - Kilit koşulu, hepsi birlikte:
@@ -143,7 +143,7 @@ gerekiyorsa kilidi yeniden yazar.
   - Testler.
   - **Commit:** `feat(shared): lock public writes while the super admin edits`
 
-- [x] **7.6 Süper admin API'si** (gemini ile yapıldı)
+- [x] **7.6 Süper admin API'si** (gemini ile yapıldı) — `71840c8`
   - catalog'da `/api/catalog/admin/ops` grubu:
     `JWTAuth(WithFailClosed())` + `RequireSuperAdmin()`.
     - `GET /status`
@@ -155,7 +155,7 @@ gerekiyorsa kilidi yeniden yazar.
     ayarlar). Uygulama tarafında ek iş yok, ama yol adını değiştirme.
   - **Commit:** `feat(catalog): add super admin endpoints for the permanent state`
 
-- [x] **7.7 "Kalıcı Veri" sayfası** (gemini ile yapıldı)
+- [x] **7.7 "Kalıcı Veri" sayfası** (gemini ile yapıldı) — `d2a7e89`
   - `frontend/src/pages/admin/system/baseline/index.tsx` ve `routes.tsx`'de
     route (≈154 civarı). Menüde yalnız `user.is_superadmin` iken görünsün;
     route guard da olsun.
@@ -166,7 +166,7 @@ gerekiyorsa kilidi yeniden yazar.
     an değişiklik yapılamaz."
   - **Commit:** `feat(frontend): add the permanent state page for the super admin`
 
-- [x] **7.8 e2e (önerilir)** (gemini ile yapıldı)
+- [x] **7.8 e2e (önerilir)** (gemini ile yapıldı) — `22c13f1`
   - CI `backend-e2e`'ye ekle:
     1. demo-ops ayakta;
     2. begin-edit;
