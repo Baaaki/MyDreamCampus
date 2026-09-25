@@ -115,8 +115,9 @@
     ilk kalıcı durumun göründüğünü kontrol et.
   - [ ] Expo hesabı: `eas init` (projectId), ardından
     `eas build -p android --profile preview`. APK linkini README'ye ekle.
-  - [ ] (İsteğe bağlı) Sunucu dışı yedek: rclone kur ve
-    `BASELINE_OFFSITE_CMD`'yi ayarla.
+  - [ ] (İsteğe bağlı) Sunucu dışı yedek: rclone'u host'a kur ve DEPLOY.md
+    C/8'deki cron satırını ekle. (`BASELINE_OFFSITE_CMD` demo-ops
+    konteynerinde çalışır; orada rclone yok.)
 
 
 ## Faz sonu

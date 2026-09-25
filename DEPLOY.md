@@ -653,21 +653,24 @@ make deploy
 `.env`'deki `EDGE=tunnel` sayesinde bu komut `docker-compose.yml` ve `docker-compose.tunnel.yml`
 katmanlarını birlikte yükler.
 Caddy'nin host portları kalkar, `cloudflared` konteyneri ayağa kalkıp tüneli kurar.
+`make` hedefleri katmanı kendisi seçer. Compose'u doğrudan çağıracaksan ("Günlük komutlar"daki
+`COMPOSE_FILE` örneği) `docker-compose.standalone.yml` yerine `docker-compose.tunnel.yml` yaz.
 
 #### 4. Seed ve İlk Kalıcı Durumu Doğrula
 ```bash
 # Seed işlemini kontrol et
-docker compose logs seed | grep "seed complete"
+docker logs mydreamcampus-seed | grep "seed complete"
 
 # demo-ops konteynerinin ilk kalıcı durumu kaydettiğini kontrol et
-docker compose logs demo-ops | grep "baseline"
+docker logs mydreamcampus-demo-ops | grep "Snapshot completed"
 ```
 
 #### 5. Süper Admin İlk Girişi ve Doğrulama
 1. Tarayıcıda `https://mydreamcampus.madebybaki.com` adresini aç.
 2. `ADMIN_EMAIL` ve `ADMIN_INITIAL_PASSWORD` ile giriş yap.
 3. Sunucu seni otomatik olarak `/change-password` ekranına yönlendirecektir; güçlü yeni şifreni belirle.
-4. `/system/baseline` ("Kalıcı Veri") sayfasına git ve ilk kalıcı durumun (v1) başarıyla listelendiğini gör.
+4. `/system/baseline` ("Kalıcı Veri") sayfasına git ve ilk kalıcı durumun (`YYYYMMDD-HHMMSS` adlı sürüm)
+   listelendiğini gör. Cloudflare Access'i (aşağıda 4. adım) kurduysan sayfa önce Access doğrulaması ister.
 
 #### 6. Otomatik Deploy'u Kur
 ```bash
@@ -709,6 +712,11 @@ doğrular ve yalnızca CI'dan geçmiş sürümleri deploy eder; katmanı yine `.
      - Policy: Rule name: `Superadmin Only`, Action: `Allow`.
      - Include Selector: `Emails` -> Kullanıcının kendi şahsi e-posta adresi (One-time PIN ile doğrulanır).
    - Böylece kalıcı veri alma ve düzenleme moduna geçme uçları internetten gelebilecek yetkisiz taramalara karşı Cloudflare seviyesinde korunur.
+   - **Kalıcı Veri sayfası Access'ten önce geçemez.** Sayfanın arka plandaki istekleri, Access'in
+     giriş sayfasına yönlendirmesini izleyemez (başka bir origin) ve hata verir. Sayfa bu durumda
+     bir doğrulama bağlantısı gösterir: bağlantı `https://mydreamcampus.madebybaki.com/api/catalog/admin/ops/status`
+     adresini yeni sekmede açar, PIN'i girersin, Access `CF_Authorization` çerezini bırakır ve
+     sayfa "Yenile" ile çalışır. Çerez, uygulamanın oturum süresi (varsayılan 24 saat) boyunca geçerlidir.
 
 5. **GitHub Dal Koruması:**
    - GitHub Repository -> Settings -> Branches -> Add branch protection rule (`main`):
@@ -732,12 +740,17 @@ doğrular ve yalnızca CI'dan geçmiş sürümleri deploy eder; katmanı yine `.
    EAS tarafından üretilen APK indirme bağlantısını projenin dokümantasyonuna veya README'sine ekleyebilirsin.
 
 8. **(İsteğe bağlı) Sunucu Dışı Yedek:**
-   Sunucuya `rclone` kurup harici bir bulut depolama (Google Drive, AWS S3 vb.) bağla.
-   `.env` dosyasında `BASELINE_OFFSITE_CMD` değişkenine yedekleme komutunu gir:
+   `BASELINE_OFFSITE_CMD` her kalıcı durumdan sonra **demo-ops konteynerinin içinde** çalışır.
+   O imajda yalnız `sh`, `curl`, `jq` ve Postgres araçları var; `rclone` yok, host'a kurulan
+   `rclone` da oradan görünmez. En kolayı yedeği host'tan almak: `rclone`'u host'a kur,
+   bir uzak depo bağla (`rclone config`) ve kalıcı durum volume'unu günde bir kopyala:
    ```bash
-   BASELINE_OFFSITE_CMD="rclone copy /baselines remote:mydreamcampus-backups"
+   docker volume inspect mydreamcampus_demo-baselines --format '{{ .Mountpoint }}'
+   # crontab -e
+   30 4 * * * rclone copy <Mountpoint> remote:mydreamcampus-backups
    ```
-   Her yeni kalıcı durum alındığında `demo-ops` bu komutu otomatik çalıştıracaktır.
+   Rootless Docker'da Mountpoint `~/.local/share/docker/volumes/...` altındadır, yani
+   senin kullanıcın okuyabilir. `BASELINE_OFFSITE_CMD` boş kalır.
 
 ---
 
@@ -802,7 +815,7 @@ Kalıcı olsun istersen `~/.bashrc`'ye ekle.
 | Tunnel bağlanmıyor | `docker compose logs cloudflared`. `TUNNEL_TOKEN` değerinin `.env`'de doğru olduğunu kontrol et. Cloudflare Zero Trust'ta Public Hostname hedefinin `caddy:80` (HTTP) olarak yazıldığından emin ol (localhost:80 container içinden host'a değil container'ın kendisine bakar). |
 | Loglarda gerçek IP görünmüyor | `frontend/Caddyfile`'daki `trusted_proxies` bloğunun Docker ağını (`172.16.0.0/12`) kapsadığından emin ol. Compose ağı `172.28.0.0/16` olarak sabitlenmiştir. |
 | Geri dönüş (restore) hatası | `docker compose logs demo-ops`. Veritabanı şifrelerinin `.env` ile uyumunu doğrula. `docker exec mydreamcampus-demo-ops ls -la /baselines` ile geçerli dump dosyalarını kontrol et. |
-| Kilit takılı kaldı (503 SYSTEM_EDITING) | Süper admin düzenleme modundayken oturum kapandıysa veya demo-ops zaman aşımından önce çöktüyse: `docker exec mydreamcampus-redis redis-cli -a "$REDIS_PASSWORD" DEL system:editing_lock system:editing_until` çalıştır veya Kalıcı Veri sayfasında "İptal Et" butonuna bas. |
+| Kilit takılı kaldı (503 SYSTEM_EDITING) | Kalıcı Veri sayfasına bak. Mod "Düzenleme" ise süper admin "Kaydet ve Yayına Al" ya da "Vazgeç ve Sıfırla" ile bitirir; bitirmezse demo-ops `EDIT_TIMEOUT_MINUTES` (varsayılan 120) dolunca kendisi kapatır. demo-ops çöktüyse `docker restart mydreamcampus-demo-ops`: yarıda kalan bir işlemin kilidini kaldırır, süren bir düzenlemeyi son tarihine kadar korur. Kilit Redis'teki süreli `ops:write_lock` anahtarıdır; son çare: `docker exec mydreamcampus-redis sh -c 'redis-cli -a "$REDIS_PASSWORD" --no-auth-warning DEL ops:write_lock'`. |
 
 
 ### RabbitMQ sürüm yükseltmesi
