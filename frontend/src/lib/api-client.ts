@@ -1,4 +1,5 @@
 import ky from "ky"
+import { setSystemEditing } from "@/lib/services/baseline-service"
 
 const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || ""
 
@@ -150,6 +151,27 @@ const apiClient = ky.create({
     ],
     afterResponse: [
       async ({ request, response }) => {
+        const systemEditingHeader = response.headers.get("X-System-Editing")
+        if (systemEditingHeader === "1") {
+          setSystemEditing(true)
+        }
+
+        if (response.status === 503) {
+          try {
+            const body: unknown = await response.clone().json()
+            if (
+              typeof body === "object" &&
+              body !== null &&
+              "code" in body &&
+              body.code === "SYSTEM_EDITING"
+            ) {
+              setSystemEditing(true)
+            }
+          } catch {
+            // Ignore non-json 503
+          }
+        }
+
         if (await isForcedPasswordChange(response)) {
           if (
             typeof window !== "undefined" &&

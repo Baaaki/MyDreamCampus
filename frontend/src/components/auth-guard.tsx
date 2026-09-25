@@ -2,9 +2,11 @@ import { Navigate, Outlet } from "react-router"
 
 interface AuthGuardProps {
   allowedRoles: string[]
+  requireSuperAdmin?: boolean
+  children?: React.ReactNode
 }
 
-export function AuthGuard({ allowedRoles }: AuthGuardProps) {
+export function AuthGuard({ allowedRoles, requireSuperAdmin, children }: AuthGuardProps) {
   const userStr = localStorage.getItem("user")
 
   // User info in localStorage is for UI routing only.
@@ -27,6 +29,8 @@ export function AuthGuard({ allowedRoles }: AuthGuardProps) {
       } else {
         redirectPath = "/auth/login"
       }
+    } else if (requireSuperAdmin && !user.is_superadmin) {
+      redirectPath = "/dashboard"
     }
   } catch {
     redirectPath = "/auth/login"
@@ -36,5 +40,5 @@ export function AuthGuard({ allowedRoles }: AuthGuardProps) {
     return <Navigate to={redirectPath} replace />
   }
 
-  return <Outlet />
+  return children ? <>{children}</> : <Outlet />
 }

@@ -155,7 +155,7 @@ gerekiyorsa kilidi yeniden yazar.
     ayarlar). Uygulama tarafında ek iş yok, ama yol adını değiştirme.
   - **Commit:** `feat(catalog): add super admin endpoints for the permanent state`
 
-- [ ] **7.7 "Kalıcı Veri" sayfası**
+- [x] **7.7 "Kalıcı Veri" sayfası** (gemini ile yapıldı)
   - `frontend/src/pages/admin/system/baseline/index.tsx` ve `routes.tsx`'de
     route (≈154 civarı). Menüde yalnız `user.is_superadmin` iken görünsün;
     route guard da olsun.

@@ -64,4 +64,44 @@ describe("AuthGuard", () => {
     renderAt("/admin", ["admin"])
     expect(screen.getByText("login")).toBeInTheDocument()
   })
+
+  it("redirects regular admin to /dashboard when superadmin is required", () => {
+    localStorage.setItem(
+      "user",
+      JSON.stringify({ id: "1", role: "admin", is_superadmin: false })
+    )
+    render(
+      <MemoryRouter initialEntries={["/system/baseline"]}>
+        <Routes>
+          <Route
+            element={<AuthGuard allowedRoles={["admin"]} requireSuperAdmin />}
+          >
+            <Route path="/system/baseline" element={<div>baseline</div>} />
+          </Route>
+          <Route path="/dashboard" element={<div>admin-home</div>} />
+        </Routes>
+      </MemoryRouter>
+    )
+    expect(screen.getByText("admin-home")).toBeInTheDocument()
+  })
+
+  it("allows superadmin when superadmin is required", () => {
+    localStorage.setItem(
+      "user",
+      JSON.stringify({ id: "1", role: "admin", is_superadmin: true })
+    )
+    render(
+      <MemoryRouter initialEntries={["/system/baseline"]}>
+        <Routes>
+          <Route
+            element={<AuthGuard allowedRoles={["admin"]} requireSuperAdmin />}
+          >
+            <Route path="/system/baseline" element={<div>baseline</div>} />
+          </Route>
+          <Route path="/dashboard" element={<div>admin-home</div>} />
+        </Routes>
+      </MemoryRouter>
+    )
+    expect(screen.getByText("baseline")).toBeInTheDocument()
+  })
 })

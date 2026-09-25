@@ -126,6 +126,28 @@ export function Sidebar() {
 
   const isDemo = useIsDemoMode()
 
+  const userStr = typeof window !== "undefined" ? localStorage.getItem("user") : null
+  let isSuperAdmin = false
+  if (userStr) {
+    try {
+      const u = JSON.parse(userStr)
+      isSuperAdmin = !!u.is_superadmin
+    } catch {
+      // ignore invalid json in storage
+    }
+  }
+
+  const currentNavItems = navItems.map((item) => {
+    if (item.label === "Sistem") {
+      const children = [...(item.children || [])]
+      if (isSuperAdmin && !children.some((c) => c.href === "/system/baseline")) {
+        children.push({ label: "Kalıcı Veri", href: "/system/baseline" })
+      }
+      return { ...item, children }
+    }
+    return item
+  })
+
   return (
     <aside
       className={cn(
@@ -146,7 +168,7 @@ export function Sidebar() {
       {/* Navigation */}
       <nav className="h-[calc(100vh-4rem)] overflow-y-auto p-4">
         <ul className="space-y-1">
-          {navItems.map((item) => {
+          {currentNavItems.map((item) => {
             const Icon = item.icon
             const hasChildren = item.children && item.children.length > 0
             const isExpanded = expandedItems.includes(item.label)

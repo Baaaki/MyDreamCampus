@@ -9,6 +9,7 @@ import { AuthGuard } from "@/components/auth-guard"
 // users, and the auth bundle is small enough that splitting it would only
 // add a network round trip before the first render.
 import { DemoBanner } from "@/components/layout/demo-banner"
+import { SystemEditingBanner } from "@/components/layout/system-editing-banner"
 import LoginPage from "@/pages/auth/login"
 import NotFoundPage from "@/pages/not-found"
 import ChangePasswordPage from "@/pages/auth/change-password"
@@ -51,6 +52,7 @@ const SemesterWizardPage = lazy(
   () => import("@/pages/admin/system/semesters/new")
 )
 const AuditPage = lazy(() => import("@/pages/admin/system/audit"))
+const BaselinePage = lazy(() => import("@/pages/admin/system/baseline"))
 const AdminAttendancePage = lazy(() => import("@/pages/admin/attendance"))
 const AdminAttendanceSessionPage = lazy(
   () => import("@/pages/admin/attendance/sessionId")
@@ -102,6 +104,7 @@ export function AppRoutes() {
   return (
     <>
       <DemoBanner />
+      <SystemEditingBanner />
       <Suspense fallback={<LoadingFallback />}>
       <Routes>
         <Route path="/" element={<Navigate to="/auth/login" replace />} />
@@ -161,6 +164,14 @@ export function AppRoutes() {
               element={<SemesterWizardPage />}
             />
             <Route path="/system/audit" element={<AuditPage />} />
+            <Route
+              path="/system/baseline"
+              element={
+                <AuthGuard allowedRoles={["admin"]} requireSuperAdmin>
+                  <BaselinePage />
+                </AuthGuard>
+              }
+            />
           </Route>
         </Route>
 
