@@ -47,11 +47,13 @@
 | Anahtar | Tür | İçerik |
 |---|---|---|
 | `ops:commands` | list (LPUSH / BRPOP) | `{"id","action","version?","requested_by","requested_at"}`; `action` ∈ `begin_edit`, `save`, `cancel_edit`, `restore_now`, `restore_version` |
-| `ops:status` | string (JSON) | `{"mode":"normal\|editing\|busy","current":"<sürüm>","versions":[...],"edit_deadline","last_action","last_error","updated_at"}` |
+| `ops:status` | string (JSON) | `{"mode":"normal\|editing\|busy","current":"<sürüm>","versions":[...],"edit_deadline","last_action","last_command_id","last_error","updated_at"}` |
 | `ops:write_lock` | string `"1"`, TTL | Yazma kilidi (TTL = düzenleme süre sınırı) |
 
-Geri dönüşte `FLUSHDB` yapılır; `demo-ops` ardından `ops:status`'u ve
-gerekiyorsa kilidi yeniden yazar.
+Geri dönüşte `ops:*` dışındaki tüm anahtarlar tek bir Lua çağrısıyla silinir
+(25.09: önce `FLUSHDB` idi; durum işlem sürerken `normal` görünüyor, kuyruktaki
+komutlar kayboluyordu). `last_command_id`, durumun hangi komuttan sonra
+yazıldığını söyler; panel ve e2e kendi komutunu buna bakarak bekler.
 
 ## Görevler
 
@@ -78,6 +80,8 @@ gerekiyorsa kilidi yeniden yazar.
   - `DEMO_MODE` kapalıysa konteyner hiçbir şey yapmadan beklesin (ya da
     compose profile `demo` kullan; hangisini seçtiğini not et).
   - **Commit:** `feat(infra): add the demo-ops container`
+  > Not (25.09): `DEMO_MODE` kapalıyken konteyner `sleep infinity` ile
+  > bekliyor (compose profile değil).
 
 - [x] **7.2 Anlık görüntü (save)** (gemini ile yapıldı) — `2ce3c7f`
   - Veritabanları: `auth staff student catalog enrollment attendance grades meal payment notification`.
@@ -95,6 +99,11 @@ gerekiyorsa kilidi yeniden yazar.
   - İsteğe bağlı sunucu dışı kopya: `BASELINE_OFFSITE_CMD` doluysa her
     kayıttan sonra çalıştır (örn. rclone); boşsa atla.
   - **Commit:** `feat(infra): snapshot the permanent state`
+  > Not (25.09, inceleme düzeltmeleri — `7fbd7f2`, `425ec58`): `*.dlq`
+  > kuyrukları boşalma kontrolünden çıkarıldı (tek bir dead-letter mesajı her
+  > kaydetmeyi kilitliyordu). Dump'lar `.tmp-<sürüm>` dizinine yazılıp
+  > tamamlanınca sürüm adını alıyor; yarım sürüm artık listede görünmüyor.
+  > Okunamayan outbox "boş" sayılmıyor. Hata nedeni panele Türkçe gidiyor.
 
 - [x] **7.3 Geri dönüş (restore)** (gemini ile yapıldı) — `de5745c`
   - Sıra:
@@ -116,6 +125,12 @@ gerekiyorsa kilidi yeniden yazar.
     - süper admin düzenle, kaydet → "şimdi geri al" → süper adminin kaydı
       duruyor.
   - **Commit:** `feat(infra): restore the permanent state`
+  > Not (25.09, inceleme düzeltmeleri — `425ec58`, `a92e832`): Restore
+  > hiçbir veritabanına dokunmadan önce tüm dump'ları `pg_restore -l` ile
+  > doğruluyor. Başarısız restore artık "başarılı" diye raporlanmıyor, nedeni
+  > panelde kalıyor. Adım 5 `FLUSHDB` yerine `ops:*` dışındaki anahtarları
+  > siliyor. Kabul adımları sudo gerektirdiği için yapılmadı; aynı akışı CI
+  > `backend-e2e` doğruluyor (push sonrası).
 
 - [x] **7.4 Zamanlama ve ilk kalıcı durum** (gemini ile yapıldı) — `d3a25fd`
   - Açılışta `/baselines/current` yoksa seed bitmiş demektir; hemen ilk
@@ -125,6 +140,17 @@ gerekiyorsa kilidi yeniden yazar.
       değilse restore et, `editing` ise atla ve logla;
     - düzenleme süresi dolduysa `cancel_edit` uygula.
   - **Commit:** `feat(infra): schedule the nightly restore`
+  > Not (25.09, inceleme düzeltmeleri — `0883684`, `55a3a85`): BusyBox
+  > `date -d` ISO son tarihi okuyamıyordu; düzenleme hiç zaman aşımına
+  > uğramıyor, mod `editing` kaldığı için gece geri dönüşü her gece
+  > atlanıyordu. Son tarih artık `date -D` ile okunuyor, okunamayan son tarih
+  > dolmuş sayılıyor, başarısız kaydetme son tarihi koruyor, yeniden başlatma
+  > düzenlemeyi sürdürüyor. Gece geri dönüşü tam dakika yerine
+  > `NIGHTLY_RESET_AT` sonrasındaki bir saat içinde, günde bir kez koşuyor;
+  > son çalıştığı gün volume'daki `.last_nightly`'de. İlk kalıcı durum
+  > alınamazsa dakikada bir yeniden deneniyor. demo-ops komutları moda göre
+  > süzüyor: düzenleme dışında `save`/`cancel_edit`, düzenleme içinde
+  > `begin_edit`/restore reddediliyor (`a92e832`).
 
 - [x] **7.5 Yazma kilidi middleware'i (K3)** (gemini ile yapıldı) — `c4c2784`
   - Yeni `shared/platform/middleware/writelock.go`. Global zincire ekle
@@ -154,6 +180,10 @@ gerekiyorsa kilidi yeniden yazar.
   - K4 evetse bu yol Cloudflare Access ile korunacak (Faz 8'de kullanıcı
     ayarlar). Uygulama tarafında ek iş yok, ama yol adını değiştirme.
   - **Commit:** `feat(catalog): add super admin endpoints for the permanent state`
+  > Not (25.09, inceleme düzeltmeleri — `d6a4edf`, `86764ea`): `:version`
+  > yalnız `YYYYMMDD-HHMMSS` biçiminde kabul ediliyor (400). Test jwt'yi
+  > doğrudan import ettiği için catalog `go.mod` tidy değildi; CI'ın tidy
+  > kontrolü düşerdi.
 
 - [x] **7.7 "Kalıcı Veri" sayfası** (gemini ile yapıldı) — `d2a7e89`
   - `frontend/src/pages/admin/system/baseline/index.tsx` ve `routes.tsx`'de
@@ -165,6 +195,12 @@ gerekiyorsa kilidi yeniden yazar.
   - Genel şerit: `X-System-Editing` başlığı gelince "Sistem güncelleniyor, şu
     an değişiklik yapılamaz."
   - **Commit:** `feat(frontend): add the permanent state page for the super admin`
+  > Not (25.09, inceleme düzeltmeleri — `28e317d`, `38ba187`, `31901d8`):
+  > Sayfa 202'den sonra durum kendi komutunu (`last_command_id`) gösterene
+  > kadar yokluyor; önceden ilk yenileme eski modu okuyup yoklamayı hiç
+  > başlatmıyordu. Düzenlemede 15 sn'de bir yokluyor. Şerit başlık gelmeyince
+  > kapanıyor (önce yalnız açılıyordu) ve demo şeridiyle üst üste binmek
+  > yerine onun yerini alıyor.
 
 - [x] **7.8 e2e (önerilir)** (gemini ile yapıldı) — `22c13f1`
   - CI `backend-e2e`'ye ekle:
@@ -176,6 +212,11 @@ gerekiyorsa kilidi yeniden yazar.
     6. restore-now;
     7. kontrol: demo adminin kaydı yok, süper adminin kaydı var.
   - **Commit:** `test(infra): cover the permanent state cycle in e2e`
+  > Not (25.09, inceleme düzeltmeleri — `1930fec`): Ders gövdelerinde zorunlu
+  > `faculty`, `class_level`, `course_type` yoktu; döngü ilk yazmada 400
+  > alıyordu. Beklemeler komut kimliğine bağlandı; düzenleme sırasında demo
+  > adminin yazması 503 `SYSTEM_EDITING` almalı. Faz 5–7 commit'leri henüz
+  > push edilmedi; e2e CI'da hiç koşmadı.
 
 ## Faz sonu
 - README §5 yeşil olmalı.

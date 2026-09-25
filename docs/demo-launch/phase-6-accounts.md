@@ -61,6 +61,11 @@
       hesapları döner.
     - Şifre "şifre = e-posta" kuralından hesaplanır, DB'den okunmaz.
   - **Commit:** `feat(auth): provision public demo accounts`
+  > Not (25.09, inceleme düzeltmesi — `db21439`): Öğretmen ve öğrencinin
+  > `is_demo` bayrağını yalnız seed koyuyordu; seed dolu sistemde koşmadığı
+  > için Faz 6'dan önce seed'lenmiş bir yığında bu iki hesap giriş panelinde
+  > çıkmıyordu. auth açılışta `DEMO_MODE` açıksa ikisini de işaretliyor.
+  > Faz 6–7'nin bıraktığı 9 biçimsiz Go dosyası gofmt'landı (`1629778`).
 
 - [x] **6.3 Sistem hesaplarını koruma** (gemini ile yapıldı) — `a9764de`, `f4220be`, `16b0170`
   Admin paneli ziyaretçilere tamamen açık olduğu için bu korumalar şart. Aksi

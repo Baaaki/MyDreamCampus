@@ -34,6 +34,9 @@ altyapısındaki `vi.mock` ve `__mocks__` uygulama kodu değildir; kalır.
   - `pages/admin/attendance/sessionId/index.tsx`: ≈39-90;
     `generateMockSessionRecords` ve `markMockStudentPresent`.
   - **Commit:** `refactor(frontend): drop the mock data toggles from admin pages`
+  > Not (25.09, inceleme düzeltmesi — `7ae9ac2`): Oturum sayfasında manuel
+  > yoklama eklemenin hatası yalnız konsola yazılıyordu; artık sayfada
+  > gösteriliyor.
 
 
 - [x] **5.3 Diğer sahte dallar** (gemini ile yapıldı)
@@ -63,6 +66,12 @@ altyapısındaki `vi.mock` ve `__mocks__` uygulama kodu değildir; kalır.
     - `semesters/new/index.tsx` (≈179-180) güncellensin.
   - **Commit:** `fix(catalog): manage every period type from the catalog`,
     `refactor(frontend): read periods from the catalog`
+  > Not (25.09, inceleme düzeltmesi — `febd3ed`): Paylaşılan period
+  > handler'ı `course_catalog.outbox_events`'e ham SQL yazıyordu (sihirbazın
+  > payload kodunun kopyası; `shared/` servise özgü şey bilmemeli). Artık
+  > `PeriodEventQueuer` alıyor, catalog bunu sihirbazın sqlc tabanlı
+  > fonksiyonlarıyla sağlıyor. 17 dosya Prettier'dan geçmiyordu; CI'ın
+  > Prettier kontrolü düşerdi (`5337636`, Faz 6–7 dosyaları dahil).
 
 - [x] **5.5 Denetim kaydı** (gemini ile yapıldı)
   - `system-service.ts` `listAuditLog` (≈260) sahte veri dönüyor. Bunun
