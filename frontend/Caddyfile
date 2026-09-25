@@ -170,13 +170,25 @@
 			-Server
 		}
 
-		# Hashed Vite assets can be cached immutably by browsers and Cloudflare.
-		@assets path /assets/*
-		header @assets Cache-Control "public, max-age=31536000, immutable"
-
 		root * /srv
-		try_files {path} /index.html
-		file_server
-	}
 
+		# Vite names every asset by its content hash, so browsers and
+		# Cloudflare may keep one for a year. A missing one must 404 rather
+		# than fall back to index.html: an old tab asking for a chunk the
+		# last deploy removed would otherwise get HTML cached for a year under
+		# that chunk's name — still served after a rollback brings the real
+		# file back. The header goes only on files that exist, so the 404 is
+		# not made immutable either.
+		@assets path /assets/*
+		handle @assets {
+			@asset_file file
+			header @asset_file Cache-Control "public, max-age=31536000, immutable"
+			file_server
+		}
+
+		handle {
+			try_files {path} /index.html
+			file_server
+		}
+	}
 }
