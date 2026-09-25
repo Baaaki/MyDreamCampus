@@ -12,15 +12,25 @@ if [ -z "$target_version" ]; then
 fi
 
 if [ -z "$target_version" ]; then
-    echo "!! [restore] No target version specified and no current baseline found."
-    exit 1
+    fail "[restore] No target version specified and no current baseline found." \
+        "Geri dönülecek kalıcı durum yok; önce bir kalıcı durum kaydedilmeli."
 fi
 
 SRC="$BASELINE_DIR/$target_version"
 if [ ! -d "$SRC" ]; then
-    echo "!! [restore] Baseline directory does not exist: $SRC"
-    exit 1
+    fail "[restore] Baseline directory does not exist: $SRC" \
+        "Kalıcı durum bulunamadı: $target_version"
 fi
+
+# Every dump is checked before anything is touched: a bad file found half-way
+# would leave some databases rewound and the rest not.
+for db in $ALL_DBS; do
+    dump_file="$SRC/$db.dump"
+    if [ ! -s "$dump_file" ] || ! pg_restore -l "$dump_file" >/dev/null 2>&1; then
+        fail "[restore] Dump file missing or unreadable for $db: $dump_file" \
+            "Kalıcı durum $target_version bozuk: $db yedeği okunamıyor. Başka bir sürüme dönün."
+    fi
+done
 
 echo ">> [restore] Restoring baseline $target_version (keep_lock=$keep_lock)..."
 
@@ -30,11 +40,6 @@ set_write_lock $((EDIT_TIMEOUT_MINUTES * 60))
 # 2. Restore each database
 for db in $ALL_DBS; do
     dump_file="$SRC/$db.dump"
-    if [ ! -f "$dump_file" ]; then
-        echo "!! [restore] Dump file not found for $db: $dump_file"
-        exit 1
-    fi
-
     echo "   Restoring database: $db..."
     restore_success=false
 
@@ -50,8 +55,8 @@ for db in $ALL_DBS; do
     done
 
     if [ "$restore_success" != "true" ]; then
-        echo "!! [restore] Failed to restore database $db"
-        exit 1
+        fail "[restore] Failed to restore database $db" \
+            "Geri dönüş $db veritabanında başarısız oldu; veritabanları birbiriyle tutarsız olabilir. Geri dönüşü tekrarlayın."
     fi
 
     # Ensure schema ownership belongs to service role
@@ -69,11 +74,15 @@ for pair in $MIGRATE_PAIRS; do
     dir="/migrations/modules/$module"
     [ -d "$dir" ] || continue
     url="$(svc_url "$db")"
-    goose -dir "$dir" -table "goose_db_version_$module" postgres "$url" up >/dev/null
+    goose -dir "$dir" -table "goose_db_version_$module" postgres "$url" up >/dev/null \
+        || fail "[restore] goose up failed for $module" \
+            "Geri dönüş sonrası $db migration'ları uygulanamadı."
 done
 
 if [ -d "/migrations/notification" ]; then
-    goose -dir /migrations/notification -table goose_db_version_notification postgres "$(svc_url notification)" up >/dev/null
+    goose -dir /migrations/notification -table goose_db_version_notification postgres "$(svc_url notification)" up >/dev/null \
+        || fail "[restore] goose up failed for notification" \
+            "Geri dönüş sonrası notification migration'ları uygulanamadı."
 fi
 
 # 4. Purge RabbitMQ queues

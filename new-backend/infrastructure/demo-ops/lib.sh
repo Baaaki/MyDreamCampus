@@ -27,6 +27,18 @@ ALL_DBS="auth staff student catalog enrollment attendance grades meal payment no
 MIGRATE_PAIRS="auth:auth staff:staff student:student course_catalog:catalog \
 enrollment:enrollment attendance:attendance grades:grades meal:meal payment:payment"
 
+# snapshot.sh and restore.sh leave the user-facing reason of a failure here;
+# ops.sh puts it on the status panel.
+ERROR_FILE="${ERROR_FILE:-/tmp/ops-last-error}"
+
+# fail logs the reason in English, leaves the Turkish one for the panel and
+# stops the script.
+fail() {
+    echo "!! $1" >&2
+    printf '%s' "$2" > "$ERROR_FILE"
+    exit 1
+}
+
 redis_cmd() {
     redis-cli -h "$REDIS_HOST" -p "$REDIS_PORT" -a "$REDIS_PASSWORD" --no-auth-warning "$@"
 }

@@ -21,9 +21,10 @@ for i in $(seq 1 60); do
                 "meal:meal.outbox_events" "payment:payment.outbox_events"; do
         db="${pair%%:*}"
         tbl="${pair##*:}"
-        cnt=$(psql_super "$db" -c "SELECT count(*) FROM $tbl WHERE status = 'pending';" 2>/dev/null || echo "0")
+        # An outbox that cannot be read is not known to be empty.
+        cnt=$(psql_super "$db" -c "SELECT count(*) FROM $tbl WHERE status = 'pending';" 2>/dev/null || echo "1")
         cnt=$(echo "$cnt" | tr -d '[:space:]')
-        [ -z "$cnt" ] && cnt=0
+        [ -z "$cnt" ] && cnt=1
         pending_total=$((pending_total + cnt))
     done
 
@@ -43,23 +44,26 @@ for i in $(seq 1 60); do
 done
 
 if [ "$drained" != "true" ]; then
-    err="Timeout waiting for outbox ($pending_total pending) or rabbitmq ($rmq_messages messages) to drain"
-    echo "!! [snapshot] $err"
-    update_status "editing" "save" "$err" ""
-    exit 1
+    fail "[snapshot] Timeout waiting for outbox ($pending_total pending) or rabbitmq ($rmq_messages messages) to drain" \
+        "Kaydedilemedi: bekleyen olaylar 60 sn içinde işlenmedi (outbox: $pending_total, kuyruk: $rmq_messages). Birkaç dakika sonra tekrar deneyin."
 fi
 
-# 2. Create destination directory
+# 2. Dump into a hidden work directory; it gets the version name only once
+# every file is written, so a half-written version is never offered for restore.
 VERSION=$(date +"%Y%m%d-%H%M%S")
 DEST="$BASELINE_DIR/$VERSION"
-mkdir -p "$DEST"
+WORK="$BASELINE_DIR/.tmp-$VERSION"
+trap 'rm -rf "$WORK"' EXIT
+# Leftovers of a snapshot the container was killed in the middle of.
+rm -rf "$BASELINE_DIR"/.tmp-*
+mkdir -p "$WORK"
 
-echo ">> [snapshot] Dumping databases to $DEST..."
+echo ">> [snapshot] Dumping databases to $WORK..."
 
-# Dump each database
 for db in $ALL_DBS; do
     echo "   Dumping $db..."
-    PGPASSWORD="$POSTGRES_PASSWORD" pg_dump -h "$PG_HOST" -U "$POSTGRES_USER" -Fc "$db" > "$DEST/$db.dump"
+    PGPASSWORD="$POSTGRES_PASSWORD" pg_dump -h "$PG_HOST" -U "$POSTGRES_USER" -Fc "$db" > "$WORK/$db.dump" \
+        || fail "[snapshot] pg_dump failed for $db" "Kaydedilemedi: $db veritabanının yedeği alınamadı."
 done
 
 # Collect goose versions for manifest
@@ -82,7 +86,7 @@ done
 manifest_versions="$manifest_versions}"
 
 now_iso=$(date -u +"%Y-%m-%dT%H:%M:%SZ")
-cat <<EOF > "$DEST/manifest.json"
+cat <<EOF > "$WORK/manifest.json"
 {
   "version": "$VERSION",
   "created_at": "$now_iso",
@@ -90,6 +94,8 @@ cat <<EOF > "$DEST/manifest.json"
   "goose_versions": $manifest_versions
 }
 EOF
+
+mv "$WORK" "$DEST"
 
 # 3. Update current pointer
 echo "$VERSION" > "$BASELINE_DIR/current"

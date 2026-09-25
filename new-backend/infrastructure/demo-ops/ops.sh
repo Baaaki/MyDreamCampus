@@ -15,13 +15,64 @@ wait_for_services
 
 mkdir -p "$BASELINE_DIR"
 
-# Check if initial baseline exists
-if [ ! -f "$BASELINE_DIR/current" ] || [ ! -d "$BASELINE_DIR/$(cat "$BASELINE_DIR/current" 2>/dev/null)" ]; then
-    echo ">> [demo-ops] No initial baseline found. Creating first baseline from seeded databases..."
-    "$DIR/snapshot.sh" "system-initial" || echo "!! [demo-ops] Initial baseline snapshot failed"
+# run_step <script> [args...] runs snapshot.sh or restore.sh. On failure
+# STEP_ERROR holds the Turkish reason the script left for the panel.
+run_step() {
+    script="$1"
+    shift
+    rm -f "$ERROR_FILE"
+    STEP_ERROR=""
+    if "$DIR/$script" "$@"; then
+        return 0
+    fi
+    STEP_ERROR=$(cat "$ERROR_FILE" 2>/dev/null || true)
+    [ -n "$STEP_ERROR" ] || STEP_ERROR="İşlem beklenmedik bir hatayla durdu; ayrıntı demo-ops loglarında."
+    echo "!! [demo-ops] $script failed: $STEP_ERROR"
+    return 1
+}
+
+# restore_to <version|""> <action> returns the system to a baseline and leaves
+# it writable. A failed restore may have rewound some databases and not the
+# others, so its reason stays on the panel instead of reading as success.
+restore_to() {
+    update_status "busy" "$2" "" ""
+    if run_step restore.sh "$1" "false"; then
+        update_status "normal" "$2" "" ""
+    else
+        remove_write_lock
+        update_status "normal" "$2" "$STEP_ERROR" ""
+    fi
+}
+
+# ensure_baseline takes the first permanent state right after the seed, and
+# keeps retrying every 5 minutes if that failed: without a baseline neither
+# the nightly restore nor editing can work.
+LAST_BASELINE_ATTEMPT=0
+ensure_baseline() {
+    current=$(get_current_version)
+    if [ -n "$current" ] && [ -d "$BASELINE_DIR/$current" ]; then
+        return 0
+    fi
+    now=$(date +%s)
+    [ $((now - LAST_BASELINE_ATTEMPT)) -ge 300 ] || return 1
+    LAST_BASELINE_ATTEMPT=$now
+
+    echo ">> [demo-ops] No baseline found. Creating one from the current databases..."
+    update_status "busy" "initial_snapshot" "" ""
+    if run_step snapshot.sh "system-initial"; then
+        update_status "normal" "initial_snapshot" "" ""
+        return 0
+    fi
+    update_status "normal" "initial_snapshot" "İlk kalıcı durum alınamadı: $STEP_ERROR" ""
+    return 1
+}
+
+if ! ensure_baseline; then
+    echo "!! [demo-ops] Initial baseline snapshot failed; retrying every 5 minutes"
 fi
 
-update_status "normal" "startup" "" ""
+current_error=$(redis_cmd GET ops:status 2>/dev/null | jq -r '.last_error // empty' 2>/dev/null || true)
+update_status "normal" "startup" "$current_error" ""
 echo ">> [demo-ops] Ready and listening for commands on ops:commands..."
 
 LAST_NIGHTLY_RUN=""
@@ -45,7 +96,7 @@ while true; do
         case "$action" in
             begin_edit)
                 update_status "busy" "begin_edit" "" ""
-                if "$DIR/restore.sh" "" "true"; then
+                if run_step restore.sh "" "true"; then
                     now_epoch=$(date +%s)
                     deadline_epoch=$((now_epoch + EDIT_TIMEOUT_MINUTES * 60))
                     # ISO 8601 UTC date
@@ -54,44 +105,35 @@ while true; do
                     update_status "editing" "begin_edit" "" "$deadline_iso"
                 else
                     remove_write_lock
-                    update_status "normal" "begin_edit" "Failed to restore baseline for editing" ""
+                    update_status "normal" "begin_edit" "$STEP_ERROR" ""
                 fi
                 ;;
 
             save)
                 update_status "busy" "save" "" ""
-                if "$DIR/snapshot.sh" "$req_by"; then
+                if run_step snapshot.sh "$req_by"; then
                     remove_write_lock
                     update_status "normal" "save" "" ""
                 else
                     # Keep editing mode so user doesn't lose modifications on save error
                     set_write_lock $((EDIT_TIMEOUT_MINUTES * 60))
-                    update_status "editing" "save" "Failed to save baseline snapshot" ""
+                    update_status "editing" "save" "$STEP_ERROR" ""
                 fi
                 ;;
 
             cancel_edit)
-                update_status "busy" "cancel_edit" "" ""
-                "$DIR/restore.sh" "" "false" || true
-                remove_write_lock
-                update_status "normal" "cancel_edit" "" ""
+                restore_to "" "cancel_edit"
                 ;;
 
             restore_now)
-                update_status "busy" "restore_now" "" ""
-                "$DIR/restore.sh" "" "false" || true
-                remove_write_lock
-                update_status "normal" "restore_now" "" ""
+                restore_to "" "restore_now"
                 ;;
 
             restore_version)
-                update_status "busy" "restore_version" "" ""
                 if [ -n "$target_ver" ] && [ -d "$BASELINE_DIR/$target_ver" ]; then
-                    "$DIR/restore.sh" "$target_ver" "false" || true
-                    remove_write_lock
-                    update_status "normal" "restore_version" "" ""
+                    restore_to "$target_ver" "restore_version"
                 else
-                    update_status "normal" "restore_version" "Version not found: $target_ver" ""
+                    update_status "normal" "restore_version" "Sürüm bulunamadı: $target_ver" ""
                 fi
                 ;;
 
@@ -100,6 +142,8 @@ while true; do
                 ;;
         esac
     fi
+
+    ensure_baseline || true
 
     # 1. Scheduled Nightly Reset (NIGHTLY_RESET_AT)
     now_hm=$(date +"%H:%M")
@@ -113,10 +157,7 @@ while true; do
             echo ">> [demo-ops] Nightly reset skipped: editing mode is currently active."
         else
             echo ">> [demo-ops] Executing nightly baseline restore at $now_hm..."
-            update_status "busy" "nightly_restore" "" ""
-            "$DIR/restore.sh" "" "false" || true
-            remove_write_lock
-            update_status "normal" "nightly_restore" "" ""
+            restore_to "" "nightly_restore"
         fi
         LAST_NIGHTLY_RUN="$today"
     fi
@@ -131,10 +172,7 @@ while true; do
         deadline_epoch=$(date -d "$deadline" +%s 2>/dev/null || echo 0)
         if [ "$deadline_epoch" -gt 0 ] && [ "$now_epoch" -ge "$deadline_epoch" ]; then
             echo ">> [demo-ops] Edit deadline expired ($deadline). Canceling edit automatically..."
-            update_status "busy" "timeout_cancel_edit" "" ""
-            "$DIR/restore.sh" "" "false" || true
-            remove_write_lock
-            update_status "normal" "timeout_cancel_edit" "" ""
+            restore_to "" "timeout_cancel_edit"
         fi
     fi
 done
