@@ -39,6 +39,28 @@ fail() {
     exit 1
 }
 
+# The day of the last nightly restore lives on the volume: Redis is reset by
+# every restore and the loop's memory by every container restart.
+LAST_NIGHTLY_FILE="$BASELINE_DIR/.last_nightly"
+
+epoch_to_iso() {
+    date -u -d "@$1" +"%Y-%m-%dT%H:%M:%SZ"
+}
+
+# Busybox date cannot read ISO 8601 through -d alone; -D names the format.
+# The plain -d form is the GNU fallback. Unreadable input yields 0.
+iso_to_epoch() {
+    [ -n "$1" ] || { echo 0; return; }
+    date -u -D "%Y-%m-%dT%H:%M:%SZ" -d "$1" +%s 2>/dev/null \
+        || date -u -d "$1" +%s 2>/dev/null \
+        || echo 0
+}
+
+# status_field <name> reads one field of ops:status, empty when unset.
+status_field() {
+    redis_cmd GET ops:status 2>/dev/null | jq -r ".$1 // empty" 2>/dev/null || true
+}
+
 redis_cmd() {
     redis-cli -h "$REDIS_HOST" -p "$REDIS_PORT" -a "$REDIS_PASSWORD" --no-auth-warning "$@"
 }
