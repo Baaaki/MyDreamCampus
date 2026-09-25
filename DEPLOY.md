@@ -358,7 +358,13 @@ make autodeploy-install
 
 Kurulan şey bir **systemd user timer**: 2 dakikada bir
 [scripts/auto-deploy.sh](scripts/auto-deploy.sh) çalışır, yeni commit yoksa
-hiçbir şey yapmadan çıkar, varsa `git pull --ff-only` + `make deploy` yapar.
+hiçbir şey yapmadan çıkar. Varsa önce GitHub API'den o commit'in `ci-passed`
+kontrolüne bakar; yalnız başarılıysa `git pull --ff-only` + `make deploy`
+yapar. CI sürüyorsa ya da kırmızıysa deploy etmez, sonraki turda yeniden
+bakar.
+
+Sunucuda `jq` kurulu olmalı (`sudo apt install jq`); yoksa script CI'ın
+cevabını okuyamaz ve deploy etmeden hata verir.
 
 ```bash
 make autodeploy-status   # sonraki kontrol ne zaman, son sonuç ne
@@ -403,6 +409,13 @@ listener'ı sonradan eklemek mümkün.
   sonraki turda aynı commit tekrar denenir.
 - **Private repo ise** sunucuya read-only bir GitHub *deploy key* ekle
   (`ssh-keygen -t ed25519` → public key'i repo → Settings → Deploy keys).
+  CI kontrolü için de token gerekir: `repo` scope'lu bir classic token üret
+  ve `systemctl --user edit mydreamcampus-deploy.service` ile
+  `[Service]` altına `Environment=GITHUB_TOKEN=<token>` yaz. Bu override
+  `make autodeploy-install` tekrar çalışınca silinmez.
+- **Deploy neden olmuyor?** `make autodeploy-logs`: `waiting for CI` CI'ın
+  bitmesini, `not deploying, ci-passed concluded failure` kırmızı bir CI'ı
+  gösterir. İkisinde de sunucu bir önceki sürümde çalışmaya devam eder.
 
 ---
 
