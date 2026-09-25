@@ -71,6 +71,9 @@
   - `mobile/eas.json` `preview` profili:
     `env.EXPO_PUBLIC_API_URL = https://mydreamcampus.madebybaki.com/api`.
   - **Commit:** `chore(mobile): prepare release build settings`
+  > Not (25.09): Sıfır UUID yer tutucusu kaldırıldı — `eas init` var olan
+  > `projectId`'yi "zaten bağlı" sayıp yenisini yazmıyordu. ID'yi `eas init`
+  > ekler (8.6).
 
 - [x] **8.5 DEPLOY.md'ye "Demo kurulumu" bölümü** (gemini ile yapıldı) — `25d8378`
   - Sunucuda adım adım:

@@ -714,9 +714,12 @@ doğrular ve yalnızca CI'dan geçmiş sürümleri deploy eder; katmanı yine `.
    ```bash
    cd mobile
    npx eas-cli login
-   npx eas-cli init    # app.json içerisindeki projectId'yi günceller
+   npx eas-cli init    # Expo projesini oluşturur, app.json'a extra.eas.projectId yazar
    npx eas-cli build -p android --profile preview
    ```
+   `app.json`'da yer tutucu bir `projectId` bırakma: `eas init` var olan bir ID'yi
+   "zaten bağlı" sayıp yenisini yazmaz, build de olmayan projeyi arar.
+   `eas init`'in yazdığı `extra.eas` bloğunu commit'le.
    EAS tarafından üretilen APK indirme bağlantısını projenin dokümantasyonuna veya README'sine ekleyebilirsin.
 
 8. **(İsteğe bağlı) Sunucu Dışı Yedek:**
