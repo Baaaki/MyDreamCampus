@@ -52,6 +52,7 @@ type Module struct {
 	auditHandler          *handler.AuditHandler
 	periodHandler         *platformHandler.SimplePeriodHandler
 	timeHandler           *platformHandler.TimeControlHandler
+	opsHandler            *handler.OpsHandler
 
 	auditConsumer *worker.AuditConsumer
 }
@@ -66,6 +67,7 @@ func New(
 	staffClient service.StaffClient,
 	mealClient service.MealClient,
 	clockBackend clocksync.Backend,
+	opsBackend handler.OpsBackend,
 ) *Module {
 	catalogRepo := repository.NewCatalogRepository(pool)
 	facultyRepo := repository.NewFacultyRepository(pool)
@@ -110,6 +112,7 @@ func New(
 		auditConsumer: worker.NewAuditConsumer(rabbitmq.NewConsumer(rabbitConn), auditRepo),
 		periodHandler: platformHandler.NewSimplePeriodHandler(periodRepo, semesterStatusRepo, auditLogger),
 		timeHandler:   platformHandler.NewTimeControlHandler("catalog", clockBackend, auditLogger),
+		opsHandler:    handler.NewOpsHandler(opsBackend, auditLogger),
 	}
 }
 
@@ -139,6 +142,16 @@ func (m *Module) RegisterRoutes(rg *gin.RouterGroup) {
 	rg.GET("/courses/:course_code", m.catalogHandler.GetCourseByCourseCode)
 	rg.GET("/faculties", m.facultyHandler.ListFaculties)
 
+	// Super admin ops group — demo baseline & permanent state operations.
+	// Protected by fail-closed JWT auth, CSRF, and RequireSuperAdmin.
+	opsGroup := rg.Group("/admin")
+	opsGroup.Use(platformMiddleware.JWTAuth(platformMiddleware.WithFailClosed()))
+	opsGroup.Use(platformMiddleware.CSRFProtection())
+	opsGroup.Use(platformMiddleware.RequireSuperAdmin())
+	{
+		m.opsHandler.RegisterRoutes(opsGroup)
+	}
+
 	// Protected — JWT + CSRF + per-user rate limit.
 	protected := rg.Group("")
 	protected.Use(platformMiddleware.JWTAuth())
@@ -159,7 +172,6 @@ func (m *Module) RegisterRoutes(rg *gin.RouterGroup) {
 			m.auditHandler.RegisterAdminRoutes(admin)
 		}
 	}
-
 }
 
 // RegisterPublicRoutes mounts the legacy /api/semesters routes that the

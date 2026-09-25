@@ -143,7 +143,7 @@ gerekiyorsa kilidi yeniden yazar.
   - Testler.
   - **Commit:** `feat(shared): lock public writes while the super admin edits`
 
-- [ ] **7.6 Süper admin API'si**
+- [x] **7.6 Süper admin API'si** (gemini ile yapıldı)
   - catalog'da `/api/catalog/admin/ops` grubu:
     `JWTAuth(WithFailClosed())` + `RequireSuperAdmin()`.
     - `GET /status`

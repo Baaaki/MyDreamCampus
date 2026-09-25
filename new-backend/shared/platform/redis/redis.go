@@ -2,6 +2,7 @@ package redis
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"time"
 
@@ -180,4 +181,25 @@ func (c *ClientWrapper) IsWriteLocked(ctx context.Context) (bool, error) {
 	}
 	return exists > 0, nil
 }
+
+// GetOpsStatus returns the current JSON status string from ops:status in Redis DB 0.
+func (c *ClientWrapper) GetOpsStatus(ctx context.Context) (string, error) {
+	if c == nil || c.client == nil {
+		return "", errors.New("redis client not available")
+	}
+	val, err := c.client.Get(ctx, "ops:status").Result()
+	if err == redis.Nil {
+		return "", nil
+	}
+	return val, err
+}
+
+// PushOpsCommand pushes a command JSON string to the ops:commands list in Redis DB 0.
+func (c *ClientWrapper) PushOpsCommand(ctx context.Context, cmdJSON string) error {
+	if c == nil || c.client == nil {
+		return errors.New("redis client not available")
+	}
+	return c.client.LPush(ctx, "ops:commands", cmdJSON).Err()
+}
+
 
