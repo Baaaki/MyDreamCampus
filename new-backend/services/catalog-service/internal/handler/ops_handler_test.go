@@ -150,3 +150,19 @@ func TestOpsHandler_Commands_EnqueuedAndAudited(t *testing.T) {
 		assert.Equal(t, "user-123", auditLog.events[i].ActorID)
 	}
 }
+
+func TestOpsHandler_RestoreVersion_MalformedVersion_Returns400(t *testing.T) {
+	backend := &mockOpsBackend{}
+	r := setupOpsRouter(t, backend, &mockAuditLogger{})
+	superToken := createTestToken(true)
+
+	for _, version := range []string{"..", "current", "20260924-12000", "20260924_120000"} {
+		req := httptest.NewRequest(http.MethodPost, "/api/catalog/admin/ops/restore/"+version, nil)
+		req.Header.Set("Authorization", "Bearer "+superToken)
+		w := httptest.NewRecorder()
+		r.ServeHTTP(w, req)
+
+		assert.Equal(t, http.StatusBadRequest, w.Code, "version %q", version)
+	}
+	assert.Empty(t, backend.pushed)
+}

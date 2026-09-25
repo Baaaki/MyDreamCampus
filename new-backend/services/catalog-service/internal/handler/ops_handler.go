@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"net/http"
+	"regexp"
 	"time"
 
 	"github.com/baaaki/mydreamcampus/shared/platform/audit"
@@ -28,6 +29,10 @@ type OpsHandler struct {
 func NewOpsHandler(backend OpsBackend, auditLogger audit.Logger) *OpsHandler {
 	return &OpsHandler{backend: backend, auditLogger: auditLogger}
 }
+
+// baselineVersion is the name demo-ops gives a snapshot (YYYYMMDD-HHMMSS).
+// The version reaches a path on the baselines volume, so nothing else passes.
+var baselineVersion = regexp.MustCompile(`^[0-9]{8}-[0-9]{6}$`)
 
 type opsCommand struct {
 	ID          string `json:"id"`
@@ -181,9 +186,9 @@ func (h *OpsHandler) RestoreNow(c *gin.Context) {
 // POST /api/catalog/admin/ops/restore/:version
 func (h *OpsHandler) RestoreVersion(c *gin.Context) {
 	version := c.Param("version")
-	if version == "" {
+	if !baselineVersion.MatchString(version) {
 		c.JSON(http.StatusBadRequest, gin.H{
-			"error": "Sürüm parametresi zorunludur",
+			"error": "Geçersiz sürüm",
 			"code":  "VALIDATION_ERROR",
 		})
 		return
