@@ -68,7 +68,8 @@
   > benzeri 4 CPU/16 GB builder'da 9 dk/10 GB; önce auth-service ile 2,5
   > dk/2,5 GB). Derleme ayrı adıma alındı; e2e golden path yerelde temiz
   > yığında baştan sona yeşil, geri dönüş sonrası catalog 500'ü de giderildi.
-  > CI'da doğrulanması push'a bağlı.
+  > CI'da doğrulandı: `be761d8` için `backend-e2e` ve `ci-passed` yeşil
+  > (derleme 2,5 dk, job ~4,5 dk).
 
 - [x] **8.4 Mobil yayın ayarları** (gemini ile yapıldı) — `e47b63c`
   - `mobile/app.json`: `name: "MyDreamCampus"`, anlamlı bir `slug` ve
