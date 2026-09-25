@@ -151,10 +151,9 @@ const apiClient = ky.create({
     ],
     afterResponse: [
       async ({ request, response }) => {
-        const systemEditingHeader = response.headers.get("X-System-Editing")
-        if (systemEditingHeader === "1") {
-          setSystemEditing(true)
-        }
+        // Every service sends the header while the super admin edits, so a
+        // response without it means the edit is over.
+        setSystemEditing(response.headers.get("X-System-Editing") === "1")
 
         if (response.status === 503) {
           try {

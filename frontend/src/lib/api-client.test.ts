@@ -1,5 +1,6 @@
 import { HTTPError } from "ky"
 import { describe, it, expect, beforeEach, afterEach, vi } from "vitest"
+import { act, renderHook } from "@testing-library/react"
 
 // Helper that re-imports the module fresh after manipulating cookies/fetch
 async function loadClient() {
@@ -333,5 +334,41 @@ describe("api-client - idempotency and retries", () => {
     expect(second.headers.get("Idempotency-Key")).toBe(
       first.headers.get("Idempotency-Key")
     )
+  })
+})
+
+describe("api-client - system editing notice", () => {
+  afterEach(() => {
+    vi.unstubAllGlobals()
+    vi.resetAllMocks()
+  })
+
+  it("clears the notice once responses stop carrying X-System-Editing", async () => {
+    const fetchSpy = vi
+      .fn(
+        async (_input: RequestInfo | URL, _init?: RequestInit) =>
+          new Response("{}", { status: 200 })
+      )
+      .mockResolvedValueOnce(
+        new Response("{}", {
+          status: 200,
+          headers: { "X-System-Editing": "1" },
+        })
+      )
+    vi.stubGlobal("fetch", fetchSpy)
+
+    const { apiClient } = await loadClient()
+    const { useIsSystemEditing } = await import("./services/baseline-service")
+    const { result } = renderHook(() => useIsSystemEditing())
+
+    await act(async () => {
+      await apiClient.get("api/echo")
+    })
+    expect(result.current).toBe(true)
+
+    await act(async () => {
+      await apiClient.get("api/echo")
+    })
+    expect(result.current).toBe(false)
   })
 })
