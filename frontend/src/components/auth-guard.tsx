@@ -6,7 +6,11 @@ interface AuthGuardProps {
   children?: React.ReactNode
 }
 
-export function AuthGuard({ allowedRoles, requireSuperAdmin, children }: AuthGuardProps) {
+export function AuthGuard({
+  allowedRoles,
+  requireSuperAdmin,
+  children,
+}: AuthGuardProps) {
   const userStr = localStorage.getItem("user")
 
   // User info in localStorage is for UI routing only.

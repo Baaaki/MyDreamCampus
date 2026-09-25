@@ -18,7 +18,10 @@ function renderAt(initial = "/auth/forgot-password") {
     <QueryClientProvider client={queryClient}>
       <MemoryRouter initialEntries={[initial]}>
         <Routes>
-          <Route path="/auth/forgot-password" element={<ForgotPasswordPage />} />
+          <Route
+            path="/auth/forgot-password"
+            element={<ForgotPasswordPage />}
+          />
           <Route path="/auth/login" element={<div>login-page</div>} />
         </Routes>
       </MemoryRouter>
@@ -48,7 +51,12 @@ describe("ForgotPasswordPage", () => {
     vi.stubGlobal(
       "fetch",
       vi.fn(async (input: RequestInfo | URL) => {
-        const url = typeof input === "string" ? input : input instanceof Request ? input.url : input.toString()
+        const url =
+          typeof input === "string"
+            ? input
+            : input instanceof Request
+              ? input.url
+              : input.toString()
         if (url.includes("/api/auth/demo-accounts")) {
           return jsonResponse([
             {
@@ -74,7 +82,12 @@ describe("ForgotPasswordPage", () => {
     vi.stubGlobal(
       "fetch",
       vi.fn(async (input: RequestInfo | URL) => {
-        const url = typeof input === "string" ? input : input instanceof Request ? input.url : input.toString()
+        const url =
+          typeof input === "string"
+            ? input
+            : input instanceof Request
+              ? input.url
+              : input.toString()
         if (url.includes("/api/auth/demo-accounts")) {
           return new Response(JSON.stringify({ error: "DEMO_MODE_DISABLED" }), {
             status: 404,
@@ -98,7 +111,12 @@ describe("ForgotPasswordPage", () => {
     vi.stubGlobal(
       "fetch",
       vi.fn(async (input: RequestInfo | URL) => {
-        const url = typeof input === "string" ? input : input instanceof Request ? input.url : input.toString()
+        const url =
+          typeof input === "string"
+            ? input
+            : input instanceof Request
+              ? input.url
+              : input.toString()
         if (url.includes("/api/auth/request-password-reset")) {
           resetRequested = true
           return jsonResponse({ message: "sent" })

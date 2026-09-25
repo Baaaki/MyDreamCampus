@@ -253,10 +253,7 @@ export default function CourseCatalogPage() {
               </div>
               <div className="rounded-lg bg-green-50 p-4">
                 <div className="text-2xl font-bold text-green-600">
-                  {faculties.reduce(
-                    (sum, f) => sum + f.departments.length,
-                    0
-                  )}
+                  {faculties.reduce((sum, f) => sum + f.departments.length, 0)}
                 </div>
                 <div className="text-sm text-gray-600">Bölüm</div>
               </div>

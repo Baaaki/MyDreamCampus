@@ -12,7 +12,9 @@ describe("SystemEditingBanner", () => {
 
   it("renders nothing when system is not editing", () => {
     render(<SystemEditingBanner />)
-    expect(screen.queryByText("Sistem güncelleniyor, şu an değişiklik yapılamaz.")).not.toBeInTheDocument()
+    expect(
+      screen.queryByText("Sistem güncelleniyor, şu an değişiklik yapılamaz.")
+    ).not.toBeInTheDocument()
   })
 
   it("renders warning banner when system editing is true", () => {
@@ -20,6 +22,8 @@ describe("SystemEditingBanner", () => {
     act(() => {
       setSystemEditing(true)
     })
-    expect(screen.getByText("Sistem güncelleniyor, şu an değişiklik yapılamaz.")).toBeInTheDocument()
+    expect(
+      screen.getByText("Sistem güncelleniyor, şu an değişiklik yapılamaz.")
+    ).toBeInTheDocument()
   })
 })

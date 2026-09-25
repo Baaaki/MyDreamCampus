@@ -8,9 +8,11 @@ import { Badge } from "@/components/ui/badge"
 import { Copy, Check, LogIn } from "lucide-react"
 
 const roleBadgeVariant: Record<string, string> = {
-  admin: "bg-purple-100 text-purple-800 dark:bg-purple-900/30 dark:text-purple-300",
+  admin:
+    "bg-purple-100 text-purple-800 dark:bg-purple-900/30 dark:text-purple-300",
   teacher: "bg-blue-100 text-blue-800 dark:bg-blue-900/30 dark:text-blue-300",
-  student: "bg-emerald-100 text-emerald-800 dark:bg-emerald-900/30 dark:text-emerald-300",
+  student:
+    "bg-emerald-100 text-emerald-800 dark:bg-emerald-900/30 dark:text-emerald-300",
 }
 
 export default function LoginPage() {
@@ -206,8 +208,7 @@ export default function LoginPage() {
               {demoAccounts?.map((account) => {
                 const isCopied = copiedEmail === account.email
                 const badgeClass =
-                  roleBadgeVariant[account.role] ??
-                  "bg-gray-100 text-gray-800"
+                  roleBadgeVariant[account.role] ?? "bg-gray-100 text-gray-800"
 
                 return (
                   <div
@@ -215,11 +216,11 @@ export default function LoginPage() {
                     className="space-y-2 rounded-lg border border-gray-100 bg-gray-50 p-3.5 transition-colors hover:border-gray-200 dark:border-gray-800 dark:bg-gray-900/50"
                   >
                     <div className="flex items-center justify-between gap-2">
-                      <span className="font-semibold text-sm text-gray-900 dark:text-gray-100">
+                      <span className="text-sm font-semibold text-gray-900 dark:text-gray-100">
                         {account.label || account.role}
                       </span>
                       <Badge
-                        className={`px-2 py-0.5 text-xs font-medium uppercase tracking-wider ${badgeClass}`}
+                        className={`px-2 py-0.5 text-xs font-medium tracking-wider uppercase ${badgeClass}`}
                       >
                         {account.role}
                       </Badge>
@@ -235,7 +236,9 @@ export default function LoginPage() {
                         </span>
                       </div>
                       <div className="flex items-center justify-between">
-                        <span className="font-medium text-gray-500">Şifre:</span>
+                        <span className="font-medium text-gray-500">
+                          Şifre:
+                        </span>
                         <span className="font-mono text-gray-800 dark:text-gray-200">
                           {account.password}
                         </span>

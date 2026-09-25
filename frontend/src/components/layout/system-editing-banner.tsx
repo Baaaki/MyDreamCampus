@@ -10,7 +10,7 @@ export function SystemEditingBanner() {
     <div
       role="alert"
       aria-label="Sistem güncelleme bilgilendirmesi"
-      className="fixed top-0 right-0 left-0 z-50 flex h-8 items-center justify-center gap-2 bg-destructive px-4 text-xs font-semibold text-destructive-foreground shadow-xs animate-in fade-in"
+      className="text-destructive-foreground fixed top-0 right-0 left-0 z-50 flex h-8 animate-in items-center justify-center gap-2 bg-destructive px-4 text-xs font-semibold shadow-xs fade-in"
     >
       <AlertCircle className="h-3.5 w-3.5 shrink-0" />
       <span className="truncate">

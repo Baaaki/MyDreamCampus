@@ -251,5 +251,3 @@ describe("audit log service", () => {
     expect(url.searchParams.get("offset")).toBe("40")
   })
 })
-
-

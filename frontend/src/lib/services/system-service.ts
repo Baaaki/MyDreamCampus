@@ -176,10 +176,7 @@ export async function deleteGradesPeriod(id: string): Promise<void> {
 
 // Simple Periods
 export type SimplePeriodServiceKey =
-  | "enrollment"
-  | "catalog"
-  | "attendance"
-  | "grading"
+  "enrollment" | "catalog" | "attendance" | "grading"
 
 export async function listSimplePeriods(
   service: SimplePeriodServiceKey,

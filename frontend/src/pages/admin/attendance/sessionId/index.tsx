@@ -38,8 +38,7 @@ export default function AdminAttendanceSessionPage() {
 
   // Read session item from router state if available
   const sessionItemState = location.state?.session as
-    | AdminSessionItem
-    | undefined
+    AdminSessionItem | undefined
 
   const { data: sessionDetailsApi } = useQuery({
     queryKey: ["admin-session-details", sessionId],

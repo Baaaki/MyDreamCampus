@@ -20,7 +20,8 @@ export function DemoBanner() {
     >
       <AlertTriangle className="h-3.5 w-3.5 shrink-0" />
       <span className="truncate">
-        Bu bir demo. Yaptığınız değişiklikler her gece 04:00&apos;te geri alınır. Gerçek kişisel bilgi girmeyin.
+        Bu bir demo. Yaptığınız değişiklikler her gece 04:00&apos;te geri
+        alınır. Gerçek kişisel bilgi girmeyin.
       </span>
     </div>
   )

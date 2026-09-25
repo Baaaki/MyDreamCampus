@@ -126,7 +126,8 @@ export function Sidebar() {
 
   const isDemo = useIsDemoMode()
 
-  const userStr = typeof window !== "undefined" ? localStorage.getItem("user") : null
+  const userStr =
+    typeof window !== "undefined" ? localStorage.getItem("user") : null
   let isSuperAdmin = false
   if (userStr) {
     try {
@@ -140,7 +141,10 @@ export function Sidebar() {
   const currentNavItems = navItems.map((item) => {
     if (item.label === "Sistem") {
       const children = [...(item.children || [])]
-      if (isSuperAdmin && !children.some((c) => c.href === "/system/baseline")) {
+      if (
+        isSuperAdmin &&
+        !children.some((c) => c.href === "/system/baseline")
+      ) {
         children.push({ label: "Kalıcı Veri", href: "/system/baseline" })
       }
       return { ...item, children }

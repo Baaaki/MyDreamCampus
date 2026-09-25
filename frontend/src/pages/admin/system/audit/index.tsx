@@ -48,7 +48,8 @@ const SERVICE_COLORS: Record<string, string> = {
     "bg-orange-100 text-orange-700 dark:bg-orange-900/30 dark:text-orange-300",
   auth: "bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-300",
   students: "bg-cyan-100 text-cyan-700 dark:bg-cyan-900/30 dark:text-cyan-300",
-  staff: "bg-indigo-100 text-indigo-700 dark:bg-indigo-900/30 dark:text-indigo-300",
+  staff:
+    "bg-indigo-100 text-indigo-700 dark:bg-indigo-900/30 dark:text-indigo-300",
   payment:
     "bg-emerald-100 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-300",
 }

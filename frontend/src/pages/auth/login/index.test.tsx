@@ -293,7 +293,12 @@ describe("LoginPage - demo accounts panel", () => {
     vi.stubGlobal(
       "fetch",
       vi.fn(async (input: RequestInfo | URL) => {
-        const url = typeof input === "string" ? input : input instanceof Request ? input.url : input.toString()
+        const url =
+          typeof input === "string"
+            ? input
+            : input instanceof Request
+              ? input.url
+              : input.toString()
         if (url.includes("/api/auth/demo-accounts")) {
           return jsonResponse(demoAccounts)
         }
@@ -305,18 +310,29 @@ describe("LoginPage - demo accounts panel", () => {
 
     expect(await screen.findByText("Demo Hesapları")).toBeInTheDocument()
     expect(screen.getByText("Demo Yönetici")).toBeInTheDocument()
-    expect(screen.getAllByText("demo.admin@mydreamcampus.com").length).toBeGreaterThanOrEqual(1)
+    expect(
+      screen.getAllByText("demo.admin@mydreamcampus.com").length
+    ).toBeGreaterThanOrEqual(1)
     expect(screen.getByText("Demo Öğretmen")).toBeInTheDocument()
-    expect(screen.getAllByText("ahmet.yilmaz@uni.edu.tr").length).toBeGreaterThanOrEqual(1)
+    expect(
+      screen.getAllByText("ahmet.yilmaz@uni.edu.tr").length
+    ).toBeGreaterThanOrEqual(1)
     expect(screen.getByText("Demo Öğrenci")).toBeInTheDocument()
-    expect(screen.getAllByText("zeynep.sahin@uni.edu.tr").length).toBeGreaterThanOrEqual(1)
+    expect(
+      screen.getAllByText("zeynep.sahin@uni.edu.tr").length
+    ).toBeGreaterThanOrEqual(1)
   })
 
   it("hides demo accounts panel when GET /api/auth/demo-accounts returns 404", async () => {
     vi.stubGlobal(
       "fetch",
       vi.fn(async (input: RequestInfo | URL) => {
-        const url = typeof input === "string" ? input : input instanceof Request ? input.url : input.toString()
+        const url =
+          typeof input === "string"
+            ? input
+            : input instanceof Request
+              ? input.url
+              : input.toString()
         if (url.includes("/api/auth/demo-accounts")) {
           return new Response(JSON.stringify({ error: "DEMO_MODE_DISABLED" }), {
             status: 404,
@@ -337,14 +353,23 @@ describe("LoginPage - demo accounts panel", () => {
     vi.stubGlobal(
       "fetch",
       vi.fn(async (input: RequestInfo | URL) => {
-        const url = typeof input === "string" ? input : input instanceof Request ? input.url : input.toString()
+        const url =
+          typeof input === "string"
+            ? input
+            : input instanceof Request
+              ? input.url
+              : input.toString()
         if (url.includes("/api/auth/demo-accounts")) {
           return jsonResponse(demoAccounts)
         }
         if (url.includes("/api/auth/login")) {
           return jsonResponse({
             access_token: "at-demo",
-            user: { id: "u-admin", email: "demo.admin@mydreamcampus.com", role: "admin" },
+            user: {
+              id: "u-admin",
+              email: "demo.admin@mydreamcampus.com",
+              role: "admin",
+            },
           })
         }
         return jsonResponse({})
@@ -355,7 +380,9 @@ describe("LoginPage - demo accounts panel", () => {
 
     expect(await screen.findByText("Demo Yönetici")).toBeInTheDocument()
 
-    const loginButtons = screen.getAllByRole("button", { name: /bu hesapla gir/i })
+    const loginButtons = screen.getAllByRole("button", {
+      name: /bu hesapla gir/i,
+    })
     await userEvent.click(loginButtons[0])
 
     expect(await screen.findByText("admin-home")).toBeInTheDocument()
@@ -376,7 +403,12 @@ describe("LoginPage - demo accounts panel", () => {
     vi.stubGlobal(
       "fetch",
       vi.fn(async (input: RequestInfo | URL) => {
-        const url = typeof input === "string" ? input : input instanceof Request ? input.url : input.toString()
+        const url =
+          typeof input === "string"
+            ? input
+            : input instanceof Request
+              ? input.url
+              : input.toString()
         if (url.includes("/api/auth/demo-accounts")) {
           return jsonResponse(demoAccounts)
         }

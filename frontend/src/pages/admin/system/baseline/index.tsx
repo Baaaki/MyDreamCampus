@@ -126,7 +126,10 @@ export default function BaselinePage() {
 
   const countdown = useCountdown(status?.edit_deadline)
 
-  const showToast = (message: string, type: "success" | "error" | "info" = "info") => {
+  const showToast = (
+    message: string,
+    type: "success" | "error" | "info" = "info"
+  ) => {
     setToast({ message, type, isVisible: true })
   }
 
@@ -136,7 +139,8 @@ export default function BaselinePage() {
       showToast("Düzenleme modu başlatıldı. Veriler hazırlanıyor...", "success")
       queryClient.invalidateQueries({ queryKey: ["baseline-status"] })
     },
-    onError: (err) => showToast(apiErrorMessage(err, "Düzenleme modu başlatılamadı"), "error"),
+    onError: (err) =>
+      showToast(apiErrorMessage(err, "Düzenleme modu başlatılamadı"), "error"),
   })
 
   const mutateSave = useMutation({
@@ -145,7 +149,8 @@ export default function BaselinePage() {
       showToast("Kalıcı durum anlık görüntüsü alınıyor...", "success")
       queryClient.invalidateQueries({ queryKey: ["baseline-status"] })
     },
-    onError: (err) => showToast(apiErrorMessage(err, "Kalıcı durum kaydedilemedi"), "error"),
+    onError: (err) =>
+      showToast(apiErrorMessage(err, "Kalıcı durum kaydedilemedi"), "error"),
   })
 
   const mutateCancel = useMutation({
@@ -154,7 +159,8 @@ export default function BaselinePage() {
       showToast("Düzenlemeden vazgeçildi. Kalıcı duruma dönülüyor...", "info")
       queryClient.invalidateQueries({ queryKey: ["baseline-status"] })
     },
-    onError: (err) => showToast(apiErrorMessage(err, "Düzenleme iptal edilemedi"), "error"),
+    onError: (err) =>
+      showToast(apiErrorMessage(err, "Düzenleme iptal edilemedi"), "error"),
   })
 
   const mutateRestoreNow = useMutation({
@@ -163,7 +169,8 @@ export default function BaselinePage() {
       showToast("Geri dönüş işlemi başlatıldı...", "info")
       queryClient.invalidateQueries({ queryKey: ["baseline-status"] })
     },
-    onError: (err) => showToast(apiErrorMessage(err, "Geri dönüş işlemi başarısız"), "error"),
+    onError: (err) =>
+      showToast(apiErrorMessage(err, "Geri dönüş işlemi başarısız"), "error"),
   })
 
   const mutateRestoreVersion = useMutation({
@@ -172,7 +179,8 @@ export default function BaselinePage() {
       showToast("Belirtilen sürüme geri dönüş başlatıldı...", "info")
       queryClient.invalidateQueries({ queryKey: ["baseline-status"] })
     },
-    onError: (err) => showToast(apiErrorMessage(err, "Sürüme geri dönüş başarısız"), "error"),
+    onError: (err) =>
+      showToast(apiErrorMessage(err, "Sürüme geri dönüş başarısız"), "error"),
   })
 
   const isBusy =
@@ -250,8 +258,8 @@ export default function BaselinePage() {
             Kalıcı Veri ve Canlı Demo Yönetimi
           </h1>
           <p className="text-sm text-gray-500 dark:text-gray-400">
-            Süper admin kalıcı veri modunu yönetir; her gece 04:00&apos;te sistem
-            burada kaydedilen kalıcı duruma geri döner.
+            Süper admin kalıcı veri modunu yönetir; her gece 04:00&apos;te
+            sistem burada kaydedilen kalıcı duruma geri döner.
           </p>
         </div>
         <Button
@@ -276,7 +284,7 @@ export default function BaselinePage() {
           <AlertCircle className="mt-0.5 h-5 w-5 shrink-0 text-red-600 dark:text-red-400" />
           <div className="space-y-1">
             <p className="text-sm font-semibold">Son Operasyon Hatası</p>
-            <p className="text-xs font-mono">{status.last_error}</p>
+            <p className="font-mono text-xs">{status.last_error}</p>
           </div>
         </div>
       )}
@@ -295,11 +303,14 @@ export default function BaselinePage() {
                   Düzenleme Modu Aktif
                 </Badge>
               ) : status?.mode === "busy" ? (
-                <Badge className="bg-blue-600 text-white hover:bg-blue-700 animate-pulse">
+                <Badge className="animate-pulse bg-blue-600 text-white hover:bg-blue-700">
                   İşlem Yapılıyor...
                 </Badge>
               ) : (
-                <Badge variant="outline" className="text-emerald-700 border-emerald-300 bg-emerald-50 dark:bg-emerald-950/30">
+                <Badge
+                  variant="outline"
+                  className="border-emerald-300 bg-emerald-50 text-emerald-700 dark:bg-emerald-950/30"
+                >
                   Normal (Korumalı)
                 </Badge>
               )}
@@ -311,29 +322,33 @@ export default function BaselinePage() {
           <CardContent className="space-y-4">
             <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
               <div className="rounded-lg border p-3">
-                <div className="text-xs text-muted-foreground">Aktif Kalıcı Sürüm</div>
-                <div className="text-base font-semibold mt-1">
+                <div className="text-xs text-muted-foreground">
+                  Aktif Kalıcı Sürüm
+                </div>
+                <div className="mt-1 text-base font-semibold">
                   {formatVersionDate(status?.current || "")}
                 </div>
-                <div className="text-xs text-muted-foreground font-mono mt-0.5">
+                <div className="mt-0.5 font-mono text-xs text-muted-foreground">
                   {status?.current || "Henüz kaydedilmedi"}
                 </div>
               </div>
 
               <div className="rounded-lg border p-3">
-                <div className="text-xs text-muted-foreground">Yazma Kilidi / Kalan Süre</div>
-                <div className="text-base font-semibold mt-1 flex items-center gap-2">
+                <div className="text-xs text-muted-foreground">
+                  Yazma Kilidi / Kalan Süre
+                </div>
+                <div className="mt-1 flex items-center gap-2 text-base font-semibold">
                   <Clock className="h-4 w-4 text-muted-foreground" />
                   {status?.mode === "editing" ? (
                     countdown || "Hesaplanıyor..."
                   ) : (
-                    <span className="text-muted-foreground text-sm font-normal">
+                    <span className="text-sm font-normal text-muted-foreground">
                       Yazma kilidi kapalı
                     </span>
                   )}
                 </div>
                 {status?.mode === "editing" && (
-                  <div className="text-xs text-amber-600 dark:text-amber-400 mt-0.5">
+                  <div className="mt-0.5 text-xs text-amber-600 dark:text-amber-400">
                     Süre dolunca otomatik olarak iptal edilir
                   </div>
                 )}
@@ -341,15 +356,19 @@ export default function BaselinePage() {
             </div>
 
             {/* Action buttons */}
-            <div className="pt-2 flex flex-wrap gap-3">
+            <div className="flex flex-wrap gap-3 pt-2">
               {status?.mode === "editing" ? (
                 <>
                   <Button
                     onClick={handleSave}
                     disabled={isBusy}
-                    className="gap-2 bg-emerald-600 hover:bg-emerald-700 text-white"
+                    className="gap-2 bg-emerald-600 text-white hover:bg-emerald-700"
                   >
-                    {isBusy ? <Loader2 className="h-4 w-4 animate-spin" /> : <Save className="h-4 w-4" />}
+                    {isBusy ? (
+                      <Loader2 className="h-4 w-4 animate-spin" />
+                    ) : (
+                      <Save className="h-4 w-4" />
+                    )}
                     Kaydet ve Yayına Al
                   </Button>
                   <Button
@@ -367,16 +386,20 @@ export default function BaselinePage() {
                   <Button
                     onClick={handleBeginEdit}
                     disabled={isBusy || isLoading}
-                    className="gap-2 bg-indigo-600 hover:bg-indigo-700 text-white"
+                    className="gap-2 bg-indigo-600 text-white hover:bg-indigo-700"
                   >
-                    {isBusy ? <Loader2 className="h-4 w-4 animate-spin" /> : <Edit3 className="h-4 w-4" />}
+                    {isBusy ? (
+                      <Loader2 className="h-4 w-4 animate-spin" />
+                    ) : (
+                      <Edit3 className="h-4 w-4" />
+                    )}
                     Düzenlemeye Başla
                   </Button>
                   <Button
                     variant="outline"
                     onClick={handleRestoreNow}
                     disabled={isBusy || isLoading || !status?.current}
-                    className="gap-2 text-amber-700 border-amber-300 hover:bg-amber-50 dark:text-amber-400 dark:border-amber-800 dark:hover:bg-amber-950/30"
+                    className="gap-2 border-amber-300 text-amber-700 hover:bg-amber-50 dark:border-amber-800 dark:text-amber-400 dark:hover:bg-amber-950/30"
                   >
                     <RotateCcw className="h-4 w-4" />
                     Bugünkü Değişiklikleri Şimdi Geri Al
@@ -390,23 +413,28 @@ export default function BaselinePage() {
         {/* Info card */}
         <Card>
           <CardHeader>
-            <CardTitle className="text-base flex items-center gap-2">
+            <CardTitle className="flex items-center gap-2 text-base">
               <AlertTriangle className="h-4 w-4 text-amber-500" />
               Nasıl Çalışır?
             </CardTitle>
           </CardHeader>
-          <CardContent className="text-xs text-muted-foreground space-y-3">
+          <CardContent className="space-y-3 text-xs text-muted-foreground">
             <p>
-              1. <strong>Düzenlemeye Başla:</strong> Günün ziyaretçi verileri silinir, son kalıcı duruma dönülür ve diğer kullanıcılara yazma kilitlenir.
+              1. <strong>Düzenlemeye Başla:</strong> Günün ziyaretçi verileri
+              silinir, son kalıcı duruma dönülür ve diğer kullanıcılara yazma
+              kilitlenir.
             </p>
             <p>
-              2. <strong>Kalıcı Veri Düzenleme:</strong> Panelden istediğiniz ders, bölüm veya ayarları düzenleyin.
+              2. <strong>Kalıcı Veri Düzenleme:</strong> Panelden istediğiniz
+              ders, bölüm veya ayarları düzenleyin.
             </p>
             <p>
-              3. <strong>Kaydet:</strong> Yeni durum kalıcı hale getirilir ve ziyaretçilere açılır.
+              3. <strong>Kaydet:</strong> Yeni durum kalıcı hale getirilir ve
+              ziyaretçilere açılır.
             </p>
             <p>
-              4. <strong>Gece 04:00:</strong> Her gece sistem otomatik olarak bu kalıcı duruma geri döner.
+              4. <strong>Gece 04:00:</strong> Her gece sistem otomatik olarak bu
+              kalıcı duruma geri döner.
             </p>
           </CardContent>
         </Card>
@@ -447,11 +475,13 @@ export default function BaselinePage() {
                       </TableCell>
                       <TableCell>
                         {isCurrent ? (
-                          <Badge className="bg-emerald-600 hover:bg-emerald-700 text-white">
+                          <Badge className="bg-emerald-600 text-white hover:bg-emerald-700">
                             Aktif Sürüm
                           </Badge>
                         ) : (
-                          <span className="text-xs text-muted-foreground">Arşiv</span>
+                          <span className="text-xs text-muted-foreground">
+                            Arşiv
+                          </span>
                         )}
                       </TableCell>
                       <TableCell className="text-right">
@@ -484,9 +514,7 @@ export default function BaselinePage() {
       {/* Confirmation Dialog */}
       <AlertDialog
         open={confirmDialog.open}
-        onOpenChange={(open) =>
-          setConfirmDialog((prev) => ({ ...prev, open }))
-        }
+        onOpenChange={(open) => setConfirmDialog((prev) => ({ ...prev, open }))}
       >
         <AlertDialogContent>
           <AlertDialogHeader>
@@ -502,7 +530,7 @@ export default function BaselinePage() {
               onClick={confirmDialog.onConfirm}
               className={
                 confirmDialog.variant === "destructive"
-                  ? "bg-destructive text-destructive-foreground hover:bg-destructive/90"
+                  ? "text-destructive-foreground bg-destructive hover:bg-destructive/90"
                   : ""
               }
             >

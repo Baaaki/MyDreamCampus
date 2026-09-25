@@ -503,60 +503,60 @@ export default function SemesterReviewPage() {
               ) : (
                 <div className="space-y-2">
                   {faculties.map((faculty) => {
-                  const isExpanded = expandedFaculties.includes(faculty.id)
-                  return (
-                    <div
-                      key={faculty.id}
-                      className="overflow-hidden rounded-lg border dark:border-gray-700"
-                    >
-                      <button
-                        onClick={() => toggleFaculty(faculty.id)}
-                        className="flex w-full items-center justify-between bg-gray-50 p-4 text-left transition-colors hover:bg-gray-100 dark:bg-gray-700 dark:hover:bg-gray-600"
+                    const isExpanded = expandedFaculties.includes(faculty.id)
+                    return (
+                      <div
+                        key={faculty.id}
+                        className="overflow-hidden rounded-lg border dark:border-gray-700"
                       >
-                        <div className="flex items-center gap-3">
-                          <Building2 className="h-5 w-5 text-indigo-600" />
-                          <span className="font-semibold text-gray-900 dark:text-white">
-                            {faculty.name}
-                          </span>
-                          <Badge variant="outline" className="text-xs">
-                            {faculty.departments.length} bölüm
-                          </Badge>
-                        </div>
-                        {isExpanded ? (
-                          <ChevronDown className="h-5 w-5 text-gray-500" />
-                        ) : (
-                          <ChevronRight className="h-5 w-5 text-gray-500" />
+                        <button
+                          onClick={() => toggleFaculty(faculty.id)}
+                          className="flex w-full items-center justify-between bg-gray-50 p-4 text-left transition-colors hover:bg-gray-100 dark:bg-gray-700 dark:hover:bg-gray-600"
+                        >
+                          <div className="flex items-center gap-3">
+                            <Building2 className="h-5 w-5 text-indigo-600" />
+                            <span className="font-semibold text-gray-900 dark:text-white">
+                              {faculty.name}
+                            </span>
+                            <Badge variant="outline" className="text-xs">
+                              {faculty.departments.length} bölüm
+                            </Badge>
+                          </div>
+                          {isExpanded ? (
+                            <ChevronDown className="h-5 w-5 text-gray-500" />
+                          ) : (
+                            <ChevronRight className="h-5 w-5 text-gray-500" />
+                          )}
+                        </button>
+                        {isExpanded && (
+                          <div className="border-t bg-white dark:border-gray-700 dark:bg-gray-800">
+                            {faculty.departments.map((dept, i) => (
+                              <button
+                                key={dept.id}
+                                onClick={() =>
+                                  setSelectedDepartment({ dept, faculty })
+                                }
+                                className={`flex w-full items-center justify-between p-3 pl-12 text-left transition-colors hover:bg-indigo-50 dark:hover:bg-indigo-900/20 ${
+                                  i !== faculty.departments.length - 1
+                                    ? "border-b border-gray-100 dark:border-gray-700"
+                                    : ""
+                                }`}
+                              >
+                                <div className="flex items-center gap-3">
+                                  <GraduationCap className="h-4 w-4 text-gray-400" />
+                                  <span className="text-gray-700 dark:text-gray-300">
+                                    {dept.name}
+                                  </span>
+                                </div>
+                                <ChevronRight className="h-4 w-4 text-gray-400" />
+                              </button>
+                            ))}
+                          </div>
                         )}
-                      </button>
-                      {isExpanded && (
-                        <div className="border-t bg-white dark:border-gray-700 dark:bg-gray-800">
-                          {faculty.departments.map((dept, i) => (
-                            <button
-                              key={dept.id}
-                              onClick={() =>
-                                setSelectedDepartment({ dept, faculty })
-                              }
-                              className={`flex w-full items-center justify-between p-3 pl-12 text-left transition-colors hover:bg-indigo-50 dark:hover:bg-indigo-900/20 ${
-                                i !== faculty.departments.length - 1
-                                  ? "border-b border-gray-100 dark:border-gray-700"
-                                  : ""
-                              }`}
-                            >
-                              <div className="flex items-center gap-3">
-                                <GraduationCap className="h-4 w-4 text-gray-400" />
-                                <span className="text-gray-700 dark:text-gray-300">
-                                  {dept.name}
-                                </span>
-                              </div>
-                              <ChevronRight className="h-4 w-4 text-gray-400" />
-                            </button>
-                          ))}
-                        </div>
-                      )}
-                    </div>
-                  )
-                })}
-              </div>
+                      </div>
+                    )
+                  })}
+                </div>
               )
             ) : (
               /* Weekly Schedule View */

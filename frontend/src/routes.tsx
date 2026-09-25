@@ -104,140 +104,152 @@ export function AppRoutes() {
     <>
       <DemoBanner />
       <Suspense fallback={<LoadingFallback />}>
-      <Routes>
-        <Route path="/" element={<Navigate to="/auth/login" replace />} />
+        <Routes>
+          <Route path="/" element={<Navigate to="/auth/login" replace />} />
 
-        {/* Auth (public) */}
-        <Route path="/auth/login" element={<LoginPage />} />
-        <Route path="/auth/change-password" element={<ChangePasswordPage />} />
-        <Route path="/auth/sessions" element={<SessionsPage />} />
-        <Route path="/auth/forgot-password" element={<ForgotPasswordPage />} />
-        <Route path="/auth/reset-password" element={<ResetPasswordPage />} />
+          {/* Auth (public) */}
+          <Route path="/auth/login" element={<LoginPage />} />
+          <Route
+            path="/auth/change-password"
+            element={<ChangePasswordPage />}
+          />
+          <Route path="/auth/sessions" element={<SessionsPage />} />
+          <Route
+            path="/auth/forgot-password"
+            element={<ForgotPasswordPage />}
+          />
+          <Route path="/auth/reset-password" element={<ResetPasswordPage />} />
 
-        {/* Admin */}
-        <Route element={<AuthGuard allowedRoles={["admin"]} />}>
-          <Route element={<AdminLayout />}>
-            <Route path="/dashboard" element={<DashboardPage />} />
-            <Route path="/settings" element={<SettingsPage />} />
-            <Route path="/enrollment" element={<AdminEnrollmentPage />} />
-            <Route path="/staff" element={<StaffPage />} />
-            <Route
-              path="/staff/personel-details"
-              element={<StaffDetailsPage />}
-            />
-            <Route path="/students" element={<StudentsPage />} />
-            <Route path="/students/student" element={<StudentPage />} />
-            <Route
-              path="/students/student/profile"
-              element={<StudentProfilePage />}
-            />
-            <Route path="/students/advisors" element={<AdvisorsPage />} />
-            <Route path="/catalog" element={<CatalogPage />} />
-            <Route path="/catalog/add" element={<CatalogAddPage />} />
-            <Route path="/catalog/edit" element={<CatalogEditPage />} />
-            <Route path="/catalog/schedule" element={<CatalogSchedulePage />} />
-            <Route path="/semester-courses" element={<SemesterCoursesPage />} />
-            <Route
-              path="/semester-courses/list"
-              element={<SemesterCoursesListPage />}
-            />
-            <Route
-              path="/semester-courses/review"
-              element={<SemesterReviewPage />}
-            />
-            <Route path="/meal/cafeterias" element={<CafeteriasPage />} />
-            <Route path="/meal/admin" element={<MealAdminPage />} />
-            <Route path="/meal/menus" element={<MenusPage />} />
-            <Route path="/meal/student" element={<MealStudentPage />} />
-            <Route path="/attendance" element={<AdminAttendancePage />} />
-            <Route
-              path="/attendance/:sessionId"
-              element={<AdminAttendanceSessionPage />}
-            />
-            <Route path="/grades" element={<AdminGradesPage />} />
-            <Route path="/system/time" element={<TimeSettingsPage />} />
-            <Route path="/system/semesters" element={<SemestersPage />} />
-            <Route
-              path="/system/semesters/new"
-              element={<SemesterWizardPage />}
-            />
-            <Route path="/system/audit" element={<AuditPage />} />
-            <Route
-              path="/system/baseline"
-              element={
-                <AuthGuard allowedRoles={["admin"]} requireSuperAdmin>
-                  <BaselinePage />
-                </AuthGuard>
-              }
-            />
+          {/* Admin */}
+          <Route element={<AuthGuard allowedRoles={["admin"]} />}>
+            <Route element={<AdminLayout />}>
+              <Route path="/dashboard" element={<DashboardPage />} />
+              <Route path="/settings" element={<SettingsPage />} />
+              <Route path="/enrollment" element={<AdminEnrollmentPage />} />
+              <Route path="/staff" element={<StaffPage />} />
+              <Route
+                path="/staff/personel-details"
+                element={<StaffDetailsPage />}
+              />
+              <Route path="/students" element={<StudentsPage />} />
+              <Route path="/students/student" element={<StudentPage />} />
+              <Route
+                path="/students/student/profile"
+                element={<StudentProfilePage />}
+              />
+              <Route path="/students/advisors" element={<AdvisorsPage />} />
+              <Route path="/catalog" element={<CatalogPage />} />
+              <Route path="/catalog/add" element={<CatalogAddPage />} />
+              <Route path="/catalog/edit" element={<CatalogEditPage />} />
+              <Route
+                path="/catalog/schedule"
+                element={<CatalogSchedulePage />}
+              />
+              <Route
+                path="/semester-courses"
+                element={<SemesterCoursesPage />}
+              />
+              <Route
+                path="/semester-courses/list"
+                element={<SemesterCoursesListPage />}
+              />
+              <Route
+                path="/semester-courses/review"
+                element={<SemesterReviewPage />}
+              />
+              <Route path="/meal/cafeterias" element={<CafeteriasPage />} />
+              <Route path="/meal/admin" element={<MealAdminPage />} />
+              <Route path="/meal/menus" element={<MenusPage />} />
+              <Route path="/meal/student" element={<MealStudentPage />} />
+              <Route path="/attendance" element={<AdminAttendancePage />} />
+              <Route
+                path="/attendance/:sessionId"
+                element={<AdminAttendanceSessionPage />}
+              />
+              <Route path="/grades" element={<AdminGradesPage />} />
+              <Route path="/system/time" element={<TimeSettingsPage />} />
+              <Route path="/system/semesters" element={<SemestersPage />} />
+              <Route
+                path="/system/semesters/new"
+                element={<SemesterWizardPage />}
+              />
+              <Route path="/system/audit" element={<AuditPage />} />
+              <Route
+                path="/system/baseline"
+                element={
+                  <AuthGuard allowedRoles={["admin"]} requireSuperAdmin>
+                    <BaselinePage />
+                  </AuthGuard>
+                }
+              />
+            </Route>
           </Route>
-        </Route>
 
-        {/* Teacher */}
-        <Route element={<AuthGuard allowedRoles={["teacher"]} />}>
-          <Route element={<TeacherLayout />}>
-            <Route
-              path="/teacher/attendance"
-              element={<TeacherAttendancePage />}
-            />
-            <Route
-              path="/teacher/attendance/:courseId"
-              element={<TeacherAttendanceCoursePage />}
-            />
-            <Route
-              path="/teacher/attendance/:courseId/session/:sessionId"
-              element={<TeacherAttendanceSessionPage />}
-            />
-            <Route
-              path="/teacher/enrollment"
-              element={<TeacherEnrollmentPage />}
-            />
-            <Route path="/teacher/grades" element={<TeacherGradesPage />} />
-            <Route
-              path="/teacher/grades/:courseId/:slug"
-              element={<TeacherGradesCourseSlugPage />}
-            />
+          {/* Teacher */}
+          <Route element={<AuthGuard allowedRoles={["teacher"]} />}>
+            <Route element={<TeacherLayout />}>
+              <Route
+                path="/teacher/attendance"
+                element={<TeacherAttendancePage />}
+              />
+              <Route
+                path="/teacher/attendance/:courseId"
+                element={<TeacherAttendanceCoursePage />}
+              />
+              <Route
+                path="/teacher/attendance/:courseId/session/:sessionId"
+                element={<TeacherAttendanceSessionPage />}
+              />
+              <Route
+                path="/teacher/enrollment"
+                element={<TeacherEnrollmentPage />}
+              />
+              <Route path="/teacher/grades" element={<TeacherGradesPage />} />
+              <Route
+                path="/teacher/grades/:courseId/:slug"
+                element={<TeacherGradesCourseSlugPage />}
+              />
+            </Route>
           </Route>
-        </Route>
 
-        {/* Student */}
-        <Route element={<AuthGuard allowedRoles={["student"]} />}>
-          <Route element={<StudentLayout />}>
-            <Route
-              path="/student/dashboard"
-              element={<StudentDashboardPage />}
-            />
-            <Route
-              path="/student/attendance"
-              element={<StudentAttendancePage />}
-            />
-            <Route
-              path="/student/enrollment"
-              element={<StudentEnrollmentPage />}
-            />
-            <Route
-              path="/student/enrollment/rejections"
-              element={<StudentEnrollmentRejectionsPage />}
-            />
-            <Route path="/student/grades" element={<StudentGradesPage />} />
-            <Route
-              path="/student/cafeteria"
-              element={<StudentCafeteriaPage />}
-            />
-            <Route
-              path="/student/cafeteria/menu"
-              element={<StudentCafeteriaMenuPage />}
-            />
-            <Route
-              path="/student/cafeteria/history"
-              element={<StudentCafeteriaHistoryPage />}
-            />
+          {/* Student */}
+          <Route element={<AuthGuard allowedRoles={["student"]} />}>
+            <Route element={<StudentLayout />}>
+              <Route
+                path="/student/dashboard"
+                element={<StudentDashboardPage />}
+              />
+              <Route
+                path="/student/attendance"
+                element={<StudentAttendancePage />}
+              />
+              <Route
+                path="/student/enrollment"
+                element={<StudentEnrollmentPage />}
+              />
+              <Route
+                path="/student/enrollment/rejections"
+                element={<StudentEnrollmentRejectionsPage />}
+              />
+              <Route path="/student/grades" element={<StudentGradesPage />} />
+              <Route
+                path="/student/cafeteria"
+                element={<StudentCafeteriaPage />}
+              />
+              <Route
+                path="/student/cafeteria/menu"
+                element={<StudentCafeteriaMenuPage />}
+              />
+              <Route
+                path="/student/cafeteria/history"
+                element={<StudentCafeteriaHistoryPage />}
+              />
+            </Route>
           </Route>
-        </Route>
 
-        <Route path="*" element={<NotFoundPage />} />
-      </Routes>
-    </Suspense>
+          <Route path="*" element={<NotFoundPage />} />
+        </Routes>
+      </Suspense>
     </>
   )
 }
