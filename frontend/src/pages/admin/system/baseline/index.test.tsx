@@ -108,4 +108,44 @@ describe("BaselinePage", () => {
     expect(screen.getByText("Başla")).toBeInTheDocument()
     expect(screen.getByText("İptal")).toBeInTheDocument()
   })
+
+  it("keeps polling until demo-ops has handled the queued command", async () => {
+    const user = userEvent.setup()
+    vi.mocked(baselineService.getBaselineStatus).mockResolvedValue({
+      mode: "normal",
+      current: "20260925-100000",
+      versions: ["20260925-100000"],
+      edit_deadline: null,
+      last_action: "save",
+      last_command_id: "cmd-0",
+      last_error: null,
+      updated_at: "2026-09-25T10:00:00Z",
+    })
+    vi.mocked(baselineService.beginEdit).mockResolvedValue("cmd-1")
+
+    renderComponent()
+    await user.click(await screen.findByText("Düzenlemeye Başla"))
+    await user.click(screen.getByText("Başla"))
+
+    // The status still predates the command, so the page must not settle.
+    expect(await screen.findByText("İşlem Yapılıyor...")).toBeInTheDocument()
+
+    vi.mocked(baselineService.getBaselineStatus).mockResolvedValue({
+      mode: "editing",
+      current: "20260925-100000",
+      versions: ["20260925-100000"],
+      edit_deadline: new Date(Date.now() + 60000).toISOString(),
+      last_action: "begin_edit",
+      last_command_id: "cmd-1",
+      last_error: null,
+      updated_at: "2026-09-25T10:01:00Z",
+    })
+
+    await waitFor(
+      () => {
+        expect(screen.getByText("Düzenleme Modu Aktif")).toBeInTheDocument()
+      },
+      { timeout: 4000 }
+    )
+  })
 })

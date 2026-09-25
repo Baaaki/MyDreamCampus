@@ -112,6 +112,14 @@ export default function BaselinePage() {
     onConfirm: () => {},
   })
 
+  // The last command this page queued. A status written before demo-ops
+  // picked it up still shows the old mode, so polling goes on until the
+  // status names this command and demo-ops is done with it.
+  const [pendingCommand, setPendingCommand] = useState<string | null>(null)
+  const isWaitingFor = (s: BaselineStatus | undefined) =>
+    pendingCommand !== null &&
+    (s?.last_command_id !== pendingCommand || s?.mode === "busy")
+
   const {
     data: status,
     isLoading,
@@ -120,9 +128,15 @@ export default function BaselinePage() {
   } = useQuery<BaselineStatus>({
     queryKey: ["baseline-status"],
     queryFn: getBaselineStatus,
-    refetchInterval: (query) =>
-      query.state.data?.mode === "busy" ? 2000 : false,
+    refetchInterval: (query) => {
+      const data = query.state.data
+      if (data?.mode === "busy" || isWaitingFor(data)) return 2000
+      // demo-ops ends an expired edit on its own; the page follows.
+      if (data?.mode === "editing") return 15000
+      return false
+    },
   })
+  const isProcessing = status?.mode === "busy" || isWaitingFor(status)
 
   const countdown = useCountdown(status?.edit_deadline)
 
@@ -133,11 +147,16 @@ export default function BaselinePage() {
     setToast({ message, type, isVisible: true })
   }
 
+  const onQueued = (commandId: string) => {
+    setPendingCommand(commandId)
+    queryClient.invalidateQueries({ queryKey: ["baseline-status"] })
+  }
+
   const mutateBegin = useMutation({
     mutationFn: beginEdit,
-    onSuccess: () => {
+    onSuccess: (commandId) => {
       showToast("Düzenleme modu başlatıldı. Veriler hazırlanıyor...", "success")
-      queryClient.invalidateQueries({ queryKey: ["baseline-status"] })
+      onQueued(commandId)
     },
     onError: (err) =>
       showToast(apiErrorMessage(err, "Düzenleme modu başlatılamadı"), "error"),
@@ -145,9 +164,9 @@ export default function BaselinePage() {
 
   const mutateSave = useMutation({
     mutationFn: saveBaseline,
-    onSuccess: () => {
+    onSuccess: (commandId) => {
       showToast("Kalıcı durum anlık görüntüsü alınıyor...", "success")
-      queryClient.invalidateQueries({ queryKey: ["baseline-status"] })
+      onQueued(commandId)
     },
     onError: (err) =>
       showToast(apiErrorMessage(err, "Kalıcı durum kaydedilemedi"), "error"),
@@ -155,9 +174,9 @@ export default function BaselinePage() {
 
   const mutateCancel = useMutation({
     mutationFn: cancelEdit,
-    onSuccess: () => {
+    onSuccess: (commandId) => {
       showToast("Düzenlemeden vazgeçildi. Kalıcı duruma dönülüyor...", "info")
-      queryClient.invalidateQueries({ queryKey: ["baseline-status"] })
+      onQueued(commandId)
     },
     onError: (err) =>
       showToast(apiErrorMessage(err, "Düzenleme iptal edilemedi"), "error"),
@@ -165,9 +184,9 @@ export default function BaselinePage() {
 
   const mutateRestoreNow = useMutation({
     mutationFn: restoreNow,
-    onSuccess: () => {
+    onSuccess: (commandId) => {
       showToast("Geri dönüş işlemi başlatıldı...", "info")
-      queryClient.invalidateQueries({ queryKey: ["baseline-status"] })
+      onQueued(commandId)
     },
     onError: (err) =>
       showToast(apiErrorMessage(err, "Geri dönüş işlemi başarısız"), "error"),
@@ -175,16 +194,16 @@ export default function BaselinePage() {
 
   const mutateRestoreVersion = useMutation({
     mutationFn: (version: string) => restoreVersion(version),
-    onSuccess: () => {
+    onSuccess: (commandId) => {
       showToast("Belirtilen sürüme geri dönüş başlatıldı...", "info")
-      queryClient.invalidateQueries({ queryKey: ["baseline-status"] })
+      onQueued(commandId)
     },
     onError: (err) =>
       showToast(apiErrorMessage(err, "Sürüme geri dönüş başarısız"), "error"),
   })
 
   const isBusy =
-    status?.mode === "busy" ||
+    isProcessing ||
     mutateBegin.isPending ||
     mutateSave.isPending ||
     mutateCancel.isPending ||
@@ -298,13 +317,13 @@ export default function BaselinePage() {
                 <Database className="h-5 w-5 text-indigo-600" />
                 Mevcut Sistem Durumu
               </CardTitle>
-              {status?.mode === "editing" ? (
-                <Badge className="bg-amber-500 text-white hover:bg-amber-600">
-                  Düzenleme Modu Aktif
-                </Badge>
-              ) : status?.mode === "busy" ? (
+              {isProcessing ? (
                 <Badge className="animate-pulse bg-blue-600 text-white hover:bg-blue-700">
                   İşlem Yapılıyor...
+                </Badge>
+              ) : status?.mode === "editing" ? (
+                <Badge className="bg-amber-500 text-white hover:bg-amber-600">
+                  Düzenleme Modu Aktif
                 </Badge>
               ) : (
                 <Badge
