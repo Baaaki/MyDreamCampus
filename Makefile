@@ -128,6 +128,23 @@ check-env:
 		echo "HATA: $(INFRA)/.env icinde hala CHANGE_ME var — secret'lari doldur."; \
 		echo "  openssl rand -base64 48"; \
 		exit 1; } || true
+	@if grep -qE '^[[:space:]]*DEMO_MODE[[:space:]]*=[[:space:]]*"?true"?' $(INFRA)/.env; then \
+		for var in DEMO_ADMIN_EMAIL DEMO_TEACHER_EMAIL DEMO_STUDENT_EMAIL; do \
+			val=$$(grep -E "^[[:space:]]*$${var}[[:space:]]*=" $(INFRA)/.env | head -1 | cut -d'=' -f2- | tr -d '\"'\''[:space:]'); \
+			if [ -z "$$val" ]; then \
+				echo "HATA: DEMO_MODE=true ama $$var tanimli veya dolu degil."; \
+				exit 1; \
+			fi; \
+		done; \
+	fi
+	@if [ "$(EDGE)" = "tunnel" ]; then \
+		val=$$(grep -E '^[[:space:]]*TUNNEL_TOKEN[[:space:]]*=' $(INFRA)/.env | head -1 | cut -d'=' -f2- | tr -d '\"'\''[:space:]'); \
+		if [ -z "$$val" ] && [ -z "$$TUNNEL_TOKEN" ]; then \
+			echo "HATA: EDGE=tunnel secildi ama TUNNEL_TOKEN tanimli veya dolu degil."; \
+			exit 1; \
+		fi; \
+	fi
+
 
 # RabbitMQ will not start a new release series on a data directory whose
 # stable feature flags the previous release left disabled — the 3.13 -> 4.2

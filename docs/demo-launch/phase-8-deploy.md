@@ -37,7 +37,7 @@
     DEPLOY.md'de anlat.
   - **Commit:** `feat(infra): add a Cloudflare Tunnel compose layer`
 
-- [ ] **8.2 Ortam değişkenleri**
+- [x] **8.2 Ortam değişkenleri** (gemini ile yapıldı)
   - `new-backend/infrastructure/.env.example`'a ekle:
     - `DEMO_MODE=true`, `DEMO_ADMIN_EMAIL`, `DEMO_TEACHER_EMAIL`,
       `DEMO_STUDENT_EMAIL`

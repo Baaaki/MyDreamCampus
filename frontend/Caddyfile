@@ -169,8 +169,14 @@
 			Permissions-Policy "camera=(), microphone=(), geolocation=()"
 			-Server
 		}
+
+		# Hashed Vite assets can be cached immutably by browsers and Cloudflare.
+		@assets path /assets/*
+		header @assets Cache-Control "public, max-age=31536000, immutable"
+
 		root * /srv
 		try_files {path} /index.html
 		file_server
 	}
+
 }
