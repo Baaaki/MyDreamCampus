@@ -27,8 +27,9 @@ for i in $(seq 1 60); do
         pending_total=$((pending_total + cnt))
     done
 
-    # Check RabbitMQ queues
-    rmq_messages=$(curl -s -u "$RABBITMQ_USER:$RABBITMQ_PASSWORD" "http://$RABBITMQ_HOST:$RABBITMQ_PORT/api/queues" 2>/dev/null | jq '[.[].messages // 0] | add // 0' || echo "0")
+    # Dead-letter queues hold what consumers gave up on and nothing drains
+    # them: counting them would fail every save until someone empties them.
+    rmq_messages=$(curl -s -u "$RABBITMQ_USER:$RABBITMQ_PASSWORD" "http://$RABBITMQ_HOST:$RABBITMQ_PORT/api/queues" 2>/dev/null | jq '[.[] | select(.name | endswith(".dlq") | not) | .messages // 0] | add // 0' || echo "0")
     rmq_messages=$(echo "$rmq_messages" | tr -d '[:space:]')
     [ -z "$rmq_messages" ] && rmq_messages=0
 
