@@ -266,9 +266,9 @@ credentials-file: /home/KULLANICI/.cloudflared/<TUNNEL_ID>.json
 
 ingress:
   - hostname: campus.example.com
-    service: http://localhost:8080      # mydreamcampus (HTTP_PORT)
+    service: http://127.0.0.1:8080      # mydreamcampus (HTTP_PORT)
   - hostname: proje2.example.com
-    service: http://localhost:8081
+    service: http://127.0.0.1:8081
   # Zorunlu: eslesmeyen her istek icin catch-all, en sonda olmali.
   - service: http_status:404
 ```
@@ -285,13 +285,20 @@ sudo systemctl status cloudflared
 #### 5. `.env`'i tunnel'a göre ayarla
 
 ```
-HTTP_PORT=8080
-HTTPS_PORT=8443
+HTTP_PORT=127.0.0.1:8080
+HTTPS_PORT=127.0.0.1:8443
 PUBLIC_HOST=:80
 PUBLIC_ORIGIN=https://campus.example.com
 ```
 
 `make deploy` ile uygula. Artık `https://campus.example.com` çalışıyor.
+
+> **`127.0.0.1:` öneki neden?** Öneksiz `HTTP_PORT=8080` portu tüm arayüzlere
+> açar: LAN'daki (ya da port yönlendirmesi varsa internetteki) herkes Caddy'ye
+> Cloudflare'i — Access'i, WAF'ı, rate limit kuralını — atlayarak ulaşır.
+> Önekle yalnız aynı makinedeki `cloudflared` bağlanabilir. Ingress'te de bu
+> yüzden `localhost` değil `127.0.0.1` yazılı: `localhost` önce `::1`'e
+> çözülebilir ve orada dinleyen yoktur.
 
 > **`PUBLIC_HOST=:80` neden?** Tunnel isteği `Host: campus.example.com` ile
 > iletir. Caddy'ye sabit bir hostname yazarsan eşleşmeyen her istek 404 döner;
@@ -303,7 +310,8 @@ PUBLIC_ORIGIN=https://campus.example.com
 > — tarayıcının gördüğü şema o, CORS ve e-posta linkleri oradan üretiliyor.
 >
 > `HTTPS_PORT` bu senaryoda kullanılmıyor (TLS Cloudflare'de bitiyor), ama
-> compose onu publish ettiği için diğer projelerle çakışmayan bir değer ver.
+> compose onu publish ettiği için diğer projelerle çakışmayan, `127.0.0.1`'e
+> bağlı bir değer ver.
 
 ---
 
@@ -632,10 +640,11 @@ Gereken temel değerler:
 - `PUBLIC_ORIGIN=https://mydreamcampus.madebybaki.com`
 
 > **Alternatif (Host Seviyesinde Cloudflared):** Eğer sunucuda zaten Docker dışında
-> bağımsız çalışan bir `cloudflared` varsa, stack'i `EDGE=tunnel` ile başlatmak yerine
-> normal `make deploy` ile başlatabilirsin. Bu durumda `.env`'de `HTTP_PORT=8080` tanımlanır,
-> Caddy host'ta `127.0.0.1:8080` dinler ve host'taki `~/.cloudflared/config.yml` ingress kuralına
-> `service: http://127.0.0.1:8080` yazılır.
+> bağımsız çalışan bir `cloudflared` varsa, `EDGE`'i boş bırak ve normal `make deploy`
+> kullan. `.env`'de `HTTP_PORT=127.0.0.1:8080` ve `HTTPS_PORT=127.0.0.1:8443` yaz —
+> `127.0.0.1:` öneki olmadan port tüm arayüzlere açılır ve Cloudflare'i atlayan bir kapı
+> kalır. Host'taki `~/.cloudflared/config.yml` ingress kuralına
+> `service: http://127.0.0.1:8080` yazılır (ayrıntı: A8).
 
 #### 3. Stack'i Başlat
 ```bash
