@@ -96,7 +96,7 @@ gerekiyorsa kilidi yeniden yazar.
     kayıttan sonra çalıştır (örn. rclone); boşsa atla.
   - **Commit:** `feat(infra): snapshot the permanent state`
 
-- [ ] **7.3 Geri dönüş (restore)**
+- [x] **7.3 Geri dönüş (restore)** (gemini ile yapıldı)
   - Sıra:
     1. Yazma kilidini koy.
     2. Her DB için `pg_restore --clean --if-exists --single-transaction`
