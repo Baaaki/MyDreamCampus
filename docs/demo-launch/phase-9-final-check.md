@@ -69,9 +69,9 @@
 - [ ] Mobil APK: giriş paneli, rezervasyon ve kartla ödeme çalışıyor.
 
 ### Kod
-- [ ] `grep -rni mock frontend/src --include=*.ts --include=*.tsx | grep -v "\.test\."`
-  boş dönüyor.
-- [ ] README §5 komutlarının hepsi yeşil.
+- [x] `grep -rni mock frontend/src --include=*.ts --include=*.tsx | grep -v "\.test\."`
+  boş dönüyor. (gemini ile yapıldı)
+- [x] README §5 komutlarının hepsi yeşil. (gemini ile yapıldı)
 
 ## Faz sonu
 - Tüm maddeler işaretliyse README §6'da Faz 9'u **Bitti** yap ve Oturum
