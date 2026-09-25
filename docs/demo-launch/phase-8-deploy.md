@@ -64,7 +64,7 @@
   - auto-deploy `EDGE=tunnel` ile çalışsın (systemd unit veya `.env`).
   - **Commit:** `fix(infra): deploy only commits that passed CI`
 
-- [ ] **8.4 Mobil yayın ayarları**
+- [x] **8.4 Mobil yayın ayarları** (gemini ile yapıldı)
   - `mobile/app.json`: `name: "MyDreamCampus"`, anlamlı bir `slug` ve
     `scheme`. `extra.eas.projectId` kullanıcıdan gelecek; şimdilik yer tutucu
     kalsın ve not düş.
