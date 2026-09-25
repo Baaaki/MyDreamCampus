@@ -382,87 +382,93 @@ jobs:
           expect 401 "$code" "unauthenticated request is rejected (grades)"
 
           # ── Permanent state & demo-ops cycle (Phase 7) ─────────────────
-          # 1. demo-ops is running and took the initial baseline
+          # The ops endpoints only queue a command; demo-ops stamps the status
+          # with the command's id once it has handled it. Waiting on the mode
+          # alone would read a status written before the command was picked up.
+          ops_run() {
+            ops_path="$1"; want_mode="$2"
+            code=$(api -X POST "http://localhost/api/catalog/admin/ops/$ops_path" -H "Authorization: Bearer $TOKEN")
+            expect 202 "$code" "ops $ops_path queued (catalog)"
+            cmd=$(jq -r '.command_id' /tmp/body)
+            for _ in $(seq 1 180); do
+              code=$(api http://localhost/api/catalog/admin/ops/status -H "Authorization: Bearer $TOKEN")
+              if [ "$code" = 200 ] && [ "$(jq -r '.last_command_id // empty' /tmp/body)" = "$cmd" ] \
+                && [ "$(jq -r '.mode' /tmp/body)" != busy ]; then
+                break
+              fi
+              sleep 1
+            done
+            [ "$(jq -r '.last_command_id // empty' /tmp/body)" = "$cmd" ] \
+              || { echo "::error::demo-ops never handled $ops_path: $(head -c 300 /tmp/body)"; exit 1; }
+            ops_mode=$(jq -r '.mode' /tmp/body)
+            ops_error=$(jq -r '.last_error // empty' /tmp/body)
+            if [ "$ops_mode" != "$want_mode" ] || [ -n "$ops_error" ]; then
+              echo "::error::ops $ops_path ended in mode $ops_mode (want $want_mode): $ops_error"
+              exit 1
+            fi
+            echo "ok  ops $ops_path -> $ops_mode (demo-ops)"
+          }
+          course_json() {
+            printf '{"course_code":"%s","name":"%s","faculty":"Mühendislik Fakültesi","department":"Bilgisayar Mühendisliği","class_level":1,"course_type":"elective","credits":3,"ects":5}' "$1" "$2"
+          }
+
+          # The access token from the start of the job may be near its 15 minutes.
+          code=$(api -X POST http://localhost/api/auth/login \
+            -H 'Content-Type: application/json' \
+            -d '{"email":"admin@university.edu.tr","password":"ci-admin-password"}')
+          expect 200 "$code" "super admin login (auth)"
+          TOKEN=$(jq -r '.access_token' /tmp/body)
+
+          # 1. demo-ops is up and has taken the first permanent state. A status
+          # with no updated_at is catalog's default: demo-ops has not written
+          # yet. The first snapshot may meet this job's own events and be
+          # retried a minute later, hence the long wait.
           state=$(docker inspect -f '{{.State.Status}}' mydreamcampus-demo-ops 2>/dev/null || echo missing)
           [ "$state" = "running" ] || { echo "::error::demo-ops is not running"; exit 1; }
-
-          # Wait for demo-ops to finish initial baseline snapshot (mode == "normal")
-          for _ in $(seq 1 40); do
+          for _ in $(seq 1 300); do
             code=$(api http://localhost/api/catalog/admin/ops/status -H "Authorization: Bearer $TOKEN")
-            mode=$(jq -r '.mode // empty' /tmp/body 2>/dev/null || echo "")
-            [ "$mode" = "normal" ] && break
+            [ "$code" = 200 ] && [ "$(jq -r '.mode' /tmp/body)" = normal ] \
+              && [ -n "$(jq -r '.updated_at // empty' /tmp/body)" ] && break
             sleep 1
           done
           expect 200 "$code" "get ops status (catalog)"
-          [ "$mode" = "normal" ] || { echo "::error::demo-ops did not reach normal mode"; exit 1; }
+          [ -n "$(jq -r '.current // empty' /tmp/body)" ] \
+            || { echo "::error::demo-ops has no initial baseline: $(head -c 300 /tmp/body)"; exit 1; }
 
-          # 2. begin-edit as super admin
-          code=$(api -X POST http://localhost/api/catalog/admin/ops/begin-edit -H "Authorization: Bearer $TOKEN")
-          expect 202 "$code" "begin-edit accepted (catalog)"
+          # 2. The super admin starts editing: everyone else's writes are locked.
+          ops_run begin-edit editing
 
-          # Wait for demo-ops to enter editing mode
-          for _ in $(seq 1 40); do
-            code=$(api http://localhost/api/catalog/admin/ops/status -H "Authorization: Bearer $TOKEN")
-            mode=$(jq -r '.mode // empty' /tmp/body 2>/dev/null || echo "")
-            [ "$mode" = "editing" ] && break
-            sleep 1
-          done
-          [ "$mode" = "editing" ] || { echo "::error::demo-ops did not enter editing mode"; exit 1; }
-
-          # 3. Super admin adds a permanent course
-          code=$(api -X POST http://localhost/api/catalog/courses \
-            -H "Authorization: Bearer $TOKEN" -H 'Content-Type: application/json' \
-            -d '{"course_code":"CS999","name":"Permanent Course","credits":3,"ects":5,"department":"Bilgisayar Mühendisliği"}')
-          expect 201 "$code" "super admin creates course during edit mode"
-
-          # 4. save baseline
-          code=$(api -X POST http://localhost/api/catalog/admin/ops/save -H "Authorization: Bearer $TOKEN")
-          expect 202 "$code" "save baseline accepted"
-
-          # Wait for demo-ops to return to normal mode
-          for _ in $(seq 1 40); do
-            code=$(api http://localhost/api/catalog/admin/ops/status -H "Authorization: Bearer $TOKEN")
-            mode=$(jq -r '.mode // empty' /tmp/body 2>/dev/null || echo "")
-            [ "$mode" = "normal" ] && break
-            sleep 1
-          done
-          [ "$mode" = "normal" ] || { echo "::error::demo-ops did not return to normal mode after save"; exit 1; }
-
-          # 5. Demo admin adds a temporary course
           code=$(api -X POST http://localhost/api/auth/login \
             -H 'Content-Type: application/json' \
             -d '{"email":"demo.admin@mydreamcampus.com","password":"demo.admin@mydreamcampus.com"}')
-          expect 200 "$code" "demo admin login"
+          expect 200 "$code" "demo admin login while the super admin edits (auth)"
           DEMO_ADMIN_TOKEN=$(jq -r '.access_token' /tmp/body)
-
           code=$(api -X POST http://localhost/api/catalog/courses \
             -H "Authorization: Bearer $DEMO_ADMIN_TOKEN" -H 'Content-Type: application/json' \
-            -d '{"course_code":"CS888","name":"Temporary Course","credits":3,"ects":5,"department":"Bilgisayar Mühendisliği"}')
-          expect 201 "$code" "demo admin creates temporary course"
+            -d "$(course_json CS777 'Locked Course')")
+          expect 503 "$code" "demo admin write is locked during edit mode (catalog)"
+          [ "$(jq -r '.code' /tmp/body)" = SYSTEM_EDITING ] \
+            || { echo "::error::locked write did not answer SYSTEM_EDITING"; exit 1; }
 
-          # Verify both courses exist
-          code=$(api http://localhost/api/catalog/courses/CS999)
-          expect 200 "$code" "CS999 exists before restore"
+          # 3. The super admin adds a permanent course and saves.
+          code=$(api -X POST http://localhost/api/catalog/courses \
+            -H "Authorization: Bearer $TOKEN" -H 'Content-Type: application/json' \
+            -d "$(course_json CS999 'Permanent Course')")
+          expect 201 "$code" "super admin creates course during edit mode (catalog)"
+          ops_run save normal
+
+          # 4. A visitor's change after the save is temporary.
+          code=$(api -X POST http://localhost/api/catalog/courses \
+            -H "Authorization: Bearer $DEMO_ADMIN_TOKEN" -H 'Content-Type: application/json' \
+            -d "$(course_json CS888 'Temporary Course')")
+          expect 201 "$code" "demo admin creates temporary course (catalog)"
           code=$(api http://localhost/api/catalog/courses/CS888)
           expect 200 "$code" "CS888 exists before restore"
 
-          # 6. restore-now by super admin
-          code=$(api -X POST http://localhost/api/catalog/admin/ops/restore-now -H "Authorization: Bearer $TOKEN")
-          expect 202 "$code" "restore-now accepted"
-
-          # Wait for restore to complete and return to normal mode
-          for _ in $(seq 1 40); do
-            code=$(api http://localhost/api/catalog/admin/ops/status -H "Authorization: Bearer $TOKEN" 2>/dev/null || echo "500")
-            mode=$(jq -r '.mode // empty' /tmp/body 2>/dev/null || echo "")
-            [ "$mode" = "normal" ] && break
-            sleep 1
-          done
-          [ "$mode" = "normal" ] || { echo "::error::demo-ops did not return to normal mode after restore"; exit 1; }
-
-          # 7. Check: demo admin's course is gone (404), super admin's course remains (200)
+          # 5. Restoring drops the visitor's course and keeps the saved one.
+          ops_run restore-now normal
           code=$(api http://localhost/api/catalog/courses/CS888)
           expect 404 "$code" "demo admin temporary course CS888 is wiped after restore"
-
           code=$(api http://localhost/api/catalog/courses/CS999)
           expect 200 "$code" "super admin permanent course CS999 remains after restore"
 
