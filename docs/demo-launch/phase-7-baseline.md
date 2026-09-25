@@ -55,7 +55,7 @@ gerekiyorsa kilidi yeniden yazar.
 
 ## Görevler
 
-- [ ] **7.1 demo-ops konteyneri**
+- [x] **7.1 demo-ops konteyneri** (gemini ile yapıldı)
   - Yeni dizin `new-backend/infrastructure/demo-ops/`:
     - `Dockerfile`: `FROM postgres:18-alpine`. `pg_dump` sürümü sunucuyla aynı
       olmalı; migrate imajındaki alpine istemcisi 16 sürümünde, bu yüzden o

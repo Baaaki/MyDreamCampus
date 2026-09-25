@@ -404,6 +404,42 @@ services:
       catalog-service:
         condition: service_started
 
+  # Ops daemon: manages baseline snapshots and nightly restore to permanent state.
+  demo-ops:
+    build:
+      context: ../..
+      dockerfile: new-backend/infrastructure/demo-ops/Dockerfile
+    image: mydreamcampus-demo-ops:latest
+    container_name: mydreamcampus-demo-ops
+    restart: unless-stopped
+    mem_limit: 256m
+    logging: *logging
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      rabbitmq:
+        condition: service_healthy
+      seed:
+        condition: service_completed_successfully
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-postgres}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?POSTGRES_PASSWORD is required — see .env.example}
+      SERVICE_DB_PASSWORD: ${SERVICE_DB_PASSWORD:?SERVICE_DB_PASSWORD is required — see .env.example}
+      REDIS_ADDR: redis:6379
+      REDIS_PASSWORD: ${REDIS_PASSWORD:?set REDIS_PASSWORD in .env}
+      RABBITMQ_USER: ${RABBITMQ_USER:-rabbitmq}
+      RABBITMQ_PASSWORD: ${RABBITMQ_PASSWORD:?RABBITMQ_PASSWORD is required — see .env.example}
+      TZ: Europe/Istanbul
+      NIGHTLY_RESET_AT: ${NIGHTLY_RESET_AT:-04:00}
+      BASELINE_KEEP: ${BASELINE_KEEP:-7}
+      EDIT_TIMEOUT_MINUTES: ${EDIT_TIMEOUT_MINUTES:-120}
+      DEMO_MODE: ${DEMO_MODE:-false}
+      BASELINE_OFFSITE_CMD: ${BASELINE_OFFSITE_CMD:-}
+    volumes:
+      - demo-baselines:/baselines
+
   # Public edge: serves the SPA and reverse-proxies each /api prefix to its own
   # service. Fetches a real Let's Encrypt cert for SITE_ADDRESS automatically.
   #
@@ -441,3 +477,5 @@ volumes:
   redis-data:
   caddy-data:
   caddy-config:
+  demo-baselines:
+

@@ -165,7 +165,7 @@ Başlangıç durumu (24.09.2026, Faz 0 sonu): 11 Go modülünde `go vet` temiz,
 | 4 | [phase-4-seed.md](phase-4-seed.md) | Referans veri ve seed'in yeniden yazımı | Bitti |
 | 5 | [phase-5-mock-cleanup.md](phase-5-mock-cleanup.md) | Frontend'den mock temizliği | Bitti (gemini ile yapıldı) |
 | 6 | [phase-6-accounts.md](phase-6-accounts.md) | Süper admin, demo hesapları, giriş paneli | Bitti (gemini ile yapıldı) |
-| 7 | [phase-7-baseline.md](phase-7-baseline.md) | Kalıcı durum ve gece 04:00 geri dönüşü | Bekliyor |
+| 7 | [phase-7-baseline.md](phase-7-baseline.md) | Kalıcı durum ve gece 04:00 geri dönüşü | Devam ediyor |
 | 8 | [phase-8-deploy.md](phase-8-deploy.md) | Ev sunucusu + Cloudflare Tunnel | Bekliyor |
 | 9 | [phase-9-final-check.md](phase-9-final-check.md) | Son kontrol (tarayıcı + mobil) | Bekliyor |
 
