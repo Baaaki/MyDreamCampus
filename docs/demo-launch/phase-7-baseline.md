@@ -79,7 +79,7 @@ gerekiyorsa kilidi yeniden yazar.
     compose profile `demo` kullan; hangisini seçtiğini not et).
   - **Commit:** `feat(infra): add the demo-ops container`
 
-- [ ] **7.2 Anlık görüntü (save)**
+- [x] **7.2 Anlık görüntü (save)** (gemini ile yapıldı)
   - Veritabanları: `auth staff student catalog enrollment attendance grades meal payment notification`.
   - Boşalmayı bekle (en fazla 60 sn):
     - her DB'de outbox tablosunda `pending` satır sayısı 0 (tablo adlarını her
