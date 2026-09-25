@@ -479,10 +479,15 @@ volumes:
   caddy-config:
   demo-baselines:
 
+# A fixed subnet inside 172.16.0.0/12, the range Caddy trusts to forward the
+# client's address (cloudflared, or the port proxy in front of a host-level
+# one). Left to Docker, a busy host hands out 192.168.x.0/20 once its 172.x
+# pools run out, and every visitor would share cloudflared's address in the
+# rate limiter. 172.16.0.0/16 is outside Docker's automatic pools (172.17-31),
+# so no other stack on the host is given an overlapping one; 172.28.0.0/16
+# was, and `up` failed with "Pool overlaps".
 networks:
   default:
     ipam:
       config:
-        - subnet: 172.28.0.0/16
-
-
+        - subnet: ${STACK_SUBNET:-172.16.238.0/24}

@@ -801,6 +801,7 @@ Kalıcı olsun istersen `~/.bashrc`'ye ekle.
 | `permission denied ... docker.sock` | Klasik daemon'ın root soketine düşmüşsün. `DOCKER_HOST=unix:///run/user/$(id -u)/docker.sock` ayarlı mı? |
 | SSH kapanınca container'lar ölüyor | `sudo loginctl enable-linger $USER` yapılmamış (adım A1). |
 | `bind: permission denied` (port 80) | Rootless 1024 altına bağlanamaz: `.env`'de `HTTP_PORT=8080` kullan ya da `setcap` uygula (adım A1). |
+| `Pool overlaps with other one on this address space` | Host'taki başka bir Docker ağı compose'un alt ağını kullanıyor. `.env`'de `STACK_SUBNET`'i `172.16.0.0/12` içinde boş bir aralığa ayarla (ör. `172.16.239.0/24`); `docker network ls` ile mevcutları gör. |
 | `port is already allocated` | Makinede o portu tutan başka bir şey var. `.env`'de `HTTP_PORT` (veya infra için `POSTGRES_HOST_PORT`, `REDIS_HOST_PORT`…) ile değiştir. |
 | Ev ağındaki telefondan açılmıyor | `PUBLIC_ORIGIN` `localhost` kalmış olabilir — LAN IP + port olmalı. Ayrıca `sudo ufw allow <HTTP_PORT>/tcp`. |
 | Bir servis sürekli restart | `make logs-<servis>` → genelde `.env`'de eksik/default secret. Düzelt, `make deploy-<servis>`. |
@@ -813,7 +814,7 @@ Kalıcı olsun istersen `~/.bashrc`'ye ekle.
 | Build OOM (2GB) | Adım 4b swap ekle veya droplet'i 4GB'a resize et. |
 | `rabbitmq` açılmıyor, logda `feature flag` / `incompatible` | Broker yeni bir sürüm serisine, eski sürümde kapalı kalmış feature flag'lerle geçmiş. Aşağıdaki "RabbitMQ sürüm yükseltmesi" bölümüne bak. |
 | Tunnel bağlanmıyor | `docker compose logs cloudflared`. `TUNNEL_TOKEN` değerinin `.env`'de doğru olduğunu kontrol et. Cloudflare Zero Trust'ta Public Hostname hedefinin `caddy:80` (HTTP) olarak yazıldığından emin ol (localhost:80 container içinden host'a değil container'ın kendisine bakar). |
-| Loglarda gerçek IP görünmüyor | `frontend/Caddyfile`'daki `trusted_proxies` bloğunun Docker ağını (`172.16.0.0/12`) kapsadığından emin ol. Compose ağı `172.28.0.0/16` olarak sabitlenmiştir. |
+| Loglarda gerçek IP görünmüyor | `frontend/Caddyfile`'daki `trusted_proxies` bloğunun Docker ağını (`172.16.0.0/12`) kapsadığından emin ol. Compose ağı `172.16.238.0/24` olarak sabitlenmiştir; `STACK_SUBNET` ile değiştirirsen `172.16.0.0/12` içinde kalmalı. |
 | Geri dönüş (restore) hatası | `docker compose logs demo-ops`. Veritabanı şifrelerinin `.env` ile uyumunu doğrula. `docker exec mydreamcampus-demo-ops ls -la /baselines` ile geçerli dump dosyalarını kontrol et. |
 | Kilit takılı kaldı (503 SYSTEM_EDITING) | Kalıcı Veri sayfasına bak. Mod "Düzenleme" ise süper admin "Kaydet ve Yayına Al" ya da "Vazgeç ve Sıfırla" ile bitirir; bitirmezse demo-ops `EDIT_TIMEOUT_MINUTES` (varsayılan 120) dolunca kendisi kapatır. demo-ops çöktüyse `docker restart mydreamcampus-demo-ops`: yarıda kalan bir işlemin kilidini kaldırır, süren bir düzenlemeyi son tarihine kadar korur. Kilit Redis'teki süreli `ops:write_lock` anahtarıdır; son çare: `docker exec mydreamcampus-redis sh -c 'redis-cli -a "$REDIS_PASSWORD" --no-auth-warning DEL ops:write_lock'`. |
 
