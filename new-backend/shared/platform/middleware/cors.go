@@ -14,6 +14,8 @@ import (
 const corsAllowHeaders = "Content-Type, Authorization, X-Requested-With, X-Request-ID, X-CSRF-Token, " +
 	IdempotencyHeader + ", X-Client-Type"
 
+const corsExposeHeaders = "X-RateLimit-Limit, X-RateLimit-Remaining, Retry-After, X-System-Editing"
+
 // devDefaultOrigins is used only when CORS_ALLOWED_ORIGINS is unset and
 // ENVIRONMENT != "production".
 var devDefaultOrigins = []string{
@@ -61,7 +63,7 @@ func CORS() gin.HandlerFunc {
 
 		c.Writer.Header().Set("Access-Control-Allow-Headers", corsAllowHeaders)
 		c.Writer.Header().Set("Access-Control-Allow-Methods", "GET, POST, PUT, DELETE, PATCH, OPTIONS")
-		c.Writer.Header().Set("Access-Control-Expose-Headers", "X-RateLimit-Limit, X-RateLimit-Remaining, Retry-After")
+		c.Writer.Header().Set("Access-Control-Expose-Headers", corsExposeHeaders)
 		c.Writer.Header().Set("Access-Control-Max-Age", "86400") // 24 hours
 
 		// Handle preflight OPTIONS request
@@ -88,7 +90,7 @@ func CORSWithOrigins(allowedOrigins []string) gin.HandlerFunc {
 
 		c.Writer.Header().Set("Access-Control-Allow-Headers", corsAllowHeaders)
 		c.Writer.Header().Set("Access-Control-Allow-Methods", "GET, POST, PUT, DELETE, PATCH, OPTIONS")
-		c.Writer.Header().Set("Access-Control-Expose-Headers", "X-RateLimit-Limit, X-RateLimit-Remaining, Retry-After")
+		c.Writer.Header().Set("Access-Control-Expose-Headers", corsExposeHeaders)
 		c.Writer.Header().Set("Access-Control-Max-Age", "86400")
 
 		if c.Request.Method == "OPTIONS" {
@@ -153,6 +155,6 @@ func CORSForMobile() gin.HandlerFunc {
 func setCORSCommonHeaders(c *gin.Context) {
 	c.Writer.Header().Set("Access-Control-Allow-Headers", corsAllowHeaders)
 	c.Writer.Header().Set("Access-Control-Allow-Methods", "GET, POST, PUT, DELETE, PATCH, OPTIONS")
-	c.Writer.Header().Set("Access-Control-Expose-Headers", "X-RateLimit-Limit, X-RateLimit-Remaining, Retry-After")
+	c.Writer.Header().Set("Access-Control-Expose-Headers", corsExposeHeaders)
 	c.Writer.Header().Set("Access-Control-Max-Age", "86400")
 }

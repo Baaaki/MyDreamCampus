@@ -126,7 +126,7 @@ gerekiyorsa kilidi yeniden yazar.
     - düzenleme süresi dolduysa `cancel_edit` uygula.
   - **Commit:** `feat(infra): schedule the nightly restore`
 
-- [ ] **7.5 Yazma kilidi middleware'i (K3)**
+- [x] **7.5 Yazma kilidi middleware'i (K3)** (gemini ile yapıldı)
   - Yeni `shared/platform/middleware/writelock.go`. Global zincire ekle
     (`shared/httpserver/server.go` `NewServer`, rate limit'ten sonra).
   - Kilit koşulu, hepsi birlikte:

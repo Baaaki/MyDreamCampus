@@ -164,3 +164,20 @@ func (c *ClientWrapper) ConsumeResetToken(ctx context.Context, token string) (st
 	}
 	return val, err
 }
+
+// ============================================
+// Demo Ops - Write Lock
+// ============================================
+
+// IsWriteLocked checks if ops:write_lock key is present in Redis DB 0.
+func (c *ClientWrapper) IsWriteLocked(ctx context.Context) (bool, error) {
+	if c == nil || c.client == nil {
+		return false, nil
+	}
+	exists, err := c.client.Exists(ctx, "ops:write_lock").Result()
+	if err != nil {
+		return false, err
+	}
+	return exists > 0, nil
+}
+

@@ -197,6 +197,9 @@ func (r *Runtime) initRedis(opts Options) {
 	// two services cannot be served the wrong service's stored response.
 	platformMiddleware.SetIdempotencyStore(client, opts.Service)
 
+	// Write lock for demo ops editing mode.
+	platformMiddleware.SetWriteLockStore(client)
+
 	// The time machine's offset is shared through Redis. Without Redis the
 	// service stays on the real clock, which is the safe side to fail on.
 	clocksync.Start(r.Ctx, client)
