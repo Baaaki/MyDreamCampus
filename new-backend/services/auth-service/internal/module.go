@@ -142,6 +142,11 @@ func (m *Module) Bootstrap(ctx context.Context) error {
 		// Non-fatal: demo admin may already exist.
 	}
 
+	if err := m.authService.EnsureDemoAccountFlags(ctx); err != nil {
+		logger.Error("marking demo accounts failed", zap.Error(err))
+		// Non-fatal: the login page lists fewer demo accounts.
+	}
+
 	m.authService.StartCleanupScheduler(ctx)
 
 	if err := m.consumer.Start(ctx); err != nil {

@@ -22,6 +22,7 @@ type demoUserRepoMock struct {
 	createdParams  db.CreateUserParams
 	createUserErr  error
 	ensuredEmail   string
+	ensuredEmails  []string
 	ensureFlagsErr error
 }
 
@@ -49,6 +50,7 @@ func (m *demoUserRepoMock) CreateUser(ctx context.Context, params db.CreateUserP
 
 func (m *demoUserRepoMock) EnsureDemoUserFlags(ctx context.Context, email string) error {
 	m.ensuredEmail = email
+	m.ensuredEmails = append(m.ensuredEmails, email)
 	return m.ensureFlagsErr
 }
 
@@ -139,4 +141,29 @@ func TestSeedDemoAdmin_CreatesUser(t *testing.T) {
 	assert.False(t, *repo.createdParams.ForcePasswordChange)
 	require.NotNil(t, repo.createdParams.IsSuperadmin)
 	assert.False(t, *repo.createdParams.IsSuperadmin)
+}
+
+func TestEnsureDemoAccountFlags_DemoMode_MarksTeacherAndStudent(t *testing.T) {
+	cfg := &config.Config{}
+	cfg.Demo.Enabled = true
+	cfg.Demo.TeacherEmail = "ahmet.yilmaz@uni.edu.tr"
+	cfg.Demo.StudentEmail = "zeynep.sahin@uni.edu.tr"
+
+	repo := &demoUserRepoMock{}
+	s := &AuthService{config: cfg, authRepo: repo}
+
+	require.NoError(t, s.EnsureDemoAccountFlags(context.Background()))
+	assert.Equal(t, []string{"ahmet.yilmaz@uni.edu.tr", "zeynep.sahin@uni.edu.tr"}, repo.ensuredEmails)
+}
+
+func TestEnsureDemoAccountFlags_Disabled_MarksNothing(t *testing.T) {
+	cfg := &config.Config{}
+	cfg.Demo.TeacherEmail = "ahmet.yilmaz@uni.edu.tr"
+	cfg.Demo.StudentEmail = "zeynep.sahin@uni.edu.tr"
+
+	repo := &demoUserRepoMock{}
+	s := &AuthService{config: cfg, authRepo: repo}
+
+	require.NoError(t, s.EnsureDemoAccountFlags(context.Background()))
+	assert.Empty(t, repo.ensuredEmails)
 }

@@ -973,6 +973,25 @@ func (s *AuthService) SeedDemoAdmin(ctx context.Context) error {
 	return nil
 }
 
+// EnsureDemoAccountFlags marks the demo teacher and student at startup. The
+// seed marks them too, but it runs only on an empty system: a stack seeded
+// before the flag existed would never list them on the login page. Addresses
+// with no account yet match no row; on a fresh stack the seed marks them.
+func (s *AuthService) EnsureDemoAccountFlags(ctx context.Context) error {
+	if !s.config.Demo.Enabled {
+		return nil
+	}
+	for _, email := range []string{s.config.Demo.TeacherEmail, s.config.Demo.StudentEmail} {
+		if email == "" {
+			continue
+		}
+		if err := s.authRepo.EnsureDemoUserFlags(ctx, email); err != nil {
+			return fmt.Errorf("mark demo account %s: %w", email, err)
+		}
+	}
+	return nil
+}
+
 // GetDemoAccounts returns active demo accounts
 func (s *AuthService) GetDemoAccounts(ctx context.Context) ([]dto.DemoAccountResponse, error) {
 	users, err := s.authRepo.GetActiveDemoUsers(ctx)
