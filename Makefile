@@ -16,7 +16,12 @@ COMPOSE_FILE := $(INFRA)/docker-compose.yml
 # third overlay without rethinking this variable:
 #   $(if $(OBSERVABILITY),-f $(INFRA)/docker-compose.observability.yml)
 # turns `make deploy OBSERVABILITY=1` on once that file exists.
+ifeq ($(EDGE),tunnel)
+COMPOSE := -f $(COMPOSE_FILE) -f $(INFRA)/docker-compose.tunnel.yml
+else
 COMPOSE := -f $(COMPOSE_FILE) -f $(INFRA)/docker-compose.standalone.yml
+endif
+
 
 # The four containers a locally-run service needs, plus the one-shot migrator.
 INFRA_SERVICES := postgres redis rabbitmq mailhog migrate

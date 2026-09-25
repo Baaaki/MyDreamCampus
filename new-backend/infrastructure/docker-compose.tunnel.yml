@@ -1,0 +1,16 @@
+# Cloudflare Tunnel edge overlay.
+# Replaces host-published Caddy ports with an internal Cloudflare Tunnel daemon
+# container talking to Caddy over the Docker bridge network.
+services:
+  caddy:
+    ports: !reset []
+
+  cloudflared:
+    image: cloudflare/cloudflared:2024.12.2
+    container_name: mydreamcampus-cloudflared
+    restart: unless-stopped
+    command: tunnel --no-autoupdate run
+    environment:
+      TUNNEL_TOKEN: ${TUNNEL_TOKEN:?TUNNEL_TOKEN is required when EDGE=tunnel}
+    depends_on:
+      - caddy

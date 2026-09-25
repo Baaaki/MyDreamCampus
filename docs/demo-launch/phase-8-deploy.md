@@ -18,7 +18,7 @@
 
 ## Görevler
 
-- [ ] **8.1 Tunnel compose katmanı**
+- [x] **8.1 Tunnel compose katmanı** (gemini ile yapıldı)
   - Yeni `new-backend/infrastructure/docker-compose.tunnel.yml`:
     - `cloudflared` servisi: `cloudflare/cloudflared`, **sabit sürüm
       etiketi**; `command: tunnel --no-autoupdate run`; env `TUNNEL_TOKEN`;
