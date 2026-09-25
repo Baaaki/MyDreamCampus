@@ -40,8 +40,8 @@
 - [ ] Denetim kaydı gerçek veri gösteriyor.
 - [ ] Zaman makinesi:
   - ileri tarihe alınca tüm servislerin durumu aynı saati gösteriyor;
-  - şerit görünüyor;
-  - 30 dk sonra (K1) ya da "Sıfırla" ile gerçek saate dönüyor.
+  - "Sıfırla" ile gerçek saate dönüyor. (K1 = Hayır: şerit ve 30 dk
+    sonra kendiliğinden kapanma yok.)
 
 ### Korumalar
 - [ ] Demo hesabında şifre değiştirme ve "tüm cihazlardan çık" kapalı.
@@ -70,10 +70,12 @@
 
 ### Kod
 - [x] `grep -rni mock frontend/src --include=*.ts --include=*.tsx | grep -v "\.test\."`
-  boş dönüyor. (gemini ile yapıldı)
-- [x] README §5 komutlarının hepsi yeşil. (gemini ile yapıldı)
+  boş dönüyor. (25.09 doğrulandı)
+- [x] README §5 komutlarının hepsi yeşil. (25.09: backend 11 modül vet temiz /
+  1160 test; frontend typecheck+lint+Prettier+build temiz / 138 test; mobil
+  tsc temiz / 103 test)
 
 ## Faz sonu
 - Tüm maddeler işaretliyse README §6'da Faz 9'u **Bitti** yap ve Oturum
   günlüğüne yaz.
-- Kullanıcıya dalı `main`'e birleştirmek için PR açmayı öner (izin iste).
+- Push için kullanıcıdan izin iste (tek dal `main`).

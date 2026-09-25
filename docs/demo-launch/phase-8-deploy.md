@@ -63,6 +63,11 @@
     "Bekliyor" ve "başarısız" durumlarını logla.
   - auto-deploy `EDGE=tunnel` ile çalışsın (systemd unit veya `.env`).
   - **Commit:** `fix(infra): deploy only commits that passed CI`
+  > ENGEL (25.09): `backend-e2e` son 11 CI koşusunun hiçbirinde geçmedi;
+  > çoğu "Start the stack" (`up -d --build`) adımında 30 dk zaman aşımına
+  > takılıyor. `ci-passed` kırmızı kaldıkça auto-deploy backend'e dokunan
+  > hiçbir commit'i deploy etmez ve 8.6'daki dal koruması merge'ü kilitler.
+  > Düzeltmesi CI'da denenmeli (push izni gerekir).
 
 - [x] **8.4 Mobil yayın ayarları** (gemini ile yapıldı) — `e47b63c`
   - `mobile/app.json`: `name: "MyDreamCampus"`, anlamlı bir `slug` ve
