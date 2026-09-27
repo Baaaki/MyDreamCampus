@@ -14,12 +14,20 @@ import (
 	"go.uber.org/zap"
 )
 
+// MenuStore is the slice of MenuRepository the service uses.
+type MenuStore interface {
+	UpsertMonthlyMenu(ctx context.Context, params db.UpsertMonthlyMenuParams) (db.MonthlyMenu, error)
+	GetMonthlyMenu(ctx context.Context, params db.GetMonthlyMenuParams) (db.MonthlyMenu, error)
+}
+
+var _ MenuStore = (*repository.MenuRepository)(nil)
+
 type MenuService struct {
-	menuRepo *repository.MenuRepository
+	menuRepo MenuStore
 	logger   *zap.Logger
 }
 
-func NewMenuService(menuRepo *repository.MenuRepository, logger *zap.Logger) *MenuService {
+func NewMenuService(menuRepo MenuStore, logger *zap.Logger) *MenuService {
 	return &MenuService{
 		menuRepo: menuRepo,
 		logger:   logger,

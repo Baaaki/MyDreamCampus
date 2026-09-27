@@ -54,6 +54,11 @@ type ReservationStore interface {
 	CancelReservationWithRefund(ctx context.Context, reservationID uuid.UUID, eventPayload map[string]any) (db.Reservation, error)
 }
 
+// CafeteriaReader is the slice of CafeteriaRepository reservations need.
+type CafeteriaReader interface {
+	GetCafeteriaByID(ctx context.Context, id uuid.UUID) (db.Cafeteria, error)
+}
+
 // StudentCacheReader is the slice of StudentCacheRepository the service uses.
 type StudentCacheReader interface {
 	GetStudentCacheByID(ctx context.Context, id uuid.UUID) (db.StudentView, error)
@@ -62,11 +67,12 @@ type StudentCacheReader interface {
 var (
 	_ ReservationStore   = (*repository.ReservationRepository)(nil)
 	_ StudentCacheReader = (*repository.StudentCacheRepository)(nil)
+	_ CafeteriaReader    = (*repository.CafeteriaRepository)(nil)
 )
 
 type ReservationService struct {
 	reservationRepo  ReservationStore
-	cafeteriaRepo    *repository.CafeteriaRepository
+	cafeteriaRepo    CafeteriaReader
 	studentCacheRepo StudentCacheReader
 	closedDaysRepo   ClosedDaysReader
 	paymentClient    PaymentClient
@@ -76,7 +82,7 @@ type ReservationService struct {
 
 func NewReservationService(
 	reservationRepo ReservationStore,
-	cafeteriaRepo *repository.CafeteriaRepository,
+	cafeteriaRepo CafeteriaReader,
 	studentCacheRepo StudentCacheReader,
 	closedDaysRepo ClosedDaysReader,
 	paymentClient PaymentClient,

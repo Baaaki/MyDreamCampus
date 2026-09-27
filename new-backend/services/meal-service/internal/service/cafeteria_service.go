@@ -14,12 +14,24 @@ import (
 	"go.uber.org/zap"
 )
 
+// CafeteriaStore is the slice of CafeteriaRepository the service uses.
+type CafeteriaStore interface {
+	GetActiveCafeterias(ctx context.Context) ([]db.Cafeteria, error)
+	GetAllCafeterias(ctx context.Context) ([]db.Cafeteria, error)
+	GetCafeteriaByID(ctx context.Context, id uuid.UUID) (db.Cafeteria, error)
+	CreateCafeteria(ctx context.Context, params db.CreateCafeteriaParams) (db.Cafeteria, error)
+	UpdateCafeteria(ctx context.Context, params db.UpdateCafeteriaParams) (db.Cafeteria, error)
+	DeactivateCafeteria(ctx context.Context, id uuid.UUID) error
+}
+
+var _ CafeteriaStore = (*repository.CafeteriaRepository)(nil)
+
 type CafeteriaService struct {
-	cafeteriaRepo *repository.CafeteriaRepository
+	cafeteriaRepo CafeteriaStore
 	logger        *zap.Logger
 }
 
-func NewCafeteriaService(cafeteriaRepo *repository.CafeteriaRepository, logger *zap.Logger) *CafeteriaService {
+func NewCafeteriaService(cafeteriaRepo CafeteriaStore, logger *zap.Logger) *CafeteriaService {
 	return &CafeteriaService{
 		cafeteriaRepo: cafeteriaRepo,
 		logger:        logger,
