@@ -267,7 +267,7 @@ describe("LoginPage - error handling", () => {
   })
 })
 
-describe("LoginPage - demo accounts panel", () => {
+describe("LoginPage - demo account buttons", () => {
   const demoAccounts = [
     {
       role: "admin",
@@ -289,143 +289,102 @@ describe("LoginPage - demo accounts panel", () => {
     },
   ]
 
-  it("renders demo accounts when GET /api/auth/demo-accounts succeeds", async () => {
-    vi.stubGlobal(
-      "fetch",
-      vi.fn(async (input: RequestInfo | URL) => {
-        const url =
-          typeof input === "string"
-            ? input
-            : input instanceof Request
-              ? input.url
-              : input.toString()
-        if (url.includes("/api/auth/demo-accounts")) {
-          return jsonResponse(demoAccounts)
-        }
-        return jsonResponse({})
-      })
-    )
+  function requestUrl(input: RequestInfo | URL) {
+    if (typeof input === "string") return input
+    return input instanceof Request ? input.url : input.toString()
+  }
+
+  function stubDemoFetch(accounts: unknown = demoAccounts, status = 200) {
+    const loginBodies: unknown[] = []
+    const fetchMock = vi.fn(async (input: RequestInfo | URL) => {
+      const url = requestUrl(input)
+      if (url.includes("/api/auth/demo-accounts")) {
+        return jsonResponse(accounts, status)
+      }
+      if (url.includes("/api/auth/login")) {
+        loginBodies.push(await (input as Request).clone().json())
+        return jsonResponse({
+          access_token: "at-demo",
+          user: { id: "u-teacher", role: "teacher" },
+        })
+      }
+      return jsonResponse({})
+    })
+    vi.stubGlobal("fetch", fetchMock)
+    return loginBodies
+  }
+
+  it("shows the three role buttons in order with the one-hour notice", async () => {
+    stubDemoFetch()
 
     renderAt()
 
-    expect(await screen.findByText("Demo Hesapları")).toBeInTheDocument()
-    expect(screen.getByText("Demo Yönetici")).toBeInTheDocument()
-    expect(
-      screen.getAllByText("demo.admin@mydreamcampus.com").length
-    ).toBeGreaterThanOrEqual(1)
-    expect(screen.getByText("Demo Öğretmen")).toBeInTheDocument()
-    expect(
-      screen.getAllByText("ahmet.yilmaz@uni.edu.tr").length
-    ).toBeGreaterThanOrEqual(1)
-    expect(screen.getByText("Demo Öğrenci")).toBeInTheDocument()
-    expect(
-      screen.getAllByText("zeynep.sahin@uni.edu.tr").length
-    ).toBeGreaterThanOrEqual(1)
+    const buttons = await screen.findAllByRole("button", {
+      name: /olarak giriş/i,
+    })
+    expect(buttons.map((b) => b.textContent)).toEqual([
+      "Öğrenci Olarak Giriş",
+      "Öğretmen Olarak Giriş",
+      "Admin Olarak Giriş",
+    ])
+    expect(screen.getByRole("note")).toHaveTextContent(
+      "Yaptığınız tüm değişiklikler 1 saat sonra geri döndürülecektir."
+    )
   })
 
-  it("hides demo accounts panel when GET /api/auth/demo-accounts returns 404", async () => {
-    vi.stubGlobal(
-      "fetch",
-      vi.fn(async (input: RequestInfo | URL) => {
-        const url =
-          typeof input === "string"
-            ? input
-            : input instanceof Request
-              ? input.url
-              : input.toString()
-        if (url.includes("/api/auth/demo-accounts")) {
-          return new Response(JSON.stringify({ error: "DEMO_MODE_DISABLED" }), {
-            status: 404,
-            headers: { "Content-Type": "application/json" },
-          })
-        }
-        return jsonResponse({})
-      })
+  it("fills the form without signing in, then signs in with Giriş Yap", async () => {
+    const loginBodies = stubDemoFetch()
+
+    renderAt()
+    await userEvent.click(
+      await screen.findByRole("button", { name: "Öğretmen Olarak Giriş" })
     )
+
+    expect(screen.getByPlaceholderText("E-posta adresi")).toHaveValue(
+      "ahmet.yilmaz@uni.edu.tr"
+    )
+    expect(screen.getByPlaceholderText("Şifre")).toHaveValue(
+      "ahmet.yilmaz@uni.edu.tr"
+    )
+    expect(
+      screen.getByRole("button", { name: "Öğretmen Olarak Giriş" })
+    ).toHaveAttribute("aria-pressed", "true")
+    expect(screen.getByRole("button", { name: /giriş yap/i })).toHaveFocus()
+    expect(loginBodies).toHaveLength(0)
+
+    await userEvent.click(screen.getByRole("button", { name: /giriş yap/i }))
+
+    expect(await screen.findByText("teacher-home")).toBeInTheDocument()
+    expect(loginBodies).toEqual([
+      {
+        email: "ahmet.yilmaz@uni.edu.tr",
+        password: "ahmet.yilmaz@uni.edu.tr",
+      },
+    ])
+  })
+
+  it("leaves out a role the backend does not list", async () => {
+    stubDemoFetch(demoAccounts.filter((a) => a.role !== "admin"))
+
+    renderAt()
+
+    expect(
+      await screen.findByRole("button", { name: "Öğrenci Olarak Giriş" })
+    ).toBeInTheDocument()
+    expect(
+      screen.queryByRole("button", { name: "Admin Olarak Giriş" })
+    ).not.toBeInTheDocument()
+  })
+
+  it("hides the buttons and the notice when demo mode is off (404)", async () => {
+    stubDemoFetch({ error: "DEMO_MODE_DISABLED" }, 404)
 
     renderAt()
 
     await new Promise((r) => setTimeout(r, 50))
-    expect(screen.queryByText("Demo Hesapları")).not.toBeInTheDocument()
-  })
-
-  it("fills credentials and logs in when clicking 'Bu hesapla gir'", async () => {
-    vi.stubGlobal(
-      "fetch",
-      vi.fn(async (input: RequestInfo | URL) => {
-        const url =
-          typeof input === "string"
-            ? input
-            : input instanceof Request
-              ? input.url
-              : input.toString()
-        if (url.includes("/api/auth/demo-accounts")) {
-          return jsonResponse(demoAccounts)
-        }
-        if (url.includes("/api/auth/login")) {
-          return jsonResponse({
-            access_token: "at-demo",
-            user: {
-              id: "u-admin",
-              email: "demo.admin@mydreamcampus.com",
-              role: "admin",
-            },
-          })
-        }
-        return jsonResponse({})
-      })
-    )
-
-    renderAt()
-
-    expect(await screen.findByText("Demo Yönetici")).toBeInTheDocument()
-
-    const loginButtons = screen.getAllByRole("button", {
-      name: /bu hesapla gir/i,
-    })
-    await userEvent.click(loginButtons[0])
-
-    expect(await screen.findByText("admin-home")).toBeInTheDocument()
-    expect(JSON.parse(localStorage.getItem("user")!)).toMatchObject({
-      email: "demo.admin@mydreamcampus.com",
-      role: "admin",
-    })
-  })
-
-  it("copies credentials to clipboard when clicking 'Kopyala'", async () => {
-    const writeTextMock = vi.fn().mockResolvedValue(undefined)
-    Object.assign(navigator, {
-      clipboard: {
-        writeText: writeTextMock,
-      },
-    })
-
-    vi.stubGlobal(
-      "fetch",
-      vi.fn(async (input: RequestInfo | URL) => {
-        const url =
-          typeof input === "string"
-            ? input
-            : input instanceof Request
-              ? input.url
-              : input.toString()
-        if (url.includes("/api/auth/demo-accounts")) {
-          return jsonResponse(demoAccounts)
-        }
-        return jsonResponse({})
-      })
-    )
-
-    renderAt()
-
-    expect(await screen.findByText("Demo Yönetici")).toBeInTheDocument()
-
-    const copyButtons = screen.getAllByRole("button", { name: /kopyala/i })
-    await userEvent.click(copyButtons[0])
-
-    expect(writeTextMock).toHaveBeenCalledWith(
-      "demo.admin@mydreamcampus.com / demo.admin@mydreamcampus.com"
-    )
-    expect(await screen.findByText("Kopyalandı")).toBeInTheDocument()
+    expect(
+      screen.queryByRole("button", { name: /olarak giriş/i })
+    ).not.toBeInTheDocument()
+    expect(screen.queryByRole("note")).not.toBeInTheDocument()
   })
 })

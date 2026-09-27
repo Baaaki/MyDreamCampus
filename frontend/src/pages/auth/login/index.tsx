@@ -1,19 +1,25 @@
-import { useState } from "react"
+import { useRef, useState } from "react"
 import { Link, useNavigate, useSearchParams } from "react-router"
 import { authApi } from "@/lib/api-client"
 import { apiErrorMessage } from "@/lib/api-error"
 import type { AuthResponse, DemoAccount } from "@/lib/types"
 import { useDemoAccounts } from "@/lib/services/demo-service"
-import { Badge } from "@/components/ui/badge"
-import { Copy, Check, LogIn } from "lucide-react"
+import { cn } from "@/lib/utils"
+import {
+  AlertTriangle,
+  GraduationCap,
+  Presentation,
+  ShieldCheck,
+  type LucideIcon,
+} from "lucide-react"
 
-const roleBadgeVariant: Record<string, string> = {
-  admin:
-    "bg-purple-100 text-purple-800 dark:bg-purple-900/30 dark:text-purple-300",
-  teacher: "bg-blue-100 text-blue-800 dark:bg-blue-900/30 dark:text-blue-300",
-  student:
-    "bg-emerald-100 text-emerald-800 dark:bg-emerald-900/30 dark:text-emerald-300",
-}
+// Button order and text on the login page; a role the backend does not list
+// gets no button.
+const demoRoleButtons: { role: string; label: string; icon: LucideIcon }[] = [
+  { role: "student", label: "Öğrenci Olarak Giriş", icon: GraduationCap },
+  { role: "teacher", label: "Öğretmen Olarak Giriş", icon: Presentation },
+  { role: "admin", label: "Admin Olarak Giriş", icon: ShieldCheck },
+]
 
 export default function LoginPage() {
   const navigate = useNavigate()
@@ -22,18 +28,23 @@ export default function LoginPage() {
   const [password, setPassword] = useState("")
   const [error, setError] = useState("")
   const [loading, setLoading] = useState(false)
-  const [copiedEmail, setCopiedEmail] = useState<string | null>(null)
+  const submitRef = useRef<HTMLButtonElement>(null)
 
   const { data: demoAccounts } = useDemoAccounts()
+  const demoButtons = demoRoleButtons.flatMap((button) => {
+    const account = demoAccounts?.find((a) => a.role === button.role)
+    return account ? [{ ...button, account }] : []
+  })
 
-  const executeLogin = async (loginEmail: string, loginPassword: string) => {
+  const handleLogin = async (e: React.FormEvent) => {
+    e.preventDefault()
     setError("")
     setLoading(true)
 
     try {
       const response: AuthResponse = await authApi
         .post("login", {
-          json: { email: loginEmail, password: loginPassword },
+          json: { email, password },
         })
         .json()
 
@@ -85,201 +96,130 @@ export default function LoginPage() {
     }
   }
 
-  const handleLogin = async (e: React.FormEvent) => {
-    e.preventDefault()
-    await executeLogin(email, password)
-  }
-
-  const handleDemoLogin = (account: DemoAccount) => {
+  // Only fills the form: the visitor still signs in with "Giriş Yap", which
+  // takes focus so Enter does it too.
+  const fillDemoAccount = (account: DemoAccount) => {
+    setError("")
     setEmail(account.email)
     setPassword(account.password)
-    void executeLogin(account.email, account.password)
+    submitRef.current?.focus()
   }
-
-  const handleCopy = async (account: DemoAccount) => {
-    try {
-      if (navigator.clipboard) {
-        await navigator.clipboard.writeText(
-          `${account.email} / ${account.password}`
-        )
-      }
-      setCopiedEmail(account.email)
-      setTimeout(() => setCopiedEmail(null), 2000)
-    } catch {
-      // Ignore if clipboard API is not available
-    }
-  }
-
-  const hasDemoAccounts = Boolean(demoAccounts && demoAccounts.length > 0)
 
   return (
     <div className="flex min-h-screen items-center justify-center bg-gray-50 px-4 py-12">
-      <div className="flex w-full max-w-4xl flex-col items-center justify-center gap-8 lg:flex-row lg:items-start">
-        {/* Main Login Form Card */}
-        <div className="w-full max-w-md space-y-8 rounded-lg bg-white p-8 shadow-md">
-          <div>
-            <h2 className="mt-6 text-center text-3xl font-extrabold text-gray-900">
-              MyDreamCampus
-            </h2>
-            <p className="mt-2 text-center text-sm text-gray-600">
-              Hesabınıza giriş yapın
-            </p>
-          </div>
-          <form className="mt-8 space-y-6" onSubmit={handleLogin}>
-            {error && (
-              <div className="rounded-md bg-red-50 p-4">
-                <p className="text-sm text-red-800">{error}</p>
-              </div>
-            )}
-            <div className="-space-y-px rounded-md shadow-sm">
-              <div>
-                <label htmlFor="email" className="sr-only">
-                  E-posta
-                </label>
-                <input
-                  id="email"
-                  name="email"
-                  type="email"
-                  autoComplete="email"
-                  required
-                  className="relative block w-full appearance-none rounded-none rounded-t-md border border-gray-300 px-3 py-2 text-gray-900 placeholder-gray-500 focus:z-10 focus:border-indigo-500 focus:ring-indigo-500 focus:outline-none sm:text-sm"
-                  placeholder="E-posta adresi"
-                  value={email}
-                  onChange={(e) => setEmail(e.target.value)}
-                  disabled={loading}
-                />
-              </div>
-              <div>
-                <label htmlFor="password" className="sr-only">
-                  Şifre
-                </label>
-                <input
-                  id="password"
-                  name="password"
-                  type="password"
-                  autoComplete="current-password"
-                  required
-                  className="relative block w-full appearance-none rounded-none rounded-b-md border border-gray-300 px-3 py-2 text-gray-900 placeholder-gray-500 focus:z-10 focus:border-indigo-500 focus:ring-indigo-500 focus:outline-none sm:text-sm"
-                  placeholder="Şifre"
-                  value={password}
-                  onChange={(e) => setPassword(e.target.value)}
-                  disabled={loading}
-                />
-              </div>
-            </div>
-
-            <div>
-              <button
-                type="submit"
-                disabled={loading}
-                className="group relative flex w-full justify-center rounded-md border border-transparent bg-indigo-600 px-4 py-2 text-sm font-medium text-white hover:bg-indigo-700 focus:ring-2 focus:ring-indigo-500 focus:ring-offset-2 focus:outline-none disabled:cursor-not-allowed disabled:opacity-50"
-              >
-                {loading ? "Giriş yapılıyor..." : "Giriş Yap"}
-              </button>
-            </div>
-            <p className="text-center text-sm">
-              <Link
-                to="/auth/forgot-password"
-                className="font-medium text-indigo-600 hover:text-indigo-500"
-              >
-                Şifremi unuttum
-              </Link>
-            </p>
-          </form>
+      <div className="w-full max-w-md space-y-8 rounded-lg bg-white p-8 shadow-md">
+        <div>
+          <h2 className="mt-6 text-center text-3xl font-extrabold text-gray-900">
+            MyDreamCampus
+          </h2>
+          <p className="mt-2 text-center text-sm text-gray-600">
+            Hesabınıza giriş yapın
+          </p>
         </div>
 
-        {/* Demo Accounts Panel */}
-        {hasDemoAccounts && (
-          <div
-            aria-label="Demo hesapları paneli"
-            className="w-full max-w-md space-y-4 rounded-lg border border-gray-200 bg-white p-6 shadow-md"
-          >
-            <div>
-              <h3 className="text-lg font-bold text-gray-900">
-                Demo Hesapları
-              </h3>
-              <p className="mt-1 text-xs text-gray-500">
-                Giriş yapmak için bir hesaba tıklayabilir veya bilgileri
-                kopyalayabilirsiniz.
+        {demoButtons.length > 0 && (
+          <section aria-label="Demo hesapları" className="space-y-3">
+            <div
+              role="note"
+              className="flex items-start gap-2 rounded-md border border-amber-200 bg-amber-50 p-3 text-sm font-medium text-amber-900"
+            >
+              <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0" />
+              <p>
+                Bu bir demo. Yaptığınız tüm değişiklikler 1 saat sonra geri
+                döndürülecektir.
               </p>
             </div>
-
-            <div className="space-y-3">
-              {demoAccounts?.map((account) => {
-                const isCopied = copiedEmail === account.email
-                const badgeClass =
-                  roleBadgeVariant[account.role] ?? "bg-gray-100 text-gray-800"
-
+            <div className="grid gap-2">
+              {demoButtons.map(({ role, label, icon: Icon, account }) => {
+                const selected = email === account.email
                 return (
-                  <div
-                    key={account.email}
-                    className="space-y-2 rounded-lg border border-gray-100 bg-gray-50 p-3.5 transition-colors hover:border-gray-200 dark:border-gray-800 dark:bg-gray-900/50"
+                  <button
+                    key={role}
+                    type="button"
+                    aria-pressed={selected}
+                    onClick={() => fillDemoAccount(account)}
+                    disabled={loading}
+                    className={cn(
+                      "flex w-full items-center justify-center gap-2 rounded-md border px-4 py-2 text-sm font-semibold tracking-wide uppercase transition-colors focus:ring-2 focus:ring-indigo-500 focus:ring-offset-2 focus:outline-none disabled:cursor-not-allowed disabled:opacity-50",
+                      selected
+                        ? "border-indigo-600 bg-indigo-50 text-indigo-700"
+                        : "border-gray-300 bg-white text-gray-700 hover:border-indigo-400 hover:bg-gray-50"
+                    )}
                   >
-                    <div className="flex items-center justify-between gap-2">
-                      <span className="text-sm font-semibold text-gray-900 dark:text-gray-100">
-                        {account.label || account.role}
-                      </span>
-                      <Badge
-                        className={`px-2 py-0.5 text-xs font-medium tracking-wider uppercase ${badgeClass}`}
-                      >
-                        {account.role}
-                      </Badge>
-                    </div>
-
-                    <div className="space-y-0.5 text-xs text-gray-600 dark:text-gray-400">
-                      <div className="flex items-center justify-between">
-                        <span className="font-medium text-gray-500">
-                          E-posta:
-                        </span>
-                        <span className="font-mono text-gray-800 dark:text-gray-200">
-                          {account.email}
-                        </span>
-                      </div>
-                      <div className="flex items-center justify-between">
-                        <span className="font-medium text-gray-500">
-                          Şifre:
-                        </span>
-                        <span className="font-mono text-gray-800 dark:text-gray-200">
-                          {account.password}
-                        </span>
-                      </div>
-                    </div>
-
-                    <div className="flex items-center gap-2 pt-1">
-                      <button
-                        type="button"
-                        onClick={() => handleCopy(account)}
-                        className="inline-flex flex-1 items-center justify-center gap-1 rounded-md border border-gray-300 bg-white px-2.5 py-1.5 text-xs font-medium text-gray-700 shadow-xs hover:bg-gray-50 focus:ring-2 focus:ring-indigo-500 focus:outline-none dark:border-gray-700 dark:bg-gray-800 dark:text-gray-200 dark:hover:bg-gray-700"
-                      >
-                        {isCopied ? (
-                          <>
-                            <Check className="h-3.5 w-3.5 text-green-600" />
-                            <span>Kopyalandı</span>
-                          </>
-                        ) : (
-                          <>
-                            <Copy className="h-3.5 w-3.5" />
-                            <span>Kopyala</span>
-                          </>
-                        )}
-                      </button>
-
-                      <button
-                        type="button"
-                        onClick={() => handleDemoLogin(account)}
-                        disabled={loading}
-                        className="inline-flex flex-1 items-center justify-center gap-1 rounded-md bg-indigo-600 px-2.5 py-1.5 text-xs font-medium text-white shadow-xs hover:bg-indigo-700 focus:ring-2 focus:ring-indigo-500 focus:outline-none disabled:cursor-not-allowed disabled:opacity-50"
-                      >
-                        <LogIn className="h-3.5 w-3.5" />
-                        <span>Bu hesapla gir</span>
-                      </button>
-                    </div>
-                  </div>
+                    <Icon className="h-4 w-4 shrink-0" />
+                    <span>{label}</span>
+                  </button>
                 )
               })}
             </div>
-          </div>
+            <p className="text-center text-xs text-gray-500">
+              Bir hesap seçin, bilgileri doldurulunca Giriş Yap&apos;a basın.
+            </p>
+          </section>
         )}
+
+        <form className="space-y-6" onSubmit={handleLogin}>
+          {error && (
+            <div className="rounded-md bg-red-50 p-4">
+              <p className="text-sm text-red-800">{error}</p>
+            </div>
+          )}
+          <div className="-space-y-px rounded-md shadow-sm">
+            <div>
+              <label htmlFor="email" className="sr-only">
+                E-posta
+              </label>
+              <input
+                id="email"
+                name="email"
+                type="email"
+                autoComplete="email"
+                required
+                className="relative block w-full appearance-none rounded-none rounded-t-md border border-gray-300 px-3 py-2 text-gray-900 placeholder-gray-500 focus:z-10 focus:border-indigo-500 focus:ring-indigo-500 focus:outline-none sm:text-sm"
+                placeholder="E-posta adresi"
+                value={email}
+                onChange={(e) => setEmail(e.target.value)}
+                disabled={loading}
+              />
+            </div>
+            <div>
+              <label htmlFor="password" className="sr-only">
+                Şifre
+              </label>
+              <input
+                id="password"
+                name="password"
+                type="password"
+                autoComplete="current-password"
+                required
+                className="relative block w-full appearance-none rounded-none rounded-b-md border border-gray-300 px-3 py-2 text-gray-900 placeholder-gray-500 focus:z-10 focus:border-indigo-500 focus:ring-indigo-500 focus:outline-none sm:text-sm"
+                placeholder="Şifre"
+                value={password}
+                onChange={(e) => setPassword(e.target.value)}
+                disabled={loading}
+              />
+            </div>
+          </div>
+
+          <div>
+            <button
+              ref={submitRef}
+              type="submit"
+              disabled={loading}
+              className="group relative flex w-full justify-center rounded-md border border-transparent bg-indigo-600 px-4 py-2 text-sm font-medium text-white hover:bg-indigo-700 focus:ring-2 focus:ring-indigo-500 focus:ring-offset-2 focus:outline-none disabled:cursor-not-allowed disabled:opacity-50"
+            >
+              {loading ? "Giriş yapılıyor..." : "Giriş Yap"}
+            </button>
+          </div>
+          <p className="text-center text-sm">
+            <Link
+              to="/auth/forgot-password"
+              className="font-medium text-indigo-600 hover:text-indigo-500"
+            >
+              Şifremi unuttum
+            </Link>
+          </p>
+        </form>
       </div>
     </div>
   )
