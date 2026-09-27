@@ -29,13 +29,13 @@ import (
 var _ = time.Now
 
 type GradeService struct {
-	pool             *pgxpool.Pool
-	cacheRepo        *repository.CacheRepository
-	registrationRepo *repository.RegistrationRepository
-	scoreRepo        *repository.ScoreRepository
-	completedRepo    *repository.CompletedRepository
-	outboxRepo       *repository.OutboxRepository
-	periodRepo       *sharedRepo.SimplePeriodRepository
+	pool             txBeginner
+	cacheRepo        cacheStore
+	registrationRepo registrationStore
+	scoreRepo        scoreStore
+	completedRepo    completedStore
+	outboxRepo       outboxStore
+	periodRepo       periodStore
 	auditLogger      audit.Logger
 	semesterClient   SemesterClient
 }
@@ -54,10 +54,10 @@ func NewGradeService(
 	return &GradeService{
 		pool:             pool,
 		cacheRepo:        cacheRepo,
-		registrationRepo: registrationRepo,
-		scoreRepo:        scoreRepo,
-		completedRepo:    completedRepo,
-		outboxRepo:       outboxRepo,
+		registrationRepo: registrationRepoAdapter{registrationRepo},
+		scoreRepo:        scoreRepoAdapter{scoreRepo},
+		completedRepo:    completedRepoAdapter{completedRepo},
+		outboxRepo:       outboxRepoAdapter{outboxRepo},
 		periodRepo:       periodRepo,
 		auditLogger:      auditLogger,
 		semesterClient:   semesterClient,

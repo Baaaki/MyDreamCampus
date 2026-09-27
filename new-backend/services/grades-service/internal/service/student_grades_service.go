@@ -18,10 +18,10 @@ import (
 )
 
 type StudentGradesService struct {
-	cacheRepo        *repository.CacheRepository
-	registrationRepo *repository.RegistrationRepository
-	scoreRepo        *repository.ScoreRepository
-	completedRepo    *repository.CompletedRepository
+	cacheRepo        cacheStore
+	registrationRepo registrationStore
+	scoreRepo        scoreStore
+	completedRepo    completedStore
 }
 
 func NewStudentGradesService(
@@ -32,9 +32,9 @@ func NewStudentGradesService(
 ) *StudentGradesService {
 	return &StudentGradesService{
 		cacheRepo:        cacheRepo,
-		registrationRepo: registrationRepo,
-		scoreRepo:        scoreRepo,
-		completedRepo:    completedRepo,
+		registrationRepo: registrationRepoAdapter{registrationRepo},
+		scoreRepo:        scoreRepoAdapter{scoreRepo},
+		completedRepo:    completedRepoAdapter{completedRepo},
 	}
 }
 
