@@ -46,7 +46,7 @@ restore_to() {
 
 # ensure_baseline takes the first permanent state right after the seed, and
 # keeps retrying every minute if that failed: without a baseline neither the
-# nightly restore nor editing can work. The first try often meets the
+# rewind nor editing can work. The first try often meets the
 # events the seed and the first visitors are still producing.
 LAST_BASELINE_ATTEMPT=0
 ensure_baseline() {
@@ -61,6 +61,7 @@ ensure_baseline() {
     echo ">> [demo-ops] No baseline found. Creating one from the current databases..."
     update_status "busy" "initial_snapshot" "" ""
     if run_step snapshot.sh "system-initial"; then
+        clear_changes
         update_status "normal" "initial_snapshot" "" ""
         return 0
     fi
@@ -94,6 +95,7 @@ save() {
     deadline=$(status_field edit_deadline)
     update_status "busy" "save" "" "$deadline"
     if run_step snapshot.sh "$1"; then
+        clear_changes
         remove_write_lock
         update_status "normal" "save" "" ""
     else
@@ -102,36 +104,34 @@ save() {
     fi
 }
 
-# Minutes since midnight. The leading zero is stripped: ash reads 08 as a bad
-# octal number.
-minutes_of_day() {
-    h=${1%%:*}
-    m=${1##*:}
-    echo $((${h#0} * 60 + ${m#0}))
-}
+# Visitors' changes live at most REVERT_AFTER_MINUTES: the system returns to
+# the permanent state once the first change since the last restore is that
+# old. Timing from the first change rather than the clock leaves an untouched
+# system alone, instead of signing every visitor out on the hour. An
+# unreadable stamp counts as expired. Editing is left alone: begin_edit has
+# already rewound and the lock keeps visitors out. A failed restore keeps the
+# stamp and is retried five minutes later, not on every loop. 0 turns the
+# rewind off.
+LAST_REVERT_ATTEMPT=0
+check_revert() {
+    [ "$REVERT_AFTER_MINUTES" -gt 0 ] || return 0
+    since=$(redis_cmd GET ops:dirty_since 2>/dev/null || true)
+    [ -n "$since" ] || return 0
+    case "$since" in
+        *[!0-9]*) since=0 ;;
+    esac
+    now=$(date +%s)
+    [ $((now - since)) -ge $((REVERT_AFTER_MINUTES * 60)) ] || return 0
+    [ "$(status_field mode)" = "normal" ] || return 0
+    [ $((now - LAST_REVERT_ATTEMPT)) -ge 300 ] || return 0
+    LAST_REVERT_ATTEMPT=$now
 
-# The nightly restore runs once a day within an hour of NIGHTLY_RESET_AT, not
-# only in its exact minute: a long command or a restart spanning that minute
-# must not skip a night, and a server that was down all night must not rewind
-# the visitors in the middle of the day.
-check_nightly() {
-    today=$(date +"%Y-%m-%d")
-    [ "$(cat "$LAST_NIGHTLY_FILE" 2>/dev/null || true)" != "$today" ] || return 0
-    now=$(minutes_of_day "$(date +%H:%M)")
-    start=$(minutes_of_day "$NIGHTLY_RESET_AT")
-    { [ "$now" -ge "$start" ] && [ "$now" -lt $((start + 60)) ]; } || return 0
-
-    echo "$today" > "$LAST_NIGHTLY_FILE"
-    if [ "$(status_field mode)" = "editing" ]; then
-        echo ">> [demo-ops] Nightly reset skipped: editing mode is currently active."
-        return 0
-    fi
-    echo ">> [demo-ops] Executing nightly baseline restore..."
-    restore_to "" "nightly_restore"
+    echo ">> [demo-ops] Visitor changes reached ${REVERT_AFTER_MINUTES} minutes. Restoring the permanent state..."
+    restore_to "" "auto_revert"
 }
 
 # An edit session whose deadline cannot be read counts as expired: it must
-# never outlive its lock and hold the nightly restore off.
+# never outlive its lock and hold the rewind off.
 check_edit_timeout() {
     [ "$(status_field mode)" = "editing" ] || return 0
     deadline=$(status_field edit_deadline)
@@ -243,6 +243,6 @@ while true; do
     fi
 
     ensure_baseline || true
-    check_nightly
+    check_revert
     check_edit_timeout
 done

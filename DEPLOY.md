@@ -606,8 +606,9 @@ aracılığıyla dış dünyaya (`https://mydreamcampus.madebybaki.com`) açıl�
   İstekler Cloudflare'in sunucuya kurduğu tünel konteyneri (`cloudflared`) üzerinden
   dahili Docker ağıyla Caddy'ye (`http://caddy:80`) ulaşır.
 - **Güvenli ve İzole:** Statik varlıklar Cloudflare tarafından önbelleğe alınır,
-  yönetim uçları Cloudflare Access ile korunur, gece 04:00'te sistem otomatik olarak
-  süper adminin kaydettiği kalıcı duruma döner.
+  yönetim uçları Cloudflare Access ile korunur. Ziyaretçilerin değişiklikleri en
+  fazla 1 saat yaşar: son geri dönüşten sonraki ilk değişiklik 1 saatlik olunca
+  sistem süper adminin kaydettiği kalıcı duruma döner.
 
 ---
 
@@ -633,7 +634,7 @@ Gereken temel değerler:
 - `DEMO_ADMIN_EMAIL=demo.admin@mydreamcampus.com`
 - `DEMO_TEACHER_EMAIL=ahmet.yilmaz@uni.edu.tr`
 - `DEMO_STUDENT_EMAIL=zeynep.sahin@uni.edu.tr`
-- `NIGHTLY_RESET_AT=04:00`
+- `REVERT_AFTER_MINUTES=60`
 - `BASELINE_KEEP=7`
 - `EDGE=tunnel`: Her `make` hedefi ve otomatik deploy bunu `.env`'den okur. Yazmazsan elle
   çalıştırılan bir `make deploy` standalone katmanına döner ve `cloudflared`'ı kaldırır.

@@ -148,7 +148,7 @@ DEMO_ADMIN_EMAIL=demo.admin@mydreamcampus.com
 DEMO_TEACHER_EMAIL=ahmet.yilmaz@uni.edu.tr
 DEMO_STUDENT_EMAIL=zeynep.sahin@uni.edu.tr
 
-NIGHTLY_RESET_AT=04:00
+REVERT_AFTER_MINUTES=60
 BASELINE_KEEP=7
 
 EDGE=tunnel
@@ -340,9 +340,10 @@ konteynerinin içinde çalışıyor ve orada rclone yok.
 
 Her şey ayaktayken
 [phase-9-final-check.md](phase-9-final-check.md) listesini tarayıcıda ve
-APK'da sırayla dene. Gece geri dönüşü maddesi için:
-`.env`'de `NIGHTLY_RESET_AT`'i 5 dakika sonrasına al, `make deploy`,
-gözlemle, eski değerine döndür, yine `make deploy`.
+APK'da sırayla dene. Saatlik geri dönüş maddesi için:
+`.env`'de `REVERT_AFTER_MINUTES=2` yap, `make deploy`, demo admin ile bir
+kayıt ekle, 2-3 dakika sonra kaydın gittiğini gözle, değeri 60'a döndür,
+yine `make deploy`.
 
 Sonuçları bana madde madde yaz (geçti / şu hata). Faz 9'u birlikte
 işaretleyip kapatalım; hata çıkan maddeleri düzeltirim.

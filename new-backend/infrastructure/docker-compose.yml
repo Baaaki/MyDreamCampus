@@ -404,7 +404,8 @@ services:
       catalog-service:
         condition: service_started
 
-  # Ops daemon: manages baseline snapshots and nightly restore to permanent state.
+  # Ops daemon: manages baseline snapshots and rewinds visitor changes to the
+  # permanent state an hour after the first one.
   demo-ops:
     build:
       context: ../..
@@ -432,7 +433,7 @@ services:
       RABBITMQ_USER: ${RABBITMQ_USER:-rabbitmq}
       RABBITMQ_PASSWORD: ${RABBITMQ_PASSWORD:?RABBITMQ_PASSWORD is required — see .env.example}
       TZ: Europe/Istanbul
-      NIGHTLY_RESET_AT: ${NIGHTLY_RESET_AT:-04:00}
+      REVERT_AFTER_MINUTES: ${REVERT_AFTER_MINUTES:-60}
       BASELINE_KEEP: ${BASELINE_KEEP:-7}
       EDIT_TIMEOUT_MINUTES: ${EDIT_TIMEOUT_MINUTES:-120}
       DEMO_MODE: ${DEMO_MODE:-false}

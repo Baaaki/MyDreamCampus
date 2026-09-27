@@ -105,6 +105,9 @@ purge_rabbitmq_queues
 # and attendance buffers go; the ops:* keys stay.
 echo ">> [restore] Resetting Redis (keeping ops:* keys)..."
 reset_redis >/dev/null
+# Still under the write lock, so no visitor write can land between the
+# rewind and the stamp going away.
+clear_changes
 
 # 6. Rewrite current baseline pointer if restoring a specific past version
 echo "$target_version" > "$BASELINE_DIR/current"

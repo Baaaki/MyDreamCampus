@@ -14,7 +14,7 @@ set -e
 : "${BASELINE_DIR:=/baselines}"
 : "${BASELINE_KEEP:=7}"
 : "${EDIT_TIMEOUT_MINUTES:=120}"
-: "${NIGHTLY_RESET_AT:=04:00}"
+: "${REVERT_AFTER_MINUTES:=60}"
 : "${DEMO_MODE:=false}"
 : "${BASELINE_OFFSITE_CMD:=}"
 
@@ -38,10 +38,6 @@ fail() {
     printf '%s' "$2" > "$ERROR_FILE"
     exit 1
 }
-
-# The day of the last nightly restore lives on the volume: Redis is reset by
-# every restore and the loop's memory by every container restart.
-LAST_NIGHTLY_FILE="$BASELINE_DIR/.last_nightly"
 
 epoch_to_iso() {
     date -u -d "@$1" +"%Y-%m-%dT%H:%M:%SZ"
@@ -93,6 +89,13 @@ set_write_lock() {
 
 remove_write_lock() {
     redis_cmd DEL ops:write_lock >/dev/null
+}
+
+# The services stamp ops:dirty_since (Unix seconds) with the first visitor
+# write after a restore; it is dropped whenever the data is back in, or has
+# just become, the permanent state.
+clear_changes() {
+    redis_cmd DEL ops:dirty_since >/dev/null
 }
 
 get_current_version() {
