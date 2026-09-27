@@ -474,11 +474,27 @@ jobs:
           expect 201 "$code" "super admin creates course during edit mode (catalog)"
           ops_run save normal
 
+          # The rewind timer: the services stamp the first visitor write after
+          # a restore or save, and demo-ops rewinds an hour after it.
+          dirty_since() {
+            docker exec mydreamcampus-redis redis-cli -a ci-redis-password --no-auth-warning GET ops:dirty_since
+          }
+          [ -z "$(dirty_since)" ] || { echo "::error::save left ops:dirty_since behind"; exit 1; }
+
           # 4. A visitor's change after the save is temporary.
           code=$(api -X POST http://localhost/api/catalog/courses \
             -H "Authorization: Bearer $DEMO_ADMIN_TOKEN" -H 'Content-Type: application/json' \
             -d "$(course_json CS888 'Temporary Course')")
           expect 201 "$code" "demo admin creates temporary course (catalog)"
+          [ -n "$(dirty_since)" ] || { echo "::error::a demo admin write did not stamp ops:dirty_since"; exit 1; }
+          echo "ok  visitor write stamped ops:dirty_since"
+
+          # The demo admin's login is public, so it may change but not delete.
+          code=$(api -X DELETE http://localhost/api/students/00000000-0000-0000-0000-000000000000 \
+            -H "Authorization: Bearer $DEMO_ADMIN_TOKEN")
+          expect 403 "$code" "demo admin delete is refused (student)"
+          [ "$(jq -r '.code' /tmp/body)" = DEMO_DELETE_DISABLED ] \
+            || { echo "::error::demo admin delete did not answer DEMO_DELETE_DISABLED"; exit 1; }
           code=$(api http://localhost/api/catalog/courses/CS888)
           expect 200 "$code" "CS888 exists before restore"
 
@@ -488,6 +504,8 @@ jobs:
           expect 404 "$code" "demo admin temporary course CS888 is wiped after restore"
           code=$(api http://localhost/api/catalog/courses/CS999)
           expect 200 "$code" "super admin permanent course CS999 remains after restore"
+          [ -z "$(dirty_since)" ] || { echo "::error::restore left ops:dirty_since behind"; exit 1; }
+          echo "ok  restore cleared ops:dirty_since"
 
       - name: Collect logs on failure
         if: failure()
