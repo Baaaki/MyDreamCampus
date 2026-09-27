@@ -179,6 +179,15 @@ export default function LoginScreen() {
                   <Ionicons name="people-outline" size={18} color={colors.primary} />
                   <Text className="text-sm font-bold text-foreground">Demo Hesapları</Text>
                 </View>
+                <View
+                  className="mb-3 flex-row items-start gap-2 rounded-xl bg-warning/10 p-3"
+                  accessibilityRole="alert"
+                >
+                  <Ionicons name="warning-outline" size={16} color={colors.warning} />
+                  <Text className="flex-1 text-xs font-semibold text-foreground">
+                    Bu bir demo. Yaptığınız tüm değişiklikler 1 saat sonra geri döndürülecektir.
+                  </Text>
+                </View>
                 <Text className="mb-3 text-xs text-muted-foreground">
                   Dokunarak formu otomatik doldurabilirsiniz:
                 </Text>
