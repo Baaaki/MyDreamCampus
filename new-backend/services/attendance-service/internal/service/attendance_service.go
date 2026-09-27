@@ -547,8 +547,16 @@ func (s *AttendanceService) FinalizeAttendance(ctx context.Context, courseID, in
 
 	// Get total sessions by type. Thresholds scale with the sessions
 	// actually held (10/14 and 11/14 ratios) instead of flat constants.
-	theoryTotal, _ := s.attendanceRepo.GetTotalSessionsByCourseAndType(ctx, courseID, semester, db.AttendanceSessionTypeEnumTheory)
-	labTotal, _ := s.attendanceRepo.GetTotalSessionsByCourseAndType(ctx, courseID, semester, db.AttendanceSessionTypeEnumLab)
+	// A total read as zero would lift every threshold and pass the whole
+	// class, so a failed read stops the finalize instead.
+	theoryTotal, err := s.attendanceRepo.GetTotalSessionsByCourseAndType(ctx, courseID, semester, db.AttendanceSessionTypeEnumTheory)
+	if err != nil {
+		return dto.FinalizeAttendanceResponse{}, fmt.Errorf("count theory sessions: %w", err)
+	}
+	labTotal, err := s.attendanceRepo.GetTotalSessionsByCourseAndType(ctx, courseID, semester, db.AttendanceSessionTypeEnumLab)
+	if err != nil {
+		return dto.FinalizeAttendanceResponse{}, fmt.Errorf("count lab sessions: %w", err)
+	}
 	minTheory := minTheoryRequired(theoryTotal)
 	minLab := minLabRequired(labTotal)
 

@@ -636,6 +636,8 @@ func TestCloseSession_CountsBufferedScansAndKeepsTheBuffer(t *testing.T) {
 	assert.ErrorIs(t, err, attErrors.ErrForbidden)
 }
 
+// --------------------------------------------------------- FinalizeAttendance
+
 // holdSessions opens n sessions of a kind and marks each student present in
 // the first present[i] of them.
 func holdSessions(w *attWorld, courseID uuid.UUID, kind db.SessionTypeEnum, n int, students []uuid.UUID, present []int) {
@@ -693,5 +695,18 @@ func TestFinalizeAttendance_Refused(t *testing.T) {
 	assert.ErrorIs(t, err, attErrors.ErrForbidden)
 	_, err = w.service(nil).FinalizeAttendance(context.Background(), uuid.New(), teacherID, semester)
 	assert.ErrorIs(t, err, attErrors.ErrCourseNotFound)
+	assert.Empty(t, w.outbox)
+}
+
+// With the session totals unreadable every threshold reads as zero: nobody
+// would fail on attendance and the finalize would report success.
+func TestFinalizeAttendance_SessionTotalsUnreadable_Fails(t *testing.T) {
+	w, courseID, s := newAttWorld(t)
+	holdSessions(w, courseID, db.AttendanceSessionTypeEnumTheory, 14, s, []int{0, 0, 0})
+	w.failSessionTotals = true
+
+	_, err := w.service(nil).FinalizeAttendance(context.Background(), courseID, teacherID, semester)
+
+	assert.Error(t, err)
 	assert.Empty(t, w.outbox)
 }
