@@ -2,6 +2,7 @@ package handler
 
 import (
 	"context"
+	"io"
 	"net/http"
 	"strings"
 	"time"
@@ -21,12 +22,18 @@ const (
 	defaultLimit   = 20
 )
 
-type StudentHandler struct {
-	service       *service.StudentService
-	importService *service.ImportService
+type ImportServiceInterface interface {
+	BulkImportStudents(ctx context.Context, fileName string, fileReader io.Reader, createdBy uuid.UUID) (string, error)
+	GetImportJobStatus(ctx context.Context, jobID string) (dto.ImportJobResponse, error)
+	ListImportJobs(ctx context.Context, userID uuid.UUID, query dto.ImportJobFilterQuery) (dto.ImportJobListResponse, error)
 }
 
-func NewStudentHandler(service *service.StudentService, importService *service.ImportService) *StudentHandler {
+type StudentHandler struct {
+	service       *service.StudentService
+	importService ImportServiceInterface
+}
+
+func NewStudentHandler(service *service.StudentService, importService ImportServiceInterface) *StudentHandler {
 	return &StudentHandler{
 		service:       service,
 		importService: importService,
