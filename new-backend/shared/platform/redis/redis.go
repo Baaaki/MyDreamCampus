@@ -182,6 +182,17 @@ func (c *ClientWrapper) IsWriteLocked(ctx context.Context) (bool, error) {
 	return exists > 0, nil
 }
 
+// MarkChanged records when the data first moved away from the permanent
+// state; demo-ops rewinds it once that moment is REVERT_AFTER_MINUTES old and
+// deletes the key. NX keeps the first change's time, so a steady stream of
+// visitor writes cannot keep pushing the rewind back.
+func (c *ClientWrapper) MarkChanged(ctx context.Context) error {
+	if c == nil || c.client == nil {
+		return nil
+	}
+	return c.client.SetNX(ctx, "ops:dirty_since", time.Now().Unix(), 0).Err()
+}
+
 // GetOpsStatus returns the current JSON status string from ops:status in Redis DB 0.
 func (c *ClientWrapper) GetOpsStatus(ctx context.Context) (string, error) {
 	if c == nil || c.client == nil {

@@ -199,6 +199,9 @@ func (r *Runtime) initRedis(opts Options) {
 
 	// Write lock for demo ops editing mode.
 	platformMiddleware.SetWriteLockStore(client)
+	if r.Cfg.Demo.Enabled {
+		platformMiddleware.SetChangeRecorder(client)
+	}
 
 	// The time machine's offset is shared through Redis. Without Redis the
 	// service stays on the real clock, which is the safe side to fail on.

@@ -163,3 +163,76 @@ func TestWriteLock_FailsOpenOnRedisError(t *testing.T) {
 	// Failing open means request is permitted
 	assert.Equal(t, http.StatusOK, w.Code)
 }
+
+type mockChangeRecorder struct {
+	calls int
+	err   error
+}
+
+func (m *mockChangeRecorder) MarkChanged(_ context.Context) error {
+	m.calls++
+	return m.err
+}
+
+func setupChangeRouter(t *testing.T, locked bool, recorder ChangeRecorder) *gin.Engine {
+	t.Helper()
+	r := setupWriteLockRouter(t, &mockWriteLockStore{locked: locked})
+	SetChangeRecorder(recorder)
+	t.Cleanup(func() { SetChangeRecorder(nil) })
+	r.POST("/api/courses/invalid", func(c *gin.Context) {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "bad"})
+	})
+	return r
+}
+
+func serve(r *gin.Engine, method, path, token string) int {
+	req := httptest.NewRequest(method, path, nil)
+	if token != "" {
+		req.Header.Set("Authorization", "Bearer "+token)
+	}
+	w := httptest.NewRecorder()
+	r.ServeHTTP(w, req)
+	return w.Code
+}
+
+func TestWriteLock_SuccessfulVisitorWrites_RecordChange(t *testing.T) {
+	utils.InitJWTSecret("test-secret-key-minimum-32-characters-long-aaa")
+	recorder := &mockChangeRecorder{}
+	r := setupChangeRouter(t, false, recorder)
+
+	assert.Equal(t, http.StatusOK, serve(r, http.MethodPost, "/api/courses", ""))
+	assert.Equal(t, http.StatusOK, serve(r, http.MethodDelete, "/api/courses/1", makeTestToken(false)))
+
+	assert.Equal(t, 2, recorder.calls)
+}
+
+func TestWriteLock_NoChangeToRewind_RecordsNothing(t *testing.T) {
+	utils.InitJWTSecret("test-secret-key-minimum-32-characters-long-aaa")
+	recorder := &mockChangeRecorder{}
+	r := setupChangeRouter(t, false, recorder)
+
+	assert.Equal(t, http.StatusOK, serve(r, http.MethodGet, "/api/courses", ""))
+	assert.Equal(t, http.StatusOK, serve(r, http.MethodPost, "/api/auth/login", ""))
+	assert.Equal(t, http.StatusOK, serve(r, http.MethodPost, "/internal/sync", ""))
+	assert.Equal(t, http.StatusBadRequest, serve(r, http.MethodPost, "/api/courses/invalid", ""))
+	// The super admin's lasting changes go through an edit session and a save.
+	assert.Equal(t, http.StatusOK, serve(r, http.MethodPost, "/api/courses", makeTestToken(true)))
+
+	assert.Zero(t, recorder.calls)
+}
+
+func TestWriteLock_LockedVisitorWrite_RecordsNothing(t *testing.T) {
+	recorder := &mockChangeRecorder{}
+	r := setupChangeRouter(t, true, recorder)
+
+	assert.Equal(t, http.StatusServiceUnavailable, serve(r, http.MethodPost, "/api/courses", ""))
+	assert.Zero(t, recorder.calls)
+}
+
+func TestWriteLock_RecorderError_KeepsResponse(t *testing.T) {
+	recorder := &mockChangeRecorder{err: errors.New("redis down")}
+	r := setupChangeRouter(t, false, recorder)
+
+	assert.Equal(t, http.StatusOK, serve(r, http.MethodPost, "/api/courses", ""))
+	assert.Equal(t, 1, recorder.calls)
+}
