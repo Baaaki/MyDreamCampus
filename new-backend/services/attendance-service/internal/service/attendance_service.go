@@ -36,14 +36,14 @@ const (
 )
 
 type AttendanceService struct {
-	cacheRepo      *repository.CacheRepository
-	sessionRepo    *repository.SessionRepository
-	attendanceRepo *repository.AttendanceRepository
-	outboxRepo     *repository.OutboxRepository
+	cacheRepo      attendanceCache
+	sessionRepo    sessionStore
+	attendanceRepo attendanceStore
+	outboxRepo     attendanceOutbox
 	qrService      *QRService
-	redisService   *RedisService
+	redisService   attendanceRedis
 	semesterClient SemesterClient
-	periodRepo     *sharedRepo.SimplePeriodRepository
+	periodRepo     attendancePeriods
 }
 
 func NewAttendanceService(
