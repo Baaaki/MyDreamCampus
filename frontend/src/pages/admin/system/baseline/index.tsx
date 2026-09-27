@@ -255,9 +255,9 @@ export default function BaselinePage() {
   const handleRestoreNow = () => {
     setConfirmDialog({
       open: true,
-      title: "Bugünkü Değişiklikleri Şimdi Geri Al",
+      title: "Ziyaretçi Değişikliklerini Şimdi Geri Al",
       description:
-        "Gece 04:00 beklenmeden sistem anında en son kaydedilmiş kalıcı duruma döndürülecektir. Bugün yapılan ziyaretçi değişiklikleri silinecektir. Devam etmek istiyor musunuz?",
+        "Saatlik geri dönüş beklenmeden sistem anında en son kaydedilmiş kalıcı duruma döndürülecektir. Ziyaretçilerin yaptığı değişiklikler silinecektir. Devam etmek istiyor musunuz?",
       actionText: "Şimdi Geri Al",
       variant: "destructive",
       onConfirm: () => mutateRestoreNow.mutate(),
@@ -283,8 +283,9 @@ export default function BaselinePage() {
             Kalıcı Veri ve Canlı Demo Yönetimi
           </h1>
           <p className="text-sm text-gray-500 dark:text-gray-400">
-            Süper admin kalıcı veri modunu yönetir; her gece 04:00&apos;te
-            sistem burada kaydedilen kalıcı duruma geri döner.
+            Süper admin kalıcı veri modunu yönetir; ziyaretçilerin
+            değişiklikleri en fazla 1 saat sonra burada kaydedilen kalıcı duruma
+            geri döner.
           </p>
         </div>
         <Button
@@ -455,7 +456,7 @@ export default function BaselinePage() {
                     className="gap-2 border-amber-300 text-amber-700 hover:bg-amber-50 dark:border-amber-800 dark:text-amber-400 dark:hover:bg-amber-950/30"
                   >
                     <RotateCcw className="h-4 w-4" />
-                    Bugünkü Değişiklikleri Şimdi Geri Al
+                    Ziyaretçi Değişikliklerini Şimdi Geri Al
                   </Button>
                 </>
               )}
@@ -473,9 +474,8 @@ export default function BaselinePage() {
           </CardHeader>
           <CardContent className="space-y-3 text-xs text-muted-foreground">
             <p>
-              1. <strong>Düzenlemeye Başla:</strong> Günün ziyaretçi verileri
-              silinir, son kalıcı duruma dönülür ve diğer kullanıcılara yazma
-              kilitlenir.
+              1. <strong>Düzenlemeye Başla:</strong> Ziyaretçi verileri silinir,
+              son kalıcı duruma dönülür ve diğer kullanıcılara yazma kilitlenir.
             </p>
             <p>
               2. <strong>Kalıcı Veri Düzenleme:</strong> Panelden istediğiniz
@@ -486,8 +486,9 @@ export default function BaselinePage() {
               ziyaretçilere açılır.
             </p>
             <p>
-              4. <strong>Gece 04:00:</strong> Her gece sistem otomatik olarak bu
-              kalıcı duruma geri döner.
+              4. <strong>Saatlik geri dönüş:</strong> Son geri dönüşten sonraki
+              ilk ziyaretçi değişikliği 1 saatlik olunca sistem otomatik olarak
+              bu kalıcı duruma geri döner.
             </p>
           </CardContent>
         </Card>

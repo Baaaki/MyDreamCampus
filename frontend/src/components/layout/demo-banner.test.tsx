@@ -60,7 +60,7 @@ describe("DemoBanner", () => {
 
     expect(
       await screen.findByText(
-        /Bu bir demo\. Yaptığınız değişiklikler her gece 04:00'te geri alınır\./i
+        /Bu bir demo\. Yaptığınız tüm değişiklikler 1 saat sonra geri döndürülecektir\./i
       )
     ).toBeInTheDocument()
   })

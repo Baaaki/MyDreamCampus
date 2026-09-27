@@ -111,7 +111,7 @@ describe("BaselinePage", () => {
     expect(screen.getByText("Normal (Korumalı)")).toBeInTheDocument()
     expect(screen.getByText("Düzenlemeye Başla")).toBeInTheDocument()
     expect(
-      screen.getByText("Bugünkü Değişiklikleri Şimdi Geri Al")
+      screen.getByText("Ziyaretçi Değişikliklerini Şimdi Geri Al")
     ).toBeInTheDocument()
     await waitFor(() => {
       expect(screen.getByText("Aktif Sürüm")).toBeInTheDocument()
