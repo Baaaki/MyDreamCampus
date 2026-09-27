@@ -751,6 +751,24 @@ func TestAutoFinalize_WriteFails_NothingIsKept(t *testing.T) {
 	assert.Empty(t, w.outbox)
 }
 
+// A student whose scores cannot be read must not be finalized out of the
+// course: the same transaction deletes every registration and score, so
+// skipping the student would erase their grade without a completed record.
+func TestAutoFinalize_ScoresUnreadable_AbortsWithoutDeletingAnything(t *testing.T) {
+	w, courseID := newGradesWorld(t)
+	w.enroll(courseID, "1", 90, 90, false)
+	unreadable := w.enroll(courseID, "2", 80, 80, false)
+	w.failScoresFor = unreadable.ID
+
+	_, err := w.service(openSemester()).AutoFinalize(context.Background(), courseID, instructorID)
+
+	require.Error(t, err)
+	assert.Empty(t, w.completed)
+	assert.Len(t, w.regs, 2)
+	assert.Len(t, w.scores, 4)
+	assert.Empty(t, w.outbox)
+}
+
 func TestAutoFinalize_NoRegistrationsOrCourse_Fails(t *testing.T) {
 	w, courseID := newGradesWorld(t)
 
@@ -821,6 +839,8 @@ func TestLockScore_HardDeadlinePassed_Refused(t *testing.T) {
 	err = w.service(openSemester()).UnlockScore(context.Background(), reg.ID, "quiz")
 	assert.ErrorIs(t, err, gradeErrors.ErrScoreNotFound)
 }
+
+// -------------------------------------------------------------- ProcessAppeal
 
 // finalizedCourse leaves one completed record as AutoFinalize would.
 func finalizedCourse(w *gradesWorld, courseID uuid.UUID, gradingType db.GradesGradingTypeEnum, vize, final float64, gp db.GradesGradePointEnum) db.GradesStudentCompletedCourse {

@@ -351,10 +351,13 @@ func (s *GradeService) AutoFinalize(ctx context.Context, courseID uuid.UUID, ins
 
 	for _, reg := range registrations {
 		// Get scores for this registration
+		// Skipping the student would not leave them out of the finalize:
+		// step 10 deletes every registration and score of the course, so
+		// their grade would vanish without a completed record.
 		scores, err := s.scoreRepo.GetScoresByRegistration(ctx, reg.ID)
 		if err != nil {
 			logger.Error("failed to get scores", zap.Error(err))
-			continue
+			return nil, fmt.Errorf("get scores for registration %s: %w", reg.ID, err)
 		}
 
 		scoreMap := make(map[string]float64)
