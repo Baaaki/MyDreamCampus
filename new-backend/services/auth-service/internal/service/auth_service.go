@@ -1077,6 +1077,9 @@ func (s *AuthService) generateAccessToken(user db.User) (string, error) {
 	if user.IsSuperadmin {
 		claims["super_admin"] = true
 	}
+	if user.IsDemo {
+		claims["demo"] = true
+	}
 
 	token := jwt.NewWithClaims(jwt.SigningMethodHS256, claims)
 	return token.SignedString([]byte(s.config.JWT.Secret))

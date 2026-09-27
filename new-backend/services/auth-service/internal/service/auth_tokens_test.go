@@ -68,6 +68,25 @@ func TestGenerateAccessToken_SuperAdminClaim(t *testing.T) {
 	assert.False(t, regClaims.SuperAdmin)
 }
 
+// The shared chain refuses deletes from the demo admin by this claim alone.
+func TestGenerateAccessToken_DemoClaim_OnlyOnDemoAccounts(t *testing.T) {
+	s := newTokenTestService()
+
+	demoUser := tokenTestUser()
+	demoUser.IsDemo = true
+	token, err := s.generateAccessToken(demoUser)
+	require.NoError(t, err)
+	claims, err := utils.ValidateAccessTokenWithSecret(token, []byte(tokenTestSecret))
+	require.NoError(t, err)
+	assert.True(t, claims.Demo)
+
+	token, err = s.generateAccessToken(tokenTestUser())
+	require.NoError(t, err)
+	claims, err = utils.ValidateAccessTokenWithSecret(token, []byte(tokenTestSecret))
+	require.NoError(t, err)
+	assert.False(t, claims.Demo)
+}
+
 func TestGenerateRefreshToken_RejectedAsAccessToken(t *testing.T) {
 	s := newTokenTestService()
 
