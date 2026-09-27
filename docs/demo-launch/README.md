@@ -74,8 +74,7 @@ Proje, CV için **herkese açık canlı demo** olarak kullanıcının ev sunucus
 
 - Giriş kartında üç **public demo hesabı** için "Öğrenci / Öğretmen / Admin
   Olarak Giriş" düğmeleri var; düğme formu doldurur, ziyaretçi "Giriş Yap"a
-  basar. Ziyaretçiler hesap açmadan bunlarla girer. Demo admin hiçbir şeyi
-  silemez.
+  basar. Ziyaretçiler hesap açmadan bunlarla girer.
 - Kullanıcının kendi **süper admin** hesabı var. Ona kimse erişemez; kalıcı
   veriyi yalnız o girer.
 - Süper admin dışındaki herkes her şeyi değiştirebilir (admin paneli dahil,
@@ -101,7 +100,7 @@ Proje, CV için **herkese açık canlı demo** olarak kullanıcının ev sunucus
 |---|---|---|
 | Admin paneli | Ziyaretçilere tamamen açık; yalnız sistem hesapları korunur | 6 |
 | Kalıcılık | Süper admin "düzenleme modu" → "kaydet" ile kalıcı durum alır; ziyaretçi değişiklikleri ilk değişiklikten 1 saat sonra ona döner (`REVERT_AFTER_MINUTES`, 27.09; önce her gece 04:00) | 7 |
-| Demo admin silme | Demo admin `DELETE` isteklerinde 403 `DEMO_DELETE_DISABLED` alır; kendi oturumunu kapatmak hariç (27.09) | 6 |
+| Demo admin silme | Demo admin de silebilir; silinenler de diğer değişiklikler gibi 1 saat içinde geri gelir (27.09 — aynı gün eklenen silme yasağı kaldırıldı) | 6 |
 | Giriş ekranı | Hesap listesi yerine üç rol düğmesi formu doldurur, giriş elle yapılır; "1 saat sonra geri döndürülecektir" uyarısı (27.09) | 6 |
 | Ödeme | payment servisine kendi DB'si + outbox; sahte kartla onay | 3 |
 | Yeni kullanıcının ilk şifresi | E-posta adresi kalır; ilk girişte değişim **sunucuda** zorunlu | 1 |

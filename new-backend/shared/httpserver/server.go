@@ -63,7 +63,6 @@ func NewServer(cfg *config.Config, service string) *Server {
 	r.Use(platformMiddleware.RequestLogger())
 	r.Use(platformMiddleware.IPRateLimit())
 	r.Use(platformMiddleware.WriteLock())
-	r.Use(platformMiddleware.DemoAdminNoDelete())
 	r.Use(platformMiddleware.SetCSRFToken(cfg.Server.Environment == "production"))
 
 	return &Server{
