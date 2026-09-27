@@ -72,14 +72,17 @@
 Proje, CV için **herkese açık canlı demo** olarak kullanıcının ev sunucusunda
 çalışacak ve **Cloudflare Tunnel** ile internete açılacak.
 
-- Giriş ekranının yanında üç **public demo hesabı** (admin, öğretmen,
-  öğrenci) e-posta ve şifresiyle yazar. Ziyaretçiler hesap açmadan bunlarla
-  girer.
+- Giriş kartında üç **public demo hesabı** için "Öğrenci / Öğretmen / Admin
+  Olarak Giriş" düğmeleri var; düğme formu doldurur, ziyaretçi "Giriş Yap"a
+  basar. Ziyaretçiler hesap açmadan bunlarla girer. Demo admin hiçbir şeyi
+  silemez.
 - Kullanıcının kendi **süper admin** hesabı var. Ona kimse erişemez; kalıcı
   veriyi yalnız o girer.
 - Süper admin dışındaki herkes her şeyi değiştirebilir (admin paneli dahil,
-  tamamen açık) ama bu değişiklikler **kalıcı değildir**: her gece 04:00'te
-  sistem süper adminin en son kaydettiği duruma ("kalıcı durum") döner.
+  tamamen açık) ama bu değişiklikler **kalıcı değildir**: en fazla 1 saat
+  yaşar. Son geri dönüşten sonraki ilk değişiklik 1 saatlik olunca sistem
+  süper adminin en son kaydettiği duruma ("kalıcı durum") döner (27.09'a
+  kadar her gece 04:00'teydi).
 - **Zaman makinesi:** kapalıyken dünyadaki gerçek saat; açılınca tüm servisler
   aynı simüle saatle çalışır. Amaç, zamana bağlı davranışları ziyaretçilerin
   inceleyebilmesi.
@@ -97,7 +100,9 @@ Proje, CV için **herkese açık canlı demo** olarak kullanıcının ev sunucus
 | Konu | Karar | Faz |
 |---|---|---|
 | Admin paneli | Ziyaretçilere tamamen açık; yalnız sistem hesapları korunur | 6 |
-| Kalıcılık | Süper admin "düzenleme modu" → "kaydet" ile kalıcı durum alır; her gece 04:00'te ona dönülür | 7 |
+| Kalıcılık | Süper admin "düzenleme modu" → "kaydet" ile kalıcı durum alır; ziyaretçi değişiklikleri ilk değişiklikten 1 saat sonra ona döner (`REVERT_AFTER_MINUTES`, 27.09; önce her gece 04:00) | 7 |
+| Demo admin silme | Demo admin `DELETE` isteklerinde 403 `DEMO_DELETE_DISABLED` alır; kendi oturumunu kapatmak hariç (27.09) | 6 |
+| Giriş ekranı | Hesap listesi yerine üç rol düğmesi formu doldurur, giriş elle yapılır; "1 saat sonra geri döndürülecektir" uyarısı (27.09) | 6 |
 | Ödeme | payment servisine kendi DB'si + outbox; sahte kartla onay | 3 |
 | Yeni kullanıcının ilk şifresi | E-posta adresi kalır; ilk girişte değişim **sunucuda** zorunlu | 1 |
 | Zaman makinesi | Tüm servislerde çalışır; ofset modeli, saat akar | 2 |
@@ -200,4 +205,4 @@ Durum değerleri: **Bekliyor**, **Devam ediyor**, **Bitti**, **Engelli**.
 | 25.09.2026 | Faz 8–9 incelemesi | Faz 8 (gemini) incelendi, 10 commit (bu ilerleme commit'i dahil). auto-deploy `EDGE` yokken tunnel'a geçiyordu (LAN sunucusunda her tur `check-env`'e takılırdı); elle `make deploy` tunnel sunucusunda cloudflared'ı kaldırıyordu — `EDGE` artık `.env`'den okunuyor. `TUNNEL_TOKEN` yer tutucusu tunnel'sız her deploy'da `check-env`'i düşürüyordu. CI kapısı `jq` yokken sonsuza dek "bekliyor" diyor, repo adını çözemeyince kontrolsüz deploy ediyordu — ikisi de artık birimi düşürüyor. Caddy eksik bir asset'e index.html'i bir yıllık immutable önbellekle veriyordu — artık 404 (yerel caddy ile denendi). cloudflared 2024.12.2 → 2026.9.3. Sıfır EAS `projectId` `eas init`'i engelliyordu. Kalıcı Veri sayfası durum okunamayınca boş kalıyordu — hata ve Cloudflare Access doğrulama bağlantısı eklendi. DEPLOY.md: host-cloudflared portu `127.0.0.1:`'e bağlandı, kilit kurtarma gerçek `ops:write_lock` anahtarıyla, rclone yedeği host'tan, log kontrolleri konteyner adlarıyla. Faz 9 Kod maddeleri doğrulandı; K1 ile çelişen zaman makinesi maddesi düzeltildi. **ENGEL:** `backend-e2e` son 11 CI koşusunda hiç geçmedi (build adımında 30 dk zaman aşımı) — `ci-passed` kırmızı kaldıkça auto-deploy backend commit'lerini deploy etmez. Backend 11 modül vet temiz / 1160 test; frontend typecheck+lint+Prettier+build temiz / 138 test; mobil tsc temiz / 103 test | Faz 8.6 kullanıcıda, e2e zaman aşımı push izniyle ele alınmalı; Faz 9 canlı kontrolleri bekliyor |
 | 25.09.2026 | Faz 8–9 incelemesi (2) | e2e ENGEL'i yerelde çözüldü, 5 commit (bu ilerleme commit'i dahil). CI e2e'si yerelde birebir koşturuldu (izole `mdc-e2e` projesi): golden path'in tamamı geçti, yalnız son adım 500 aldı — `pg_restore --clean` enum/tabloları yeni OID'lerle kurduğu için servislerin açık bağlantılarındaki hazır sorgular "cached plan must not change result type" veriyordu; demo-ops artık her geri dönüşte eski oturumları sonlandırıyor (pgxpool boştaki bağlantıyı ping'leyip yeniliyor) ve golden path baştan sona yeşil. CI zaman aşımının nedeni ölçüldü: tüm imajlar aynı anda soğuk derlenince 4 CPU/16 GB'lık builder'da 9 dk ve 10 GB; önce auth-service derlenince 2,5 dk ve 2,5 GB — CI'da derleme ayrı ve süre sınırlı adım oldu, `make deploy` da aynı ısındırmayı yapıyor. Faz 8.1'in sabit alt ağı `172.28.0.0/16` Docker'ın otomatik havuzunda olduğu için bu makinede başka bir stack'le çakışıp `up`'ı düşürüyordu; `172.16.238.0/24`'e (Docker havuzu dışında, Caddy'nin güvendiği aralıkta, `STACK_SUBNET` ile değişir) alındı ve iletilen istemci IP'sinin servise ulaştığı denendi | CI doğrulaması push'a bağlı; Faz 8.6 kullanıcıda; Faz 9 canlı kontrolleri bekliyor |
 | 25.09.2026 | Faz 8–9 incelemesi (3) | Push edildi (kullanıcı izniyle). İlk CI koşusunda (`7859e9c`) derleme 2,5 dk'ya indi ama golden path geri dönüş sonrası yine 500 aldı: sonlandırılan bağlantılardan 1 sn'den kısa süre önce kullanılmış olanı pgxpool ping'lemeden veriyordu (57P01). Hızlı yoklamalı yeniden üretimde 10 turda 7 hata; demo-ops artık sonlandırmadan sonra 2 sn bekleyip bitti diyor — 15 turda 0 hata. 2 commit (bu ilerleme commit'i dahil). `be761d8`: `backend-e2e` 24.09'dan beri ilk kez yeşil, `ci-passed` başarılı | Faz 8.6 kullanıcıda; Faz 9 canlı kontrolleri bekliyor |
-
+| 27.09.2026 | Plan değişikliği | Kullanıcı isteğiyle, 9 commit (bu doküman dahil). Gece 04:00 geri dönüşü kalktı: servisler süper admin dışındaki ilk başarılı yazmada `ops:dirty_since`'i (SET NX) damgalıyor, demo-ops damga `REVERT_AFTER_MINUTES` (60) dakikalık olunca kalıcı duruma dönüyor; her restore/kaydetme/ilk kalıcı durum damgayı siliyor, başarısız geri dönüş 5 dk sonra yeniden deneniyor, 0 kapatıyor. Access token'a `demo` claim'i; ortak zincir demo adminin `DELETE` isteklerini 403 ile reddediyor. Web giriş kartında üç rol düğmesi + 1 saat uyarısı, demo şeridi/Kalıcı Veri metinleri, mobil girişe uyarı. e2e'ye damga ve 403 kontrolleri. Yerel izole e2e (`mdc-e2e`) baştan sona yeşil; `REVERT_AFTER_MINUTES=1` ile otomatik geri dönüş gerçek yığında denendi (ziyaretçi dersi 87 sn'de gitti, süper adminin dersi kaldı). Backend shared+auth vet/test temiz; frontend typecheck+lint+Prettier temiz / 138 test; mobil tsc temiz / 103 test | Faz 8.6 kullanıcıda; Faz 9 canlı kontrolleri bekliyor |
