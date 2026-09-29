@@ -27,10 +27,15 @@ var (
 	// Raised when catalog cannot be reached: the hard deadline binds admins
 	// too, so an unverifiable deadline blocks the edit.
 	ErrSemesterInfoUnavailable = sharedErrors.New("SEMESTER_INFO_UNAVAILABLE", "Dönem bilgisi şu anda alınamıyor, lütfen birazdan tekrar deneyin", http.StatusServiceUnavailable)
+	// Raised when the student service cannot be reached: an advisor that
+	// cannot be confirmed is not one, so the transcript stays closed.
+	ErrStudentInfoUnavailable = sharedErrors.New("STUDENT_INFO_UNAVAILABLE", "Öğrencinin danışman bilgisi şu anda doğrulanamıyor, lütfen birazdan tekrar deneyin", http.StatusServiceUnavailable)
 
 	// Authorization errors (AppError for HTTP responses)
 	ErrNotCourseInstructor = sharedErrors.New("NOT_COURSE_INSTRUCTOR", "Bu dersin öğretim üyesi değilsiniz", http.StatusForbidden)
 	ErrStudentDeactivated  = sharedErrors.New("STUDENT_DEACTIVATED", "Öğrenci hesabı devre dışı", http.StatusForbidden)
+	ErrTranscriptForbidden = sharedErrors.New("TRANSCRIPT_FORBIDDEN", "Bu transkripti görüntüleme yetkiniz yok", http.StatusForbidden)
+	ErrNotStudentAdvisor   = sharedErrors.New("NOT_STUDENT_ADVISOR", "Yalnızca danışmanı olduğunuz öğrencilerin transkriptini görüntüleyebilirsiniz", http.StatusForbidden)
 
 	// Not found errors (AppError for HTTP responses)
 	ErrCourseNotFound       = sharedErrors.New("COURSE_NOT_FOUND", "Ders bulunamadı", http.StatusNotFound)

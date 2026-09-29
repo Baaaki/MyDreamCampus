@@ -10,7 +10,7 @@ import (
 
 // FromConfig builds the transport for one target service. Every caller goes
 // through here so the timeout, the internal secret, the request-id hand-off
-// and the breaker thresholds are identical on all seven sync seams.
+// and the breaker thresholds are identical on every sync seam.
 //
 // The base URL comes from config — never from request data — so a caller
 // cannot be talked into pointing an internal client somewhere else (SSRF).

@@ -3,6 +3,7 @@ package service
 import (
 	"context"
 	"encoding/json"
+	goerrors "errors"
 	"fmt"
 	"strconv"
 	"strings"
@@ -22,6 +23,7 @@ type StudentGradesService struct {
 	registrationRepo registrationStore
 	scoreRepo        scoreStore
 	completedRepo    completedStore
+	studentClient    StudentClient
 }
 
 func NewStudentGradesService(
@@ -29,12 +31,14 @@ func NewStudentGradesService(
 	registrationRepo *repository.RegistrationRepository,
 	scoreRepo *repository.ScoreRepository,
 	completedRepo *repository.CompletedRepository,
+	studentClient StudentClient,
 ) *StudentGradesService {
 	return &StudentGradesService{
 		cacheRepo:        cacheRepo,
 		registrationRepo: registrationRepoAdapter{registrationRepo},
 		scoreRepo:        scoreRepoAdapter{scoreRepo},
 		completedRepo:    completedRepoAdapter{completedRepo},
+		studentClient:    studentClient,
 	}
 }
 
@@ -136,9 +140,20 @@ func (s *StudentGradesService) GetMyGrades(ctx context.Context, studentID uuid.U
 }
 
 func (s *StudentGradesService) GetTranscript(ctx context.Context, requesterID uuid.UUID, requesterRole string, studentID uuid.UUID) (*dto.TranscriptResponse, error) {
-	// 1. Authorization check
-	if requesterRole == "student" && requesterID != studentID {
-		return nil, errors.ErrNotCourseInstructor // Reusing error for unauthorized access
+	// 1. Authorization: an admin sees every transcript, a student only
+	// their own, a teacher only their advisees'. Any other role sees none.
+	switch requesterRole {
+	case "admin":
+	case "student":
+		if requesterID != studentID {
+			return nil, errors.ErrTranscriptForbidden
+		}
+	case "teacher":
+		if err := s.requireAdvisor(ctx, requesterID, studentID); err != nil {
+			return nil, err
+		}
+	default:
+		return nil, errors.ErrTranscriptForbidden
 	}
 
 	// 2. Check if student is active (only for student role)
@@ -232,6 +247,24 @@ func (s *StudentGradesService) GetTranscript(ctx context.Context, requesterID uu
 			CumulativeGPA: gpa,
 		},
 	}, nil
+}
+
+// requireAdvisor lets the teacher through only if the student service names
+// them as the student's advisor. It fails closed: when the student service
+// cannot be reached, the advisor is unconfirmed and the transcript refused.
+func (s *StudentGradesService) requireAdvisor(ctx context.Context, teacherID, studentID uuid.UUID) error {
+	student, err := s.studentClient.GetStudentByID(ctx, studentID)
+	if err != nil {
+		if goerrors.Is(err, errors.ErrStudentNotFound) {
+			return errors.ErrStudentNotFound
+		}
+		logger.Error("failed to read the student's advisor", zap.Error(err), zap.String("student_id", studentID.String()))
+		return errors.ErrStudentInfoUnavailable
+	}
+	if student.AdvisorID == nil || *student.AdvisorID != teacherID.String() {
+		return errors.ErrNotStudentAdvisor
+	}
+	return nil
 }
 
 // Helper functions

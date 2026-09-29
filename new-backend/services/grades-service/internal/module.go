@@ -44,6 +44,7 @@ func New(
 	rabbitConn *rabbitmq.Connection,
 	periodRepo *platformRepo.SimplePeriodRepository,
 	semesterClient service.SemesterClient,
+	studentClient service.StudentClient,
 ) *Module {
 	cacheRepo := repository.NewCacheRepository(pool)
 	registrationRepo := repository.NewRegistrationRepository(pool)
@@ -72,6 +73,7 @@ func New(
 		registrationRepo,
 		scoreRepo,
 		completedRepo,
+		studentClient,
 	)
 
 	return &Module{
@@ -132,6 +134,9 @@ func (m *Module) RegisterRoutes(rg *gin.RouterGroup) {
 			teacher.POST("/courses/:course_id/scores", platformMiddleware.Idempotency(), m.gradeHandler.SubmitScore)
 			teacher.POST("/courses/:course_id/scores/bulk", platformMiddleware.Idempotency(), m.gradeHandler.BulkSubmitScores)
 			teacher.POST("/courses/:course_id/scores/lock", m.gradeHandler.LockAssessment)
+			// A teacher sees only their advisees' transcripts; the service
+			// asks the student service who the advisor is.
+			teacher.GET("/students/:student_id/transcript", m.gradeHandler.GetStudentTranscript)
 		}
 
 		// Student facing routes
@@ -139,7 +144,7 @@ func (m *Module) RegisterRoutes(rg *gin.RouterGroup) {
 		student.Use(platformMiddleware.RequireStudent())
 		{
 			student.GET("/grades", m.gradeHandler.GetMyGrades)
-			student.GET("/transcript", m.gradeHandler.GetTranscript)
+			student.GET("/transcript", m.gradeHandler.GetMyTranscript)
 		}
 
 		// Admin facing routes. The appeal handler mutates a finalized

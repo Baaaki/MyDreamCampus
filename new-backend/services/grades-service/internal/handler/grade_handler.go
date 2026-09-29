@@ -417,75 +417,65 @@ func (h *GradeHandler) GetMyGrades(c *gin.Context) {
 	c.JSON(http.StatusOK, grades)
 }
 
-// GetTranscript - GET /api/v1/grades/transcript/:studentId
-func (h *GradeHandler) GetTranscript(c *gin.Context) {
-	ctx, cancel := context.WithTimeout(c.Request.Context(), requestTimeout)
-	defer cancel()
-
-	handlerLogger := logger.WithContextAndFields(ctx,
-		zap.String("handler", "GradeHandler"),
-		zap.String("method", "GetTranscript"),
-	)
-
-	// Get requester info from context (set by JWTAuth middleware as string)
-	requesterIDStr, exists := c.Get("user_id")
-	if !exists {
-		handlerLogger.Error("user_id not found in context")
-		c.JSON(http.StatusUnauthorized, dto.ErrorResponse{
-			Error: sharedErrors.ErrUnauthorized.Message,
-			Code:  sharedErrors.ErrUnauthorized.Code,
-		})
+// GetMyTranscript - GET /api/grades/my/transcript. The student is the caller;
+// there is no id in the path to point at someone else.
+func (h *GradeHandler) GetMyTranscript(c *gin.Context) {
+	requesterID, role, ok := h.requester(c)
+	if !ok {
 		return
 	}
+	h.writeTranscript(c, requesterID, role, requesterID)
+}
 
-	// Parse string to UUID
-	requesterID, err := uuid.Parse(requesterIDStr.(string))
+// GetStudentTranscript - GET /api/grades/students/:student_id/transcript,
+// for teachers and admins. The service decides whether this teacher may see
+// this student.
+func (h *GradeHandler) GetStudentTranscript(c *gin.Context) {
+	requesterID, role, ok := h.requester(c)
+	if !ok {
+		return
+	}
+	studentID, err := uuid.Parse(c.Param("student_id"))
 	if err != nil {
-		handlerLogger.Error("invalid requester ID format", zap.Error(err))
-		c.JSON(http.StatusBadRequest, dto.ErrorResponse{
-			Error: "Geçersiz kullanıcı kimliği",
-			Code:  "INVALID_ID",
-		})
-		return
-	}
-
-	requesterRole, exists := c.Get("role")
-	if !exists {
-		handlerLogger.Error("role not found in context")
-		c.JSON(http.StatusUnauthorized, dto.ErrorResponse{
-			Error: sharedErrors.ErrUnauthorized.Message,
-			Code:  sharedErrors.ErrUnauthorized.Code,
-		})
-		return
-	}
-
-	// Parse student ID
-	studentIDStr := c.Param("student_id")
-	studentID, err := uuid.Parse(studentIDStr)
-	if err != nil {
-		handlerLogger.Error("invalid student ID format", zap.Error(err))
 		c.JSON(http.StatusBadRequest, dto.ErrorResponse{
 			Error: "Geçersiz öğrenci kimliği",
 			Code:  "INVALID_ID",
 		})
 		return
 	}
+	h.writeTranscript(c, requesterID, role, studentID)
+}
 
-	handlerLogger.Info("getting transcript",
-		zap.String("requester_id", requesterID.String()),
-		zap.String("requester_role", requesterRole.(string)),
-		zap.String("student_id", studentID.String()),
-	)
+// requester reads the caller's id and role that JWTAuth put on the context,
+// answering the request itself when either is missing or malformed.
+func (h *GradeHandler) requester(c *gin.Context) (uuid.UUID, string, bool) {
+	rawID, _ := c.Get("user_id")
+	rawRole, _ := c.Get("role")
+	idStr, idOK := rawID.(string)
+	roleStr, roleOK := rawRole.(string)
+	id, err := uuid.Parse(idStr)
+	if !idOK || !roleOK || err != nil {
+		c.JSON(http.StatusUnauthorized, dto.ErrorResponse{
+			Error: sharedErrors.ErrUnauthorized.Message,
+			Code:  sharedErrors.ErrUnauthorized.Code,
+		})
+		return uuid.Nil, "", false
+	}
+	return id, roleStr, true
+}
 
-	// Get transcript
-	transcript, err := h.studentGradeService.GetTranscript(
-		ctx,
-		requesterID,
-		requesterRole.(string),
-		studentID,
-	)
+func (h *GradeHandler) writeTranscript(c *gin.Context, requesterID uuid.UUID, role string, studentID uuid.UUID) {
+	ctx, cancel := context.WithTimeout(c.Request.Context(), requestTimeout)
+	defer cancel()
+
+	transcript, err := h.studentGradeService.GetTranscript(ctx, requesterID, role, studentID)
 	if err != nil {
-		handlerLogger.Error("failed to get transcript", zap.Error(err))
+		logger.WithContextAndFields(ctx,
+			zap.String("handler", "GradeHandler"),
+			zap.String("method", "GetTranscript"),
+			zap.String("requester_id", requesterID.String()),
+			zap.String("student_id", studentID.String()),
+		).Warn("transcript refused or failed", zap.Error(err))
 		h.handleError(c, err)
 		return
 	}

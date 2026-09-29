@@ -44,6 +44,7 @@ enrollment  ──► student     (öğrenci doğrulama)
 enrollment  ──► catalog     (ders listesi / ders doğrulama)
 attendance  ──► catalog     (SemesterInfo)
 grades      ──► catalog     (SemesterInfo)
+grades      ──► student     (danışman doğrulama: öğretmen yalnız danışmanı olduğu öğrencinin transkriptini görür)
 meal        ──► payment     (ödeme başlatma / iade)
 ```
 

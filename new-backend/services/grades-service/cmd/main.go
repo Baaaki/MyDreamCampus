@@ -35,7 +35,9 @@ func main() {
 	periodRepo := platformRepo.NewSimplePeriodRepository(rt.Pool, "grades")
 
 	module := grades.New(rt.Pool, rt.Rabbit, periodRepo,
-		service.NewHTTPSemesterClient(rt.InternalClient("catalog")))
+		service.NewHTTPSemesterClient(rt.InternalClient("catalog")),
+		// Transcript access: a teacher must be the student's advisor.
+		service.NewHTTPStudentClient(rt.InternalClient("student")))
 	if err := module.Bootstrap(rt.Ctx); err != nil {
 		logger.Fatal("failed to bootstrap grades module", zap.Error(err))
 	}
