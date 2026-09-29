@@ -1,5 +1,5 @@
 .PHONY: help dev up down stop infra infra-down frontend mobile clean \
-	test test-backend test-frontend test-mobile test-coverage \
+	test test-backend test-integration test-frontend test-mobile test-coverage \
 	deploy deploy-down deploy-logs deploy-ps deploy-update check-env rabbitmq-feature-flags \
 	backup restore \
 	autodeploy-install autodeploy-status autodeploy-logs autodeploy-now autodeploy-off
@@ -78,6 +78,7 @@ help:
 	@echo ""
 	@echo "  make test            Run ALL test suites (backend + frontend + mobile)"
 	@echo "  make test-backend    Run Go tests across shared + every service (with -race)"
+	@echo "  make test-integration  Repository/Redis tests on throwaway Postgres + Redis containers"
 	@echo "  make test-frontend   Run Vitest unit tests in frontend/"
 	@echo "  make test-mobile     Run Jest unit tests in mobile/"
 	@echo "  make test-coverage   Backend tests with coverage report"
@@ -290,6 +291,35 @@ test-backend:
 		echo "→ $$svc"; \
 		(cd $$svc && go test -race -count=1 ./...) || exit 1; \
 	done
+
+# Integration tests (files behind the `integration` build tag) run against a
+# real Postgres and Redis. Both containers are throwaway: loopback ports of
+# their own, no volume, removed when the run ends, pass or fail. Each test
+# creates and drops its own database on the server. Only packages holding a
+# tagged file run: the rest are the unit tests `make test-backend` covers.
+IT_PG_PORT ?= 55432
+IT_REDIS_PORT ?= 56379
+IT_PG := mdc-it-postgres
+IT_REDIS := mdc-it-redis
+
+test-integration:
+	@$(SUDO) docker rm -f $(IT_PG) $(IT_REDIS) >/dev/null 2>&1 || true
+	@$(SUDO) docker run -d --rm --name $(IT_PG) -e POSTGRES_PASSWORD=it \
+		-p 127.0.0.1:$(IT_PG_PORT):5432 postgres:18 >/dev/null
+	@$(SUDO) docker run -d --rm --name $(IT_REDIS) \
+		-p 127.0.0.1:$(IT_REDIS_PORT):6379 redis:8.10-alpine >/dev/null
+	@until $(SUDO) docker exec $(IT_PG) pg_isready -U postgres -h 127.0.0.1 >/dev/null 2>&1; do sleep 1; done
+	@status=0; \
+	export TEST_DATABASE_URL="postgres://postgres:it@127.0.0.1:$(IT_PG_PORT)/postgres?sslmode=disable"; \
+	export TEST_REDIS_ADDR="127.0.0.1:$(IT_REDIS_PORT)"; \
+	for mod in new-backend/shared new-backend/services/*/; do \
+		pkgs=$$(cd $$mod && grep -rl --include='*_test.go' '^//go:build integration' . | xargs -r -n1 dirname | sort -u); \
+		[ -n "$$pkgs" ] || continue; \
+		echo "→ $$mod"; \
+		(cd $$mod && go test -tags integration -count=1 $$pkgs) || status=1; \
+	done; \
+	$(SUDO) docker rm -f $(IT_PG) $(IT_REDIS) >/dev/null 2>&1; \
+	exit $$status
 
 test-frontend:
 	@echo "→ frontend (vitest)"
