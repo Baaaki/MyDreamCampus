@@ -482,6 +482,8 @@ export interface BulkSubmitScoresRequest {
 export interface BulkSubmitScoresResponse {
   slug: string
   success_count: number
+  /** Entries not saved because their score was locked while editing. */
+  skipped_locked?: number
   auto_finalized?: boolean
   finalize_result?: FinalizeResult
 }

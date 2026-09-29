@@ -219,7 +219,14 @@ export default function GradeEntryPage() {
         message +=
           " Tüm notlar girildiği için ders notları otomatik olarak kesinleştirildi."
       }
-      setSaveMessage({ type: "success", text: message })
+      // The grades service skips scores locked while the teacher was typing.
+      if (result.skipped_locked) {
+        message += ` ${result.skipped_locked} öğrencinin notu bu sırada kilitlendiği için kaydedilmedi.`
+      }
+      setSaveMessage({
+        type: result.skipped_locked ? "error" : "success",
+        text: message,
+      })
 
       // Refresh data
       const [statusRes, studentsRes] = await Promise.all([

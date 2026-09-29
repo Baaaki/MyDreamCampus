@@ -267,6 +267,26 @@ describe("GradeEntryPage", () => {
     ).toBeInTheDocument()
   })
 
+  it("says which changes were not saved because the scores got locked meanwhile", async () => {
+    stubBackend({
+      save: () => json({ slug: "vize", success_count: 1, skipped_locked: 1 }),
+    })
+    const user = userEvent.setup()
+    renderPage()
+
+    await screen.findByText("Ayşe Kaya")
+    await user.clear(row("Ali Yılmaz").getByRole("spinbutton"))
+    await user.type(row("Ali Yılmaz").getByRole("spinbutton"), "88")
+    await user.type(row("Ayşe Kaya").getByRole("spinbutton"), "70")
+    await user.click(saveButton())
+
+    expect(
+      await screen.findByText(
+        "1 öğrencinin notu başarıyla kaydedildi. 1 öğrencinin notu bu sırada kilitlendiği için kaydedilmedi."
+      )
+    ).toBeInTheDocument()
+  })
+
   it("keeps the unsaved change when the save fails", async () => {
     stubBackend({
       save: () =>
