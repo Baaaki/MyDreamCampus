@@ -33,7 +33,7 @@ func NewReservationRepository(pool *pgxpool.Pool) *ReservationRepository {
 func (r *ReservationRepository) CreateReservation(ctx context.Context, params db.CreateReservationParams) (db.Reservation, error) {
 	reservation, err := r.queries.CreateReservation(ctx, params)
 	if err != nil {
-		return db.Reservation{}, fmt.Errorf("%w: failed to create reservation: %v", sharedErrors.ErrQueryFailed, err)
+		return db.Reservation{}, fmt.Errorf("%w: failed to create reservation: %w", sharedErrors.ErrQueryFailed, err)
 	}
 	return reservation, nil
 }
@@ -52,7 +52,7 @@ func (r *ReservationRepository) CreateReservationWithEvent(ctx context.Context, 
 	// Create reservation
 	reservation, err := qtx.CreateReservation(ctx, reservationParams)
 	if err != nil {
-		return db.Reservation{}, fmt.Errorf("%w: failed to create reservation: %v", sharedErrors.ErrQueryFailed, err)
+		return db.Reservation{}, fmt.Errorf("%w: failed to create reservation: %w", sharedErrors.ErrQueryFailed, err)
 	}
 
 	// Create outbox event
@@ -83,7 +83,7 @@ func (r *ReservationRepository) CreateBatchReservations(ctx context.Context, res
 	for _, params := range reservations {
 		reservation, err := qtx.CreateReservation(ctx, params)
 		if err != nil {
-			return nil, fmt.Errorf("%w: failed to create reservation in batch: %v", sharedErrors.ErrQueryFailed, err)
+			return nil, fmt.Errorf("%w: failed to create reservation in batch: %w", sharedErrors.ErrQueryFailed, err)
 		}
 		createdReservations = append(createdReservations, reservation)
 	}
