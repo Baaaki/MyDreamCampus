@@ -308,6 +308,12 @@ func (s *SemesterService) CreateSemesterCourse(ctx context.Context, semester str
 	}
 
 	if err := scheduleRepoTx.BulkCreateScheduleSessions(ctx, sessionParams); err != nil {
+		if sharedErrors.Is(err, catalogErrors.ErrInstructorScheduleConflict) {
+			serviceLogger.Warn("instructor slot taken after the conflict check (race caught by trigger)",
+				zap.Error(err),
+			)
+			return dto.SemesterCourseResponse{}, catalogErrors.ErrInstructorScheduleConflict
+		}
 		return dto.SemesterCourseResponse{}, sharedErrors.Wrap(sharedErrors.ErrInternal, err)
 	}
 

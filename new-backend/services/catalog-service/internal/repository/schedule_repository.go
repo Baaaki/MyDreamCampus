@@ -5,6 +5,7 @@ import (
 	"fmt"
 
 	"github.com/baaaki/mydreamcampus/catalog/internal/db"
+	catalogErrors "github.com/baaaki/mydreamcampus/catalog/internal/errors"
 	sharedErrors "github.com/baaaki/mydreamcampus/shared/platform/errors"
 	"github.com/baaaki/mydreamcampus/shared/platform/utils"
 	"github.com/google/uuid"
@@ -85,9 +86,17 @@ func (r *ScheduleRepository) BulkCreateScheduleSessions(ctx context.Context, ses
 	// Execute batch and collect errors
 	var batchErr error
 	results.Exec(func(i int, err error) {
-		if err != nil && batchErr == nil {
-			batchErr = fmt.Errorf("%w: batch insert failed at session %d: %v", sharedErrors.ErrQueryFailed, i, err)
+		if err == nil || batchErr != nil {
+			return
 		}
+		// Both unique guards on this table mean a slot is already taken: the
+		// instructor schedule trigger (raised as 23505) and the per-course
+		// slot constraint. Either lost a race with the service's own check.
+		if isPgUniqueViolation(err) {
+			batchErr = fmt.Errorf("%w: session %d: %v", catalogErrors.ErrInstructorScheduleConflict, i, err)
+			return
+		}
+		batchErr = fmt.Errorf("%w: batch insert failed at session %d: %v", sharedErrors.ErrQueryFailed, i, err)
 	})
 
 	return batchErr
