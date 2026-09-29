@@ -76,8 +76,10 @@ jobs:
           go-version: ${{ env.GO_VERSION }}
           cache-dependency-path: new-backend/**/go.sum
 
+      # The integration tag only adds files, so vet and lint see the tagged
+      # tests as well as everything else.
       - name: go vet
-        run: go vet ./...
+        run: go vet -tags integration ./...
 
       # v6 of the action only installs golangci-lint v1, whose binaries are
       # built with a Go older than this module's go directive.
@@ -88,13 +90,31 @@ jobs:
           install-only: true
 
       - name: Lint
-        run: golangci-lint run --timeout=5m ./...
+        run: golangci-lint run --timeout=5m --build-tags integration ./...
 
       - name: Build
         run: go build ./...
 
       - name: Test
         run: go test -race -count=1 ./...
+
+      # Files behind the integration tag run against a real Postgres and
+      # Redis, the same images compose uses. Modules without such files skip
+      # the step before any container starts.
+      - name: Integration tests
+        timeout-minutes: 10
+        run: |
+          pkgs=$(grep -rl --include='*_test.go' '^//go:build integration' . | xargs -r -n1 dirname | sort -u)
+          if [ -z "$pkgs" ]; then
+            echo "no integration tests in this module"
+            exit 0
+          fi
+          docker run -d --name it-postgres -e POSTGRES_PASSWORD=it -p 127.0.0.1:5432:5432 postgres:18
+          docker run -d --name it-redis -p 127.0.0.1:6379:6379 redis:8.10-alpine
+          until docker exec it-postgres pg_isready -U postgres -h 127.0.0.1 >/dev/null 2>&1; do sleep 1; done
+          TEST_DATABASE_URL="postgres://postgres:it@127.0.0.1:5432/postgres?sslmode=disable" \
+          TEST_REDIS_ADDR="127.0.0.1:6379" \
+            go test -tags integration -race -count=1 $pkgs
 
       - name: Check go.mod tidiness
         run: |
