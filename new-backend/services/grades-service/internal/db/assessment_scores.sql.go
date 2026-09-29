@@ -177,6 +177,18 @@ func (q *Queries) IsScoreLocked(ctx context.Context, arg IsScoreLockedParams) (b
 	return is_locked, err
 }
 
+const lockCourseGrading = `-- name: LockCourseGrading :exec
+SELECT pg_advisory_xact_lock(hashtextextended('grades:course:' || $1::uuid::text, 0))
+`
+
+// Serializes every write that grades, locks or finalizes one course: the
+// advisory lock is held until the calling transaction ends, so the next job
+// on the same course waits for it instead of interleaving.
+func (q *Queries) LockCourseGrading(ctx context.Context, courseID uuid.UUID) error {
+	_, err := q.db.Exec(ctx, lockCourseGrading, courseID)
+	return err
+}
+
 const lockScore = `-- name: LockScore :exec
 UPDATE grades.student_assessment_scores
 SET is_locked = TRUE

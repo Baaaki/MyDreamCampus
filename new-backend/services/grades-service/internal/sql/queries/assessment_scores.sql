@@ -76,3 +76,9 @@ FROM grades.student_course_registrations r
 WHERE sa.registration_id = r.id
   AND r.course_id = $1
   AND sa.slug = $2;
+
+-- name: LockCourseGrading :exec
+-- Serializes every write that grades, locks or finalizes one course: the
+-- advisory lock is held until the calling transaction ends, so the next job
+-- on the same course waits for it instead of interleaving.
+SELECT pg_advisory_xact_lock(hashtextextended('grades:course:' || sqlc.arg(course_id)::uuid::text, 0));

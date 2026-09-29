@@ -11,15 +11,23 @@ import (
 	"github.com/jackc/pgx/v5/pgxpool"
 )
 
+// txStarter opens the transaction the *WithEvent writes run in: the pool
+// normally, or the caller's transaction once the repository is bound to one
+// (pgx then opens a savepoint), so those writes join the caller's work
+// instead of committing on their own beside it.
+type txStarter interface {
+	Begin(ctx context.Context) (pgx.Tx, error)
+}
+
 type ScoreRepository struct {
 	queries *db.Queries
-	pool    *pgxpool.Pool
+	txs     txStarter
 }
 
 func NewScoreRepository(pool *pgxpool.Pool) *ScoreRepository {
 	return &ScoreRepository{
 		queries: db.New(pool),
-		pool:    pool,
+		txs:     pool,
 	}
 }
 
@@ -36,7 +44,7 @@ func (r *ScoreRepository) UpsertAssessmentScoreWithEvent(
 	scoreParams db.UpsertAssessmentScoreParams,
 	eventParams *db.CreateOutboxEventParams,
 ) (db.GradesStudentAssessmentScore, error) {
-	tx, err := r.pool.Begin(ctx)
+	tx, err := r.txs.Begin(ctx)
 	if err != nil {
 		return db.GradesStudentAssessmentScore{}, fmt.Errorf("%w: failed to begin tx: %v", sharedErrors.ErrTransactionFailed, err)
 	}
@@ -90,7 +98,7 @@ func (r *ScoreRepository) BulkUpsertAssessmentScoresWithEvents(ctx context.Conte
 		return 0, nil
 	}
 
-	tx, err := r.pool.Begin(ctx)
+	tx, err := r.txs.Begin(ctx)
 	if err != nil {
 		return 0, fmt.Errorf("%w: failed to begin tx: %v", sharedErrors.ErrTransactionFailed, err)
 	}
@@ -161,8 +169,15 @@ func (r *ScoreRepository) LockScoresByCourseAndSlug(ctx context.Context, courseI
 	})
 }
 
-// WithTx returns a copy of the repository whose queries run inside tx —
-// required by AutoFinalize so its multi-table writes commit atomically.
+// LockCourseGrading waits for, then holds until the transaction ends, the
+// lock every grading write on the course takes. Only meaningful on a
+// repository bound to a transaction.
+func (r *ScoreRepository) LockCourseGrading(ctx context.Context, courseID uuid.UUID) error {
+	return r.queries.LockCourseGrading(ctx, courseID)
+}
+
+// WithTx returns a copy of the repository whose queries, and whose
+// *WithEvent writes, run inside tx.
 func (r *ScoreRepository) WithTx(tx pgx.Tx) *ScoreRepository {
-	return &ScoreRepository{queries: r.queries.WithTx(tx), pool: r.pool}
+	return &ScoreRepository{queries: r.queries.WithTx(tx), txs: tx}
 }

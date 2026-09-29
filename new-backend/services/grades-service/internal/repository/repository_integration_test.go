@@ -275,3 +275,69 @@ func TestRepositories_WithTx_RollbackLeavesNothing(t *testing.T) {
 	require.NoError(t, err)
 	assert.Len(t, scores, 1)
 }
+
+// A repository bound to a transaction must not open one of its own for the
+// *WithEvent writes: they are part of the caller's job and roll back with it.
+func TestScoreRepository_BoundToATransaction_WritesRollBackWithIt(t *testing.T) {
+	g := newGradesDB(t)
+	ctx := context.Background()
+	reg := g.register(t, "1", false)
+
+	tx, err := g.pool.Begin(ctx)
+	require.NoError(t, err)
+	scores := g.scores.WithTx(tx)
+	_, err = scores.UpsertAssessmentScoreWithEvent(ctx, score(t, reg, "vize", 70), event())
+	require.NoError(t, err)
+	_, err = scores.BulkUpsertAssessmentScoresWithEvents(ctx, []BulkUpsertEntry{{ScoreParams: score(t, reg, "final", 60), EventParams: event()}})
+	require.NoError(t, err)
+	require.NoError(t, tx.Rollback(ctx))
+
+	rows, err := g.scores.GetScoresByRegistration(ctx, reg)
+	require.NoError(t, err)
+	assert.Empty(t, rows)
+	assert.Equal(t, 0, g.outboxCount(t))
+}
+
+func TestScoreRepository_LockCourseGrading_TheNextJobWaitsForTheFirst(t *testing.T) {
+	g := newGradesDB(t)
+	ctx := context.Background()
+	first, err := g.pool.Begin(ctx)
+	require.NoError(t, err)
+	defer func() { _ = first.Rollback(ctx) }()
+	require.NoError(t, g.scores.WithTx(first).LockCourseGrading(ctx, g.course))
+
+	lockOn := func(course uuid.UUID) <-chan error {
+		done := make(chan error, 1)
+		go func() {
+			tx, err := g.pool.Begin(ctx)
+			if err != nil {
+				done <- err
+				return
+			}
+			defer func() { _ = tx.Rollback(ctx) }()
+			done <- g.scores.WithTx(tx).LockCourseGrading(ctx, course)
+		}()
+		return done
+	}
+	sameCourse := lockOn(g.course)
+	otherCourse := lockOn(uuid.New())
+
+	select {
+	case err := <-otherCourse:
+		require.NoError(t, err, "another course is not held up")
+	case <-time.After(5 * time.Second):
+		t.Fatal("a job on another course waited for this one")
+	}
+	select {
+	case <-sameCourse:
+		t.Fatal("a second job on the course ran while the first held it")
+	case <-time.After(300 * time.Millisecond):
+	}
+	require.NoError(t, first.Commit(ctx))
+	select {
+	case err := <-sameCourse:
+		require.NoError(t, err)
+	case <-time.After(5 * time.Second):
+		t.Fatal("the second job never got the course after the first ended")
+	}
+}
