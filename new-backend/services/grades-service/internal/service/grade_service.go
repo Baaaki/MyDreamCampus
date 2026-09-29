@@ -20,6 +20,7 @@ import (
 	"github.com/baaaki/mydreamcampus/shared/platform/rules"
 	"github.com/baaaki/mydreamcampus/shared/platform/utils"
 	"github.com/google/uuid"
+	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgtype"
 	"github.com/jackc/pgx/v5/pgxpool"
 	"go.uber.org/zap"
@@ -64,6 +65,29 @@ func NewGradeService(
 	}
 }
 
+// withCourseLock runs fn in one transaction that first takes the course's
+// grading lock. Every write that grades, locks or finalizes a course goes
+// through it, so on one course they run one after another: a save that began
+// before a lock finishes first, and a save that begins after it sees the
+// lock. Anything that decides a write, such as whether a score is locked,
+// must be read inside fn through stores bound to tx.
+func (s *GradeService) withCourseLock(ctx context.Context, courseID uuid.UUID, fn func(tx pgx.Tx) error) error {
+	tx, err := s.pool.Begin(ctx)
+	if err != nil {
+		return fmt.Errorf("begin grading transaction: %w", err)
+	}
+	// Rollback after successful commit is a no-op returning ErrTxClosed — safe to discard.
+	defer func() { _ = tx.Rollback(ctx) }()
+
+	if err := s.scoreRepo.WithTx(tx).LockCourseGrading(ctx, courseID); err != nil {
+		return fmt.Errorf("take course grading lock: %w", err)
+	}
+	if err := fn(tx); err != nil {
+		return err
+	}
+	return tx.Commit(ctx)
+}
+
 // ============================================
 // Score Submission
 // ============================================
@@ -97,21 +121,14 @@ func (s *GradeService) SubmitScore(ctx context.Context, instructorID uuid.UUID, 
 		return nil, errors.ErrAttendanceFailed
 	}
 
-	// 5. Check grading period deadline + score lock using CanEditGrade rule engine
-	isLocked := false
-	existingScore, err := s.scoreRepo.GetScoreByRegistrationAndSlug(ctx, req.RegistrationID, req.Slug)
-	if err == nil && existingScore.IsLocked.Valid && existingScore.IsLocked.Bool {
-		isLocked = true
-	}
-
-	editResult, err := s.checkCanEditGrade(ctx, registration.Semester, &courseID, isLocked, false)
+	// 5. Grading period and hard deadline. The score's own lock is read
+	// under the course lock below, where no lock can land between the check
+	// and the write.
+	editResult, err := s.checkCanEditGrade(ctx, registration.Semester, &courseID, false, false)
 	if err != nil {
 		return nil, err
 	}
 	if !editResult.Allowed {
-		if isLocked {
-			return nil, errors.ErrScoreLocked
-		}
 		return nil, errors.ErrGradingPeriodEnded
 	}
 
@@ -146,7 +163,16 @@ func (s *GradeService) SubmitScore(ctx context.Context, instructorID uuid.UUID, 
 		return nil, err
 	}
 
-	score, err := s.scoreRepo.UpsertAssessmentScoreWithEvent(ctx, scoreParams, eventParams)
+	var score db.GradesStudentAssessmentScore
+	err = s.withCourseLock(ctx, registration.CourseID, func(tx pgx.Tx) error {
+		scores := s.scoreRepo.WithTx(tx)
+		existing, err := scores.GetScoreByRegistrationAndSlug(ctx, req.RegistrationID, req.Slug)
+		if err == nil && existing.IsLocked.Valid && existing.IsLocked.Bool {
+			return errors.ErrScoreLocked
+		}
+		score, err = scores.UpsertAssessmentScoreWithEvent(ctx, scoreParams, eventParams)
+		return err
+	})
 	if err != nil {
 		logger.Error("failed to upsert score with event", zap.Error(err))
 		return nil, err
@@ -223,85 +249,96 @@ func (s *GradeService) BulkSubmitScores(ctx context.Context, instructorID uuid.U
 		return nil, errors.ErrGradingPeriodEnded
 	}
 
-	// 4. Batch-fetch which (reg,slug) rows are already locked.
-	lockedList, err := s.scoreRepo.GetLockedRegistrationsBySlug(ctx, req.Slug, regIDs)
-	if err != nil {
-		logger.Error("failed to batch-fetch locked scores", zap.Error(err))
-		return nil, err
-	}
-	lockedSet := make(map[uuid.UUID]struct{}, len(lockedList))
-	for _, id := range lockedList {
-		lockedSet[id] = struct{}{}
-	}
+	// 4-6 run under the course lock: whether a row is locked is read in the
+	// transaction that writes the batch, so a lock cannot land in between
+	// and fail the whole batch with a generic error.
+	var successCount, skippedLocked int
+	err = s.withCourseLock(ctx, courseID, func(tx pgx.Tx) error {
+		scores := s.scoreRepo.WithTx(tx)
 
-	// 5. Per-entry validation. Skip invalid rows (preserves existing
-	//    best-effort semantics — one bad row does not fail the batch).
-	entries := make([]repository.BulkUpsertEntry, 0, len(req.Scores))
-	for _, e := range req.Scores {
-		reg, ok := regByID[e.RegistrationID]
-		if !ok {
-			logger.Warn("bulk: registration not found", zap.String("registration_id", e.RegistrationID.String()))
-			continue
+		// 4. Batch-fetch which (reg,slug) rows are already locked.
+		lockedList, err := scores.GetLockedRegistrationsBySlug(ctx, req.Slug, regIDs)
+		if err != nil {
+			logger.Error("failed to batch-fetch locked scores", zap.Error(err))
+			return err
 		}
-		if reg.CourseID != courseID {
-			logger.Warn("bulk: registration belongs to different course", zap.String("registration_id", e.RegistrationID.String()))
-			continue
-		}
-		if reg.InstructorID != instructorID {
-			logger.Warn("bulk: instructor mismatch", zap.String("registration_id", e.RegistrationID.String()))
-			continue
-		}
-		if utils.PgBoolToBool(reg.IsAttendanceFailed) {
-			logger.Warn("bulk: student attendance-failed, skipping", zap.String("registration_id", e.RegistrationID.String()))
-			continue
-		}
-		if _, locked := lockedSet[e.RegistrationID]; locked {
-			logger.Warn("bulk: score already locked, skipping", zap.String("registration_id", e.RegistrationID.String()))
-			continue
-		}
-		if e.Score != nil && (*e.Score < 0 || *e.Score > 100) {
-			logger.Warn("bulk: invalid score range", zap.String("registration_id", e.RegistrationID.String()))
-			continue
+		lockedSet := make(map[uuid.UUID]struct{}, len(lockedList))
+		for _, id := range lockedList {
+			lockedSet[id] = struct{}{}
 		}
 
-		var scoreValue pgtype.Numeric
-		if e.Score != nil {
-			var err error
-			scoreValue, err = scoreToNumeric(*e.Score)
-			if err != nil {
-				logger.Error("bulk: failed to scan score", zap.Error(err), zap.String("registration_id", e.RegistrationID.String()))
+		// 5. Per-entry validation. Skip invalid rows (preserves existing
+		//    best-effort semantics — one bad row does not fail the batch).
+		entries := make([]repository.BulkUpsertEntry, 0, len(req.Scores))
+		for _, e := range req.Scores {
+			reg, ok := regByID[e.RegistrationID]
+			if !ok {
+				logger.Warn("bulk: registration not found", zap.String("registration_id", e.RegistrationID.String()))
 				continue
 			}
+			if reg.CourseID != courseID {
+				logger.Warn("bulk: registration belongs to different course", zap.String("registration_id", e.RegistrationID.String()))
+				continue
+			}
+			if reg.InstructorID != instructorID {
+				logger.Warn("bulk: instructor mismatch", zap.String("registration_id", e.RegistrationID.String()))
+				continue
+			}
+			if utils.PgBoolToBool(reg.IsAttendanceFailed) {
+				logger.Warn("bulk: student attendance-failed, skipping", zap.String("registration_id", e.RegistrationID.String()))
+				continue
+			}
+			if _, locked := lockedSet[e.RegistrationID]; locked {
+				logger.Warn("bulk: score already locked, skipping", zap.String("registration_id", e.RegistrationID.String()))
+				skippedLocked++
+				continue
+			}
+			if e.Score != nil && (*e.Score < 0 || *e.Score > 100) {
+				logger.Warn("bulk: invalid score range", zap.String("registration_id", e.RegistrationID.String()))
+				continue
+			}
+
+			var scoreValue pgtype.Numeric
+			if e.Score != nil {
+				var err error
+				scoreValue, err = scoreToNumeric(*e.Score)
+				if err != nil {
+					logger.Error("bulk: failed to scan score", zap.Error(err), zap.String("registration_id", e.RegistrationID.String()))
+					continue
+				}
+			}
+
+			eventParams, err := buildGradeSubmittedEventParams(ctx, reg.StudentID, reg.CourseCode, req.Slug, e.Score)
+			if err != nil {
+				logger.Error("bulk: failed to build grade.submitted event", zap.Error(err), zap.String("registration_id", e.RegistrationID.String()))
+				continue
+			}
+
+			entries = append(entries, repository.BulkUpsertEntry{
+				ScoreParams: db.UpsertAssessmentScoreParams{
+					RegistrationID: e.RegistrationID,
+					Slug:           req.Slug,
+					Score:          scoreValue,
+					IsAbsent:       utils.BoolToPgBool(e.IsAbsent),
+					GradedBy:       instructorID,
+				},
+				EventParams: eventParams,
+			})
 		}
 
-		eventParams, err := buildGradeSubmittedEventParams(ctx, reg.StudentID, reg.CourseCode, req.Slug, e.Score)
-		if err != nil {
-			logger.Error("bulk: failed to build grade.submitted event", zap.Error(err), zap.String("registration_id", e.RegistrationID.String()))
-			continue
-		}
-
-		entries = append(entries, repository.BulkUpsertEntry{
-			ScoreParams: db.UpsertAssessmentScoreParams{
-				RegistrationID: e.RegistrationID,
-				Slug:           req.Slug,
-				Score:          scoreValue,
-				IsAbsent:       utils.BoolToPgBool(e.IsAbsent),
-				GradedBy:       instructorID,
-			},
-			EventParams: eventParams,
-		})
-	}
-
-	// 6. Single-tx batch upsert: every valid (score, event) pair lands together.
-	successCount, err := s.scoreRepo.BulkUpsertAssessmentScoresWithEvents(ctx, entries)
+		// 6. Single-tx batch upsert: every valid (score, event) pair lands together.
+		successCount, err = scores.BulkUpsertAssessmentScoresWithEvents(ctx, entries)
+		return err
+	})
 	if err != nil {
 		logger.Error("bulk upsert failed", zap.Error(err))
 		return nil, err
 	}
 
 	return &dto.BulkSubmitScoresResponse{
-		Slug:         req.Slug,
-		SuccessCount: successCount,
+		Slug:          req.Slug,
+		SuccessCount:  successCount,
+		SkippedLocked: skippedLocked,
 	}, nil
 }
 
@@ -317,8 +354,32 @@ func (s *GradeService) AutoFinalize(ctx context.Context, courseID uuid.UUID, ins
 		return nil, errors.ErrCourseNotFound
 	}
 
+	// The whole finalize is one transaction under the course lock, reads
+	// included: a score unlocked or changed after it was read would
+	// otherwise be finalized with its old value, then deleted. Repos are
+	// re-bound to the tx (WithTx) — without that every write below would
+	// autocommit on the pool and a mid-loop failure would leave a
+	// half-finalized course.
+	tx, err := s.pool.Begin(ctx)
+	if err != nil {
+		logger.Error("failed to begin transaction", zap.Error(err))
+		return nil, err
+	}
+	// Rollback after successful commit is a no-op returning ErrTxClosed — safe to discard.
+	defer func() { _ = tx.Rollback(ctx) }()
+
+	completedQtx := s.completedRepo.WithTx(tx)
+	outboxQtx := s.outboxRepo.WithTx(tx)
+	registrationQtx := s.registrationRepo.WithTx(tx)
+	scoreQtx := s.scoreRepo.WithTx(tx)
+
+	if err := scoreQtx.LockCourseGrading(ctx, courseID); err != nil {
+		logger.Error("failed to take course grading lock", zap.Error(err))
+		return nil, err
+	}
+
 	// 2. Get all registrations
-	registrations, err := s.registrationRepo.GetRegistrationsByCourse(ctx, courseID)
+	registrations, err := registrationQtx.GetRegistrationsByCourse(ctx, courseID)
 	if err != nil {
 		logger.Error("failed to get registrations", zap.Error(err))
 		return nil, err
@@ -354,7 +415,7 @@ func (s *GradeService) AutoFinalize(ctx context.Context, courseID uuid.UUID, ins
 		// Skipping the student would not leave them out of the finalize:
 		// step 10 deletes every registration and score of the course, so
 		// their grade would vanish without a completed record.
-		scores, err := s.scoreRepo.GetScoresByRegistration(ctx, reg.ID)
+		scores, err := scoreQtx.GetScoresByRegistration(ctx, reg.ID)
 		if err != nil {
 			logger.Error("failed to get scores", zap.Error(err))
 			return nil, fmt.Errorf("get scores for registration %s: %w", reg.ID, err)
@@ -429,22 +490,7 @@ func (s *GradeService) AutoFinalize(ctx context.Context, courseID uuid.UUID, ins
 	// 8. Combine all students
 	allStudents := append(regularStudents, attendanceFailedStudents...)
 
-	// 9. Start transaction to save completed courses. Repos are re-bound to
-	// the tx (WithTx) — without that every write below would autocommit on
-	// the pool and a mid-loop failure would leave a half-finalized course.
-	tx, err := s.pool.Begin(ctx)
-	if err != nil {
-		logger.Error("failed to begin transaction", zap.Error(err))
-		return nil, err
-	}
-	// Rollback after successful commit is a no-op returning ErrTxClosed — safe to discard.
-	defer func() { _ = tx.Rollback(ctx) }()
-
-	completedQtx := s.completedRepo.WithTx(tx)
-	outboxQtx := s.outboxRepo.WithTx(tx)
-	registrationQtx := s.registrationRepo.WithTx(tx)
-	scoreQtx := s.scoreRepo.WithTx(tx)
-
+	// 9. Save the completed courses in the transaction opened above.
 	passingCount := 0
 	failingCount := 0
 
@@ -778,7 +824,9 @@ const CtxKeyUserID auditCtxKey = "user_id"
 // checkAllScoresLocked reports whether every eligible student has a locked
 // score for every assessment in the course. Attendance-failed students are
 // excluded from the denominator — AutoFinalize assigns them FF automatically.
-func (s *GradeService) checkAllScoresLocked(ctx context.Context, courseID uuid.UUID) (bool, error) {
+// It counts through the given stores so a caller inside a transaction sees
+// the locks it has just set.
+func (s *GradeService) checkAllScoresLocked(ctx context.Context, regs registrationStore, scores scoreStore, courseID uuid.UUID) (bool, error) {
 	course, err := s.cacheRepo.GetCourseCacheByID(ctx, courseID)
 	if err != nil {
 		return false, err
@@ -789,7 +837,7 @@ func (s *GradeService) checkAllScoresLocked(ctx context.Context, courseID uuid.U
 		return false, err
 	}
 
-	eligibleStudents, err := s.registrationRepo.CountEligibleRegistrationsByCourse(ctx, courseID)
+	eligibleStudents, err := regs.CountEligibleRegistrationsByCourse(ctx, courseID)
 	if err != nil {
 		return false, err
 	}
@@ -799,7 +847,7 @@ func (s *GradeService) checkAllScoresLocked(ctx context.Context, courseID uuid.U
 	}
 
 	for _, item := range schema {
-		lockedCount, err := s.scoreRepo.CountLockedScoresBySlugAndCourse(ctx, courseID, item.Slug)
+		lockedCount, err := scores.CountLockedScoresBySlugAndCourse(ctx, courseID, item.Slug)
 		if err != nil {
 			return false, err
 		}
@@ -1122,7 +1170,13 @@ func (s *GradeService) UnlockScore(ctx context.Context, registrationID uuid.UUID
 		return err
 	}
 
-	if err := s.scoreRepo.UnlockScore(ctx, registrationID, slug); err != nil {
+	reg, err := s.registrationRepo.GetRegistrationByID(ctx, registrationID)
+	if err != nil {
+		return errors.ErrRegistrationNotFound
+	}
+	if err := s.withCourseLock(ctx, reg.CourseID, func(tx pgx.Tx) error {
+		return s.scoreRepo.WithTx(tx).UnlockScore(ctx, registrationID, slug)
+	}); err != nil {
 		logger.Error("failed to unlock score", zap.Error(err))
 		return err
 	}
@@ -1145,7 +1199,32 @@ func (s *GradeService) LockScore(ctx context.Context, registrationID uuid.UUID, 
 		return err
 	}
 
-	if err := s.scoreRepo.LockScore(ctx, registrationID, slug); err != nil {
+	reg, err := s.registrationRepo.GetRegistrationByID(ctx, registrationID)
+	if err != nil {
+		return errors.ErrRegistrationNotFound
+	}
+
+	// The lock and the finalize request commit together, under the course
+	// lock. A failed finalize check keeps the lock, as it did before: the
+	// score is final either way and the next lock re-checks the course.
+	err = s.withCourseLock(ctx, reg.CourseID, func(tx pgx.Tx) error {
+		scores := s.scoreRepo.WithTx(tx)
+		if err := scores.LockScore(ctx, registrationID, slug); err != nil {
+			return err
+		}
+		allLocked, err := s.checkAllScoresLocked(ctx, s.registrationRepo.WithTx(tx), scores, reg.CourseID)
+		if err != nil {
+			logger.Error("failed to check locked scores after admin lock", zap.Error(err))
+			return nil
+		}
+		if allLocked {
+			if err := s.emitFinalizeRequested(ctx, s.outboxRepo.WithTx(tx), reg.CourseID, reg.InstructorID, finalizeTriggerAdmin); err != nil {
+				logger.Error("failed to emit finalize.requested event after admin lock", zap.Error(err))
+			}
+		}
+		return nil
+	})
+	if err != nil {
 		logger.Error("failed to lock score", zap.Error(err))
 		return err
 	}
@@ -1154,25 +1233,6 @@ func (s *GradeService) LockScore(ctx context.Context, registrationID uuid.UUID, 
 		zap.String("registration_id", registrationID.String()),
 		zap.String("slug", slug),
 	)
-
-	reg, err := s.registrationRepo.GetRegistrationByID(ctx, registrationID)
-	if err != nil {
-		logger.Error("failed to get registration for post-lock finalize check", zap.Error(err))
-		return nil
-	}
-
-	allLocked, err := s.checkAllScoresLocked(ctx, reg.CourseID)
-	if err != nil {
-		logger.Error("failed to check locked scores after admin lock", zap.Error(err))
-		return nil
-	}
-
-	if allLocked {
-		if err := s.emitFinalizeRequested(ctx, reg.CourseID, reg.InstructorID, finalizeTriggerAdmin); err != nil {
-			logger.Error("failed to emit finalize.requested event after admin lock", zap.Error(err))
-		}
-	}
-
 	return nil
 }
 
@@ -1210,69 +1270,79 @@ func (s *GradeService) LockAssessmentBySlug(ctx context.Context, instructorID, c
 		return nil, errors.ErrGradingPeriodEnded
 	}
 
-	eligibleStudents, err := s.registrationRepo.CountEligibleRegistrationsByCourse(ctx, courseID)
-	if err != nil {
-		logger.Error("failed to count eligible registrations", zap.Error(err))
-		return nil, err
-	}
-	scoredCount, err := s.scoreRepo.CountScoresBySlugAndCourse(ctx, db.CountScoresBySlugAndCourseParams{
-		CourseID: courseID,
-		Slug:     slug,
+	// Counting the scores, locking them and asking for the finalize happen
+	// under the course lock: a save still running finishes first, so the
+	// count sees its scores and the lock covers them.
+	var response *dto.LockAssessmentResponse
+	err = s.withCourseLock(ctx, courseID, func(tx pgx.Tx) error {
+		regs, scores := s.registrationRepo.WithTx(tx), s.scoreRepo.WithTx(tx)
+		eligibleStudents, err := regs.CountEligibleRegistrationsByCourse(ctx, courseID)
+		if err != nil {
+			logger.Error("failed to count eligible registrations", zap.Error(err))
+			return err
+		}
+		scoredCount, err := scores.CountScoresBySlugAndCourse(ctx, db.CountScoresBySlugAndCourseParams{
+			CourseID: courseID,
+			Slug:     slug,
+		})
+		if err != nil {
+			logger.Error("failed to count scores", zap.Error(err))
+			return err
+		}
+		if scoredCount < eligibleStudents {
+			logger.Info("cannot lock incomplete assessment",
+				zap.String("slug", slug),
+				zap.Int64("scored", scoredCount),
+				zap.Int64("eligible", eligibleStudents),
+			)
+			return errors.ErrIncompleteAssessment
+		}
+
+		if err := scores.LockScoresByCourseAndSlug(ctx, courseID, slug); err != nil {
+			logger.Error("failed to lock assessment scores", zap.Error(err))
+			return err
+		}
+		response = &dto.LockAssessmentResponse{
+			CourseID:    courseID,
+			Slug:        slug,
+			LockedCount: int(scoredCount),
+		}
+
+		allLocked, err := s.checkAllScoresLocked(ctx, regs, scores, courseID)
+		if err != nil {
+			logger.Error("failed to check all-scores-locked after assessment lock", zap.Error(err))
+			return nil
+		}
+		if allLocked {
+			if err := s.emitFinalizeRequested(ctx, s.outboxRepo.WithTx(tx), courseID, instructorID, finalizeTriggerInstructor); err != nil {
+				logger.Error("failed to emit finalize.requested event — course will not auto-finalize", zap.Error(err))
+				return nil
+			}
+			response.FinalizeTriggered = true
+		}
+		return nil
 	})
 	if err != nil {
-		logger.Error("failed to count scores", zap.Error(err))
 		return nil, err
-	}
-	if scoredCount < eligibleStudents {
-		logger.Info("cannot lock incomplete assessment",
-			zap.String("slug", slug),
-			zap.Int64("scored", scoredCount),
-			zap.Int64("eligible", eligibleStudents),
-		)
-		return nil, errors.ErrIncompleteAssessment
 	}
 
-	if err := s.scoreRepo.LockScoresByCourseAndSlug(ctx, courseID, slug); err != nil {
-		logger.Error("failed to lock assessment scores", zap.Error(err))
-		return nil, err
-	}
 	logger.Info("assessment locked by instructor",
 		zap.String("course_id", courseID.String()),
 		zap.String("slug", slug),
-		zap.Int64("locked_count", scoredCount),
+		zap.Int("locked_count", response.LockedCount),
 	)
-
-	response := &dto.LockAssessmentResponse{
-		CourseID:    courseID,
-		Slug:        slug,
-		LockedCount: int(scoredCount),
-	}
-
-	allLocked, err := s.checkAllScoresLocked(ctx, courseID)
-	if err != nil {
-		logger.Error("failed to check all-scores-locked after assessment lock", zap.Error(err))
-		return response, nil
-	}
-	if allLocked {
-		if err := s.emitFinalizeRequested(ctx, courseID, instructorID, finalizeTriggerInstructor); err != nil {
-			logger.Error("failed to emit finalize.requested event — course will not auto-finalize", zap.Error(err))
-			return response, nil
-		}
-		response.FinalizeTriggered = true
-	}
-
 	return response, nil
 }
 
 // emitFinalizeRequested writes a grade.finalize.requested outbox event. The
 // outbox worker publishes it to RabbitMQ and the finalize consumer runs the
 // actual AutoFinalize computation off the request path.
-func (s *GradeService) emitFinalizeRequested(ctx context.Context, courseID, instructorID uuid.UUID, triggeredBy string) error {
+func (s *GradeService) emitFinalizeRequested(ctx context.Context, outbox outboxStore, courseID, instructorID uuid.UUID, triggeredBy string) error {
 	eventParams, err := buildFinalizeRequestedEventParams(ctx, courseID, instructorID, triggeredBy)
 	if err != nil {
 		return err
 	}
-	if _, err := s.outboxRepo.CreateOutboxEvent(ctx, *eventParams); err != nil {
+	if _, err := outbox.CreateOutboxEvent(ctx, *eventParams); err != nil {
 		return err
 	}
 	logger.Info("finalize.requested event emitted",

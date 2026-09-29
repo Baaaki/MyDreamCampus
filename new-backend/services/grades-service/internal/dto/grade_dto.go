@@ -40,8 +40,11 @@ type SubmitScoreResponse struct {
 }
 
 type BulkSubmitScoresResponse struct {
-	Slug           string          `json:"slug"`
-	SuccessCount   int             `json:"success_count"`
+	Slug         string `json:"slug"`
+	SuccessCount int    `json:"success_count"`
+	// SkippedLocked counts entries not saved because their score was locked,
+	// typically by a lock that ran while the teacher was still editing.
+	SkippedLocked  int             `json:"skipped_locked,omitempty"`
 	AutoFinalized  bool            `json:"auto_finalized,omitempty"`
 	FinalizeResult *FinalizeResult `json:"finalize_result,omitempty"`
 }

@@ -48,6 +48,7 @@ type scoreStore interface {
 	UnlockScore(ctx context.Context, registrationID uuid.UUID, slug string) error
 	LockScoresByCourseAndSlug(ctx context.Context, courseID uuid.UUID, slug string) error
 	DeleteScoresByCourse(ctx context.Context, courseID uuid.UUID) error
+	LockCourseGrading(ctx context.Context, courseID uuid.UUID) error
 	WithTx(tx pgx.Tx) scoreStore
 }
 

@@ -43,6 +43,13 @@ type gradesWorld struct {
 	failScoresFor       uuid.UUID
 	failCreateCompleted bool
 	txs                 []*fakeTx
+	courseLocks         []courseLock
+}
+
+// courseLock is one LockCourseGrading call and the transaction it ran in.
+type courseLock struct {
+	course uuid.UUID
+	tx     *fakeTx
 }
 
 type fakeTx struct {
@@ -298,6 +305,11 @@ func (v scoreView) LockScoresByCourseAndSlug(_ context.Context, courseID uuid.UU
 	v.setLocked(func(s db.GradesStudentAssessmentScore) bool {
 		return s.Slug == slug && v.courseOf(s.RegistrationID) == courseID
 	}, true)
+	return nil
+}
+
+func (v scoreView) LockCourseGrading(_ context.Context, courseID uuid.UUID) error {
+	v.w.courseLocks = append(v.w.courseLocks, courseLock{course: courseID, tx: v.tx})
 	return nil
 }
 
@@ -777,7 +789,9 @@ func TestAutoFinalize_NoRegistrationsOrCourse_Fails(t *testing.T) {
 
 	_, err = w.service(openSemester()).AutoFinalize(context.Background(), uuid.New(), instructorID)
 	assert.ErrorIs(t, err, gradeErrors.ErrCourseNotFound)
-	assert.Empty(t, w.txs)
+	for _, tx := range w.txs {
+		assert.False(t, tx.committed, "nothing is committed for a course that cannot be finalized")
+	}
 }
 
 // ------------------------------------------------------ Locking and finalize
@@ -964,4 +978,53 @@ func TestGetTranscript_StudentReadsOnlyOwn(t *testing.T) {
 	w.students[reg.StudentID] = db.GradesStudentsView{ID: reg.StudentID, IsActive: pgtype.Bool{Bool: false, Valid: true}}
 	_, err = svc.GetTranscript(context.Background(), reg.StudentID, "student", reg.StudentID)
 	assert.ErrorIs(t, err, gradeErrors.ErrStudentDeactivated)
+}
+
+// ------------------------------------------------------------ course lock
+
+// Every write that grades, locks or finalizes a course must take the
+// course's lock inside the transaction it writes in; a lock taken outside
+// it, or in a transaction that is never committed, serializes nothing. The
+// waiting itself is shown against Postgres in the integration tests.
+func TestGradingWrites_EachTakesTheCourseLockInItsTransaction(t *testing.T) {
+	ctx := context.Background()
+	for name, run := range map[string]func(w *gradesWorld, svc *GradeService, courseID uuid.UUID, reg db.GetRegistrationByIDRow) error{
+		"submit": func(_ *gradesWorld, svc *GradeService, courseID uuid.UUID, reg db.GetRegistrationByIDRow) error {
+			_, err := svc.SubmitScore(ctx, instructorID, courseID, dto.SubmitScoreRequest{RegistrationID: reg.ID, Slug: "vize", Score: ptr(60)})
+			return err
+		},
+		"bulk submit": func(_ *gradesWorld, svc *GradeService, courseID uuid.UUID, reg db.GetRegistrationByIDRow) error {
+			_, err := svc.BulkSubmitScores(ctx, instructorID, courseID, dto.BulkSubmitScoresRequest{
+				Slug: "vize", Scores: []dto.BulkScoreEntry{{RegistrationID: reg.ID, Score: ptr(60)}},
+			})
+			return err
+		},
+		"lock assessment": func(_ *gradesWorld, svc *GradeService, courseID uuid.UUID, _ db.GetRegistrationByIDRow) error {
+			_, err := svc.LockAssessmentBySlug(ctx, instructorID, courseID, "vize")
+			return err
+		},
+		"admin lock": func(_ *gradesWorld, svc *GradeService, _ uuid.UUID, reg db.GetRegistrationByIDRow) error {
+			return svc.LockScore(ctx, reg.ID, "vize")
+		},
+		"admin unlock": func(_ *gradesWorld, svc *GradeService, _ uuid.UUID, reg db.GetRegistrationByIDRow) error {
+			return svc.UnlockScore(ctx, reg.ID, "vize")
+		},
+		"finalize": func(_ *gradesWorld, svc *GradeService, courseID uuid.UUID, _ db.GetRegistrationByIDRow) error {
+			_, err := svc.AutoFinalize(ctx, courseID, instructorID)
+			return err
+		},
+	} {
+		t.Run(name, func(t *testing.T) {
+			w, courseID := newGradesWorld(t)
+			reg := w.enroll(courseID, "2024001", 70, 80, false)
+
+			require.NoError(t, run(w, w.service(openSemester()), courseID, reg))
+
+			require.Len(t, w.courseLocks, 1)
+			lock := w.courseLocks[0]
+			assert.Equal(t, courseID, lock.course)
+			require.NotNil(t, lock.tx, "the lock was taken outside a transaction")
+			assert.True(t, lock.tx.committed, "the transaction holding the lock was never committed")
+		})
+	}
 }
