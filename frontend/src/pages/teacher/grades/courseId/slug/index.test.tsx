@@ -199,6 +199,21 @@ describe("GradeEntryPage", () => {
     expect(saveButton()).toHaveTextContent(/^Kaydet$/)
   })
 
+  it("keeps the decimals of a score", async () => {
+    const saved = stubBackend()
+    const user = userEvent.setup()
+    renderPage()
+
+    await screen.findByText("Ayşe Kaya")
+    await user.type(row("Ayşe Kaya").getByRole("spinbutton"), "85.5")
+    await user.click(saveButton())
+
+    await screen.findByText("1 öğrencinin notu başarıyla kaydedildi.")
+    expect(saved[0].scores).toEqual([
+      { registration_id: "reg-2", score: 85.5, is_absent: false },
+    ])
+  })
+
   it("records an absence without a score", async () => {
     const saved = stubBackend()
     const user = userEvent.setup()

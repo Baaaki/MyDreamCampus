@@ -202,7 +202,7 @@ export default function GradeEntryPage() {
           score:
             local.isAbsent || local.score === ""
               ? null
-              : parseInt(local.score, 10),
+              : parseFloat(local.score),
           is_absent: local.isAbsent,
         }
       })
