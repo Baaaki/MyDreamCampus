@@ -278,6 +278,7 @@ jobs:
             -H 'Content-Type: application/json' \
             -d '{"email":"ahmet.yilmaz@uni.edu.tr","password":"ahmet.yilmaz@uni.edu.tr"}')
           expect 200 "$code" "seeded teacher login (staff event -> auth projection)"
+          TEACHER_TOKEN=$(jq -r '.access_token' /tmp/body)
 
           # Course selection: enrollment resolves the student through student
           # AND the offering list through catalog, both over internal REST.
@@ -305,6 +306,16 @@ jobs:
           expect 200 "$code" "demo student's program (enrollment)"
           [ "$(jq -r '.programs[0].status' /tmp/body)" = approved ] \
             || { echo "::error::the demo student has no approved program this semester"; exit 1; }
+
+          code=$(api http://localhost/api/grades/my/transcript -H "Authorization: Bearer $STUDENT_TOKEN")
+          expect 200 "$code" "student's own transcript (grades)"
+
+          # A teacher's transcript read asks student who the advisor is. An
+          # id student does not know comes back as its 404, so this proves
+          # the grades -> student seam, not just the route.
+          code=$(api "http://localhost/api/grades/students/$(cat /proc/sys/kernel/random/uuid)/transcript" \
+            -H "Authorization: Bearer $TEACHER_TOKEN")
+          expect 404 "$code" "teacher transcript route checks the advisor (grades -> student)"
 
           # Time machine: catalog stores the offset in Redis and every other
           # service picks it up, from the pub/sub message or at the latest on
