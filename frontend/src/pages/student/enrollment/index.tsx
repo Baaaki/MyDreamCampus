@@ -1,5 +1,6 @@
 import { useState, useEffect, useCallback } from "react"
 import { enrollmentApi } from "@/lib/api-client"
+import { apiErrorMessage } from "@/lib/api-error"
 import type {
   AvailableCourse,
   MyEnrollmentsResponse,
@@ -97,7 +98,7 @@ export default function StudentEnrollmentPage() {
     } catch (err: unknown) {
       setAvailableCourses([])
       setToast({
-        message: err instanceof Error ? err.message : "Dersler yüklenemedi",
+        message: apiErrorMessage(err, "Dersler yüklenemedi"),
         type: "error",
         isVisible: true,
       })
@@ -321,7 +322,7 @@ export default function StudentEnrollmentPage() {
       })
     } catch (err: unknown) {
       setToast({
-        message: err instanceof Error ? err.message : "Kayıt işlemi başarısız",
+        message: apiErrorMessage(err, "Kayıt işlemi başarısız"),
         type: "error",
         isVisible: true,
       })

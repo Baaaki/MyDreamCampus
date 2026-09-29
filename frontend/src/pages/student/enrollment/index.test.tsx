@@ -213,6 +213,52 @@ describe("StudentEnrollmentPage", () => {
     expect(sent.submitted).toEqual([])
   })
 
+  it("keeps the selection and explains a refused submission", async () => {
+    stubBackend({
+      submit: () =>
+        json(
+          {
+            error: "CENG101 dersinin kontenjanı dolu",
+            code: "COURSE_CAPACITY_FULL",
+          },
+          409
+        ),
+    })
+    const user = userEvent.setup()
+    renderPage()
+
+    await user.click(await screen.findByText("CENG101"))
+    await user.click(submitButton(1))
+
+    expect(
+      await screen.findByText("CENG101 dersinin kontenjanı dolu")
+    ).toBeInTheDocument()
+    expect(submitButton(1)).toBeEnabled()
+    expect(
+      screen.queryByText(
+        "Ders kaydınız danışman hoca tarafından onaylanmayı bekliyor"
+      )
+    ).not.toBeInTheDocument()
+  })
+
+  it("explains why the course list could not be loaded", async () => {
+    stubBackend({
+      courses: json(
+        {
+          error: "Ders kayıt dönemi şu anda kapalı",
+          code: "ENROLLMENT_PERIOD_CLOSED",
+        },
+        403
+      ),
+    })
+    renderPage()
+
+    expect(
+      await screen.findByText("Ders kayıt dönemi şu anda kapalı")
+    ).toBeInTheDocument()
+    expect(screen.getByText("0 ders • 0 seçili")).toBeInTheDocument()
+  })
+
   it("lets a student withdraw a pending program and start over", async () => {
     const sent = stubBackend({ programs: [program("pending", [CENG101])] })
     const user = userEvent.setup()
