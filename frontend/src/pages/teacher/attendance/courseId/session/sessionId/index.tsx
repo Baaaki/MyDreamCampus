@@ -3,6 +3,7 @@ import { useParams, useNavigate } from "react-router"
 import { Link } from "react-router"
 import { QRCodeSVG } from "qrcode.react"
 import {
+  AlertCircle,
   ArrowLeft,
   QrCode,
   UserPlus,
@@ -60,11 +61,13 @@ export default function AttendanceSessionPage() {
 
   // Manual attendance states
   const [addingStudent, setAddingStudent] = useState<string | null>(null)
+  const [markError, setMarkError] = useState("")
   const [searchQuery, setSearchQuery] = useState("")
 
   // Close session states
   const [closeDialogOpen, setCloseDialogOpen] = useState(false)
   const [closing, setClosing] = useState(false)
+  const [closeError, setCloseError] = useState("")
 
   // Time remaining
   const [timeRemaining, setTimeRemaining] = useState<string>("")
@@ -179,6 +182,7 @@ export default function AttendanceSessionPage() {
   // Add manual attendance
   const handleAddManualAttendance = async (student: EnrolledStudentItem) => {
     setAddingStudent(student.student_id)
+    setMarkError("")
     try {
       const response = await attendanceApi
         .post(`sessions/${sessionId}/manual`, {
@@ -212,20 +216,35 @@ export default function AttendanceSessionPage() {
       )
     } catch (err) {
       console.error("Failed to add attendance:", err)
+      setMarkError(
+        `${student.first_name} ${student.last_name}: ${apiErrorMessage(
+          err,
+          "Yoklamaya eklenemedi. Lütfen tekrar deneyin."
+        )}`
+      )
     } finally {
       setAddingStudent(null)
     }
   }
 
+  const openCloseDialog = (open: boolean) => {
+    setCloseError("")
+    setCloseDialogOpen(open)
+  }
+
   // Close session
   const handleCloseSession = async () => {
     setClosing(true)
+    setCloseError("")
     try {
       await attendanceApi.post(`sessions/${sessionId}/close`).json()
       setCloseDialogOpen(false)
       navigate(`/teacher/attendance/${courseId}`)
     } catch (err) {
       console.error("Failed to close session:", err)
+      setCloseError(
+        apiErrorMessage(err, "Yoklama bitirilemedi. Lütfen tekrar deneyin.")
+      )
     } finally {
       setClosing(false)
     }
@@ -268,7 +287,7 @@ export default function AttendanceSessionPage() {
           <ArrowLeft className="h-4 w-4" />
           Ders Sayfasına Dön
         </Link>
-        <Button variant="destructive" onClick={() => setCloseDialogOpen(true)}>
+        <Button variant="destructive" onClick={() => openCloseDialog(true)}>
           <StopCircle className="mr-2 h-4 w-4" />
           Yoklamayı Bitir
         </Button>
@@ -318,6 +337,16 @@ export default function AttendanceSessionPage() {
           </div>
         </div>
       </div>
+
+      {markError && (
+        <div
+          role="alert"
+          className="flex items-center gap-2 rounded-lg border border-destructive/30 bg-destructive/10 px-4 py-3 text-sm text-destructive"
+        >
+          <AlertCircle className="h-4 w-4 shrink-0" />
+          {markError}
+        </div>
+      )}
 
       {/* Content Area */}
       <div className="grid gap-6 lg:grid-cols-2">
@@ -470,7 +499,7 @@ export default function AttendanceSessionPage() {
       </div>
 
       {/* Close Session Dialog */}
-      <Dialog open={closeDialogOpen} onOpenChange={setCloseDialogOpen}>
+      <Dialog open={closeDialogOpen} onOpenChange={openCloseDialog}>
         <DialogContent>
           <DialogHeader>
             <DialogTitle>Yoklamayı Bitir</DialogTitle>
@@ -499,9 +528,18 @@ export default function AttendanceSessionPage() {
                 </span>
               </div>
             </div>
+            {closeError && (
+              <div
+                role="alert"
+                className="mt-4 flex items-center gap-2 rounded-lg border border-destructive/30 bg-destructive/10 px-4 py-3 text-sm text-destructive"
+              >
+                <AlertCircle className="h-4 w-4 shrink-0" />
+                {closeError}
+              </div>
+            )}
           </div>
           <DialogFooter>
-            <Button variant="outline" onClick={() => setCloseDialogOpen(false)}>
+            <Button variant="outline" onClick={() => openCloseDialog(false)}>
               İptal
             </Button>
             <Button

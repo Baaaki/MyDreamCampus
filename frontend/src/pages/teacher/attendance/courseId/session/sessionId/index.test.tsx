@@ -214,19 +214,30 @@ describe("AttendanceSessionPage", () => {
     ).not.toBeInTheDocument()
   })
 
-  it("leaves the student unmarked when the manual mark fails", async () => {
+  it("says why a manual mark failed and lets the teacher retry", async () => {
+    let attempts = 0
     const sent = stubBackend({
       manual: () =>
-        json({ error: "Oturum kapalı", code: "SESSION_CLOSED" }, 409),
+        ++attempts === 1
+          ? json({ error: "Oturum kapalı", code: "SESSION_CLOSED" }, 409)
+          : MANUAL_OK(),
     })
     const user = userEvent.setup()
     renderPage()
 
     await user.click(await screen.findByRole("button", { name: /Ekle/ }))
 
-    await waitFor(() => expect(sent.manual).toHaveLength(1))
-    expect(await screen.findByRole("button", { name: /Ekle/ })).toBeEnabled()
+    expect(await screen.findByRole("alert")).toHaveTextContent(
+      "Ayşe Kaya: Oturum kapalı"
+    )
+    expect(screen.getByRole("button", { name: /Ekle/ })).toBeEnabled()
     expect(screen.getAllByText("Katıldı")).toHaveLength(1)
+
+    await user.click(screen.getByRole("button", { name: /Ekle/ }))
+
+    await waitFor(() => expect(screen.getAllByText("Katıldı")).toHaveLength(2))
+    expect(screen.queryByRole("alert")).not.toBeInTheDocument()
+    expect(sent.manual).toHaveLength(2)
   })
 
   it("fetches a fresh QR code on demand", async () => {
@@ -275,13 +286,9 @@ describe("AttendanceSessionPage", () => {
     expect(sent.closed).toBe(1)
   })
 
-  it("stays on the session when closing it fails", async () => {
+  it("says why closing failed and stays on the session", async () => {
     const sent = stubBackend({
-      close: () =>
-        json(
-          { error: "Beklenmeyen bir hata oluştu", code: "INTERNAL_ERROR" },
-          500
-        ),
+      close: () => new Response(null, { status: 500 }),
     })
     const user = userEvent.setup()
     renderPage()
@@ -289,16 +296,23 @@ describe("AttendanceSessionPage", () => {
     await user.click(
       await screen.findByRole("button", { name: /Yoklamayı Bitir/ })
     )
-    const confirm = within(await screen.findByRole("dialog")).getByRole(
-      "button",
-      { name: /Yoklamayı Bitir/ }
+    const dialog = await screen.findByRole("dialog")
+    await user.click(
+      within(dialog).getByRole("button", { name: /Yoklamayı Bitir/ })
     )
-    await user.click(confirm)
 
-    await waitFor(() => expect(confirm).toBeEnabled())
+    expect(await within(dialog).findByRole("alert")).toHaveTextContent(
+      "Yoklama bitirilemedi. Lütfen tekrar deneyin."
+    )
     expect(sent.closed).toBe(1)
-    expect(screen.getByRole("dialog")).toBeInTheDocument()
     expect(screen.queryByText("course-attendance-page")).not.toBeInTheDocument()
+
+    await user.click(within(dialog).getByRole("button", { name: "İptal" }))
+    await user.click(screen.getByRole("button", { name: /Yoklamayı Bitir/ }))
+    expect(
+      within(await screen.findByRole("dialog")).queryByRole("alert"),
+      "a reopened dialog starts clean"
+    ).not.toBeInTheDocument()
   })
 
   it("shows that the session's time is up", async () => {
