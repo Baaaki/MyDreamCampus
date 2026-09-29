@@ -69,6 +69,22 @@ func isEmailConflict(err error) bool {
 	return errors.As(err, &pgErr) && pgErr.Code == "23505"
 }
 
+// createUserUnderSavepoint inserts the user under a savepoint. A unique
+// violation on the email aborts the transaction it happens in, and the
+// handler still needs that transaction to mark the event processed; rolling
+// back to the savepoint leaves it usable.
+func createUserUnderSavepoint(ctx context.Context, tx pgx.Tx, params db.CreateUserParams) error {
+	sp, err := tx.Begin(ctx)
+	if err != nil {
+		return err
+	}
+	if _, err := db.New(sp).CreateUser(ctx, params); err != nil {
+		_ = sp.Rollback(ctx)
+		return err
+	}
+	return sp.Commit(ctx)
+}
+
 func NewEventService(
 	authRepo *repository.AuthRepository,
 	eventRepo *repository.EventRepository,
@@ -135,7 +151,7 @@ func (s *EventService) HandleStudentCreated(ctx context.Context, event dto.Stude
 
 	// Create user in auth database
 	queries := db.New(tx)
-	_, err = queries.CreateUser(ctx, db.CreateUserParams{
+	err = createUserUnderSavepoint(ctx, tx, db.CreateUserParams{
 		ID:                  utils.UUIDToPgtype(userID),
 		Email:               event.Data.Email,
 		PasswordHash:        passwordHash,
@@ -248,7 +264,7 @@ func (s *EventService) HandleStaffCreated(ctx context.Context, event dto.StaffCr
 	if event.Data.Department != "" {
 		departmentPtr = utils.StringToPointer(event.Data.Department)
 	}
-	_, err = queries.CreateUser(ctx, db.CreateUserParams{
+	err = createUserUnderSavepoint(ctx, tx, db.CreateUserParams{
 		ID:                  utils.UUIDToPgtype(userID),
 		Email:               event.Data.Email,
 		PasswordHash:        passwordHash,
