@@ -279,10 +279,12 @@ func (r *StudentRepository) CreateStudentWithEvent(ctx context.Context, params d
 		var pgxErr *pgconn.PgError
 		if errors.As(err, &pgxErr) {
 			if pgxErr.Code == "23505" { // unique_violation
-				if pgxErr.ConstraintName == "students_student_number_key" {
+				// Partial unique indexes from the first migration, not
+				// column constraints: these are their names.
+				if pgxErr.ConstraintName == "idx_students_number_unique" {
 					return db.Student{}, fmt.Errorf("%w: student number already exists", serviceErrors.ErrStudentNumberExistsRepo)
 				}
-				if pgxErr.ConstraintName == "students_email_key" {
+				if pgxErr.ConstraintName == "idx_students_email_unique" {
 					return db.Student{}, fmt.Errorf("%w: email already exists", serviceErrors.ErrStudentEmailExistsRepo)
 				}
 			}
