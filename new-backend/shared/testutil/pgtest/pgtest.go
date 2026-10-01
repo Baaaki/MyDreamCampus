@@ -9,8 +9,8 @@ import (
 	"crypto/rand"
 	"encoding/hex"
 	"fmt"
+	"io/fs"
 	"os"
-	"path/filepath"
 	"sort"
 	"strings"
 	"testing"
@@ -92,31 +92,57 @@ CREATE SCHEMA IF NOT EXISTS %q;`, schema)
 // NO TRANSACTION, no CONCURRENTLY), so each Up section runs as one
 // simple-protocol query, dollar-quoted function bodies included.
 func migrate(ctx context.Context, pool *pgxpool.Pool, dir string) error {
-	files, err := filepath.Glob(filepath.Join(dir, "*.sql"))
+	files, err := readMigrations(dir)
 	if err != nil {
 		return err
 	}
-	if len(files) == 0 {
-		return fmt.Errorf("no migrations in %s", dir)
-	}
-	sort.Strings(files)
 	for _, f := range files {
-		raw, err := os.ReadFile(f)
+		up, err := upSection(f.sql)
 		if err != nil {
-			return err
-		}
-		up, err := upSection(string(raw))
-		if err != nil {
-			return fmt.Errorf("%s: %w", filepath.Base(f), err)
+			return fmt.Errorf("%s: %w", f.name, err)
 		}
 		if strings.TrimSpace(up) == "" {
 			continue
 		}
 		if _, err := pool.Exec(ctx, up); err != nil {
-			return fmt.Errorf("%s: %w", filepath.Base(f), err)
+			return fmt.Errorf("%s: %w", f.name, err)
 		}
 	}
 	return nil
+}
+
+type migrationFile struct {
+	name string
+	sql  string
+}
+
+// readMigrations returns the .sql files of dir in name order. The reads go
+// through an os.Root so a path can never leave the migrations directory.
+func readMigrations(dir string) ([]migrationFile, error) {
+	root, err := os.OpenRoot(dir)
+	if err != nil {
+		return nil, err
+	}
+	defer func() { _ = root.Close() }()
+
+	names, err := fs.Glob(root.FS(), "*.sql")
+	if err != nil {
+		return nil, err
+	}
+	if len(names) == 0 {
+		return nil, fmt.Errorf("no migrations in %s", dir)
+	}
+	sort.Strings(names)
+
+	files := make([]migrationFile, 0, len(names))
+	for _, name := range names {
+		raw, err := root.ReadFile(name)
+		if err != nil {
+			return nil, err
+		}
+		files = append(files, migrationFile{name: name, sql: string(raw)})
+	}
+	return files, nil
 }
 
 func upSection(sql string) (string, error) {
