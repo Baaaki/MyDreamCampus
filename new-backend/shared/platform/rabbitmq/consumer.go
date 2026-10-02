@@ -206,7 +206,8 @@ const retryCountHeader = "x-retry-count"
 
 // scheduleRetry parks the message in the queue's retry delay line. It goes
 // through the default exchange by queue name, so only this queue sees it
-// again.
+// again. It returns only once the broker has confirmed the copy: the caller
+// acks the original next, and an unconfirmed copy would be a lost message.
 func (c *Consumer) scheduleRetry(queueName string, msg amqp.Delivery, retryCount int) error {
 	headers := amqp.Table{}
 	for k, v := range msg.Headers {
@@ -214,11 +215,9 @@ func (c *Consumer) scheduleRetry(queueName string, msg amqp.Delivery, retryCount
 	}
 	headers[retryCountHeader] = utils.ClampToInt32(retryCount)
 
-	return c.conn.Channel().Publish(
+	return publishConfirmed(context.Background(), c.conn.Channel(),
 		"",                        // default exchange: routes by queue name
 		RetryQueueName(queueName), // routing key = the retry queue
-		false,
-		false,
 		amqp.Publishing{
 			ContentType:  msg.ContentType,
 			Body:         msg.Body,

@@ -293,32 +293,41 @@ test-backend:
 	done
 
 # Integration tests (files behind the `integration` build tag) run against a
-# real Postgres and Redis. Both containers are throwaway: loopback ports of
-# their own, no volume, removed when the run ends, pass or fail. Each test
-# creates and drops its own database on the server. Only packages holding a
-# tagged file run: the rest are the unit tests `make test-backend` covers.
+# real Postgres, Redis and RabbitMQ. All three containers are throwaway:
+# loopback ports of their own, removed when the run ends, pass or fail. Each
+# test creates and drops its own database on the server. Only packages holding
+# a tagged file run: the rest are the unit tests `make test-backend` covers.
+# RabbitMQ runs as its own user: started as root without a named volume, the
+# image could not read its own Erlang cookie (eacces) and exited.
 IT_PG_PORT ?= 55432
 IT_REDIS_PORT ?= 56379
+IT_RABBIT_PORT ?= 55672
 IT_PG := mdc-it-postgres
 IT_REDIS := mdc-it-redis
+IT_RABBIT := mdc-it-rabbitmq
 
 test-integration:
-	@$(SUDO) docker rm -f $(IT_PG) $(IT_REDIS) >/dev/null 2>&1 || true
+	@$(SUDO) docker rm -f -v $(IT_PG) $(IT_REDIS) $(IT_RABBIT) >/dev/null 2>&1 || true
 	@$(SUDO) docker run -d --rm --name $(IT_PG) -e POSTGRES_PASSWORD=it \
 		-p 127.0.0.1:$(IT_PG_PORT):5432 postgres:18 >/dev/null
 	@$(SUDO) docker run -d --rm --name $(IT_REDIS) \
 		-p 127.0.0.1:$(IT_REDIS_PORT):6379 redis:8.10-alpine >/dev/null
+	@$(SUDO) docker run -d --rm --name $(IT_RABBIT) --user rabbitmq \
+		-e RABBITMQ_DEFAULT_USER=it -e RABBITMQ_DEFAULT_PASS=it \
+		-p 127.0.0.1:$(IT_RABBIT_PORT):5672 rabbitmq:4.3-management >/dev/null
 	@until $(SUDO) docker exec $(IT_PG) pg_isready -U postgres -h 127.0.0.1 >/dev/null 2>&1; do sleep 1; done
+	@until $(SUDO) docker exec $(IT_RABBIT) rabbitmq-diagnostics -q check_port_connectivity >/dev/null 2>&1; do sleep 1; done
 	@status=0; \
 	export TEST_DATABASE_URL="postgres://postgres:it@127.0.0.1:$(IT_PG_PORT)/postgres?sslmode=disable"; \
 	export TEST_REDIS_ADDR="127.0.0.1:$(IT_REDIS_PORT)"; \
+	export TEST_RABBITMQ_URL="amqp://it:it@127.0.0.1:$(IT_RABBIT_PORT)/"; \
 	for mod in new-backend/shared new-backend/services/*/; do \
 		pkgs=$$(cd $$mod && grep -rl --include='*_test.go' '^//go:build integration' . | xargs -r -n1 dirname | sort -u); \
 		[ -n "$$pkgs" ] || continue; \
 		echo "→ $$mod"; \
 		(cd $$mod && go test -tags integration -count=1 $$pkgs) || status=1; \
 	done; \
-	$(SUDO) docker rm -f $(IT_PG) $(IT_REDIS) >/dev/null 2>&1; \
+	$(SUDO) docker rm -f -v $(IT_PG) $(IT_REDIS) $(IT_RABBIT) >/dev/null 2>&1; \
 	exit $$status
 
 test-frontend:

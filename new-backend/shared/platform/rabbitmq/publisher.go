@@ -3,6 +3,7 @@ package rabbitmq
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"time"
 
@@ -10,6 +11,14 @@ import (
 	amqp "github.com/rabbitmq/amqp091-go"
 	"go.uber.org/zap"
 )
+
+// ErrNotConfirmed means the broker refused a message (basic.nack), the
+// channel closed before it answered, or it did not answer in time. The
+// message has to be treated as never sent.
+var ErrNotConfirmed = errors.New("rabbitmq: publish not confirmed by the broker")
+
+// confirmTimeout bounds the wait for the broker's answer to one publish.
+const confirmTimeout = 5 * time.Second
 
 // Publisher handles event publishing to RabbitMQ
 type Publisher struct {
@@ -36,7 +45,10 @@ func (p *Publisher) DeclareExchange(exchangeName string) error {
 	)
 }
 
-// Publish publishes a message to an exchange with routing key
+// Publish publishes a message to an exchange with routing key and returns
+// once the broker has confirmed it. A nil error is the broker taking
+// responsibility for the message, the one moment the outbox relay may mark
+// an event sent.
 func (p *Publisher) Publish(ctx context.Context, exchangeName, routingKey string, payload any) error {
 	// Serialize payload to JSON
 	body, err := json.Marshal(payload)
@@ -44,28 +56,19 @@ func (p *Publisher) Publish(ctx context.Context, exchangeName, routingKey string
 		return fmt.Errorf("failed to marshal payload: %w", err)
 	}
 
-	// Publish message
-	err = p.conn.Channel().PublishWithContext(
-		ctx,
-		exchangeName, // exchange
-		routingKey,   // routing key
-		false,        // mandatory
-		false,        // immediate
-		amqp.Publishing{
-			ContentType:  "application/json",
-			Body:         body,
-			DeliveryMode: amqp.Persistent, // persist to disk
-			Timestamp:    time.Now(),      // transport metadata, not a business time
-		},
-	)
-
+	err = publishConfirmed(ctx, p.conn.Channel(), exchangeName, routingKey, amqp.Publishing{
+		ContentType:  "application/json",
+		Body:         body,
+		DeliveryMode: amqp.Persistent, // persist to disk
+		Timestamp:    time.Now(),      // transport metadata, not a business time
+	})
 	if err != nil {
 		logger.Error("failed to publish message",
 			zap.Error(err),
 			zap.String("exchange", exchangeName),
 			zap.String("routing_key", routingKey),
 		)
-		return fmt.Errorf("failed to publish message: %w", err)
+		return err
 	}
 
 	logger.Debug("message published",
@@ -74,6 +77,30 @@ func (p *Publisher) Publish(ctx context.Context, exchangeName, routingKey string
 		zap.Int("body_size", len(body)),
 	)
 
+	return nil
+}
+
+// publishConfirmed publishes on a channel in confirm mode and waits for the
+// broker's ack, at most confirmTimeout.
+func publishConfirmed(ctx context.Context, ch *amqp.Channel, exchange, routingKey string, msg amqp.Publishing) error {
+	confirmation, err := ch.PublishWithDeferredConfirmWithContext(ctx, exchange, routingKey, false, false, msg)
+	if err != nil {
+		return fmt.Errorf("failed to publish message: %w", err)
+	}
+	if confirmation == nil {
+		// Only a channel that never entered confirm mode hands back none.
+		return fmt.Errorf("%w: channel is not in confirm mode", ErrNotConfirmed)
+	}
+
+	waitCtx, cancel := context.WithTimeout(ctx, confirmTimeout)
+	defer cancel()
+	acked, err := confirmation.WaitContext(waitCtx)
+	if err != nil {
+		return fmt.Errorf("%w: %w", ErrNotConfirmed, err)
+	}
+	if !acked {
+		return ErrNotConfirmed
+	}
 	return nil
 }
 

@@ -95,6 +95,16 @@ func (c *Connection) connect() error {
 		return fmt.Errorf("failed to set QoS: %w", err)
 	}
 
+	// Confirm mode: the broker acks each publish once it has taken
+	// responsibility for it. Without it a publish "succeeds" when the bytes
+	// leave the socket, and the outbox marked events sent that a broker
+	// restart could still drop.
+	if err := channel.Confirm(false); err != nil {
+		_ = channel.Close()
+		_ = conn.Close()
+		return fmt.Errorf("failed to enable publisher confirms: %w", err)
+	}
+
 	// Registered before anything else can use the pair, so no close goes
 	// unnoticed. Buffered: amqp blocks on an unread notification.
 	connClosed := conn.NotifyClose(make(chan *amqp.Error, 1))
