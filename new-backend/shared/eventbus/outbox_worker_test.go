@@ -34,6 +34,8 @@ type fakeStore struct {
 	// markProcessedErr, when set, makes every "mark sent" fail the way a
 	// database that went away mid-batch does.
 	markProcessedErr error
+	// markFailedErr does the same for "park this event".
+	markFailedErr error
 }
 
 var _ OutboxStore = (*fakeStore)(nil)
@@ -115,6 +117,9 @@ func (s *fakeStore) MarkProcessed(ctx context.Context, id uuid.UUID) error {
 func (s *fakeStore) MarkFailed(ctx context.Context, id uuid.UUID, msg string) error {
 	if err := ctx.Err(); err != nil {
 		return err
+	}
+	if s.markFailedErr != nil {
+		return s.markFailedErr
 	}
 	return s.set(id, statusFailed, true)
 }
@@ -281,9 +286,12 @@ func TestProcessEvents_BacklogLargerThanABatch_IsDrainedInOneTick(t *testing.T) 
 	}
 }
 
-// A row whose "mark sent" keeps failing is still pending, so reading the next
-// batch would hand the same rows back and the drain would never end.
-func TestProcessEvents_MarkSentFails_StopsDrainingInsteadOfRereadingTheSameRows(t *testing.T) {
+// Inside the claim transaction a failed write aborts the transaction, so
+// every later write fails too and the whole batch rolls back. Publishing the
+// rest of it would only send events the next tick sends again, and a row whose
+// "mark sent" keeps failing is still pending, so reading the next batch would
+// hand the same rows back and the drain would never end.
+func TestProcessEvents_MarkSentFails_StopsTheBatchAtTheFirstFailedWrite(t *testing.T) {
 	store := newFakeStore(payloads(25)...)
 	store.markProcessedErr = errors.New("connection reset")
 	broker := &fakeBroker{failFrom: -1}
@@ -292,5 +300,17 @@ func TestProcessEvents_MarkSentFails_StopsDrainingInsteadOfRereadingTheSameRows(
 
 	newTestWorker(t, store, broker, 10).processEvents(ctx)
 
-	assert.Equal(t, 10, broker.calls, "one batch, then back to the ticker")
+	assert.Equal(t, 1, broker.calls, "the event whose write failed is the last one sent")
+}
+
+// Same for parking a malformed payload: the transaction is poisoned, so the
+// valid event behind it must not be published only to roll back.
+func TestProcessEvents_ParkingFails_StopsTheBatchAtTheFirstFailedWrite(t *testing.T) {
+	store := newFakeStore(`not json`, `{"n":2}`)
+	store.markFailedErr = errors.New("connection reset")
+	broker := &fakeBroker{failFrom: -1}
+
+	newTestWorker(t, store, broker, 10).processEvents(context.Background())
+
+	assert.Equal(t, 0, broker.calls)
 }

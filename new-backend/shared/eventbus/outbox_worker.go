@@ -110,8 +110,16 @@ func (w *OutboxWorker) processEvents(ctx context.Context) {
 						zap.Error(err),
 						zap.String("event_id", ev.ID.String()),
 					)
+					// A failed write aborts the claim transaction, so every later
+					// write fails too and the batch rolls back: publishing more of
+					// it would only send those events again on the next tick.
 					if txErr := tx.MarkFailed(ctx, ev.ID, err.Error()); txErr != nil {
+						log.Error("mark failed failed",
+							zap.Error(txErr),
+							zap.String("event_id", ev.ID.String()),
+						)
 						stoppedEarly = true
+						break
 					}
 					failed++
 					continue
@@ -154,7 +162,7 @@ func (w *OutboxWorker) processEvents(ctx context.Context) {
 					)
 					failed++
 					stoppedEarly = true
-					continue
+					break
 				}
 				success++
 			}
@@ -179,7 +187,6 @@ func (w *OutboxWorker) processEvents(ctx context.Context) {
 		}
 	}
 }
-
 
 func (w *OutboxWorker) processFailedEvents(ctx context.Context) {
 	log := logger.WithContextAndFields(ctx,
