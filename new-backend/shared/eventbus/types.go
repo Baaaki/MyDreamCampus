@@ -25,9 +25,17 @@ type OutboxEvent struct {
 	CorrelationID string
 }
 
+// ClaimTx allows marking claimed rows as processed or failed inside the
+// active claim transaction.
+type ClaimTx interface {
+	MarkProcessed(ctx context.Context, id uuid.UUID) error
+	MarkFailed(ctx context.Context, id uuid.UUID, reason string) error
+}
+
 // OutboxStore is the contract every module repository implements so the worker
 // can drive its outbox table without knowing the module's sqlc rows.
 type OutboxStore interface {
+	ClaimPending(ctx context.Context, limit int32, settle func(ctx context.Context, events []OutboxEvent, tx ClaimTx) error) error
 	GetPending(ctx context.Context, limit int32) ([]OutboxEvent, error)
 	GetFailed(ctx context.Context, limit int32) ([]OutboxEvent, error)
 	MarkProcessed(ctx context.Context, id uuid.UUID) error

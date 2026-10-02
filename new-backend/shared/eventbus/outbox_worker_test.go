@@ -49,6 +49,43 @@ func newFakeStore(payloads ...string) *fakeStore {
 	return s
 }
 
+type fakeClaimTx struct {
+	store *fakeStore
+}
+
+func (tx *fakeClaimTx) MarkProcessed(ctx context.Context, id uuid.UUID) error {
+	settleCtx, cancel := context.WithTimeout(context.WithoutCancel(ctx), settleTimeout)
+	defer cancel()
+	return tx.store.MarkProcessed(settleCtx, id)
+}
+
+func (tx *fakeClaimTx) MarkFailed(ctx context.Context, id uuid.UUID, msg string) error {
+	settleCtx, cancel := context.WithTimeout(context.WithoutCancel(ctx), settleTimeout)
+	defer cancel()
+	return tx.store.MarkFailed(settleCtx, id, msg)
+}
+
+func (s *fakeStore) ClaimPending(ctx context.Context, limit int32, settle func(ctx context.Context, events []OutboxEvent, tx ClaimTx) error) error {
+	if err := ctx.Err(); err != nil {
+		return err
+	}
+	s.mu.Lock()
+	var out []OutboxEvent
+	for _, r := range s.rows {
+		if r.status == statusPending && int32(len(out)) < limit {
+			out = append(out, r.event)
+		}
+	}
+	s.mu.Unlock()
+
+	if len(out) == 0 {
+		return settle(ctx, nil, nil)
+	}
+
+	claimTx := &fakeClaimTx{store: s}
+	return settle(ctx, out, claimTx)
+}
+
 func (s *fakeStore) GetPending(ctx context.Context, limit int32) ([]OutboxEvent, error) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
