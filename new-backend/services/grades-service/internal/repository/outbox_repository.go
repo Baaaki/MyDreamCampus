@@ -21,6 +21,13 @@ func NewOutboxRepository(pool *pgxpool.Pool) *OutboxRepository {
 	}
 }
 
+func (r *OutboxRepository) withTx(tx pgx.Tx) *OutboxRepository {
+	return &OutboxRepository{
+		queries: r.queries.WithTx(tx),
+		pool:    r.pool,
+	}
+}
+
 func (r *OutboxRepository) CreateOutboxEvent(ctx context.Context, arg db.CreateOutboxEventParams) (db.GradesOutboxEvent, error) {
 	return r.queries.CreateOutboxEvent(ctx, arg)
 }

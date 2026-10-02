@@ -10,7 +10,8 @@ RETURNING *;
 SELECT * FROM grades.outbox_events
 WHERE status = 'pending'
 ORDER BY created_at
-LIMIT $1;
+LIMIT $1
+FOR UPDATE SKIP LOCKED;
 
 -- name: MarkOutboxEventProcessed :exec
 UPDATE grades.outbox_events

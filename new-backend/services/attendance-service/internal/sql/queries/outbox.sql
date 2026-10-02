@@ -7,7 +7,8 @@ SELECT id, event_type, routing_key, payload, retry_count, max_retries, correlati
 FROM attendance.outbox_events
 WHERE status = 'pending'
 ORDER BY created_at ASC
-LIMIT $1;
+LIMIT $1
+FOR UPDATE SKIP LOCKED;
 
 -- name: MarkOutboxEventProcessed :exec
 UPDATE attendance.outbox_events

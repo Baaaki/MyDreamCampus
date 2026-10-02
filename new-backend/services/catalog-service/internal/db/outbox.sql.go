@@ -109,6 +109,7 @@ FROM course_catalog.outbox_events
 WHERE status = 'pending'
 ORDER BY created_at ASC
 LIMIT $1
+FOR UPDATE SKIP LOCKED
 `
 
 func (q *Queries) GetPendingEvents(ctx context.Context, limit int32) ([]OutboxEvent, error) {

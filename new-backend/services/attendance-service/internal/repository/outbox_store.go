@@ -6,6 +6,7 @@ import (
 	"github.com/baaaki/mydreamcampus/shared/eventbus"
 	"github.com/baaaki/mydreamcampus/shared/platform/utils"
 	"github.com/google/uuid"
+	"github.com/jackc/pgx/v5"
 )
 
 type OutboxStore struct {
@@ -14,6 +15,59 @@ type OutboxStore struct {
 
 func NewOutboxStore(repo *OutboxRepository) *OutboxStore {
 	return &OutboxStore{repo: repo}
+}
+
+var _ eventbus.OutboxStore = (*OutboxStore)(nil)
+
+type outboxClaimTx struct {
+	repo *OutboxRepository
+}
+
+func (c *outboxClaimTx) MarkProcessed(ctx context.Context, id uuid.UUID) error {
+	settleCtx, cancel := context.WithTimeout(context.WithoutCancel(ctx), eventbus.SettleTimeout)
+	defer cancel()
+	return c.repo.MarkOutboxEventProcessed(settleCtx, utils.UUIDToPgUUID(id))
+}
+
+func (c *outboxClaimTx) MarkFailed(ctx context.Context, id uuid.UUID, errMsg string) error {
+	settleCtx, cancel := context.WithTimeout(context.WithoutCancel(ctx), eventbus.SettleTimeout)
+	defer cancel()
+	return c.repo.MarkOutboxEventFailed(settleCtx, utils.UUIDToPgUUID(id), errMsg)
+}
+
+func (s *OutboxStore) ClaimPending(ctx context.Context, limit int32, settle func(ctx context.Context, events []eventbus.OutboxEvent, tx eventbus.ClaimTx) error) error {
+	if err := ctx.Err(); err != nil {
+		return err
+	}
+	commitCtx, cancel := context.WithTimeout(context.WithoutCancel(ctx), eventbus.SettleTimeout)
+	defer cancel()
+
+	return pgx.BeginFunc(commitCtx, s.repo.pool, func(tx pgx.Tx) error {
+		txRepo := s.repo.withTx(tx)
+		events, err := txRepo.GetPendingOutboxEvents(ctx, limit)
+		if err != nil {
+			return err
+		}
+		if len(events) == 0 {
+			return settle(ctx, nil, nil)
+		}
+		result := make([]eventbus.OutboxEvent, len(events))
+		for i, e := range events {
+			var retryCount int16
+			if e.RetryCount.Valid {
+				retryCount = e.RetryCount.Int16
+			}
+			result[i] = eventbus.OutboxEvent{
+				ID:            e.ID.Bytes,
+				EventType:     e.EventType,
+				RoutingKey:    e.RoutingKey,
+				Payload:       e.Payload,
+				RetryCount:    retryCount,
+				CorrelationID: utils.CorrelationIDString(e.CorrelationID),
+			}
+		}
+		return settle(ctx, result, &outboxClaimTx{repo: txRepo})
+	})
 }
 
 func (s *OutboxStore) GetPending(ctx context.Context, batchSize int32) ([]eventbus.OutboxEvent, error) {

@@ -72,6 +72,7 @@ SELECT id, event_type, routing_key, payload, status, retry_count, max_retries, c
 WHERE status = 'pending'
 ORDER BY created_at
 LIMIT $1
+FOR UPDATE SKIP LOCKED
 `
 
 func (q *Queries) GetPendingOutboxEvents(ctx context.Context, limit int32) ([]GradesOutboxEvent, error) {

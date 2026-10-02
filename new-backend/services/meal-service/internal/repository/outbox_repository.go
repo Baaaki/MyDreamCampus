@@ -9,6 +9,7 @@ import (
 	"github.com/baaaki/mydreamcampus/shared/platform/utils"
 	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5/pgtype"
+	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgxpool"
 )
 
@@ -21,6 +22,13 @@ func NewOutboxRepository(pool *pgxpool.Pool) *OutboxRepository {
 	return &OutboxRepository{
 		queries: db.New(pool),
 		pool:    pool,
+	}
+}
+
+func (r *OutboxRepository) withTx(tx pgx.Tx) *OutboxRepository {
+	return &OutboxRepository{
+		queries: r.queries.WithTx(tx),
+		pool:    r.pool,
 	}
 }
 

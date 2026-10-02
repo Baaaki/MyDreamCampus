@@ -137,6 +137,7 @@ FROM enrollment.outbox_events
 WHERE status = 'pending'
 ORDER BY created_at ASC
 LIMIT $1
+FOR UPDATE SKIP LOCKED
 `
 
 type GetPendingOutboxEventsRow struct {

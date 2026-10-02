@@ -7,6 +7,7 @@ import (
 	"github.com/baaaki/mydreamcampus/shared/platform/utils"
 	"github.com/baaaki/mydreamcampus/staff/internal/db"
 	"github.com/google/uuid"
+	"github.com/jackc/pgx/v5"
 )
 
 // OutboxStore adapts the sqlc-shaped OutboxRepository to eventbus.OutboxStore
@@ -23,6 +24,46 @@ func NewOutboxStore(repo *OutboxRepository) *OutboxStore {
 
 // Compile-time assertion that the adapter satisfies the worker's contract.
 var _ eventbus.OutboxStore = (*OutboxStore)(nil)
+
+type outboxClaimTx struct {
+	repo *OutboxRepository
+}
+
+func (c *outboxClaimTx) MarkProcessed(ctx context.Context, id uuid.UUID) error {
+	settleCtx, cancel := context.WithTimeout(context.WithoutCancel(ctx), eventbus.SettleTimeout)
+	defer cancel()
+	return c.repo.MarkEventProcessed(settleCtx, id)
+}
+
+func (c *outboxClaimTx) MarkFailed(ctx context.Context, id uuid.UUID, msg string) error {
+	settleCtx, cancel := context.WithTimeout(context.WithoutCancel(ctx), eventbus.SettleTimeout)
+	defer cancel()
+	return c.repo.MarkEventFailed(settleCtx, id, msg)
+}
+
+func (s *OutboxStore) ClaimPending(ctx context.Context, limit int32, settle func(ctx context.Context, events []eventbus.OutboxEvent, tx eventbus.ClaimTx) error) error {
+	if err := ctx.Err(); err != nil {
+		return err
+	}
+	commitCtx, cancel := context.WithTimeout(context.WithoutCancel(ctx), eventbus.SettleTimeout)
+	defer cancel()
+
+	return pgx.BeginFunc(commitCtx, s.repo.pool, func(tx pgx.Tx) error {
+		txRepo := s.repo.withTx(tx)
+		rows, err := txRepo.GetPendingEvents(ctx, limit)
+		if err != nil {
+			return err
+		}
+		if len(rows) == 0 {
+			return settle(ctx, nil, nil)
+		}
+		events := make([]eventbus.OutboxEvent, len(rows))
+		for i, r := range rows {
+			events[i] = pendingRowToEvent(r)
+		}
+		return settle(ctx, events, &outboxClaimTx{repo: txRepo})
+	})
+}
 
 func (s *OutboxStore) GetPending(ctx context.Context, limit int32) ([]eventbus.OutboxEvent, error) {
 	rows, err := s.repo.GetPendingEvents(ctx, limit)
