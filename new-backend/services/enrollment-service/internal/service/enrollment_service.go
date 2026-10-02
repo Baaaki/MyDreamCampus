@@ -2,6 +2,7 @@ package service
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"time"
 
@@ -9,6 +10,7 @@ import (
 	"github.com/baaaki/mydreamcampus/enrollment/internal/dto"
 	serviceErrors "github.com/baaaki/mydreamcampus/enrollment/internal/errors"
 	"github.com/baaaki/mydreamcampus/enrollment/internal/repository"
+	"github.com/baaaki/mydreamcampus/shared/client"
 	"github.com/baaaki/mydreamcampus/shared/contracts"
 	sharedErrors "github.com/baaaki/mydreamcampus/shared/platform/errors"
 	"github.com/baaaki/mydreamcampus/shared/platform/logger"
@@ -72,11 +74,10 @@ func (s *EnrollmentService) GetAvailableCourses(ctx context.Context, studentID u
 		zap.String("semester", semester),
 	)
 
-	// Get student from cache
-	student, err := s.studentClient.GetStudentByID(ctx, studentID)
+	student, err := lookupStudent(ctx, s.studentClient, studentID)
 	if err != nil {
-		serviceLogger.Warn("student not found")
-		return dto.AvailableCoursesResponse{}, serviceErrors.ErrStudentNotFound
+		serviceLogger.Warn("student lookup failed", zap.Error(err))
+		return dto.AvailableCoursesResponse{}, err
 	}
 
 	// Check if student is active
@@ -92,7 +93,7 @@ func (s *EnrollmentService) GetAvailableCourses(ctx context.Context, studentID u
 		semester,
 	)
 	if err != nil {
-		return dto.AvailableCoursesResponse{}, sharedErrors.Wrap(sharedErrors.ErrInternal, err)
+		return dto.AvailableCoursesResponse{}, upstreamError(err)
 	}
 
 	// Build response
@@ -194,11 +195,10 @@ func (s *EnrollmentService) CreateEnrollmentProgram(ctx context.Context, req dto
 		}
 	}
 
-	// Get student from cache
-	student, err := s.studentClient.GetStudentByID(ctx, req.StudentID)
+	student, err := lookupStudent(ctx, s.studentClient, req.StudentID)
 	if err != nil {
-		serviceLogger.Warn("student not found")
-		return dto.EnrollmentProgramResponse{}, serviceErrors.ErrStudentNotFound
+		serviceLogger.Warn("student lookup failed", zap.Error(err))
+		return dto.EnrollmentProgramResponse{}, err
 	}
 
 	// Check if student is active
@@ -237,7 +237,11 @@ func (s *EnrollmentService) CreateEnrollmentProgram(ctx context.Context, req dto
 	// Get courses
 	courses, err := s.courseCatalogClient.GetCoursesByIDs(ctx, req.Semester, req.CourseIDs)
 	if err != nil {
-		return dto.EnrollmentProgramResponse{}, sharedErrors.Wrap(sharedErrors.ErrInternal, err)
+		if errors.Is(err, client.ErrNotFound) {
+			serviceLogger.Warn("a selected course is not offered this semester", zap.Error(err))
+			return dto.EnrollmentProgramResponse{}, serviceErrors.ErrCourseNotFound
+		}
+		return dto.EnrollmentProgramResponse{}, upstreamError(err)
 	}
 
 	if len(courses) != len(req.CourseIDs) {

@@ -5,6 +5,7 @@ package service
 import (
 	"context"
 	"fmt"
+	"net/http"
 	"testing"
 	"time"
 
@@ -111,4 +112,35 @@ func TestCreateEnrollmentProgram_ValidResubmission_ReplacesThePendingProgram(t *
 	courses, err := repo.GetCoursesByProgramID(ctx, second.ID)
 	require.NoError(t, err)
 	assert.Len(t, courses, 2)
+}
+
+// downCatalog is a catalog that cannot answer at all.
+type downCatalog struct{}
+
+func (downCatalog) GetAvailableCourses(context.Context, string, int16, string) ([]contracts.SemesterCourseListItem, error) {
+	return nil, errPeerDown
+}
+
+func (downCatalog) GetCoursesByIDs(context.Context, string, []uuid.UUID) ([]contracts.SemesterCourseResponse, error) {
+	return nil, errPeerDown
+}
+
+func TestCreateEnrollmentProgram_UnknownCourse_CourseNotFound(t *testing.T) {
+	studentID := uuid.New()
+	student := contracts.StudentResponse{ID: studentID.String(), Department: "Bilgisayar Mühendisliği", ClassLevel: 2, Status: "active"}
+	svc, _ := newServiceOnDB(t, student, catalogByID{})
+
+	_, err := svc.CreateEnrollmentProgram(context.Background(), dto.CreateEnrollmentRequest{StudentID: studentID, Semester: itSemester, CourseIDs: []uuid.UUID{uuid.New()}})
+
+	assert.ErrorIs(t, err, serviceErrors.ErrCourseNotFound, "a 404 from catalog is the course's answer, not a server error")
+}
+
+func TestCreateEnrollmentProgram_CatalogDown_Returns503(t *testing.T) {
+	studentID := uuid.New()
+	student := contracts.StudentResponse{ID: studentID.String(), Department: "Bilgisayar Mühendisliği", ClassLevel: 2, Status: "active"}
+	svc, _ := newServiceOnDB(t, student, downCatalog{})
+
+	_, err := svc.CreateEnrollmentProgram(context.Background(), dto.CreateEnrollmentRequest{StudentID: studentID, Semester: itSemester, CourseIDs: []uuid.UUID{uuid.New()}})
+
+	requireStatus(t, err, http.StatusServiceUnavailable)
 }

@@ -130,7 +130,8 @@ func (m *mockStudentClient) GetStudentByID(ctx context.Context, id uuid.UUID) (c
 	}
 	st, ok := m.students[id]
 	if !ok {
-		return contracts.StudentResponse{}, sharedErrors.ErrNotFound
+		// What HTTPStudentClient turns a 404 into.
+		return contracts.StudentResponse{}, serviceErrors.ErrStudentNotFound
 	}
 	return st, nil
 }

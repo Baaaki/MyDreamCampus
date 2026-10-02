@@ -40,9 +40,9 @@ func (s *EnrollmentService) ApproveEnrollmentProgram(ctx context.Context, progra
 	}
 
 	// Get student to verify advisor
-	student, err := s.studentClient.GetStudentByID(ctx, utils.PgtypeToUUID(program.StudentID))
+	student, err := lookupStudent(ctx, s.studentClient, utils.PgtypeToUUID(program.StudentID))
 	if err != nil {
-		return dto.EnrollmentProgramResponse{}, sharedErrors.Wrap(sharedErrors.ErrInternal, err)
+		return dto.EnrollmentProgramResponse{}, err
 	}
 
 	// Verify advisor — student must have an assigned advisor and it must match
@@ -133,9 +133,9 @@ func (s *EnrollmentService) RejectEnrollmentProgram(ctx context.Context, program
 	}
 
 	// Get student to verify advisor
-	student, err := s.studentClient.GetStudentByID(ctx, utils.PgtypeToUUID(program.StudentID))
+	student, err := lookupStudent(ctx, s.studentClient, utils.PgtypeToUUID(program.StudentID))
 	if err != nil {
-		return sharedErrors.Wrap(sharedErrors.ErrInternal, err)
+		return err
 	}
 
 	// Verify advisor
@@ -220,7 +220,7 @@ func (s *EnrollmentService) GetPendingProgramsByAdvisor(ctx context.Context, adv
 
 	students, err := s.studentClient.GetStudentsByAdvisorID(ctx, advisorID)
 	if err != nil {
-		return dto.AdvisorPendingProgramsResponse{}, sharedErrors.Wrap(sharedErrors.ErrInternal, err)
+		return dto.AdvisorPendingProgramsResponse{}, upstreamError(err)
 	}
 
 	if len(students) == 0 {
