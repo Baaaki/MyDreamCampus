@@ -29,10 +29,19 @@ func newEnrollmentDB(t *testing.T) (*pgxpool.Pool, *EnrollmentRepository) {
 }
 
 func submit(repo *EnrollmentRepository, student uuid.UUID, courses ...ProgramCourseSnapshot) (db.EnrollmentProgram, error) {
+	return resubmit(repo, student, nil, courses...)
+}
+
+// resubmit is submit for a student whose pending program the new one replaces.
+func resubmit(repo *EnrollmentRepository, student uuid.UUID, replace *ProgramReplacement, courses ...ProgramCourseSnapshot) (db.EnrollmentProgram, error) {
 	return repo.CreateProgramWithCoursesAndEvent(context.Background(), db.CreateEnrollmentProgramParams{
 		StudentID: utils.UUIDToPgtype(student), Semester: fall,
 		Status: db.NullEnrollmentStatusEnum{EnrollmentStatusEnum: db.EnrollmentEnrollmentStatusEnumPending, Valid: true},
-	}, courses, map[string]any{})
+	}, courses, map[string]any{}, replace)
+}
+
+func replacing(program db.EnrollmentProgram) *ProgramReplacement {
+	return &ProgramReplacement{ProgramID: utils.PgtypeToUUID(program.ID), EventPayload: map[string]any{}}
 }
 
 func course(capacity int16) ProgramCourseSnapshot {
@@ -116,6 +125,66 @@ func TestCreateProgram_SameCoursesInOppositeOrder_NoDeadlock(t *testing.T) {
 	n, err := repo.CountEnrollmentForCourse(context.Background(), b.CourseID)
 	require.NoError(t, err)
 	assert.Equal(t, 2*pairs, n)
+}
+
+// The pending program used to be deleted in its own transaction before the
+// new one was even checked, so a new selection that failed left the student
+// with no program at all.
+func TestCreateProgram_ReplacementHitsAFullCourse_PendingProgramStays(t *testing.T) {
+	pool, repo := newEnrollmentDB(t)
+	student := uuid.New()
+	kept := course(30)
+	full := course(1)
+	pending, err := submit(repo, student, kept)
+	require.NoError(t, err)
+	_, err = submit(repo, uuid.New(), full)
+	require.NoError(t, err)
+
+	_, err = resubmit(repo, student, replacing(pending), full)
+
+	require.ErrorIs(t, err, sharedErrors.ErrConflict)
+	still, err := repo.GetEnrollmentProgramByStudentAndSemester(context.Background(), student, fall)
+	require.NoError(t, err)
+	assert.Equal(t, pending.ID, still.ID)
+	assert.Equal(t, 0, count(t, pool, "SELECT count(*) FROM enrollment.outbox_events WHERE event_type = 'enrollment.program.cancelled'"),
+		"nothing may announce a cancellation that rolled back")
+}
+
+func TestCreateProgram_Replacement_SwapsProgramsAtomicallyAndKeepsTheSeat(t *testing.T) {
+	pool, repo := newEnrollmentDB(t)
+	student := uuid.New()
+	last := course(1)
+	pending, err := submit(repo, student, last)
+	require.NoError(t, err)
+
+	// The course is full with the student's own seat; the replacement
+	// frees that seat inside the same transaction and takes it back.
+	replaced, err := resubmit(repo, student, replacing(pending), last)
+
+	require.NoError(t, err)
+	assert.NotEqual(t, pending.ID, replaced.ID)
+	_, err = repo.GetEnrollmentProgramByID(context.Background(), utils.PgtypeToUUID(pending.ID))
+	assert.ErrorIs(t, err, sharedErrors.ErrNotFound)
+	n, err := repo.CountEnrollmentForCourse(context.Background(), last.CourseID)
+	require.NoError(t, err)
+	assert.Equal(t, 1, n)
+	assert.Equal(t, 1, count(t, pool, "SELECT count(*) FROM enrollment.outbox_events WHERE event_type = 'enrollment.program.cancelled'"))
+}
+
+func TestCreateProgram_ReplacedProgramApprovedMeanwhile_Conflict(t *testing.T) {
+	_, repo := newEnrollmentDB(t)
+	student := uuid.New()
+	pending, err := submit(repo, student, course(30))
+	require.NoError(t, err)
+	_, err = repo.ApproveProgramWithEvent(context.Background(), utils.PgtypeToUUID(pending.ID), map[string]any{})
+	require.NoError(t, err)
+
+	_, err = resubmit(repo, student, replacing(pending), course(30))
+
+	require.ErrorIs(t, err, serviceErrors.ErrSubmissionConflict)
+	approved, err := repo.GetEnrollmentProgramByID(context.Background(), utils.PgtypeToUUID(pending.ID))
+	require.NoError(t, err)
+	assert.Equal(t, db.EnrollmentEnrollmentStatusEnumApproved, approved.Status.EnrollmentStatusEnum)
 }
 
 // A double click sends two submissions for one student at once. Both pass

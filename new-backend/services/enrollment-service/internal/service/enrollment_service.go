@@ -22,7 +22,7 @@ import (
 // EnrollmentStore is the slice of EnrollmentRepository the service uses —
 // an interface so the service can be tested without a database.
 type EnrollmentStore interface {
-	CreateProgramWithCoursesAndEvent(ctx context.Context, programParams db.CreateEnrollmentProgramParams, courses []repository.ProgramCourseSnapshot, eventPayload map[string]any) (db.EnrollmentProgram, error)
+	CreateProgramWithCoursesAndEvent(ctx context.Context, programParams db.CreateEnrollmentProgramParams, courses []repository.ProgramCourseSnapshot, eventPayload map[string]any, replace *repository.ProgramReplacement) (db.EnrollmentProgram, error)
 	GetEnrollmentProgramByID(ctx context.Context, id uuid.UUID) (db.EnrollmentProgram, error)
 	GetEnrollmentProgramByStudentAndSemester(ctx context.Context, studentID uuid.UUID, semester string) (db.EnrollmentProgram, error)
 	GetEnrollmentProgramsByStudent(ctx context.Context, studentID uuid.UUID, semester *string, status *string) ([]db.EnrollmentProgram, error)
@@ -213,52 +213,25 @@ func (s *EnrollmentService) CreateEnrollmentProgram(ctx context.Context, req dto
 		return dto.EnrollmentProgramResponse{}, sharedErrors.Wrap(sharedErrors.ErrInternal, err)
 	}
 
+	// A pending program is replaced by the new selection, but only once that
+	// selection has passed every check below, and in the same transaction
+	// that creates it. Deleting it here, up front, cost the student their
+	// program whenever the new one failed a check.
+	var replace *repository.ProgramReplacement
 	if existingProgram.ID.Valid {
-		// If pending, auto-replace (cancel old program and create new one)
-		if existingProgram.Status.EnrollmentStatusEnum == db.EnrollmentEnrollmentStatusEnumPending {
-			serviceLogger.Info("replacing existing pending program",
-				zap.String("old_program_id", utils.PgtypeToUUID(existingProgram.ID).String()),
-			)
-
-			// Get courses to decrement enrollments
-			coursesRows, err := s.enrollmentRepo.GetCoursesByProgramID(ctx, utils.PgtypeToUUID(existingProgram.ID))
-			if err != nil {
-				return dto.EnrollmentProgramResponse{}, sharedErrors.Wrap(sharedErrors.ErrInternal, err)
-			}
-
-			oldCourseIDs := make([]uuid.UUID, len(coursesRows))
-			for i, row := range coursesRows {
-				oldCourseIDs[i] = utils.PgtypeToUUID(row.CourseID)
-			}
-
-			cancelEventPayload := buildEnrollmentCancelledPayload(EnrollmentCancelledInputs{
-				ProgramID:   utils.PgtypeToUUID(existingProgram.ID),
-				StudentID:   req.StudentID,
-				Semester:    req.Semester,
-				CourseIDs:   oldCourseIDs,
-				CancelledBy: "student",
-				CancelType:  "auto_replace",
-			})
-
-			// Delete old program (with transaction)
-			err = s.enrollmentRepo.CancelProgramWithEvent(ctx, utils.PgtypeToUUID(existingProgram.ID), cancelEventPayload)
-			if err != nil {
-				serviceLogger.Error("failed to cancel existing program",
-					zap.String("old_program_id", utils.PgtypeToUUID(existingProgram.ID).String()),
-					zap.Error(err),
-				)
-				return dto.EnrollmentProgramResponse{}, sharedErrors.Wrap(sharedErrors.ErrInternal, err)
-			}
-
-			serviceLogger.Info("existing pending program cancelled successfully, creating new program")
-			// Continue with new program creation...
-		} else {
-			// If approved, cannot create new program
+		if existingProgram.Status.EnrollmentStatusEnum != db.EnrollmentEnrollmentStatusEnumPending {
 			serviceLogger.Warn("student already has an approved program for this semester",
 				zap.String("existing_status", string(existingProgram.Status.EnrollmentStatusEnum)),
 			)
 			return dto.EnrollmentProgramResponse{}, serviceErrors.ErrAlreadySubmitted
 		}
+		replace, err = s.pendingProgramReplacement(ctx, existingProgram, req)
+		if err != nil {
+			return dto.EnrollmentProgramResponse{}, sharedErrors.Wrap(sharedErrors.ErrInternal, err)
+		}
+		serviceLogger.Info("new selection will replace the pending program",
+			zap.String("old_program_id", replace.ProgramID.String()),
+		)
 	}
 
 	// Get courses
@@ -326,7 +299,7 @@ func (s *EnrollmentService) CreateEnrollmentProgram(ctx context.Context, req dto
 	}
 
 	// Check capacity and create program (with transaction)
-	program, err := s.createProgramWithCapacityCheck(ctx, req, courses, student)
+	program, err := s.createProgramWithCapacityCheck(ctx, req, courses, replace)
 	if err != nil {
 		return dto.EnrollmentProgramResponse{}, err
 	}
@@ -356,8 +329,33 @@ func (s *EnrollmentService) checkPrerequisites(ctx context.Context, studentID uu
 	return nil
 }
 
+// pendingProgramReplacement describes the pending program a submission will
+// supersede, with the cancelled event that announces it.
+func (s *EnrollmentService) pendingProgramReplacement(ctx context.Context, existing db.EnrollmentProgram, req dto.CreateEnrollmentRequest) (*repository.ProgramReplacement, error) {
+	programID := utils.PgtypeToUUID(existing.ID)
+	rows, err := s.enrollmentRepo.GetCoursesByProgramID(ctx, programID)
+	if err != nil {
+		return nil, err
+	}
+	oldCourseIDs := make([]uuid.UUID, len(rows))
+	for i, row := range rows {
+		oldCourseIDs[i] = utils.PgtypeToUUID(row.CourseID)
+	}
+	return &repository.ProgramReplacement{
+		ProgramID: programID,
+		EventPayload: buildEnrollmentCancelledPayload(EnrollmentCancelledInputs{
+			ProgramID:   programID,
+			StudentID:   req.StudentID,
+			Semester:    req.Semester,
+			CourseIDs:   oldCourseIDs,
+			CancelledBy: "student",
+			CancelType:  "auto_replace",
+		}),
+	}, nil
+}
+
 // Helper: Create program with capacity check (transaction)
-func (s *EnrollmentService) createProgramWithCapacityCheck(ctx context.Context, req dto.CreateEnrollmentRequest, courses []contracts.SemesterCourseResponse, student contracts.StudentResponse) (db.EnrollmentProgram, error) {
+func (s *EnrollmentService) createProgramWithCapacityCheck(ctx context.Context, req dto.CreateEnrollmentRequest, courses []contracts.SemesterCourseResponse, replace *repository.ProgramReplacement) (db.EnrollmentProgram, error) {
 	// Create program parameters
 	programParams := db.CreateEnrollmentProgramParams{
 		StudentID: utils.UUIDToPgtype(req.StudentID),
@@ -387,7 +385,7 @@ func (s *EnrollmentService) createProgramWithCapacityCheck(ctx context.Context, 
 	}
 
 	// Create program with courses and event (atomic transaction with advisory locks)
-	program, err := s.enrollmentRepo.CreateProgramWithCoursesAndEvent(ctx, programParams, courseSnapshots, eventPayload)
+	program, err := s.enrollmentRepo.CreateProgramWithCoursesAndEvent(ctx, programParams, courseSnapshots, eventPayload, replace)
 	if err != nil {
 		if sharedErrors.Is(err, serviceErrors.ErrSubmissionConflict) {
 			return db.EnrollmentProgram{}, err

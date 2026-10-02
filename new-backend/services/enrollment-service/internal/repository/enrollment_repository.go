@@ -42,6 +42,13 @@ type ProgramCourseSnapshot struct {
 	MaxCapacity int16
 }
 
+// ProgramReplacement is the pending program a submission supersedes and the
+// cancelled event that announces it.
+type ProgramReplacement struct {
+	ProgramID    uuid.UUID
+	EventPayload map[string]any
+}
+
 var courseLockTable = crc64.MakeTable(crc64.ISO)
 
 // courseLockIDs returns the seat-lock key of every course, ascending and
@@ -59,12 +66,17 @@ func courseLockIDs(courses []ProgramCourseSnapshot) []int64 {
 	return slices.Compact(ids)
 }
 
-// CreateProgramWithCoursesAndEvent creates enrollment program, courses and outbox event atomically
+// CreateProgramWithCoursesAndEvent creates enrollment program, courses and
+// outbox event atomically. With replace set, the student's pending program
+// goes in the same transaction: a new selection that fails here — a course
+// filled up meanwhile — leaves the old one standing instead of leaving the
+// student with nothing.
 func (r *EnrollmentRepository) CreateProgramWithCoursesAndEvent(
 	ctx context.Context,
 	programParams db.CreateEnrollmentProgramParams,
 	courses []ProgramCourseSnapshot,
 	eventPayload map[string]any,
+	replace *ProgramReplacement,
 ) (db.EnrollmentProgram, error) {
 	tx, err := r.pool.Begin(ctx)
 	if err != nil {
@@ -74,6 +86,12 @@ func (r *EnrollmentRepository) CreateProgramWithCoursesAndEvent(
 	defer func() { _ = tx.Rollback(ctx) }()
 
 	qtx := r.queries.WithTx(tx)
+
+	if replace != nil {
+		if err := supersedePendingProgram(ctx, qtx, *replace); err != nil {
+			return db.EnrollmentProgram{}, err
+		}
+	}
 
 	// Every course is locked before any is counted: a seat counted while
 	// another submission can still take it is no seat at all.
@@ -137,6 +155,39 @@ func (r *EnrollmentRepository) CreateProgramWithCoursesAndEvent(
 	}
 
 	return program, nil
+}
+
+// supersedePendingProgram deletes the program a submission replaces and
+// writes its cancelled event, inside the submission's transaction. That event
+// and the new program's submitted event share the transaction's timestamp, so
+// their relay order is undefined; nothing consumes them in order today.
+func supersedePendingProgram(ctx context.Context, qtx *db.Queries, replace ProgramReplacement) error {
+	id := utils.UUIDToPgtype(replace.ProgramID)
+	if _, err := qtx.LockPendingProgram(ctx, id); err != nil {
+		if errors.Is(err, pgx.ErrNoRows) {
+			// Approved, rejected or already replaced since the caller read it.
+			return serviceErrors.ErrSubmissionConflict
+		}
+		return fmt.Errorf("%w: failed to lock program: %v", sharedErrors.ErrQueryFailed, err)
+	}
+	if err := qtx.DeleteEnrollmentProgram(ctx, id); err != nil {
+		return fmt.Errorf("%w: failed to delete program: %v", sharedErrors.ErrQueryFailed, err)
+	}
+
+	payload, err := json.Marshal(replace.EventPayload)
+	if err != nil {
+		return fmt.Errorf("%w: failed to marshal cancelled event payload: %v", sharedErrors.ErrInternal, err)
+	}
+	_, err = qtx.CreateOutboxEvent(ctx, db.CreateOutboxEventParams{
+		CorrelationID: utils.CorrelationIDFromContext(ctx),
+		EventType:     events.EventEnrollmentProgramCancelled,
+		RoutingKey:    events.RoutingKeyEnrollmentProgramCancelled,
+		Payload:       payload,
+	})
+	if err != nil {
+		return fmt.Errorf("%w: failed to create outbox event: %v", sharedErrors.ErrQueryFailed, err)
+	}
+	return nil
 }
 
 func isUniqueViolation(err error) bool {
