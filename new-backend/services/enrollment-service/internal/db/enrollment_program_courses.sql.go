@@ -11,6 +11,22 @@ import (
 	"github.com/jackc/pgx/v5/pgtype"
 )
 
+const countActiveCourseEnrollments = `-- name: CountActiveCourseEnrollments :one
+SELECT COUNT(*)
+FROM enrollment.enrollment_program_courses epc
+JOIN enrollment.enrollment_programs ep ON ep.id = epc.program_id
+WHERE epc.course_id = $1 AND ep.status IN ('pending', 'approved')
+`
+
+// Seats taken on a course: a pending program holds its seat until it is
+// rejected or cancelled, an approved one for good.
+func (q *Queries) CountActiveCourseEnrollments(ctx context.Context, courseID pgtype.UUID) (int64, error) {
+	row := q.db.QueryRow(ctx, countActiveCourseEnrollments, courseID)
+	var count int64
+	err := row.Scan(&count)
+	return count, err
+}
+
 const createEnrollmentProgramCourse = `-- name: CreateEnrollmentProgramCourse :one
 INSERT INTO enrollment.enrollment_program_courses (
     program_id, course_id, course_code, course_name, credits, created_at
@@ -92,4 +108,16 @@ func (q *Queries) GetCoursesByProgramID(ctx context.Context, programID pgtype.UU
 		return nil, err
 	}
 	return items, nil
+}
+
+const lockCourseSeats = `-- name: LockCourseSeats :exec
+SELECT pg_advisory_xact_lock($1::bigint)
+`
+
+// Holds one course's seat count still until the calling transaction ends.
+// Callers take these in ascending lock_id order, so two submissions that
+// want the same courses never wait on each other in a circle.
+func (q *Queries) LockCourseSeats(ctx context.Context, lockID int64) error {
+	_, err := q.db.Exec(ctx, lockCourseSeats, lockID)
+	return err
 }

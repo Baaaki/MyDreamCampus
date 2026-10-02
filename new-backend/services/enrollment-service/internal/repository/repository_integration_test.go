@@ -83,6 +83,41 @@ func TestCreateProgram_LastSeat_OneOfManyConcurrentStudentsGetsIt(t *testing.T) 
 	assert.Equal(t, 1, count(t, pool, "SELECT count(*) FROM enrollment.outbox_events"), "one submitted event, for the winner")
 }
 
+// Two students who pick the same courses in opposite orders must both get
+// in. Locked in request order, each transaction held one course and waited
+// for the other's, and Postgres broke the deadlock by failing one of them.
+func TestCreateProgram_SameCoursesInOppositeOrder_NoDeadlock(t *testing.T) {
+	_, repo := newEnrollmentDB(t)
+	a, b, c := course(100), course(100), course(100)
+	const pairs = 20
+
+	var wg sync.WaitGroup
+	errs := make([]error, 2*pairs)
+	start := make(chan struct{})
+	for i := range pairs {
+		wg.Add(2)
+		go func() {
+			defer wg.Done()
+			<-start
+			_, errs[2*i] = submit(repo, uuid.New(), a, b, c)
+		}()
+		go func() {
+			defer wg.Done()
+			<-start
+			_, errs[2*i+1] = submit(repo, uuid.New(), c, b, a)
+		}()
+	}
+	close(start)
+	wg.Wait()
+
+	for _, err := range errs {
+		assert.NoError(t, err)
+	}
+	n, err := repo.CountEnrollmentForCourse(context.Background(), b.CourseID)
+	require.NoError(t, err)
+	assert.Equal(t, 2*pairs, n)
+}
+
 func TestCreateProgram_RejectedOrCancelledProgram_GivesItsSeatBack(t *testing.T) {
 	pool, repo := newEnrollmentDB(t)
 	ctx := context.Background()

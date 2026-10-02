@@ -6,6 +6,7 @@ import (
 	"errors"
 	"fmt"
 	"hash/crc64"
+	"slices"
 
 	"github.com/baaaki/mydreamcampus/enrollment/internal/db"
 	serviceErrors "github.com/baaaki/mydreamcampus/enrollment/internal/errors"
@@ -40,6 +41,23 @@ type ProgramCourseSnapshot struct {
 	MaxCapacity int16
 }
 
+var courseLockTable = crc64.MakeTable(crc64.ISO)
+
+// courseLockIDs returns the seat-lock key of every course, ascending and
+// without repeats. Taken in request order, two students who pick {A, B} and
+// {B, A} each hold one lock and wait for the other's until Postgres breaks
+// the deadlock by failing one of them; one global order cannot form a cycle.
+func courseLockIDs(courses []ProgramCourseSnapshot) []int64 {
+	ids := make([]int64, 0, len(courses))
+	for _, course := range courses {
+		// The uint64→int64 wraparound is fine: the checksum is only a
+		// deterministic lock key, never interpreted as a quantity.
+		ids = append(ids, int64(crc64.Checksum(course.CourseID[:], courseLockTable))) // #nosec G115
+	}
+	slices.Sort(ids)
+	return slices.Compact(ids)
+}
+
 // CreateProgramWithCoursesAndEvent creates enrollment program, courses and outbox event atomically
 func (r *EnrollmentRepository) CreateProgramWithCoursesAndEvent(
 	ctx context.Context,
@@ -56,32 +74,18 @@ func (r *EnrollmentRepository) CreateProgramWithCoursesAndEvent(
 
 	qtx := r.queries.WithTx(tx)
 
-	// CRC64 table for advisory locks
-	crcTable := crc64.MakeTable(crc64.ISO)
-
-	// Check capacity for each course using advisory locks
-	for _, course := range courses {
-		// Acquire an exclusive transaction-level advisory lock for the course.
-		// The uint64→int64 wraparound is fine: the checksum is only a
-		// deterministic lock key, never interpreted as a quantity.
-		lockID := int64(crc64.Checksum(course.CourseID[:], crcTable)) // #nosec G115
-		_, err := tx.Exec(ctx, "SELECT pg_advisory_xact_lock($1)", lockID)
-		if err != nil {
+	// Every course is locked before any is counted: a seat counted while
+	// another submission can still take it is no seat at all.
+	for _, lockID := range courseLockIDs(courses) {
+		if err := qtx.LockCourseSeats(ctx, lockID); err != nil {
 			return db.EnrollmentProgram{}, fmt.Errorf("%w: failed to acquire advisory lock: %v", sharedErrors.ErrQueryFailed, err)
 		}
-
-		// Count current enrollments for this course
-		var count int64
-		err = tx.QueryRow(ctx, `
-			SELECT COUNT(*) 
-			FROM enrollment.enrollment_program_courses epc
-			JOIN enrollment.enrollment_programs ep ON ep.id = epc.program_id
-			WHERE epc.course_id = $1 AND ep.status IN ('pending', 'approved')
-		`, course.CourseID).Scan(&count)
+	}
+	for _, course := range courses {
+		count, err := qtx.CountActiveCourseEnrollments(ctx, utils.UUIDToPgtype(course.CourseID))
 		if err != nil {
 			return db.EnrollmentProgram{}, fmt.Errorf("%w: failed to count course enrollments: %v", sharedErrors.ErrQueryFailed, err)
 		}
-
 		if count >= int64(course.MaxCapacity) {
 			return db.EnrollmentProgram{}, fmt.Errorf("%w: course capacity is full", sharedErrors.ErrConflict)
 		}
@@ -396,15 +400,9 @@ func (r *EnrollmentRepository) CancelProgramWithEvent(
 }
 
 func (r *EnrollmentRepository) CountEnrollmentForCourse(ctx context.Context, courseID uuid.UUID) (int, error) {
-	var count int
-	err := r.pool.QueryRow(ctx, `
-		SELECT COUNT(*) 
-		FROM enrollment.enrollment_program_courses epc
-		JOIN enrollment.enrollment_programs ep ON ep.id = epc.program_id
-		WHERE epc.course_id = $1 AND ep.status IN ('pending', 'approved')
-	`, courseID).Scan(&count)
+	count, err := r.queries.CountActiveCourseEnrollments(ctx, utils.UUIDToPgtype(courseID))
 	if err != nil {
 		return 0, fmt.Errorf("%w: failed to count course enrollments: %v", sharedErrors.ErrQueryFailed, err)
 	}
-	return count, nil
+	return int(count), nil
 }
