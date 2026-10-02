@@ -43,6 +43,9 @@ var (
 
 	// Rate limiting
 	ErrRateLimitExceeded = sharedErrors.New("RATE_LIMIT_EXCEEDED", "Çok fazla istek, lütfen biraz sonra tekrar deneyin", http.StatusTooManyRequests)
+	// Every Argon2id slot stayed taken for the whole wait. A 503, not a 429:
+	// the caller did nothing wrong, the service is full for a moment.
+	ErrPasswordWorkBusy = sharedErrors.New("SERVER_BUSY", "Sistem şu anda yoğun, lütfen birkaç saniye sonra tekrar deneyin", http.StatusServiceUnavailable)
 
 	// User errors
 	ErrUserNotFound = sharedErrors.New("USER_NOT_FOUND", "Kullanıcı bulunamadı", http.StatusNotFound)

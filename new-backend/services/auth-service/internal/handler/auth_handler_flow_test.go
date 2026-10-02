@@ -14,6 +14,7 @@ import (
 	"github.com/baaaki/mydreamcampus/shared/config"
 	sharedErrors "github.com/baaaki/mydreamcampus/shared/platform/errors"
 	"github.com/baaaki/mydreamcampus/shared/platform/logger"
+	"github.com/baaaki/mydreamcampus/shared/platform/utils"
 	"github.com/gin-gonic/gin"
 	"github.com/google/uuid"
 	"github.com/stretchr/testify/assert"
@@ -170,6 +171,17 @@ func TestLogin_LockedOut_AnswersLikeWrongPassword(t *testing.T) {
 	assert.Equal(t, http.StatusUnauthorized, locked.Code)
 	assert.Equal(t, wrong.Code, locked.Code)
 	assert.Equal(t, wrong.Body.String(), locked.Body.String())
+}
+
+func TestLogin_HashingBusy_Returns503WithRetryAfter(t *testing.T) {
+	busy := sharedErrors.Wrap(authErrors.ErrPasswordWorkBusy, utils.ErrPasswordHashBusy)
+
+	w := do(newFlowRouter(t, &fakeAuthService{loginErr: busy}), "POST", "/api/auth/login", loginBody, nil)
+
+	assert.Equal(t, http.StatusServiceUnavailable, w.Code)
+	assert.Equal(t, retryAfterSeconds, w.Header().Get("Retry-After"))
+	code, _ := bodyField(t, w, "error")
+	assert.Equal(t, authErrors.ErrPasswordWorkBusy.Code, code)
 }
 
 func TestRefresh_InvalidToken_Returns401AndClearsCookies(t *testing.T) {

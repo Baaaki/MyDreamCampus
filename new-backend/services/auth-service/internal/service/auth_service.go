@@ -104,6 +104,15 @@ func NewAuthService(
 	}
 }
 
+// passwordWorkError maps a failed Argon2id call: a full slot pool is a 503 the
+// client can retry, anything else an internal error.
+func passwordWorkError(err error) error {
+	if errors.Is(err, utils.ErrPasswordHashBusy) {
+		return sharedErrors.Wrap(serviceErrors.ErrPasswordWorkBusy, err)
+	}
+	return sharedErrors.Wrap(sharedErrors.ErrInternal, err)
+}
+
 // Login authenticates a user and returns JWT tokens
 func (s *AuthService) Login(ctx context.Context, req dto.LoginRequest, deviceInfo, ipAddress string) (dto.LoginResponse, string, error) {
 	// Create child logger with service context
@@ -120,7 +129,9 @@ func (s *AuthService) Login(ctx context.Context, req dto.LoginRequest, deviceInf
 	if s.loginLockedOut(ctx, lockKey, serviceLogger) {
 		// Same work, same answer as a wrong password: a distinct lockout
 		// response would reveal that the address exists and was targeted.
-		utils.VerifyDummyPassword(req.Password)
+		if err := utils.VerifyDummyPassword(ctx, req.Password); err != nil {
+			return dto.LoginResponse{}, "", passwordWorkError(err)
+		}
 		serviceLogger.Warn("login attempt while locked out", zap.String("ip", ipAddress))
 		return dto.LoginResponse{}, "", serviceErrors.ErrAccountLocked
 	}
@@ -133,7 +144,9 @@ func (s *AuthService) Login(ctx context.Context, req dto.LoginRequest, deviceInf
 			// Timing-safe: run a real Argon2id verification against a
 			// precomputed dummy hash so response time matches the
 			// password-mismatch branch and email enumeration is closed.
-			utils.VerifyDummyPassword(req.Password)
+			if err := utils.VerifyDummyPassword(ctx, req.Password); err != nil {
+				return dto.LoginResponse{}, "", passwordWorkError(err)
+			}
 			// Counted like a wrong password, so unknown addresses lock out
 			// exactly like real ones.
 			s.recordLoginFailure(ctx, lockKey, serviceLogger)
@@ -152,14 +165,20 @@ func (s *AuthService) Login(ctx context.Context, req dto.LoginRequest, deviceInf
 	// to "user not found" externally to avoid leaking which emails exist
 	// in the system; only the audit trail records the real reason.
 	if !utils.DerefBool(user.IsActive, false) {
-		utils.VerifyDummyPassword(req.Password)
+		if err := utils.VerifyDummyPassword(ctx, req.Password); err != nil {
+			return dto.LoginResponse{}, "", passwordWorkError(err)
+		}
 		s.recordLoginFailure(ctx, lockKey, serviceLogger)
 		serviceLogger.Warn("login attempt for deactivated account")
 		return dto.LoginResponse{}, "", serviceErrors.ErrInvalidCredentials
 	}
 
 	// Verify password
-	if !utils.VerifyPassword(user.PasswordHash, req.Password) {
+	match, err := utils.VerifyPassword(ctx, user.PasswordHash, req.Password)
+	if err != nil {
+		return dto.LoginResponse{}, "", passwordWorkError(err)
+	}
+	if !match {
 		s.recordLoginFailure(ctx, lockKey, serviceLogger)
 		serviceLogger.Warn("invalid password")
 		return dto.LoginResponse{}, "", serviceErrors.ErrInvalidCredentials
@@ -570,7 +589,11 @@ func (s *AuthService) ChangePassword(ctx context.Context, userID uuid.UUID, req 
 	}
 
 	// Verify old password
-	if !utils.VerifyPassword(user.PasswordHash, req.OldPassword) {
+	match, err := utils.VerifyPassword(ctx, user.PasswordHash, req.OldPassword)
+	if err != nil {
+		return dto.ChangePasswordResponse{}, "", passwordWorkError(err)
+	}
+	if !match {
 		logger.Warn("invalid old password during password change",
 			zap.String("user_id", userID.String()),
 		)
@@ -582,10 +605,9 @@ func (s *AuthService) ChangePassword(ctx context.Context, userID uuid.UUID, req 
 	}
 
 	// Hash new password
-	newPasswordHash, err := utils.HashPassword(req.NewPassword)
+	newPasswordHash, err := utils.HashPassword(ctx, req.NewPassword)
 	if err != nil {
-		// Wrap and return, handler will log
-		return dto.ChangePasswordResponse{}, "", sharedErrors.Wrap(sharedErrors.ErrInternal, err)
+		return dto.ChangePasswordResponse{}, "", passwordWorkError(err)
 	}
 
 	// Update password (this also increments token_version)
@@ -736,9 +758,9 @@ func (s *AuthService) ResetPassword(ctx context.Context, token, newPassword stri
 		return serviceErrors.ErrInvalidResetToken
 	}
 
-	hash, err := utils.HashPassword(newPassword)
+	hash, err := utils.HashPassword(ctx, newPassword)
 	if err != nil {
-		return sharedErrors.Wrap(sharedErrors.ErrInternal, err)
+		return passwordWorkError(err)
 	}
 	userID := utils.PgtypeToUUID(user.ID)
 	// UpdatePassword bumps token_version, which retires every refresh token.
@@ -888,7 +910,7 @@ func (s *AuthService) SeedAdmin(ctx context.Context) error {
 	}
 
 	// Hash default password
-	passwordHash, err := utils.HashPassword(s.config.Admin.InitialPassword)
+	passwordHash, err := utils.HashPassword(ctx, s.config.Admin.InitialPassword)
 	if err != nil {
 		return fmt.Errorf("failed to hash admin password: %w", err)
 	}
@@ -944,7 +966,7 @@ func (s *AuthService) SeedDemoAdmin(ctx context.Context) error {
 	}
 
 	// Hash password (password = email)
-	passwordHash, err := utils.HashPassword(s.config.Demo.AdminEmail)
+	passwordHash, err := utils.HashPassword(ctx, s.config.Demo.AdminEmail)
 	if err != nil {
 		return fmt.Errorf("failed to hash demo admin password: %w", err)
 	}

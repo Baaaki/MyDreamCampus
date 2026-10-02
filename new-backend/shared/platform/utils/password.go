@@ -1,6 +1,7 @@
 package utils
 
 import (
+	"context"
 	"crypto/rand"
 	"crypto/subtle"
 	"encoding/base64"
@@ -8,6 +9,8 @@ import (
 	"fmt"
 	"strings"
 	"sync"
+	"sync/atomic"
+	"time"
 
 	"golang.org/x/crypto/argon2"
 )
@@ -38,6 +41,49 @@ var DefaultParams = &Argon2Params{
 // ErrWeakPassword is returned when a password fails policy checks.
 var ErrWeakPassword = errors.New("password does not meet policy: min 8 chars, at least one uppercase, one lowercase, one digit")
 
+// ErrPasswordHashBusy means no Argon2id slot came free within the wait, or the
+// caller's context ended first. It says nothing about the password itself.
+var ErrPasswordHashBusy = errors.New("password hashing is at capacity")
+
+// DefaultPasswordHashConcurrency is the slot count until
+// SetPasswordHashConcurrency changes it.
+const DefaultPasswordHashConcurrency = 4
+
+// passwordHashWait is how long a caller queues for a slot. A login that cannot
+// start within it is better answered "try again" than parked behind a burst
+// whose end it cannot see. A variable so tests can shorten it.
+var passwordHashWait = 5 * time.Second
+
+// hashSlots bounds the Argon2id computations in flight. Every hash and every
+// verify holds DefaultParams.Memory (64 MiB) for its whole run, so this — not
+// the request rate — keeps a login burst inside the auth container's memory:
+// N slots cost N x 64 MiB however many logins arrive at once.
+var hashSlots atomic.Pointer[chan struct{}]
+
+func init() { SetPasswordHashConcurrency(DefaultPasswordHashConcurrency) }
+
+// SetPasswordHashConcurrency resizes the slot pool. Meant for startup; a hash
+// already running gives its slot back to the pool it took it from.
+func SetPasswordHashConcurrency(n int) {
+	slots := make(chan struct{}, max(n, 1))
+	hashSlots.Store(&slots)
+}
+
+// acquireHashSlot waits for a slot and returns the function that frees it.
+func acquireHashSlot(ctx context.Context) (func(), error) {
+	slots := *hashSlots.Load()
+	timer := time.NewTimer(passwordHashWait)
+	defer timer.Stop()
+	select {
+	case slots <- struct{}{}:
+		return func() { <-slots }, nil
+	case <-timer.C:
+		return nil, ErrPasswordHashBusy
+	case <-ctx.Done():
+		return nil, fmt.Errorf("%w: %w", ErrPasswordHashBusy, ctx.Err())
+	}
+}
+
 // dummyHash is a real Argon2id hash of an unguessable random string. Use it
 // via VerifyDummyPassword to keep login response time uniform when the user
 // does not exist, defeating email enumeration via timing side-channel.
@@ -54,7 +100,7 @@ var dummyHash = sync.OnceValue(func() string {
 	if _, err := rand.Read(random); err != nil {
 		panic("failed to seed dummy password hash: " + err.Error())
 	}
-	h, err := HashPassword(base64.RawStdEncoding.EncodeToString(random))
+	h, err := hashPassword(base64.RawStdEncoding.EncodeToString(random))
 	if err != nil {
 		panic("failed to compute dummy password hash: " + err.Error())
 	}
@@ -68,11 +114,14 @@ func WarmDummyPassword() {
 }
 
 // VerifyDummyPassword runs the full Argon2id verification against a
-// precomputed throwaway hash. Always returns false. Use on the
-// "user not found" branch of a login flow so the response time is
-// indistinguishable from the password-mismatch branch.
-func VerifyDummyPassword(password string) bool {
-	return VerifyPassword(dummyHash(), password)
+// precomputed throwaway hash; it never matches. Use on the "user not found"
+// branch of a login flow so the response time is indistinguishable from the
+// password-mismatch branch. It queues for a slot like a real verify: if it
+// skipped the queue, a burst would answer unknown addresses faster — and a
+// busy answer must not leak which branch was taken either.
+func VerifyDummyPassword(ctx context.Context, password string) error {
+	_, err := VerifyPassword(ctx, dummyHash(), password)
+	return err
 }
 
 // ValidatePasswordPolicy enforces the password policy used across the system.
@@ -98,9 +147,20 @@ func ValidatePasswordPolicy(password string) error {
 	return nil
 }
 
-// HashPassword generates an Argon2id hash of the password
+// HashPassword generates an Argon2id hash of the password once a slot is free.
 // Returns format: $argon2id$v=19$m=65536,t=3,p=4$salt$hash
-func HashPassword(password string) (string, error) {
+func HashPassword(ctx context.Context, password string) (string, error) {
+	release, err := acquireHashSlot(ctx)
+	if err != nil {
+		return "", err
+	}
+	defer release()
+	return hashPassword(password)
+}
+
+// hashPassword does the work without taking a slot. Only the dummy hash calls
+// it directly: that runs once, at startup, before any request competes.
+func hashPassword(password string) (string, error) {
 	// Generate random salt
 	salt := make([]byte, DefaultParams.SaltLength)
 	if _, err := rand.Read(salt); err != nil {
@@ -135,13 +195,20 @@ func HashPassword(password string) (string, error) {
 	return encodedHash, nil
 }
 
-// VerifyPassword compares a password with an Argon2id hash
-// Uses constant-time comparison to prevent timing attacks
-func VerifyPassword(encodedHash, password string) bool {
+// VerifyPassword reports whether password matches the Argon2id hash, comparing
+// in constant time. A malformed hash is a plain false; the error is only ever
+// ErrPasswordHashBusy, which is no answer about the password at all.
+func VerifyPassword(ctx context.Context, encodedHash, password string) (bool, error) {
 	params, salt, hash, err := decodeHash(encodedHash)
 	if err != nil {
-		return false
+		return false, nil
 	}
+
+	release, err := acquireHashSlot(ctx)
+	if err != nil {
+		return false, err
+	}
+	defer release()
 
 	// Compute hash of the provided password
 	computedHash := argon2.IDKey(
@@ -154,7 +221,7 @@ func VerifyPassword(encodedHash, password string) bool {
 	)
 
 	// Constant-time comparison (prevents timing attacks)
-	return subtle.ConstantTimeCompare(hash, computedHash) == 1
+	return subtle.ConstantTimeCompare(hash, computedHash) == 1, nil
 }
 
 // decodeHash parses an encoded Argon2id hash

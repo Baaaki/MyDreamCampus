@@ -129,6 +129,20 @@ func (s *EventService) HandleStudentCreated(ctx context.Context, event dto.Stude
 		return nil
 	}
 
+	// Parse user ID
+	userID, err := uuid.Parse(event.Data.ID)
+	if err != nil {
+		return fmt.Errorf("invalid user ID: %w", err)
+	}
+
+	// Initial password = email (as per documentation). Hashed before the
+	// transaction opens: waiting for an Argon2id slot must not hold a pooled
+	// connection.
+	passwordHash, err := utils.HashPassword(ctx, event.Data.Email)
+	if err != nil {
+		return fmt.Errorf("%w: failed to hash password: %v", sharedErrors.ErrInternal, err)
+	}
+
 	// Begin transaction
 	tx, err := s.pool.Begin(ctx)
 	if err != nil {
@@ -136,18 +150,6 @@ func (s *EventService) HandleStudentCreated(ctx context.Context, event dto.Stude
 	}
 	// Rollback after successful commit is a no-op returning ErrTxClosed — safe to discard.
 	defer func() { _ = tx.Rollback(ctx) }()
-
-	// Parse user ID
-	userID, err := uuid.Parse(event.Data.ID)
-	if err != nil {
-		return fmt.Errorf("invalid user ID: %w", err)
-	}
-
-	// Initial password = email (as per documentation)
-	passwordHash, err := utils.HashPassword(event.Data.Email)
-	if err != nil {
-		return fmt.Errorf("%w: failed to hash password: %v", sharedErrors.ErrInternal, err)
-	}
 
 	// Create user in auth database
 	queries := db.New(tx)
@@ -238,6 +240,20 @@ func (s *EventService) HandleStaffCreated(ctx context.Context, event dto.StaffCr
 		return nil
 	}
 
+	// Parse user ID
+	userID, err := uuid.Parse(event.Data.ID)
+	if err != nil {
+		return fmt.Errorf("invalid user ID: %w", err)
+	}
+
+	// Initial password = email. Hashed before the
+	// transaction opens: waiting for an Argon2id slot must not hold a pooled
+	// connection.
+	passwordHash, err := utils.HashPassword(ctx, event.Data.Email)
+	if err != nil {
+		return fmt.Errorf("%w: failed to hash password: %v", sharedErrors.ErrInternal, err)
+	}
+
 	// Begin transaction
 	tx, err := s.pool.Begin(ctx)
 	if err != nil {
@@ -245,18 +261,6 @@ func (s *EventService) HandleStaffCreated(ctx context.Context, event dto.StaffCr
 	}
 	// Rollback after successful commit is a no-op returning ErrTxClosed — safe to discard.
 	defer func() { _ = tx.Rollback(ctx) }()
-
-	// Parse user ID
-	userID, err := uuid.Parse(event.Data.ID)
-	if err != nil {
-		return fmt.Errorf("invalid user ID: %w", err)
-	}
-
-	// Initial password = email
-	passwordHash, err := utils.HashPassword(event.Data.Email)
-	if err != nil {
-		return fmt.Errorf("%w: failed to hash password: %v", sharedErrors.ErrInternal, err)
-	}
 
 	// Create user in auth database
 	queries := db.New(tx)

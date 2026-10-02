@@ -132,12 +132,23 @@ func respondValidationError(c *gin.Context, message string) {
 	})
 }
 
+// retryAfterSeconds is what a 503 asks the client to wait: long enough for
+// the Argon2id queue in front of it to move.
+const retryAfterSeconds = "2"
+
 // respondError answers with the AppError's own status, code and (Turkish)
 // message; anything else is an internal error whose details stay in the log.
+// A 503 passes through too: its message is written for the user ("try again
+// shortly") and carries nothing internal.
 func respondError(c *gin.Context, err error) {
-	if appErr, ok := sharedErrors.As(err); ok && appErr.HTTPStatus < http.StatusInternalServerError {
-		c.JSON(appErr.HTTPStatus, dto.ErrorResponse{Error: appErr.Code, Message: appErr.Message})
-		return
+	if appErr, ok := sharedErrors.As(err); ok {
+		if appErr.HTTPStatus == http.StatusServiceUnavailable {
+			c.Header("Retry-After", retryAfterSeconds)
+		}
+		if appErr.HTTPStatus < http.StatusInternalServerError || appErr.HTTPStatus == http.StatusServiceUnavailable {
+			c.JSON(appErr.HTTPStatus, dto.ErrorResponse{Error: appErr.Code, Message: appErr.Message})
+			return
+		}
 	}
 	c.JSON(http.StatusInternalServerError, dto.ErrorResponse{
 		Error:   sharedErrors.ErrInternal.Code,

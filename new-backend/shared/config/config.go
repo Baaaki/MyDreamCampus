@@ -25,6 +25,7 @@ type Config struct {
 	Timeout                TimeoutConfig
 	InternalClient         InternalClientConfig
 	Demo                   DemoConfig
+	PasswordHash           PasswordHashConfig
 	ProtectedAccountEmails []string
 }
 
@@ -90,6 +91,13 @@ type DemoConfig struct {
 	AdminEmail   string `mapstructure:"DEMO_ADMIN_EMAIL"`
 	TeacherEmail string `mapstructure:"DEMO_TEACHER_EMAIL"`
 	StudentEmail string `mapstructure:"DEMO_STUDENT_EMAIL"`
+}
+
+// PasswordHashConfig sizes the Argon2id slot pool (utils.SetPasswordHashConcurrency).
+// Each slot costs 64 MiB while it runs, so the value follows the auth
+// container's mem_limit, not its CPU count.
+type PasswordHashConfig struct {
+	Concurrency int `mapstructure:"PASSWORD_HASH_CONCURRENCY"`
 }
 
 // OutboxConfig governs the per-module outbox relay goroutines
@@ -252,6 +260,7 @@ func Load() (*Config, error) {
 			TeacherEmail: viper.GetString("DEMO_TEACHER_EMAIL"),
 			StudentEmail: viper.GetString("DEMO_STUDENT_EMAIL"),
 		},
+		PasswordHash:           PasswordHashConfig{Concurrency: viper.GetInt("PASSWORD_HASH_CONCURRENCY")},
 		ProtectedAccountEmails: splitList(viper.GetString("PROTECTED_ACCOUNT_EMAILS")),
 	}
 
@@ -292,6 +301,8 @@ func setDefaults() {
 	viper.SetDefault("DEMO_TEACHER_EMAIL", "ahmet.yilmaz@uni.edu.tr")
 	viper.SetDefault("DEMO_STUDENT_EMAIL", "zeynep.sahin@uni.edu.tr")
 	viper.SetDefault("PROTECTED_ACCOUNT_EMAILS", "admin@university.edu.tr,demo.admin@mydreamcampus.com,ahmet.yilmaz@uni.edu.tr,zeynep.sahin@uni.edu.tr")
+
+	viper.SetDefault("PASSWORD_HASH_CONCURRENCY", 4)
 
 	viper.SetDefault("OUTBOX_POLL_INTERVAL_SECONDS", 5)
 	viper.SetDefault("OUTBOX_BATCH_SIZE", 10)
@@ -426,6 +437,9 @@ func (c *Config) Validate() error {
 	}
 	if c.Outbox.BatchSize <= 0 {
 		return fmt.Errorf("OUTBOX_BATCH_SIZE must be positive")
+	}
+	if c.PasswordHash.Concurrency <= 0 {
+		return fmt.Errorf("PASSWORD_HASH_CONCURRENCY must be positive")
 	}
 	return nil
 }

@@ -198,15 +198,19 @@ services:
       dockerfile: new-backend/services/auth-service/Dockerfile
     image: mydreamcampus-auth:latest
     container_name: mydreamcampus-auth
-    # Sized for Argon2id, not for idle: every hash and every verify allocates
-    # 64 MB (utils.DefaultParams.Memory), so a handful of concurrent logins —
-    # or the burst of user-creation events a seed produces — is hundreds of
-    # megabytes of transient buffers. Measured 147 MB after eleven hashes at
-    # rest; 192 MB would OOM-kill this container under three parallel logins.
+    # Sized for Argon2id, not for idle: every hash and every verify holds
+    # 64 MB (utils.DefaultParams.Memory) while it runs. The three numbers move
+    # together: PASSWORD_HASH_CONCURRENCY slots x 64 MB of live buffers, a
+    # GOMEMLIMIT just above that so the GC returns finished buffers before the
+    # cgroup kills the process, and mem_limit with room for the binary.
+    # Measured with four concurrent hashes: 609 MB peak RSS without GOMEMLIMIT,
+    # 300 MB with it. More slots buy no throughput (~33 hashes/s at 4 and 16).
     mem_limit: 384m
     environment:
       <<: *service-env
       PORT: "8081"
+      PASSWORD_HASH_CONCURRENCY: "4"
+      GOMEMLIMIT: 300MiB
       DB_URL: postgres://auth_svc:${SERVICE_DB_PASSWORD:?}@postgres:5432/auth?sslmode=disable
     expose:
       - "8081"

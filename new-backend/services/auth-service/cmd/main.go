@@ -33,6 +33,8 @@ func main() {
 		{Queue: events.QueueAuthStaffEvents, Exchange: "student.events", RoutingKey: "student.deactivated"},
 	})
 
+	// Auth is the only service that hashes, so only it sizes the pool.
+	utils.SetPasswordHashConcurrency(rt.Cfg.PasswordHash.Concurrency)
 	// Before the first login can arrive — see utils.WarmDummyPassword.
 	utils.WarmDummyPassword()
 

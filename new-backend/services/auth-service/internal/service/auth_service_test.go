@@ -2,10 +2,15 @@ package service
 
 import (
 	"context"
+	"errors"
+	"fmt"
+	"net/http"
 	"testing"
 	"time"
 
 	"github.com/baaaki/mydreamcampus/auth/internal/db"
+	serviceErrors "github.com/baaaki/mydreamcampus/auth/internal/errors"
+	sharedErrors "github.com/baaaki/mydreamcampus/shared/platform/errors"
 	"github.com/baaaki/mydreamcampus/shared/platform/utils"
 	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5/pgtype"
@@ -192,17 +197,19 @@ func TestPasswordHashing(t *testing.T) {
 	password := "TestPassword123!"
 
 	// Hash password
-	hash, err := utils.HashPassword(password)
+	hash, err := utils.HashPassword(context.Background(), password)
 	assert.NoError(t, err)
 	assert.NotEmpty(t, hash)
 	assert.NotEqual(t, password, hash)
 
 	// Verify correct password
-	valid := utils.VerifyPassword(hash, password)
+	valid, err := utils.VerifyPassword(context.Background(), hash, password)
+	assert.NoError(t, err)
 	assert.True(t, valid)
 
 	// Verify wrong password
-	invalid := utils.VerifyPassword(hash, "WrongPassword123!")
+	invalid, err := utils.VerifyPassword(context.Background(), hash, "WrongPassword123!")
+	assert.NoError(t, err)
 	assert.False(t, invalid)
 }
 
@@ -244,4 +251,15 @@ func TestEventIdempotency(t *testing.T) {
 // Helper function
 func stringPtr(s string) *string {
 	return &s
+}
+
+func TestPasswordWorkError_FullSlotPoolIsA503AndTheRestA500(t *testing.T) {
+	busy, ok := sharedErrors.As(passwordWorkError(fmt.Errorf("verify: %w", utils.ErrPasswordHashBusy)))
+	assert.True(t, ok)
+	assert.Equal(t, serviceErrors.ErrPasswordWorkBusy.Code, busy.Code)
+	assert.Equal(t, http.StatusServiceUnavailable, busy.HTTPStatus)
+
+	other, ok := sharedErrors.As(passwordWorkError(errors.New("salt: entropy source failed")))
+	assert.True(t, ok)
+	assert.Equal(t, http.StatusInternalServerError, other.HTTPStatus)
 }

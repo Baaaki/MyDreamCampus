@@ -54,7 +54,7 @@ func (f *memorySessions) RotateSession(ctx context.Context, oldJTI string, p db.
 // either log everyone out or keep a token alive for the whole offset.
 func TestLogin_TimeMachineActive_TokensAndSessionOnRealClock(t *testing.T) {
 	require.NoError(t, logger.Init("test"))
-	hash, err := utils.HashPassword("Sifre-12345")
+	hash, err := utils.HashPassword(context.Background(), "Sifre-12345")
 	require.NoError(t, err)
 
 	for _, offset := range []time.Duration{365 * 24 * time.Hour, -365 * 24 * time.Hour} {
