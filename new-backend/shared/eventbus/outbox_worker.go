@@ -6,9 +6,16 @@ import (
 	"time"
 
 	"github.com/baaaki/mydreamcampus/shared/platform/logger"
-	"github.com/baaaki/mydreamcampus/shared/platform/rabbitmq"
 	"go.uber.org/zap"
 )
+
+// Publisher is the part of rabbitmq.Publisher the relay needs. Publish
+// returns nil only once the broker has confirmed the message, which is what
+// lets the worker treat a nil as "safe to mark sent". It is an interface so a
+// test can stand a fake broker in for the real one.
+type Publisher interface {
+	Publish(ctx context.Context, exchange, routingKey string, payload any) error
+}
 
 // OutboxWorker polls one module's outbox table and relays events to RabbitMQ.
 // Each module spins
@@ -18,7 +25,7 @@ type OutboxWorker struct {
 	module    string
 	exchange  string
 	store     OutboxStore
-	publisher *rabbitmq.Publisher
+	publisher Publisher
 	interval  time.Duration
 	batchSize int32
 }
@@ -26,7 +33,7 @@ type OutboxWorker struct {
 func NewOutboxWorker(
 	module, exchange string,
 	store OutboxStore,
-	publisher *rabbitmq.Publisher,
+	publisher Publisher,
 	interval time.Duration,
 	batchSize int32,
 ) *OutboxWorker {
@@ -115,15 +122,18 @@ func (w *OutboxWorker) processEvents(ctx context.Context) {
 		}
 
 		if err := w.publisher.Publish(ctx, w.exchange, ev.RoutingKey, message); err != nil {
-			log.Error("publish failed",
+			// The broker refused, not the event: leaving the row pending with
+			// its retries intact is what lets an outage of any length end
+			// without losing anything. Counting it as a failed attempt parked
+			// events for good after ~25 s. The rest of the batch would each sit
+			// out their own confirm timeout, so the batch ends here.
+			log.Error("publish failed, leaving the rest of the batch pending",
 				zap.Error(err),
 				zap.String("event_id", ev.ID.String()),
 				zap.String("event_type", ev.EventType),
 				zap.String("routing_key", ev.RoutingKey),
 			)
-			_ = w.store.MarkFailed(ctx, ev.ID, err.Error())
-			failed++
-			continue
+			break
 		}
 
 		if err := w.store.MarkProcessed(ctx, ev.ID); err != nil {
