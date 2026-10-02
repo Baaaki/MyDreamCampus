@@ -86,78 +86,90 @@ func (w *OutboxWorker) processEvents(ctx context.Context) {
 		zap.String("method", "processEvents"),
 	)
 
-	pending, err := w.store.GetPending(ctx, w.batchSize)
-	if err != nil {
-		log.Error("failed to get pending events", zap.Error(err))
-		return
+	for {
+		if ctx.Err() != nil {
+			return
+		}
+
+		pending, err := w.store.GetPending(ctx, w.batchSize)
+		if err != nil {
+			log.Error("failed to get pending events", zap.Error(err))
+			return
+		}
+		if len(pending) == 0 {
+			w.processFailedEvents(ctx)
+			return
+		}
+
+		log.Info("processing outbox events", zap.Int("count", len(pending)))
+
+		var success, failed int
+		var stoppedEarly bool
+		for _, ev := range pending {
+			var payload map[string]any
+			if err := json.Unmarshal(ev.Payload, &payload); err != nil {
+				log.Error("malformed payload",
+					zap.Error(err),
+					zap.String("event_id", ev.ID.String()),
+				)
+				_ = settle(ctx, func(ctx context.Context) error { return w.store.MarkFailed(ctx, ev.ID, err.Error()) })
+				failed++
+				continue
+			}
+
+			// Envelope shape shared with all consumers (notification service +
+			// module workers) — changing a key here is a breaking contract change.
+			// correlation_id is omitted when absent, so consumers that predate it
+			// keep parsing the envelope unchanged.
+			message := map[string]any{
+				"event_id":   ev.ID.String(),
+				"event_type": ev.EventType,
+				"timestamp":  ev.CreatedAt,
+				"data":       payload,
+			}
+			if ev.CorrelationID != "" {
+				message["correlation_id"] = ev.CorrelationID
+			}
+
+			if err := w.publisher.Publish(ctx, w.exchange, ev.RoutingKey, message); err != nil {
+				// The broker refused, not the event: leaving the row pending with
+				// its retries intact is what lets an outage of any length end
+				// without losing anything. Counting it as a failed attempt parked
+				// events for good after ~25 s. The rest of the batch would each sit
+				// out their own confirm timeout, so the batch ends here.
+				log.Error("publish failed, leaving the rest of the batch pending",
+					zap.Error(err),
+					zap.String("event_id", ev.ID.String()),
+					zap.String("event_type", ev.EventType),
+					zap.String("routing_key", ev.RoutingKey),
+				)
+				stoppedEarly = true
+				break
+			}
+
+			if err := settle(ctx, func(ctx context.Context) error { return w.store.MarkProcessed(ctx, ev.ID) }); err != nil {
+				log.Error("mark processed failed",
+					zap.Error(err),
+					zap.String("event_id", ev.ID.String()),
+				)
+				failed++
+				stoppedEarly = true
+				continue
+			}
+			success++
+		}
+
+		log.Info("outbox cycle complete",
+			zap.Int("success", success),
+			zap.Int("failed", failed),
+			zap.Int("total", len(pending)),
+		)
+
+		if stoppedEarly || len(pending) < int(w.batchSize) {
+			w.processFailedEvents(ctx)
+			return
+		}
 	}
-	if len(pending) == 0 {
-		w.processFailedEvents(ctx)
-		return
-	}
-
-	log.Info("processing outbox events", zap.Int("count", len(pending)))
-
-	var success, failed int
-	for _, ev := range pending {
-		var payload map[string]any
-		if err := json.Unmarshal(ev.Payload, &payload); err != nil {
-			log.Error("malformed payload",
-				zap.Error(err),
-				zap.String("event_id", ev.ID.String()),
-			)
-			_ = settle(ctx, func(ctx context.Context) error { return w.store.MarkFailed(ctx, ev.ID, err.Error()) })
-			failed++
-			continue
-		}
-
-		// Envelope shape shared with all consumers (notification service +
-		// module workers) — changing a key here is a breaking contract change.
-		// correlation_id is omitted when absent, so consumers that predate it
-		// keep parsing the envelope unchanged.
-		message := map[string]any{
-			"event_id":   ev.ID.String(),
-			"event_type": ev.EventType,
-			"timestamp":  ev.CreatedAt,
-			"data":       payload,
-		}
-		if ev.CorrelationID != "" {
-			message["correlation_id"] = ev.CorrelationID
-		}
-
-		if err := w.publisher.Publish(ctx, w.exchange, ev.RoutingKey, message); err != nil {
-			// The broker refused, not the event: leaving the row pending with
-			// its retries intact is what lets an outage of any length end
-			// without losing anything. Counting it as a failed attempt parked
-			// events for good after ~25 s. The rest of the batch would each sit
-			// out their own confirm timeout, so the batch ends here.
-			log.Error("publish failed, leaving the rest of the batch pending",
-				zap.Error(err),
-				zap.String("event_id", ev.ID.String()),
-				zap.String("event_type", ev.EventType),
-				zap.String("routing_key", ev.RoutingKey),
-			)
-			break
-		}
-
-		if err := settle(ctx, func(ctx context.Context) error { return w.store.MarkProcessed(ctx, ev.ID) }); err != nil {
-			log.Error("mark processed failed",
-				zap.Error(err),
-				zap.String("event_id", ev.ID.String()),
-			)
-			failed++
-			continue
-		}
-		success++
-	}
-
-	log.Info("outbox cycle complete",
-		zap.Int("success", success),
-		zap.Int("failed", failed),
-		zap.Int("total", len(pending)),
-	)
-
-	w.processFailedEvents(ctx)
 }
 
 // settle runs one bookkeeping write about an event that was just handled, on a

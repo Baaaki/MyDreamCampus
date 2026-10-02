@@ -31,6 +31,9 @@ type fakeRow struct {
 type fakeStore struct {
 	mu   sync.Mutex
 	rows []*fakeRow
+	// markProcessedErr, when set, makes every "mark sent" fail the way a
+	// database that went away mid-batch does.
+	markProcessedErr error
 }
 
 var _ OutboxStore = (*fakeStore)(nil)
@@ -65,6 +68,9 @@ func (s *fakeStore) GetFailed(ctx context.Context, limit int32) ([]OutboxEvent, 
 func (s *fakeStore) MarkProcessed(ctx context.Context, id uuid.UUID) error {
 	if err := ctx.Err(); err != nil {
 		return err
+	}
+	if s.markProcessedErr != nil {
+		return s.markProcessedErr
 	}
 	return s.set(id, statusProcessed, false)
 }
@@ -213,4 +219,41 @@ func TestProcessEvents_ShutdownRightAfterConfirm_StillRecordsTheEventAsSent(t *t
 
 	assert.Equal(t, []outboxStatus{statusProcessed, statusPending, statusPending}, store.statuses())
 	assert.Equal(t, 1, broker.calls, "nothing more goes out once the context is cancelled")
+}
+
+func payloads(n int) []string {
+	out := make([]string, n)
+	for i := range out {
+		out[i] = `{"n":1}`
+	}
+	return out
+}
+
+// One batch per tick capped each service at batch/interval events a second
+// (10 per 5 s), so a burst of enrollments took minutes to reach its
+// consumers. A tick now runs until a batch comes back short.
+func TestProcessEvents_BacklogLargerThanABatch_IsDrainedInOneTick(t *testing.T) {
+	store := newFakeStore(payloads(25)...)
+	broker := &fakeBroker{failFrom: -1}
+
+	newTestWorker(t, store, broker, 10).processEvents(context.Background())
+
+	assert.Equal(t, 25, broker.calls)
+	for _, st := range store.statuses() {
+		assert.Equal(t, statusProcessed, st)
+	}
+}
+
+// A row whose "mark sent" keeps failing is still pending, so reading the next
+// batch would hand the same rows back and the drain would never end.
+func TestProcessEvents_MarkSentFails_StopsDrainingInsteadOfRereadingTheSameRows(t *testing.T) {
+	store := newFakeStore(payloads(25)...)
+	store.markProcessedErr = errors.New("connection reset")
+	broker := &fakeBroker{failFrom: -1}
+	ctx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
+	defer cancel()
+
+	newTestWorker(t, store, broker, 10).processEvents(ctx)
+
+	assert.Equal(t, 10, broker.calls, "one batch, then back to the ticker")
 }
