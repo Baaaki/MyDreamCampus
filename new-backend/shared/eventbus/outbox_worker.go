@@ -9,10 +9,10 @@ import (
 	"go.uber.org/zap"
 )
 
-// settleTimeout bounds one bookkeeping write about an event that has already
-// been handled.
+// SettleTimeout bounds one bookkeeping step about events that have already
+// been handled: a single write, the begin, the commit or the rollback of the
+// claim transaction.
 const SettleTimeout = 10 * time.Second
-const settleTimeout = SettleTimeout
 
 // Publisher is the part of rabbitmq.Publisher the relay needs. Publish
 // returns nil only once the broker has confirmed the message, which is what

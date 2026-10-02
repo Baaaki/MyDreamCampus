@@ -42,13 +42,7 @@ func (c *outboxClaimTx) MarkFailed(ctx context.Context, id uuid.UUID, msg string
 }
 
 func (s *OutboxStore) ClaimPending(ctx context.Context, limit int32, settle func(ctx context.Context, events []eventbus.OutboxEvent, tx eventbus.ClaimTx) error) error {
-	if err := ctx.Err(); err != nil {
-		return err
-	}
-	commitCtx, cancel := context.WithTimeout(context.WithoutCancel(ctx), eventbus.SettleTimeout)
-	defer cancel()
-
-	return pgx.BeginFunc(commitCtx, s.repo.pool, func(tx pgx.Tx) error {
+	return eventbus.InClaimTx(ctx, s.repo.pool, func(tx pgx.Tx) error {
 		txRepo := s.repo.withTx(tx)
 		rows, err := txRepo.GetPendingEvents(ctx, limit)
 		if err != nil {

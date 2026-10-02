@@ -56,13 +56,13 @@ type fakeClaimTx struct {
 }
 
 func (tx *fakeClaimTx) MarkProcessed(ctx context.Context, id uuid.UUID) error {
-	settleCtx, cancel := context.WithTimeout(context.WithoutCancel(ctx), settleTimeout)
+	settleCtx, cancel := context.WithTimeout(context.WithoutCancel(ctx), SettleTimeout)
 	defer cancel()
 	return tx.store.MarkProcessed(settleCtx, id)
 }
 
 func (tx *fakeClaimTx) MarkFailed(ctx context.Context, id uuid.UUID, msg string) error {
-	settleCtx, cancel := context.WithTimeout(context.WithoutCancel(ctx), settleTimeout)
+	settleCtx, cancel := context.WithTimeout(context.WithoutCancel(ctx), SettleTimeout)
 	defer cancel()
 	return tx.store.MarkFailed(settleCtx, id, msg)
 }
