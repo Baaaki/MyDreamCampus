@@ -278,29 +278,9 @@ func (s *EnrollmentService) CreateEnrollmentProgram(ctx context.Context, req dto
 		return dto.EnrollmentProgramResponse{}, serviceErrors.ErrScheduleConflict
 	}
 
-	// Check schedule conflicts with student's already approved enrollments
-	statusApproved := "approved"
-	approvedPrograms, err := s.enrollmentRepo.GetEnrollmentProgramsByStudent(ctx, req.StudentID, nil, &statusApproved)
-	var existingCourseIDs []uuid.UUID
-	if err == nil {
-		for _, p := range approvedPrograms {
-			cRows, _ := s.enrollmentRepo.GetCoursesByProgramID(ctx, utils.PgtypeToUUID(p.ID))
-			for _, c := range cRows {
-				existingCourseIDs = append(existingCourseIDs, utils.PgtypeToUUID(c.CourseID))
-			}
-		}
-	}
-
-	if len(existingCourseIDs) > 0 {
-		existingCourses, err := s.courseCatalogClient.GetCoursesByIDs(ctx, req.Semester, existingCourseIDs)
-		if err == nil {
-			allCourses := append(courses, existingCourses...)
-			if err := s.checkScheduleConflict(allCourses); err != nil {
-				serviceLogger.Warn("schedule conflict with approved enrollment", zap.Error(err))
-				return dto.EnrollmentProgramResponse{}, serviceErrors.ErrScheduleConflict
-			}
-		}
-	}
+	// No check against the student's approved programs: one this semester
+	// has already stopped the submission above (one program per semester),
+	// and another semester's courses cannot clash with this one's timetable.
 
 	// Check capacity and create program (with transaction)
 	program, err := s.createProgramWithCapacityCheck(ctx, req, courses, replace)
