@@ -5,8 +5,8 @@ import (
 
 	"github.com/baaaki/mydreamcampus/attendance/internal/db"
 	"github.com/baaaki/mydreamcampus/shared/platform/utils"
-	"github.com/jackc/pgx/v5/pgtype"
 	"github.com/jackc/pgx/v5"
+	"github.com/jackc/pgx/v5/pgtype"
 	"github.com/jackc/pgx/v5/pgxpool"
 )
 
