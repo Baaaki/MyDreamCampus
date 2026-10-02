@@ -124,6 +124,9 @@ type fakeBroker struct {
 }
 
 func (b *fakeBroker) Publish(ctx context.Context, exchange, routingKey string, payload any) error {
+	if err := ctx.Err(); err != nil {
+		return err
+	}
 	b.mu.Lock()
 	n := b.calls
 	b.calls++
@@ -190,4 +193,24 @@ func TestProcessEvents_MalformedPayload_IsParkedAndTheBatchContinues(t *testing.
 
 	assert.Equal(t, []outboxStatus{statusFailed, statusProcessed}, store.statuses())
 	assert.Equal(t, 1, broker.calls)
+}
+
+// The broker's confirm and the shutdown signal can arrive back to back. The
+// event is then already out, so recording it must not depend on the context
+// that was just cancelled: a row left pending is published a second time on
+// the next start.
+func TestProcessEvents_ShutdownRightAfterConfirm_StillRecordsTheEventAsSent(t *testing.T) {
+	store := newFakeStore(`{"n":1}`, `{"n":2}`, `{"n":3}`)
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+	broker := &fakeBroker{failFrom: -1, onCall: func(n int) {
+		if n == 0 {
+			cancel()
+		}
+	}}
+
+	newTestWorker(t, store, broker, 10).processEvents(ctx)
+
+	assert.Equal(t, []outboxStatus{statusProcessed, statusPending, statusPending}, store.statuses())
+	assert.Equal(t, 1, broker.calls, "nothing more goes out once the context is cancelled")
 }

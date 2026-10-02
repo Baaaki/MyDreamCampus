@@ -9,6 +9,10 @@ import (
 	"go.uber.org/zap"
 )
 
+// settleTimeout bounds one bookkeeping write about an event that has already
+// been handled.
+const settleTimeout = 10 * time.Second
+
 // Publisher is the part of rabbitmq.Publisher the relay needs. Publish
 // returns nil only once the broker has confirmed the message, which is what
 // lets the worker treat a nil as "safe to mark sent". It is an interface so a
@@ -102,7 +106,7 @@ func (w *OutboxWorker) processEvents(ctx context.Context) {
 				zap.Error(err),
 				zap.String("event_id", ev.ID.String()),
 			)
-			_ = w.store.MarkFailed(ctx, ev.ID, err.Error())
+			_ = settle(ctx, func(ctx context.Context) error { return w.store.MarkFailed(ctx, ev.ID, err.Error()) })
 			failed++
 			continue
 		}
@@ -136,7 +140,7 @@ func (w *OutboxWorker) processEvents(ctx context.Context) {
 			break
 		}
 
-		if err := w.store.MarkProcessed(ctx, ev.ID); err != nil {
+		if err := settle(ctx, func(ctx context.Context) error { return w.store.MarkProcessed(ctx, ev.ID) }); err != nil {
 			log.Error("mark processed failed",
 				zap.Error(err),
 				zap.String("event_id", ev.ID.String()),
@@ -154,6 +158,16 @@ func (w *OutboxWorker) processEvents(ctx context.Context) {
 	)
 
 	w.processFailedEvents(ctx)
+}
+
+// settle runs one bookkeeping write about an event that was just handled, on a
+// context that outlives shutdown. A confirmed publish followed by SIGTERM
+// would otherwise fail its own "mark sent" and go out a second time on the
+// next start.
+func settle(ctx context.Context, write func(ctx context.Context) error) error {
+	settleCtx, cancel := context.WithTimeout(context.WithoutCancel(ctx), settleTimeout)
+	defer cancel()
+	return write(settleCtx)
 }
 
 func (w *OutboxWorker) processFailedEvents(ctx context.Context) {
