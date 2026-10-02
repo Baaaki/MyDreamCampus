@@ -16,6 +16,7 @@ import (
 	"github.com/baaaki/mydreamcampus/shared/platform/utils"
 	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5"
+	"github.com/jackc/pgx/v5/pgconn"
 	"github.com/jackc/pgx/v5/pgtype"
 	"github.com/jackc/pgx/v5/pgxpool"
 	"go.uber.org/zap"
@@ -94,6 +95,11 @@ func (r *EnrollmentRepository) CreateProgramWithCoursesAndEvent(
 	// Create enrollment program
 	program, err := qtx.CreateEnrollmentProgram(ctx, programParams)
 	if err != nil {
+		if isUniqueViolation(err) {
+			// UNIQUE(student_id, semester): the same student's other
+			// submission committed while this one waited on the index.
+			return db.EnrollmentProgram{}, serviceErrors.ErrSubmissionConflict
+		}
 		return db.EnrollmentProgram{}, fmt.Errorf("%w: failed to create enrollment program: %v", sharedErrors.ErrQueryFailed, err)
 	}
 
@@ -131,6 +137,11 @@ func (r *EnrollmentRepository) CreateProgramWithCoursesAndEvent(
 	}
 
 	return program, nil
+}
+
+func isUniqueViolation(err error) bool {
+	var pgErr *pgconn.PgError
+	return errors.As(err, &pgErr) && pgErr.Code == "23505" // unique_violation
 }
 
 func (r *EnrollmentRepository) GetEnrollmentProgramByID(ctx context.Context, id uuid.UUID) (db.EnrollmentProgram, error) {

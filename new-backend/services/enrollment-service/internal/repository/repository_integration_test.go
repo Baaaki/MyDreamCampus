@@ -118,6 +118,39 @@ func TestCreateProgram_SameCoursesInOppositeOrder_NoDeadlock(t *testing.T) {
 	assert.Equal(t, 2*pairs, n)
 }
 
+// A double click sends two submissions for one student at once. Both pass
+// the "no program yet" read; the unique index lets one in, and the other used
+// to surface its violation as a 500.
+func TestCreateProgram_SameStudentTwiceAtOnce_OneWinsTheRestConflict(t *testing.T) {
+	_, repo := newEnrollmentDB(t)
+	student := uuid.New()
+	const attempts = 6
+
+	var wg sync.WaitGroup
+	errs := make([]error, attempts)
+	start := make(chan struct{})
+	for i := range attempts {
+		wg.Add(1)
+		go func() {
+			defer wg.Done()
+			<-start
+			_, errs[i] = submit(repo, student, course(30))
+		}()
+	}
+	close(start)
+	wg.Wait()
+
+	won := 0
+	for _, err := range errs {
+		if err == nil {
+			won++
+			continue
+		}
+		assert.ErrorIs(t, err, serviceErrors.ErrSubmissionConflict)
+	}
+	assert.Equal(t, 1, won)
+}
+
 func TestCreateProgram_RejectedOrCancelledProgram_GivesItsSeatBack(t *testing.T) {
 	pool, repo := newEnrollmentDB(t)
 	ctx := context.Background()

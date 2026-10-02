@@ -389,6 +389,9 @@ func (s *EnrollmentService) createProgramWithCapacityCheck(ctx context.Context, 
 	// Create program with courses and event (atomic transaction with advisory locks)
 	program, err := s.enrollmentRepo.CreateProgramWithCoursesAndEvent(ctx, programParams, courseSnapshots, eventPayload)
 	if err != nil {
+		if sharedErrors.Is(err, serviceErrors.ErrSubmissionConflict) {
+			return db.EnrollmentProgram{}, err
+		}
 		// Check for capacity error
 		if sharedErrors.Is(err, sharedErrors.ErrConflict) {
 			return db.EnrollmentProgram{}, serviceErrors.ErrCourseFull
