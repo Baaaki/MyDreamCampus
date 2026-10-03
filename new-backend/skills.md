@@ -133,6 +133,12 @@ make test-backend    # shared + 10 servis, -race
 - **Publish**: Service, is transaction'i ICINDE outbox tablosuna yazar
   (`staff/repository/outbox_repository.go` + `outbox_store.go` pattern'i).
   OutboxWorker arka planda RabbitMQ'ya basar.
+- **Relay (claim)**: `OutboxStore.ClaimPending` batch'i tek transaction'da
+  alir; `GetPendingOutboxEvents` sorgusu `FOR UPDATE SKIP LOCKED` tasimali
+  (iki worker ayni satiri almaz) ve store `eventbus.InClaimTx` ile sarilmali
+  (commit'in kendi timeout'u var, kapanista onayli satirlar kaybolmaz). Broker
+  reddederse satir `pending` kalir, `retry_count` yanmaz; `MarkFailed` yalniz
+  JSON olmayan payload icin.
 - **Exchange adi**: `<servis>.events` — **routing key**: `<entity>.<action>`
   (ornek: `staff.created`, `grade.finalize.requested`).
 - **Consume**: Servisin `internal/worker/` altinda EventConsumer;
