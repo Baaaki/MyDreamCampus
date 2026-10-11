@@ -1,13 +1,24 @@
 package service
 
 import (
+	"encoding/json"
 	"sort"
 	"testing"
 
 	"github.com/baaaki/mydreamcampus/catalog/internal/db"
 	"github.com/baaaki/mydreamcampus/catalog/internal/dto"
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
+
+// assertMarshalsEmptyArray pins the wire shape clients rely on: a course
+// without sessions sends [], never null.
+func assertMarshalsEmptyArray(t *testing.T, v any) {
+	t.Helper()
+	raw, err := json.Marshal(v)
+	require.NoError(t, err)
+	assert.JSONEq(t, `[]`, string(raw))
+}
 
 // sortGrouped returns a deterministic copy of result by sorting the outer
 // slice on (day, type) and the inner SlotNumbers slice. The grouping
@@ -48,8 +59,8 @@ func multiRow(day, sessionType string, slot int16) db.GetScheduleSessionsByMulti
 }
 
 func TestGroupScheduleSessionsFromRows(t *testing.T) {
-	t.Run("nil input returns nil", func(t *testing.T) {
-		assert.Nil(t, groupScheduleSessionsFromRows(nil))
+	t.Run("nil input marshals as empty array", func(t *testing.T) {
+		assertMarshalsEmptyArray(t, groupScheduleSessionsFromRows(nil))
 	})
 
 	t.Run("single row produces one session with one slot", func(t *testing.T) {
@@ -127,8 +138,8 @@ func TestGroupScheduleSessionsFromMultiRows(t *testing.T) {
 	// in the SQL it came from, but the grouping shape is identical. The cases
 	// below mirror the by-id ones to lock both call sites.
 
-	t.Run("nil input returns nil", func(t *testing.T) {
-		assert.Nil(t, groupScheduleSessionsFromMultiRows(nil))
+	t.Run("nil input marshals as empty array", func(t *testing.T) {
+		assertMarshalsEmptyArray(t, groupScheduleSessionsFromMultiRows(nil))
 	})
 
 	t.Run("groups by (day, type) across rows from multiple courses", func(t *testing.T) {
@@ -150,5 +161,22 @@ func TestGroupScheduleSessionsFromMultiRows(t *testing.T) {
 			multiRow("friday", "lab", 2),
 		})
 		assert.Len(t, got, 2)
+	})
+}
+
+func TestTeacherSchedule(t *testing.T) {
+	t.Run("no sessions marshals as empty array", func(t *testing.T) {
+		assertMarshalsEmptyArray(t, teacherSchedule(nil, "A-101"))
+	})
+
+	t.Run("one entry per slot in the course's room", func(t *testing.T) {
+		got := teacherSchedule([]db.GetScheduleSessionsByCourseIDRow{
+			row("monday", "theory", 1),
+			row("monday", "lab", 2),
+		}, "A-101")
+		assert.Equal(t, []dto.TeacherScheduleSession{
+			{Day: "monday", Time: slotTimeRange(1), Room: "A-101", SessionType: "theory"},
+			{Day: "monday", Time: slotTimeRange(2), Room: "A-101", SessionType: "lab"},
+		}, got)
 	})
 }

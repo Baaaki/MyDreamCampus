@@ -683,7 +683,7 @@ func groupScheduleSessionsFromRows(sessions []db.GetScheduleSessionsByCourseIDRo
 		dayTypeMap[key] = append(dayTypeMap[key], session.SlotNumber)
 	}
 
-	var result []dto.ScheduleSession
+	result := make([]dto.ScheduleSession, 0, len(dayTypeMap))
 	for key, slots := range dayTypeMap {
 		result = append(result, dto.ScheduleSession{
 			DayOfWeek:   key.DayOfWeek,
@@ -707,7 +707,7 @@ func groupScheduleSessionsFromMultiRows(sessions []db.GetScheduleSessionsByMulti
 		dayTypeMap[key] = append(dayTypeMap[key], session.SlotNumber)
 	}
 
-	var result []dto.ScheduleSession
+	result := make([]dto.ScheduleSession, 0, len(dayTypeMap))
 	for key, slots := range dayTypeMap {
 		result = append(result, dto.ScheduleSession{
 			DayOfWeek:   key.DayOfWeek,
@@ -717,6 +717,21 @@ func groupScheduleSessionsFromMultiRows(sessions []db.GetScheduleSessionsByMulti
 	}
 
 	return result
+}
+
+// teacherSchedule lists a course's lessons one per slot, empty rather than
+// nil so a course without sessions marshals as [] for the client.
+func teacherSchedule(sessions []db.GetScheduleSessionsByCourseIDRow, room string) []dto.TeacherScheduleSession {
+	out := make([]dto.TeacherScheduleSession, 0, len(sessions))
+	for _, session := range sessions {
+		out = append(out, dto.TeacherScheduleSession{
+			Day:         string(session.DayOfWeek),
+			Time:        slotTimeRange(session.SlotNumber),
+			Room:        room,
+			SessionType: string(session.SessionType),
+		})
+	}
+	return out
 }
 
 // toSemesterCourseResponse converts db.SemesterCourse to dto.SemesterCourseResponse
@@ -778,16 +793,6 @@ func (s *SemesterService) GetTeacherCourses(ctx context.Context, instructorID uu
 		// Get schedule sessions for this course
 		sessions, _ := s.scheduleRepo.GetScheduleSessionsByCourseID(ctx, utils.PgUUIDToUUID(course.ID))
 
-		var scheduleSessions []dto.TeacherScheduleSession
-		for _, session := range sessions {
-			scheduleSessions = append(scheduleSessions, dto.TeacherScheduleSession{
-				Day:         string(session.DayOfWeek),
-				Time:        slotTimeRange(session.SlotNumber),
-				Room:        course.ClassroomLocation,
-				SessionType: string(session.SessionType),
-			})
-		}
-
 		courseItems = append(courseItems, dto.TeacherCourseItem{
 			ID:                utils.PgUUIDToUUID(course.ID),
 			CourseCode:        course.CourseCode,
@@ -800,7 +805,7 @@ func (s *SemesterService) GetTeacherCourses(ctx context.Context, instructorID uu
 			LabHours:          course.LabHours,
 			ClassroomLocation: course.ClassroomLocation,
 			MaxCapacity:       course.MaxCapacity,
-			Schedule:          scheduleSessions,
+			Schedule:          teacherSchedule(sessions, course.ClassroomLocation),
 		})
 	}
 
