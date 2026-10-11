@@ -546,6 +546,33 @@ func (h *GradeHandler) ProcessAppeal(c *gin.Context) {
 	c.JSON(http.StatusOK, result)
 }
 
+// GetCourseResults - GET /api/grades/admin/courses/:course_id/results
+// Admin only: the frozen results of a finalized course, which appeals start from
+func (h *GradeHandler) GetCourseResults(c *gin.Context) {
+	ctx, cancel := context.WithTimeout(c.Request.Context(), requestTimeout)
+	defer cancel()
+
+	courseID, err := uuid.Parse(c.Param("course_id"))
+	if err != nil {
+		c.JSON(http.StatusBadRequest, dto.ErrorResponse{
+			Error: "Geçersiz ders kimliği",
+			Code:  "INVALID_ID",
+		})
+		return
+	}
+
+	result, err := h.gradeService.GetCourseResults(ctx, courseID)
+	if err != nil {
+		logger.WithContextAndFields(ctx,
+			zap.String("handler", "GradeHandler"),
+			zap.String("method", "GetCourseResults"),
+		).Error("failed to list course results", zap.Error(err))
+		h.handleError(c, err)
+		return
+	}
+	c.JSON(http.StatusOK, result)
+}
+
 // UnlockScore - POST /api/grades/admin/scores/unlock
 // Admin only: Unlock a specific score so the teacher can re-enter it
 func (h *GradeHandler) UnlockScore(c *gin.Context) {

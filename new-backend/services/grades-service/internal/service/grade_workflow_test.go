@@ -927,6 +927,39 @@ func TestProcessAppeal_Refused(t *testing.T) {
 	assert.Empty(t, w.outbox)
 }
 
+// Finalization deletes the registrations, so an appeal reads the student's
+// frozen record instead.
+func TestGetCourseResults_ListsFrozenRecords(t *testing.T) {
+	w, courseID := newGradesWorld(t)
+	c := finalizedCourse(w, courseID, db.GradesGradingTypeEnumAbsolute, 60, 45, db.GradesGradePointEnum050)
+	w.completed[0].StudentNumber, w.completed[0].StudentFirstName, w.completed[0].StudentLastName = "2024001", "Ali", "Veli"
+	w.completed[0].IsAttendanceFailed = pgtype.Bool{Bool: true, Valid: true}
+	finalizedCourse(w, uuid.New(), db.GradesGradingTypeEnumAbsolute, 90, 90, db.GradesGradePointEnum400)
+
+	resp, err := w.service(openSemester()).GetCourseResults(context.Background(), courseID)
+
+	require.NoError(t, err)
+	require.Len(t, resp.Results, 1, "only this course's records")
+	got := resp.Results[0]
+	assert.Equal(t, c.StudentID, got.StudentID)
+	assert.Equal(t, "2024001", got.StudentNumber)
+	assert.Equal(t, "Ali", got.FirstName)
+	assert.Equal(t, map[string]float64{"vize": 60, "final": 45}, got.Scores)
+	assert.InDelta(t, 51, got.WeightedAverage, 0.001)
+	assert.Equal(t, string(db.GradesGradePointEnum050), got.GradePoint)
+	assert.True(t, got.IsAttendanceFailed)
+}
+
+func TestGetCourseResults_NotFinalized_EmptyList(t *testing.T) {
+	w, courseID := newGradesWorld(t)
+
+	resp, err := w.service(openSemester()).GetCourseResults(context.Background(), courseID)
+
+	require.NoError(t, err)
+	assert.NotNil(t, resp.Results, "an empty list, not null")
+	assert.Empty(t, resp.Results)
+}
+
 // ------------------------------------------------------------------- Queries
 
 func TestGetCourseStatus_ReportsPendingAssessments(t *testing.T) {

@@ -154,6 +154,7 @@ func (m *Module) RegisterRoutes(rg *gin.RouterGroup) {
 		admin.Use(platformMiddleware.RequireAdmin())
 		{
 			admin.POST("/appeals", m.gradeHandler.ProcessAppeal)
+			admin.GET("/courses/:course_id/results", m.gradeHandler.GetCourseResults)
 			// Single-score lock/unlock takes a bare registration_id and skips
 			// the course-instructor check, and a lock can trigger finalize —
 			// under the teacher group any teacher could close any course.

@@ -729,6 +729,39 @@ func (s *GradeService) GetCourseStatus(ctx context.Context, instructorID uuid.UU
 	return response, nil
 }
 
+// GetCourseResults lists the frozen results of a finalized course, ordered by
+// student number. Finalization moves each registration into a completed
+// record and deletes it, so GetCourseStudents has nothing left to show.
+func (s *GradeService) GetCourseResults(ctx context.Context, courseID uuid.UUID) (*dto.CourseResultsResponse, error) {
+	rows, err := s.completedRepo.GetCompletedCoursesByCourse(ctx, courseID)
+	if err != nil {
+		return nil, fmt.Errorf("list completed courses: %w", err)
+	}
+
+	results := make([]dto.CourseResultRow, 0, len(rows))
+	for _, row := range rows {
+		scores := map[string]float64{}
+		if err := json.Unmarshal(row.AssessmentScores, &scores); err != nil {
+			return nil, fmt.Errorf("decode scores of %s: %w", row.StudentNumber, err)
+		}
+		average, err := utils.PgNumericToFloat64(row.WeightedAverage)
+		if err != nil {
+			return nil, fmt.Errorf("decode average of %s: %w", row.StudentNumber, err)
+		}
+		results = append(results, dto.CourseResultRow{
+			StudentID:          row.StudentID,
+			StudentNumber:      row.StudentNumber,
+			FirstName:          row.StudentFirstName,
+			LastName:           row.StudentLastName,
+			Scores:             scores,
+			WeightedAverage:    average,
+			GradePoint:         string(row.GradePoint),
+			IsAttendanceFailed: utils.PgBoolToBool(row.IsAttendanceFailed),
+		})
+	}
+	return &dto.CourseResultsResponse{CourseID: courseID, Results: results}, nil
+}
+
 func (s *GradeService) GetCourseStudents(ctx context.Context, instructorID uuid.UUID, courseID uuid.UUID, isAdmin bool) (*dto.CourseStudentsResponse, error) {
 	// Get course
 	course, err := s.cacheRepo.GetCourseCacheByID(ctx, courseID)

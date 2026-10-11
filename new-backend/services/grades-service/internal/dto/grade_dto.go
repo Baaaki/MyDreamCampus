@@ -222,6 +222,24 @@ type AppealScoreRequest struct {
 	Reason   string   `json:"reason" binding:"required,min=10"`
 }
 
+// CourseResultRow is one student's frozen result in a finalized course: what
+// an appeal starts from, since the course's registrations are gone by then.
+type CourseResultRow struct {
+	StudentID          uuid.UUID          `json:"student_id"`
+	StudentNumber      string             `json:"student_number"`
+	FirstName          string             `json:"first_name"`
+	LastName           string             `json:"last_name"`
+	Scores             map[string]float64 `json:"scores"`
+	WeightedAverage    float64            `json:"weighted_average"`
+	GradePoint         string             `json:"grade_point"`
+	IsAttendanceFailed bool               `json:"is_attendance_failed"`
+}
+
+type CourseResultsResponse struct {
+	CourseID uuid.UUID         `json:"course_id"`
+	Results  []CourseResultRow `json:"results"`
+}
+
 type AppealScoreResponse struct {
 	StudentID          uuid.UUID `json:"student_id"`
 	CourseCode         string    `json:"course_code"`
