@@ -254,7 +254,7 @@ func (s *CatalogService) ListCourses(ctx context.Context, req dto.ListCoursesReq
 	}
 
 	// Convert to response DTOs
-	var courseItems []dto.CourseListItem
+	courseItems := make([]dto.CourseListItem, 0, len(courses))
 	for _, course := range courses {
 		prerequisites, err := repository.JSONToPrerequisites(course.Prerequisites)
 		if err != nil {

@@ -485,7 +485,7 @@ func (s *SemesterService) ListSemesterCourses(ctx context.Context, semester stri
 	}
 
 	// Convert to response DTOs
-	var courseItems []dto.SemesterCourseListItem
+	courseItems := make([]dto.SemesterCourseListItem, 0, len(courses))
 	for _, course := range courses {
 		courseID := uuid.UUID(course.ID.Bytes)
 
@@ -788,7 +788,7 @@ func (s *SemesterService) GetTeacherCourses(ctx context.Context, instructorID uu
 	}
 
 	// Build course items with schedule sessions
-	var courseItems []dto.TeacherCourseItem
+	courseItems := make([]dto.TeacherCourseItem, 0, len(courses))
 	for _, course := range courses {
 		// Get schedule sessions for this course
 		sessions, _ := s.scheduleRepo.GetScheduleSessionsByCourseID(ctx, utils.PgUUIDToUUID(course.ID))
