@@ -780,19 +780,9 @@ func (s *SemesterService) GetTeacherCourses(ctx context.Context, instructorID uu
 
 		var scheduleSessions []dto.TeacherScheduleSession
 		for _, session := range sessions {
-			// Convert slot number to time (each slot is typically 50 min, starting from 08:00)
-			startHour := 8 + (int(session.SlotNumber)-1)/2
-			startMin := ((int(session.SlotNumber) - 1) % 2) * 50
-			endHour := startHour
-			endMin := startMin + 50
-			if endMin >= 60 {
-				endHour++
-				endMin -= 60
-			}
-
 			scheduleSessions = append(scheduleSessions, dto.TeacherScheduleSession{
 				Day:         string(session.DayOfWeek),
-				Time:        fmt.Sprintf("%02d:%02d-%02d:%02d", startHour, startMin, endHour, endMin),
+				Time:        slotTimeRange(session.SlotNumber),
 				Room:        course.ClassroomLocation,
 				SessionType: string(session.SessionType),
 			})
@@ -823,6 +813,31 @@ func (s *SemesterService) GetTeacherCourses(ctx context.Context, instructorID uu
 		TotalCourses: len(courseItems),
 		Courses:      courseItems,
 	}, nil
+}
+
+// slotTimes is the bell schedule behind slot_number: 45-minute lessons from
+// 08:30 with 10-minute breaks, slot 5 the lunch hour, and the afternoon
+// restarting at 13:00 — hence a table, not a formula. Keep it in step with
+// TIME_SLOTS in frontend/src/lib/constants.ts and mobile/constants/schedule.ts.
+var slotTimes = [...]string{
+	1: "08:30-09:15",
+	2: "09:25-10:10",
+	3: "10:20-11:05",
+	4: "11:15-12:00",
+	5: "12:10-12:55",
+	6: "13:00-13:45",
+	7: "13:55-14:40",
+	8: "14:50-15:35",
+	9: "15:45-16:30",
+}
+
+// slotTimeRange returns a slot's "HH:MM-HH:MM", or "" outside 1-9 (which the
+// column's CHECK already rules out).
+func slotTimeRange(slot int16) string {
+	if slot < 1 || int(slot) >= len(slotTimes) {
+		return ""
+	}
+	return slotTimes[slot]
 }
 
 // semesterFormatRegex validates semester format: YYYY-YYYY-Fall or YYYY-YYYY-Spring
