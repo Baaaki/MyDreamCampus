@@ -595,6 +595,24 @@ docker compose logs seed        # ">> seed complete" görmelisin
 > zincirin dışında kalır. Seed'i baştan koşturmak volume'ları siler:
 > `docker compose down -v && make deploy`.
 
+### Kalıcı durumu ne zaman yenilemeli
+
+Seed'in tarihleri seed gününe sabitlenir ve saatlik geri dönüş hep bu kalıcı
+duruma döndüğü için kendiliğinden ilerlemez. Ufuk **yaklaşık 6 ay**: periyotlar
+seed'den 180 gün sonra kapanır (ders seçimi, not ve yoklama girişi durur),
+menü 6 ay sonra biter, aktif dönemin `hard_deadline`'ı ~200. günde dolar ve
+dönem kendiliğinden tamamlanır — tamamlanan dönem geri açılmaz. O tarihten
+önce iki yoldan biri:
+
+1. **Kalıcı durumu uzat (düzenlemeler korunur):** süper admin Kalıcı Veri
+   sayfasında bir düzenleme oturumu açar, aktif dönemin periyot bitişlerini
+   ileri alır (periyot `hard_deadline`'ı geçemez; gerekiyorsa önce onu da
+   uzatır), gerekirse yeni ayların menüsünü ekler ve "Kaydet ve Yayına Al" ile
+   kaydeder. Geri dönüş bundan sonra yeni tarihlere döner.
+2. **Baştan seed (kalıcı düzenlemeler kaybolur):** `make clean && make deploy`.
+   Volume'lar silinir, seed bugünün tarihleriyle yeniden yazar; süper adminin
+   kaydettiği her şey gider.
+
 ---
 
 ## C. Canlı Demo Kurulumu (Ev Sunucusu + Cloudflare Tunnel)
