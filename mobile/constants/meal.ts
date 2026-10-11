@@ -1,9 +1,6 @@
-// Yemekhane sabitleri. Fiyat backend config'i (MEAL_PRICE_TRY) ile ayni tutulur;
-// gercek tahsilat batch yanitindaki total_amount'tan gelir, bu deger yalnizca
-// odemeden ONCE ozet ekraninda tahmini tutari gostermek icin.
+// Yemekhane sabitleri. Ogun fiyati burada degil: yemekhane listesi yanitindaki
+// meal_price'tan okunur.
 import type { MealTime, MenuType } from '@/types/meal.types';
-
-export const MEAL_PRICE_TRY = 15;
 
 export const MEAL_LABEL: Record<MealTime, string> = { lunch: 'Öğle', dinner: 'Akşam' };
 export const MENU_LABEL: Record<MenuType, string> = { normal: 'Normal', vegan: 'Vegan' };

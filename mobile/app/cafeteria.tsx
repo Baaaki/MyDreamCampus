@@ -8,7 +8,7 @@ import { CardCheckout, type Checkout } from '@/components/CardCheckout';
 import { ScreenHeader } from '@/components/ScreenHeader';
 import { Badge, Button, Card, Text } from '@/components/ui';
 import { formatDateLongTR, isCancellable, nextWeekWeekdays, toISODate } from '@/constants/datetime';
-import { MEAL_LABEL, MENU_LABEL, MEAL_PRICE_TRY, STATUS_LABEL, formatTRY, statusVariant } from '@/constants/meal';
+import { MEAL_LABEL, MENU_LABEL, STATUS_LABEL, formatTRY, statusVariant } from '@/constants/meal';
 import { useTheme } from '@/contexts/ThemeContext';
 import { useHaptic } from '@/hooks/useHaptic';
 import {
@@ -171,10 +171,12 @@ function ReservationWizard({
   visible,
   onClose,
   cafeterias,
+  mealPrice,
 }: {
   visible: boolean;
   onClose: () => void;
   cafeterias: Cafeteria[];
+  mealPrice: number;
 }) {
   const haptic = useHaptic();
   const { isDark } = useTheme();
@@ -217,7 +219,7 @@ function ReservationWizard({
       menu_type: effectiveMenuType,
     }))
   );
-  const total = items.length * MEAL_PRICE_TRY;
+  const total = items.length * mealPrice;
 
   const reset = () => {
     setStep(0);
@@ -499,7 +501,7 @@ function ReservationWizard({
                     <View className="flex-row items-center justify-between rounded-2xl border border-border bg-card p-4">
                       <View>
                         <Text className="text-sm text-muted-foreground">
-                          {items.length} öğün × {formatTRY(MEAL_PRICE_TRY)}
+                          {items.length} öğün × {formatTRY(mealPrice)}
                         </Text>
                         <Text className="text-xs text-muted-foreground">Toplam tutar</Text>
                       </View>
@@ -565,6 +567,7 @@ export default function CafeteriaScreen() {
   const bulkCancelMutation = useCancelReservations();
 
   const cafeterias = cafeteriasQuery.data?.cafeterias ?? [];
+  const mealPrice = cafeteriasQuery.data?.meal_price ?? 0;
   const reservations = useMemo(
     () => [...(reservationsQuery.data?.reservations ?? [])].sort((a, b) => a.date.localeCompare(b.date)),
     [reservationsQuery.data]
@@ -718,6 +721,7 @@ export default function CafeteriaScreen() {
           visible={wizardVisible}
           onClose={() => setWizardVisible(false)}
           cafeterias={cafeterias}
+          mealPrice={mealPrice}
         />
       )}
     </SafeAreaView>

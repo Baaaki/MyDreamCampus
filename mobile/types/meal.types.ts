@@ -12,6 +12,10 @@ export interface Cafeteria {
 
 export interface CafeteriaListData {
   cafeterias: Cafeteria[];
+  // Bir ogunun fiyati (backend MEAL_PRICE_TRY config'i); yalnizca odemeden
+  // ONCE tahmini tutar icin, gercek tahsilat batch yanitindaki total_amount.
+  meal_price: number;
+  currency: string;
 }
 
 // menu_data: { "2026-07-06": { lunch: string[], dinner: string[] }, ... }

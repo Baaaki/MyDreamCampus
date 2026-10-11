@@ -19,7 +19,10 @@ beforeEach(() => {
 describe("mealService envelope unwrapping", () => {
   it("unwraps {success, data} for cafeterias", async () => {
     apiMock.get.mockResolvedValueOnce({
-      data: { success: true, data: { cafeterias: [{ id: "c-1", name: "Merkez" }] } },
+      data: {
+        success: true,
+        data: { cafeterias: [{ id: "c-1", name: "Merkez" }], meal_price: 15, currency: "TRY" },
+      },
     });
 
     const res = await mealService.getCafeterias();
@@ -27,6 +30,7 @@ describe("mealService envelope unwrapping", () => {
     expect(apiMock.get).toHaveBeenCalledWith("/meals/cafeterias");
     expect(res.cafeterias).toHaveLength(1);
     expect(res.cafeterias[0].id).toBe("c-1");
+    expect(res.meal_price).toBe(15);
   });
 
   it("passes year/month params to monthly menu and unwraps data", async () => {
