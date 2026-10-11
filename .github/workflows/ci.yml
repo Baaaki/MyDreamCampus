@@ -255,8 +255,20 @@ jobs:
             -H 'Content-Type: application/json' \
             -d '{"email":"admin@university.edu.tr","password":"ci-admin-password"}')
           expect 200 "$code" "admin login (auth)"
+          [ "$(jq -r '.force_password_change' /tmp/body)" = true ] \
+            || { echo "::error::the super admin is not asked to replace the initial password"; exit 1; }
           TOKEN=$(jq -r '.access_token' /tmp/body)
           [ -n "$TOKEN" ] && [ "$TOKEN" != "null" ] || { echo "::error::no access_token"; exit 1; }
+
+          # Until the initial password is replaced every other admin call
+          # answers 403 FORCE_PASSWORD_CHANGE. The change revokes the token
+          # it was made with and hands back a new one.
+          ADMIN_PASSWORD=Ci-admin-password-2
+          code=$(api -X POST http://localhost/api/auth/change-password \
+            -H "Authorization: Bearer $TOKEN" -H 'Content-Type: application/json' \
+            -d "{\"old_password\":\"ci-admin-password\",\"new_password\":\"$ADMIN_PASSWORD\"}")
+          expect 200 "$code" "super admin replaces the initial password (auth)"
+          TOKEN=$(jq -r '.access_token' /tmp/body)
 
           code=$(api http://localhost/api/staff -H "Authorization: Bearer $TOKEN")
           expect 200 "$code" "list staff (staff)"
@@ -360,7 +372,7 @@ jobs:
           # Tokens stay on the real clock: one issued a year "ahead" must work.
           code=$(api -X POST http://localhost/api/auth/login \
             -H 'Content-Type: application/json' \
-            -d '{"email":"admin@university.edu.tr","password":"ci-admin-password"}')
+            -d "{\"email\":\"admin@university.edu.tr\",\"password\":\"$ADMIN_PASSWORD\"}")
           expect 200 "$code" "admin login under the time machine (auth)"
           SIM_TOKEN=$(jq -r '.access_token' /tmp/body)
           code=$(api http://localhost/api/staff -H "Authorization: Bearer $SIM_TOKEN")
@@ -471,7 +483,7 @@ jobs:
           # The access token from the start of the job may be near its 15 minutes.
           code=$(api -X POST http://localhost/api/auth/login \
             -H 'Content-Type: application/json' \
-            -d '{"email":"admin@university.edu.tr","password":"ci-admin-password"}')
+            -d "{\"email\":\"admin@university.edu.tr\",\"password\":\"$ADMIN_PASSWORD\"}")
           expect 200 "$code" "super admin login (auth)"
           TOKEN=$(jq -r '.access_token' /tmp/body)
 
@@ -530,6 +542,15 @@ jobs:
           code=$(api http://localhost/api/catalog/courses/CS888)
           expect 200 "$code" "CS888 exists before restore"
 
+          # The saved state holds the password from the start of the job, so
+          # one changed after the save is what the rewind has to keep.
+          code=$(api -X POST http://localhost/api/auth/change-password \
+            -H "Authorization: Bearer $TOKEN" -H 'Content-Type: application/json' \
+            -d "{\"old_password\":\"$ADMIN_PASSWORD\",\"new_password\":\"Ci-admin-password-3\"}")
+          expect 200 "$code" "super admin changes the password after the save (auth)"
+          ADMIN_PASSWORD=Ci-admin-password-3
+          TOKEN=$(jq -r '.access_token' /tmp/body)
+
           # 5. Restoring drops the visitor's course and keeps the saved one.
           ops_run restore-now normal
           code=$(api http://localhost/api/catalog/courses/CS888)
@@ -538,6 +559,12 @@ jobs:
           expect 200 "$code" "super admin permanent course CS999 remains after restore"
           [ -z "$(dirty_since)" ] || { echo "::error::restore left ops:dirty_since behind"; exit 1; }
           echo "ok  restore cleared ops:dirty_since"
+
+          # The rewind leaves the super admin's password alone.
+          code=$(api -X POST http://localhost/api/auth/login \
+            -H 'Content-Type: application/json' \
+            -d "{\"email\":\"admin@university.edu.tr\",\"password\":\"$ADMIN_PASSWORD\"}")
+          expect 200 "$code" "super admin logs in with the changed password after restore (auth)"
 
       - name: Collect logs on failure
         if: failure()
