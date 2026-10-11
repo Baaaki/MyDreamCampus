@@ -27,13 +27,15 @@
 - [ ] Yemek rezervasyonu (web, Yemekhane → gelecek haftanın seçimi):
   - `4242 4242 4242 4242` → onaylandı;
   - `4000 0000 0000 0002` → reddedildi;
-  - iptal (mobil uygulamadan; web'de ödenmiş rezervasyonu iptal eden bir
-    düğme yok) çalışıyor ve ödeme iade ediliyor. İptal, rezervasyon
-    haftasından önceki Cuma 23:59'da kapanır: hafta sonu gelecek haftanın
-    iptali reddedilir (`CANCEL_CUTOFF_PASSED`), bu bir hata değildir.
+  - iptal (web: Yemekhane → Geçmiş Randevularım → "İptal Et"; mobil:
+    Yemekhane) çalışıyor ve ödeme iade ediliyor. İptal, rezervasyon
+    haftasından önceki Cuma 23:59'da kapanır: o saatten sonra satırda "İptal
+    süresi doldu" yazar; hafta sonu gelecek haftanın iptali bu yüzden
+    yoktur (`CANCEL_CUTOFF_PASSED`), bu bir hata değildir.
 - [ ] Yemek QR'ı (mobil): admin "Yemekhane QR Kodları" sayfasındaki öğün
   QR'ı mobil uygulamanın tarayıcısıyla okutulunca o günün onaylı
-  rezervasyonu kullanılıyor; ikinci okutma reddediliyor. QR yalnız öğün
+  rezervasyonu kullanılıyor; ikinci okutma "Bu rezervasyon zaten
+  kullanıldı" diye reddediliyor. QR yalnız öğün
   saatinde geçer (öğle 11:00–13:00, akşam 16:00–19:00); dışındaysan zaman
   makinesiyle rezervasyonu olan bir günün öğle saatine al, sonra "Sıfırla".
 
