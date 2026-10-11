@@ -9,6 +9,7 @@ import { Button, Input, Text } from '@/components/ui';
 import { useAuthContext } from '@/contexts/AuthContext';
 import { useTheme } from '@/contexts/ThemeContext';
 import { useLogin, useDemoAccounts } from '@/hooks/useAuth';
+import { StudentOnlyError } from '@/services/authService';
 import { useHaptic } from '@/hooks/useHaptic';
 import { COLORS } from '@/lib/theme';
 
@@ -25,7 +26,8 @@ export default function LoginScreen() {
   const [formError, setFormError] = useState<string | null>(null);
 
   const loginMutation = useLogin();
-  const { data: demoAccounts } = useDemoAccounts();
+  const { data: allDemoAccounts } = useDemoAccounts();
+  const demoAccounts = allDemoAccounts?.filter((account) => account.role === 'student');
 
   const handleLogin = () => {
     if (!email || !password) {
@@ -54,6 +56,11 @@ export default function LoginScreen() {
           haptic.error();
           const errorData = error.response?.data;
           let message = 'Giris yapilamadi. Tekrar dene.';
+
+          if (error instanceof StudentOnlyError) {
+            setFormError(error.message);
+            return;
+          }
 
           // Lockout and deactivated accounts answer INVALID_CREDENTIALS too —
           // the backend does not say which, so an address cannot be probed.

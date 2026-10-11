@@ -22,7 +22,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       try {
         const hasToken = await authService.isAuthenticated();
         if (hasToken) {
-          const storedUser = await authService.getStoredUser();
+          const storedUser = await authService.restoreStudent();
           setUser(storedUser);
         }
       } catch (error) {

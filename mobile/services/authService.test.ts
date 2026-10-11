@@ -11,7 +11,7 @@ jest.mock("./api", () => {
 
 import * as SecureStore from "expo-secure-store";
 import api from "./api";
-import authService from "./authService";
+import authService, { StudentOnlyError, STUDENT_ONLY_MESSAGE } from "./authService";
 
 const apiMock = api as unknown as { post: jest.Mock; get: jest.Mock };
 
@@ -52,6 +52,52 @@ describe("authService.login", () => {
       data: { access_token: "at", refresh_token: "rt" },
     });
     await authService.login({ email: "x", password: "y" });
+    expect(await SecureStore.getItemAsync("user_data")).toBeNull();
+  });
+});
+
+describe("authService.login for non-students", () => {
+  it.each(["teacher", "admin"])("rejects a %s and stores nothing", async (role) => {
+    await SecureStore.setItemAsync("jwt_token", "stale");
+    apiMock.post.mockResolvedValueOnce({
+      data: {
+        access_token: "at",
+        refresh_token: "rt",
+        user: { id: "u-2", email: "t@y.tr", role },
+      },
+    });
+
+    const attempt = authService.login({ email: "t@y.tr", password: "Pa55word" });
+    await expect(attempt).rejects.toBeInstanceOf(StudentOnlyError);
+    await expect(attempt).rejects.toThrow(STUDENT_ONLY_MESSAGE);
+
+    expect(await SecureStore.getItemAsync("jwt_token")).toBeNull();
+    expect(await SecureStore.getItemAsync("refresh_token")).toBeNull();
+    expect(await SecureStore.getItemAsync("user_data")).toBeNull();
+  });
+});
+
+describe("authService.restoreStudent", () => {
+  it("returns the stored student", async () => {
+    const user = { id: "u-1", email: "x@y.tr", role: "student" };
+    await SecureStore.setItemAsync("jwt_token", "at");
+    await SecureStore.setItemAsync("user_data", JSON.stringify(user));
+
+    expect(await authService.restoreStudent()).toEqual(user);
+    expect(await SecureStore.getItemAsync("jwt_token")).toBe("at");
+  });
+
+  it("clears the session when the stored user is not a student", async () => {
+    await SecureStore.setItemAsync("jwt_token", "at");
+    await SecureStore.setItemAsync("refresh_token", "rt");
+    await SecureStore.setItemAsync(
+      "user_data",
+      JSON.stringify({ id: "u-2", email: "a@y.tr", role: "admin" })
+    );
+
+    expect(await authService.restoreStudent()).toBeNull();
+    expect(await SecureStore.getItemAsync("jwt_token")).toBeNull();
+    expect(await SecureStore.getItemAsync("refresh_token")).toBeNull();
     expect(await SecureStore.getItemAsync("user_data")).toBeNull();
   });
 });

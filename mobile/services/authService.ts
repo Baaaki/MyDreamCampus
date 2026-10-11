@@ -14,6 +14,16 @@ const TOKEN_KEY = 'jwt_token';
 const REFRESH_TOKEN_KEY = 'refresh_token';
 const USER_KEY = 'user_data';
 
+export const STUDENT_ONLY_MESSAGE =
+  'Mobil uygulama öğrenciler içindir; öğretmen ve yöneticiler web panelini kullanır.';
+
+export class StudentOnlyError extends Error {
+  constructor() {
+    super(STUDENT_ONLY_MESSAGE);
+    this.name = 'StudentOnlyError';
+  }
+}
+
 async function persistTokens(access?: string, refresh?: string) {
   if (access) await SecureStore.setItemAsync(TOKEN_KEY, access);
   if (refresh) await SecureStore.setItemAsync(REFRESH_TOKEN_KEY, refresh);
@@ -22,6 +32,12 @@ async function persistTokens(access?: string, refresh?: string) {
 export const authService = {
   async login(data: LoginRequest): Promise<LoginResponse> {
     const response = await api.post<LoginResponse>('/auth/login', data);
+    // The app only calls student endpoints; any other role would get a 403
+    // on every screen. Nothing is persisted so no session is left behind.
+    if (response.data.user && response.data.user.role !== 'student') {
+      await authService.clearAuth();
+      throw new StudentOnlyError();
+    }
     await persistTokens(response.data.access_token, response.data.refresh_token);
     if (response.data.user) {
       await SecureStore.setItemAsync(USER_KEY, JSON.stringify(response.data.user));
@@ -78,6 +94,17 @@ export const authService = {
     } catch {
       return null;
     }
+  },
+
+  // A non-student left in storage (older build, tampered store) would see
+  // only 403s, so drop the whole session instead of restoring it.
+  async restoreStudent(): Promise<User | null> {
+    const user = await authService.getStoredUser();
+    if (user && user.role !== 'student') {
+      await authService.clearAuth();
+      return null;
+    }
+    return user;
   },
 
   async isAuthenticated(): Promise<boolean> {
