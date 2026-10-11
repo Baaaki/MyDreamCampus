@@ -88,9 +88,13 @@ ON CONFLICT (semester, period_type) DO NOTHING;
 --             ErrPrerequisitesNotMet)
 --   reject  → Kerem, Naz    (class_level 1 < 2 → ErrInvalidClassLevel, a
 --             different, earlier guard — not the prerequisite check)
+--
+-- No attendance or grading period: attendance answers a student's page for
+-- the latest-started open attendance period, so an open one here would turn
+-- that page to this empty semester.
 INSERT INTO course_catalog.academic_periods (semester, period_start, period_end, is_active, period_type)
 SELECT :'next_semester', NOW() - INTERVAL '1 day', NOW() + INTERVAL '180 days', true, t.period_type
-FROM (VALUES ('catalog'), ('enrollment'), ('grading'), ('attendance')) AS t(period_type)
+FROM (VALUES ('catalog'), ('enrollment')) AS t(period_type)
 ON CONFLICT (semester, period_type) DO NOTHING;
 
 -- The snapshot the enrollment check walks (semester_courses.prerequisites,
