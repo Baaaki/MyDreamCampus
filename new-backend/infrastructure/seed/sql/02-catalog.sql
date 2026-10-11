@@ -1,7 +1,7 @@
 -- catalog database: the current semester (:'semester', active) and the next
 -- one (:'next_semester', planned), this semester's course offerings, the open
--- periods, the next semester's prerequisite enrollment window, and every
--- offering's weekly schedule.
+-- periods, the next semester's prerequisite enrollment window, every
+-- offering's weekly schedule, and the audit entries that setup leaves.
 --
 -- Everything is relative to the seed day, and it has to hold for six months:
 -- the hourly rewind always returns to this state, so its dates never move on
@@ -136,3 +136,47 @@ CROSS JOIN LATERAL unnest(s.slots) AS slot(n)
 WHERE sc.semester IN (:'semester', :'next_semester')
   AND NOT EXISTS (SELECT 1 FROM course_catalog.course_schedule_sessions x
                   WHERE x.semester_course_id = sc.id);
+
+-- ============================================================
+-- Audit trail of the setup above
+-- ============================================================
+-- Everything above is SQL, past the handlers that log it, so the audit page
+-- would open empty. These are the entries the super admin leaves doing the
+-- same setup from the UI, in the order the API allows: create this semester,
+-- activate it, open its periods (the period endpoint wants an active
+-- semester), then create the next semester — its periods ride in that create
+-- call, which logs none of its own. Service name, actions and details are
+-- the ones the catalog handlers write.
+INSERT INTO course_catalog.audit_log
+  (timestamp, service, actor_id, actor_role, action, resource_type, resource_id, details)
+SELECT e.at, 'course-catalog', '00000000-0000-0000-0000-000000000001'::uuid, 'admin',
+       e.action, e.resource_type, e.resource_id, e.details
+FROM (
+    SELECT NOW() - CASE WHEN s.name = :'semester' THEN INTERVAL '30 minutes' ELSE INTERVAL '5 minutes' END AS at,
+           'semester.created' AS action, 'semester' AS resource_type, s.id AS resource_id,
+           jsonb_build_object(
+             'semester_name', s.name,
+             'hard_deadline', to_char(s.hard_deadline AT TIME ZONE 'UTC', 'YYYY-MM-DD"T"HH24:MI:SS"Z"')) AS details
+    FROM course_catalog.semesters s
+    WHERE s.name IN (:'semester', :'next_semester')
+    UNION ALL
+    SELECT NOW() - INTERVAL '20 minutes', 'semester.activated', 'semester', s.id,
+           jsonb_build_object(
+             'semester_name', s.name,
+             'hard_deadline', to_char(s.hard_deadline AT TIME ZONE 'UTC', 'YYYY-MM-DD"T"HH24:MI:SS"Z"'),
+             'courses_count', (SELECT count(*) FROM course_catalog.semester_courses sc WHERE sc.semester = s.name))
+    FROM course_catalog.semesters s
+    WHERE s.name = :'semester'
+    UNION ALL
+    SELECT NOW() - INTERVAL '16 minutes' + row_number() OVER (ORDER BY p.period_type) * INTERVAL '1 minute',
+           'period.created', 'academic_period', p.id,
+           jsonb_build_object(
+             'semester', p.semester,
+             'period_type', p.period_type,
+             'period_start', to_char(p.period_start AT TIME ZONE 'UTC', 'YYYY-MM-DD"T"HH24:MI:SS"Z"'),
+             'period_end', to_char(p.period_end AT TIME ZONE 'UTC', 'YYYY-MM-DD"T"HH24:MI:SS"Z"'))
+    FROM course_catalog.academic_periods p
+    WHERE p.semester = :'semester'
+) e
+WHERE NOT EXISTS (SELECT 1 FROM course_catalog.audit_log a
+                  WHERE a.action = e.action AND a.resource_id = e.resource_id);
