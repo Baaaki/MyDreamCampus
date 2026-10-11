@@ -465,7 +465,7 @@ func (s *AttendanceService) GetMyAttendance(ctx context.Context, studentID uuid.
 		return dto.GetMyAttendanceResponse{}, err
 	}
 
-	var courses []dto.CourseAttendanceDetail
+	courses := make([]dto.CourseAttendanceDetail, 0, len(enrollments))
 
 	for _, enrollment := range enrollments {
 		courseID := utils.PgUUIDToUUID(enrollment.CourseID)
@@ -476,7 +476,7 @@ func (s *AttendanceService) GetMyAttendance(ctx context.Context, studentID uuid.
 			continue
 		}
 
-		var weeklyRecords []dto.WeeklyAttendanceRecord
+		weeklyRecords := make([]dto.WeeklyAttendanceRecord, 0, len(records))
 		for _, record := range records {
 			weeklyRecords = append(weeklyRecords, dto.WeeklyAttendanceRecord{
 				Week:        record.WeekNumber,

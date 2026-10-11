@@ -37,6 +37,7 @@ type attWorld struct {
 	periods                []sharedRepo.SimplePeriod
 	failSessionTotals      bool
 	enrollmentSemester     string
+	myEnrollments          []db.GetStudentEnrollmentsBySemesterRow
 
 	redisDown   bool
 	enrolledSet map[string]map[string]bool
@@ -82,7 +83,7 @@ func (v attCacheView) GetEnrolledStudentsByCourse(_ context.Context, courseID uu
 
 func (v attCacheView) GetStudentEnrollmentsBySemester(_ context.Context, _ uuid.UUID, semester string) ([]db.GetStudentEnrollmentsBySemesterRow, error) {
 	v.w.enrollmentSemester = semester
-	return nil, nil
+	return v.w.myEnrollments, nil
 }
 
 func (v attCacheView) CheckEnrollment(_ context.Context, studentID, courseID uuid.UUID, _ string) (bool, error) {
@@ -765,4 +766,30 @@ func TestGetMyAttendance_NoSemester_UsesActivePeriod(t *testing.T) {
 	resp, err = w.service(nil).GetMyAttendance(context.Background(), s[0], "2025-2026-Spring")
 	require.NoError(t, err)
 	assert.Equal(t, "2025-2026-Spring", resp.Semester, "an explicit semester is kept")
+}
+
+// The student pages iterate these lists; null instead of [] crashed them.
+func TestGetMyAttendance_NothingToList_MarshalsEmptyArrays(t *testing.T) {
+	w, courseID, s := newAttWorld(t)
+
+	resp, err := w.service(nil).GetMyAttendance(context.Background(), s[0], semester)
+	require.NoError(t, err)
+	raw, err := json.Marshal(resp)
+	require.NoError(t, err)
+	assert.JSONEq(t, `[]`, jsonField(t, raw, "courses"))
+
+	w.myEnrollments = []db.GetStudentEnrollmentsBySemesterRow{{CourseID: utils.UUIDToPgtype(courseID), CourseCode: "CENG101"}}
+	resp, err = w.service(nil).GetMyAttendance(context.Background(), s[0], semester)
+	require.NoError(t, err)
+	require.Len(t, resp.Courses, 1)
+	raw, err = json.Marshal(resp.Courses[0])
+	require.NoError(t, err)
+	assert.JSONEq(t, `[]`, jsonField(t, raw, "weekly_records"))
+}
+
+func jsonField(t *testing.T, raw []byte, field string) string {
+	t.Helper()
+	var obj map[string]json.RawMessage
+	require.NoError(t, json.Unmarshal(raw, &obj))
+	return string(obj[field])
 }
