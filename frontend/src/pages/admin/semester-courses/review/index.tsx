@@ -10,17 +10,14 @@ import type {
   SemesterCourse,
   SemesterCourseDTO,
   Semester,
-  SimplePeriod,
 } from "@/lib/types"
 import { normalizeSemesterCourse } from "@/lib/normalize-schedule"
+import { semesterApi, catalogApiSafe } from "@/lib/api-client"
 import {
-  semesterApi,
-  catalogApiSafe,
-  enrollmentApiSafe,
-  gradesApiSafe,
-  attendanceApiSafe,
-} from "@/lib/api-client"
-import { activateSemester } from "@/lib/services/system-service"
+  activateSemester,
+  listSimplePeriods,
+  type SimplePeriodServiceKey,
+} from "@/lib/services/system-service"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
@@ -157,19 +154,18 @@ const fetchPlannedSemester = async (): Promise<Semester | null> => {
   return semesters.find((s) => s.status === "planned") || null
 }
 
-const SERVICE_APIS = [
-  { key: "catalog", api: catalogApiSafe },
-  { key: "enrollment", api: enrollmentApiSafe },
-  { key: "grading", api: gradesApiSafe },
-  { key: "attendance", api: attendanceApiSafe },
+// Every period type lives in catalog; the other services only keep copies.
+const PERIOD_TYPES: SimplePeriodServiceKey[] = [
+  "catalog",
+  "enrollment",
+  "grading",
+  "attendance",
 ]
 
 const fetchAllPeriods = async (semester: string): Promise<PeriodInfo[]> => {
   const results = await Promise.allSettled(
-    SERVICE_APIS.map(async ({ key, api }) => {
-      const periods = await api
-        .get("admin/periods", { searchParams: { semester } })
-        .json<SimplePeriod[]>()
+    PERIOD_TYPES.map(async (key) => {
+      const periods = await listSimplePeriods(key, semester)
       const active = periods.find((p) => p.is_active) || periods[0]
       return {
         key,
@@ -183,8 +179,8 @@ const fetchAllPeriods = async (semester: string): Promise<PeriodInfo[]> => {
   return results.map((r, i) => {
     if (r.status === "fulfilled") return r.value
     return {
-      key: SERVICE_APIS[i].key,
-      label: PERIOD_LABELS[SERVICE_APIS[i].key],
+      key: PERIOD_TYPES[i],
+      label: PERIOD_LABELS[PERIOD_TYPES[i]],
       start: null,
       end: null,
     }
