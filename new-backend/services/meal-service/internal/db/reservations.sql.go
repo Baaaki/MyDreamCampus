@@ -250,7 +250,6 @@ WHERE r.cafeteria_id = $1
   AND r.meal_time = $3
   AND r.student_id = $4
   AND r.status = 'confirmed'
-  AND r.is_used = false
 LIMIT 1
 `
 
@@ -279,6 +278,9 @@ type FindReservationForQRRow struct {
 	CafeteriaLocation string                `json:"cafeteria_location"`
 }
 
+// A used reservation still matches, so a second scan can be told it was used
+// rather than that there is none. idx_unique_active_reservation allows one
+// confirmed row per student, date and meal.
 func (q *Queries) FindReservationForQR(ctx context.Context, arg FindReservationForQRParams) (FindReservationForQRRow, error) {
 	row := q.db.QueryRow(ctx, findReservationForQR,
 		arg.CafeteriaID,

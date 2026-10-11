@@ -769,6 +769,9 @@ func (s *ReservationService) UseReservation(ctx context.Context, studentID uuid.
 		}
 		return nil, err
 	}
+	if reservation.IsUsed {
+		return nil, serviceErrors.ErrReservationAlreadyUsed
+	}
 
 	// 7. Mark as used
 	_, err = s.reservationRepo.MarkReservationUsed(ctx, utils.PgtypeToUUID(reservation.ID))

@@ -110,6 +110,20 @@ func TestUseReservation_SecondScan_ReturnsAlreadyUsed(t *testing.T) {
 	assert.ErrorIs(t, err, serviceErrors.ErrReservationAlreadyUsed)
 }
 
+// A scan after the first one has finished reads the row back as used.
+func TestUseReservation_UsedReservation_ReturnsAlreadyUsed(t *testing.T) {
+	freezeAt(t, 2026, time.May, 4, 12, 0)
+	today := time.Date(2026, time.May, 4, 0, 0, 0, 0, time.UTC)
+	svc, store, _, studentID := newRaceFixture(t, today)
+	store.reservation.IsUsed = true
+
+	qr := svc.generateQRPayload(utils.PgtypeToUUID(store.reservation.CafeteriaID).String(), "2026-05-04", "lunch")
+	_, err := svc.UseReservation(context.Background(), studentID, dto.UseReservationRequest{QRPayload: qr})
+
+	assert.ErrorIs(t, err, serviceErrors.ErrReservationAlreadyUsed)
+	assert.False(t, store.used, "a used reservation must not be marked again")
+}
+
 func TestCancelReservation_SecondCancel_ReturnsInvalidStatusWithoutRefund(t *testing.T) {
 	// Monday; the reservation is next week, well before its Friday cut-off.
 	freezeAt(t, 2026, time.May, 4, 10, 0)

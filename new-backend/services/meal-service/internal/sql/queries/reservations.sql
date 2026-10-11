@@ -77,6 +77,9 @@ WHERE id = $1 AND status = 'confirmed' AND is_used = false
 RETURNING id, batch_id, student_id, cafeteria_id, reservation_date, meal_time, menu_type, status, is_used, used_at, expires_at, created_at, updated_at;
 
 -- name: FindReservationForQR :one
+-- A used reservation still matches, so a second scan can be told it was used
+-- rather than that there is none. idx_unique_active_reservation allows one
+-- confirmed row per student, date and meal.
 SELECT r.id, r.batch_id, r.student_id, r.cafeteria_id, r.reservation_date, r.meal_time, r.menu_type, r.status, r.is_used, r.used_at, r.expires_at, r.created_at, r.updated_at,
        c.name as cafeteria_name, c.location as cafeteria_location
 FROM meal.reservations r
@@ -86,7 +89,6 @@ WHERE r.cafeteria_id = $1
   AND r.meal_time = $3
   AND r.student_id = $4
   AND r.status = 'confirmed'
-  AND r.is_used = false
 LIMIT 1;
 
 -- name: ExpirePendingReservations :exec
