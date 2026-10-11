@@ -1,5 +1,8 @@
+import { useQuery } from "@tanstack/react-query"
 import { attendanceApi } from "@/lib/api-client"
 import type {
+  AttendanceFinalization,
+  AttendanceFinalizationStatus,
   CourseAttendanceDetail,
   MyAttendanceResponse,
   SessionTypeAttendance,
@@ -85,4 +88,35 @@ export function absenceWarnings(
     }
   }
   return warnings.sort((a, b) => a.absences_left - b.absences_left)
+}
+
+export function getAttendanceFinalization(
+  courseId: string
+): Promise<AttendanceFinalizationStatus> {
+  return attendanceApi
+    .get(`courses/${courseId}/finalization`)
+    .json<AttendanceFinalizationStatus>()
+}
+
+/**
+ * Finalizes the course's attendance. The backend takes the course's own
+ * semester and refuses a second call (409), so this is done once.
+ */
+export function finalizeAttendance(
+  courseId: string
+): Promise<AttendanceFinalization> {
+  return attendanceApi
+    .post(`courses/${courseId}/finalize`)
+    .json<AttendanceFinalization>()
+}
+
+export function attendanceFinalizationKey(courseId: string) {
+  return ["attendance", "finalization", courseId] as const
+}
+
+export function useAttendanceFinalization(courseId: string) {
+  return useQuery({
+    queryKey: attendanceFinalizationKey(courseId),
+    queryFn: () => getAttendanceFinalization(courseId),
+  })
 }

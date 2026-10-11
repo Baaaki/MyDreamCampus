@@ -1030,3 +1030,33 @@ export interface StudentImportJob {
   completed_at?: string
   created_at: string
 }
+
+// Attendance service: a course's attendance is finalized once. Students
+// below the theory or lab threshold fail and grades is told; the summary is
+// saved and read back on the course page.
+export interface AttendanceFailedStudent {
+  student_id: string
+  student_number: string
+  student_name: string
+  failed_type: "theory" | "lab" | "both"
+  theory?: SessionTypeAttendance
+  lab?: SessionTypeAttendance
+}
+
+export interface AttendanceFinalization {
+  course_id: string
+  course_code: string
+  semester: string
+  total_students: number
+  total_weeks: number
+  thresholds: { theory_min_required: number; lab_min_required: number }
+  finalization_summary: { passing_count: number; failing_count: number }
+  failed_students: AttendanceFailedStudent[]
+  events_published: number
+  finalized_at: string
+}
+
+export interface AttendanceFinalizationStatus {
+  finalized: boolean
+  result?: AttendanceFinalization
+}

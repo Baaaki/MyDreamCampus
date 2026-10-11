@@ -25,6 +25,7 @@ import { Button } from "@/components/ui/button"
 import { attendanceApi } from "@/lib/api-client"
 import { apiErrorMessage } from "@/lib/api-error"
 import { useTeacherCourses } from "@/lib/services/teacher-service"
+import { AttendanceFinalizeSection } from "./finalize-section"
 
 const WEEKS = Array.from({ length: 14 }, (_, i) => i + 1)
 
@@ -183,12 +184,10 @@ export default function AttendanceStartPage() {
         </div>
       </div>
 
-      {/* Placeholder for future features */}
-      <div className="rounded-xl border border-dashed border-gray-300 bg-gray-50 p-8 text-center dark:border-gray-700 dark:bg-gray-900">
-        <p className="text-sm text-gray-500 dark:text-gray-400">
-          Yoklama istatistikleri ve geçmiş yoklamalar bu alanda görüntülenecek.
-        </p>
-      </div>
+      <AttendanceFinalizeSection
+        courseId={courseId}
+        hasLab={course.lab_hours > 0}
+      />
 
       {/* Week Selection Dialog */}
       <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
