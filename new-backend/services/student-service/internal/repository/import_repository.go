@@ -8,7 +8,6 @@ import (
 	"github.com/baaaki/mydreamcampus/shared/platform/utils"
 	"github.com/baaaki/mydreamcampus/student/internal/db"
 	"github.com/google/uuid"
-	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgxpool"
 )
 
@@ -97,54 +96,4 @@ func (r *ImportRepository) ListImportJobsByUser(ctx context.Context, userID uuid
 	}
 
 	return jobs, count, nil
-}
-
-// BulkInsertStudents performs bulk insert using PostgreSQL COPY command
-func (r *ImportRepository) BulkInsertStudents(ctx context.Context, students []db.CreateStudentParams) error {
-	// Use pgx CopyFrom for high-performance bulk insert
-	tx, err := r.pool.Begin(ctx)
-	if err != nil {
-		return fmt.Errorf("%w: failed to begin transaction: %v", sharedErrors.ErrTransactionFailed, err)
-	}
-	// Rollback after successful commit is a no-op returning ErrTxClosed — safe to discard.
-	defer func() { _ = tx.Rollback(ctx) }()
-
-	// Prepare data for COPY
-	columns := []string{"student_number", "first_name", "last_name", "email", "faculty", "department", "enrollment_year", "class_level", "advisor_id"}
-	rows := make([][]any, len(students))
-
-	for i, student := range students {
-		rows[i] = []any{
-			student.StudentNumber,
-			student.FirstName,
-			student.LastName,
-			student.Email,
-			student.Faculty,
-			student.Department,
-			student.EnrollmentYear,
-			student.ClassLevel,
-			student.AdvisorID,
-		}
-	}
-
-	// Use CopyFrom for bulk insert
-	copyCount, err := tx.CopyFrom(
-		ctx,
-		pgx.Identifier{"students"}, // table name
-		columns,
-		pgx.CopyFromRows(rows),
-	)
-	if err != nil {
-		return fmt.Errorf("%w: failed to bulk insert students: %v", sharedErrors.ErrQueryFailed, err)
-	}
-
-	if copyCount != int64(len(students)) {
-		return fmt.Errorf("expected to insert %d students, but inserted %d", len(students), copyCount)
-	}
-
-	if err := tx.Commit(ctx); err != nil {
-		return fmt.Errorf("%w: failed to commit transaction: %v", sharedErrors.ErrTransactionFailed, err)
-	}
-
-	return nil
 }

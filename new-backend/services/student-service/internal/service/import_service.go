@@ -3,8 +3,12 @@ package service
 import (
 	"context"
 	"encoding/csv"
+	"encoding/json"
+	stderrors "errors"
 	"fmt"
 	"io"
+	"net/http"
+	"net/mail"
 	"strconv"
 	"strings"
 	"time"
@@ -14,223 +18,262 @@ import (
 	"github.com/baaaki/mydreamcampus/shared/platform/utils"
 	"github.com/baaaki/mydreamcampus/student/internal/db"
 	"github.com/baaaki/mydreamcampus/student/internal/dto"
-	"github.com/baaaki/mydreamcampus/student/internal/repository"
+	serviceErrors "github.com/baaaki/mydreamcampus/student/internal/errors"
 	"github.com/google/uuid"
 	"go.uber.org/zap"
 )
 
+// importJobStore is the part of the import repository the service uses; an
+// interface so the background run can be tested without a database.
+type importJobStore interface {
+	CreateImportJob(ctx context.Context, params db.CreateImportJobParams) (db.ImportJob, error)
+	GetImportJobByID(ctx context.Context, id uuid.UUID) (db.ImportJob, error)
+	UpdateImportJobProgress(ctx context.Context, params db.UpdateImportJobProgressParams) error
+	StartImportJob(ctx context.Context, id uuid.UUID) error
+	CompleteImportJob(ctx context.Context, id uuid.UUID) error
+	FailImportJob(ctx context.Context, id uuid.UUID) error
+	ListImportJobsByUser(ctx context.Context, userID uuid.UUID, limit, offset int32) ([]db.ImportJob, int64, error)
+}
+
+// StudentCreator is the single-student create path. The import goes through
+// it row by row: a direct insert skips the student.created outbox event, and
+// without it auth never opens the login account and attendance, grades and
+// meal never learn the student exists.
+type StudentCreator interface {
+	CreateStudent(ctx context.Context, req dto.CreateStudentRequest) (dto.StudentResponse, error)
+}
+
+// importProgressEvery is how many rows run between progress writes, so the
+// admin's poll sees the job advance on a large file.
+const importProgressEvery = 25
+
 type ImportService struct {
-	importRepo   *repository.ImportRepository
-	studentRepo  *repository.StudentRepository
+	importRepo   importJobStore
+	creator      StudentCreator
 	staffService StaffServiceInterface
 }
 
 func NewImportService(
-	importRepo *repository.ImportRepository,
-	studentRepo *repository.StudentRepository,
+	importRepo importJobStore,
+	creator StudentCreator,
 	staffService StaffServiceInterface,
 ) *ImportService {
 	return &ImportService{
 		importRepo:   importRepo,
-		studentRepo:  studentRepo,
+		creator:      creator,
 		staffService: staffService,
 	}
 }
 
-// BulkImportStudents handles CSV bulk import
+// importRow is a parsed CSV row and its line in the file (header is line 1).
+type importRow struct {
+	line int
+	req  dto.CreateStudentRequest
+}
+
+var expectedImportHeader = []string{"student_number", "first_name", "last_name", "email", "faculty", "department", "enrollment_year", "class_level"}
+
+// BulkImportStudents parses the CSV, records the job and creates the students
+// in the background.
 func (s *ImportService) BulkImportStudents(ctx context.Context, fileName string, fileReader io.Reader, createdBy uuid.UUID) (string, error) {
 	log := logger.WithContextAndFields(ctx,
 		zap.String("service", "ImportService"),
 		zap.String("method", "BulkImportStudents"),
 	)
 
-	// Parse CSV
-	csvReader := csv.NewReader(fileReader)
-	csvReader.TrimLeadingSpace = true
-
-	// Read header
-	header, err := csvReader.Read()
+	rows, rowErrors, err := readImportRows(fileReader)
 	if err != nil {
-		log.Error("failed to read CSV header",
-			zap.Error(err),
-		)
-		return "", errors.ErrValidation
+		log.Warn("rejected import file", zap.Error(err))
+		return "", err
 	}
 
-	// Validate header
-	expectedHeader := []string{"student_number", "first_name", "last_name", "email", "faculty", "department", "enrollment_year", "class_level"}
-	if !validateHeader(header, expectedHeader) {
-		log.Error("invalid CSV header",
-			zap.Strings("expected", expectedHeader),
-			zap.Strings("got", header),
-		)
-		return "", errors.ErrValidation
+	totalRecords := len(rows) + len(rowErrors)
+	if totalRecords == 0 {
+		return "", errors.WrapWithMessage(serviceErrors.ErrInvalidCSVFormat, nil, "CSV dosyasında öğrenci satırı yok")
 	}
 
-	// Read all records
-	var students []db.CreateStudentParams
-	var importErrors []string
-	lineNumber := 1 // Start from 1 (header is line 0)
-
-	for {
-		record, err := csvReader.Read()
-		if err == io.EOF {
-			break
-		}
-		if err != nil {
-			log.Error("failed to read CSV record",
-				zap.Error(err),
-				zap.Int("line", lineNumber+1),
-			)
-			importErrors = append(importErrors, fmt.Sprintf("Line %d: %v", lineNumber+1, err))
-			lineNumber++
-			continue
-		}
-
-		// Parse student record
-		student, parseErr := parseStudentRecord(record, lineNumber+1)
-		if parseErr != nil {
-			importErrors = append(importErrors, parseErr.Error())
-			lineNumber++
-			continue
-		}
-
-		students = append(students, student)
-		lineNumber++
-	}
-
-	totalRecords := len(students) + len(importErrors)
-
-	// Create import job
 	job, err := s.importRepo.CreateImportJob(ctx, db.CreateImportJobParams{
 		FileName:     fileName,
 		TotalRecords: utils.ClampToInt32(totalRecords),
 		CreatedBy:    utils.UUIDToPgtype(createdBy),
 	})
 	if err != nil {
-		log.Error("failed to create import job",
-			zap.Error(err),
-		)
+		log.Error("failed to create import job", zap.Error(err))
 		return "", errors.ErrInternal
 	}
 
 	jobID := utils.PgtypeToUUIDString(job.ID)
 
-	// Start background processing
-	go s.processImport(context.WithoutCancel(ctx), utils.PgtypeToUUID(job.ID), students, importErrors)
+	// The request context ends with the 202 response; the run must not.
+	go s.processImport(context.WithoutCancel(ctx), utils.PgtypeToUUID(job.ID), rows, rowErrors)
 
 	log.Info("bulk import job created",
 		zap.String("job_id", jobID),
 		zap.Int("total_records", totalRecords),
-		zap.Int("valid_records", len(students)),
+		zap.Int("valid_records", len(rows)),
 	)
 
 	return jobID, nil
 }
 
-// processImport processes the import in background
-func (s *ImportService) processImport(ctx context.Context, jobID uuid.UUID, students []db.CreateStudentParams, initialErrors []string) {
+// readImportRows checks the header and parses every row. A row that cannot
+// be used becomes a row error so the rest of the file still imports; only a
+// file that cannot be read at all is rejected.
+func readImportRows(fileReader io.Reader) ([]importRow, []dto.ImportJobError, error) {
+	csvReader := csv.NewReader(fileReader)
+	csvReader.TrimLeadingSpace = true
+	// A row with the wrong column count is reported for that row instead of
+	// failing the reader.
+	csvReader.FieldsPerRecord = -1
+
+	header, err := csvReader.Read()
+	if err != nil {
+		return nil, nil, errors.WrapWithMessage(serviceErrors.ErrInvalidCSVFormat, err, "CSV dosyası okunamadı")
+	}
+	if !validateHeader(header, expectedImportHeader) {
+		return nil, nil, errors.WrapWithMessage(serviceErrors.ErrInvalidCSVFormat,
+			fmt.Errorf("unexpected CSV header %q", header),
+			"CSV başlığı şu sütunlar olmalı: "+strings.Join(expectedImportHeader, ","))
+	}
+
+	var rows []importRow
+	var rowErrors []dto.ImportJobError
+	for line := 2; ; line++ {
+		record, err := csvReader.Read()
+		if err == io.EOF {
+			break
+		}
+		if err != nil {
+			var parseErr *csv.ParseError
+			if !stderrors.As(err, &parseErr) {
+				return nil, nil, errors.WrapWithMessage(serviceErrors.ErrInvalidCSVFormat, err, "CSV dosyası okunamadı")
+			}
+			rowErrors = append(rowErrors, dto.ImportJobError{
+				Row: line, ErrorCode: serviceErrors.ErrInvalidCSVFormat.Code, Message: "Satır okunamadı",
+			})
+			continue
+		}
+
+		req, parseErr := parseStudentRecord(record)
+		if parseErr != nil {
+			rowErrors = append(rowErrors, dto.ImportJobError{
+				Row: line, StudentNumber: firstCell(record), ErrorCode: serviceErrors.ErrInvalidCSVFormat.Code, Message: parseErr.Error(),
+			})
+			continue
+		}
+		rows = append(rows, importRow{line: line, req: req})
+	}
+	return rows, rowErrors, nil
+}
+
+// processImport creates each valid row through the single-student path and
+// keeps the job's counters and row errors current.
+func (s *ImportService) processImport(ctx context.Context, jobID uuid.UUID, rows []importRow, rowErrors []dto.ImportJobError) {
 	log := logger.WithContextAndFields(ctx,
 		zap.String("service", "ImportService"),
 		zap.String("method", "processImport"),
+		zap.String("job_id", jobID.String()),
 	)
 
-	// Mark job as processing
 	if err := s.importRepo.StartImportJob(ctx, jobID); err != nil {
-		log.Error("failed to start import job",
-			zap.Error(err),
-			zap.String("job_id", jobID.String()),
-		)
+		log.Error("failed to start import job", zap.Error(err))
 		return
 	}
 
-	log.Info("starting import processing",
-		zap.String("job_id", jobID.String()),
-		zap.Int("student_count", len(students)),
-	)
+	s.autoAssignAdvisors(ctx, rows)
 
-	// Auto-assign advisors using round-robin
-	if err := s.autoAssignAdvisors(ctx, students); err != nil {
-		log.Error("failed to auto-assign advisors",
-			zap.Error(err),
-		)
-		// Continue without advisors
-	}
-
-	// Bulk insert using PostgreSQL COPY
-	successCount := 0
-	failCount := len(initialErrors)
-	allErrors := initialErrors
-
-	if len(students) > 0 {
-		if err := s.importRepo.BulkInsertStudents(ctx, students); err != nil {
-			log.Error("bulk insert failed",
+	failed := rowErrors
+	succeeded := 0
+	for i, row := range rows {
+		if _, err := s.creator.CreateStudent(ctx, row.req); err != nil {
+			log.Warn("import row rejected",
+				zap.Int("line", row.line),
+				zap.String("student_number", row.req.StudentNumber),
 				zap.Error(err),
-				zap.String("job_id", jobID.String()),
 			)
-			failCount += len(students)
-			allErrors = append(allErrors, fmt.Sprintf("Bulk insert failed: %v", err))
+			failed = append(failed, createRowError(row, err))
 		} else {
-			successCount = len(students)
-			log.Info("bulk insert successful",
-				zap.Int("count", successCount),
-				zap.String("job_id", jobID.String()),
-			)
+			succeeded++
+		}
+		if (i+1)%importProgressEvery == 0 {
+			s.saveProgress(ctx, jobID, succeeded, failed)
 		}
 	}
+	s.saveProgress(ctx, jobID, succeeded, failed)
 
-	// Update job progress
-	errorsJSON := []byte("[]")
-	if len(allErrors) > 0 {
-		errorsJSON = fmt.Appendf(nil, `["%s"]`, strings.Join(allErrors, `","`))
-	}
-
-	if err := s.importRepo.UpdateImportJobProgress(ctx, db.UpdateImportJobProgressParams{
-		ID:                utils.UUIDToPgtype(jobID),
-		ProcessedRecords:  utils.ClampToInt32(successCount + failCount),
-		SuccessfulRecords: utils.ClampToInt32(successCount),
-		FailedRecords:     utils.ClampToInt32(failCount),
-		Errors:            errorsJSON,
-	}); err != nil {
-		log.Error("failed to update job progress",
-			zap.Error(err),
-		)
-	}
-
-	// Mark job as completed
-	if failCount > 0 && successCount == 0 {
+	if succeeded == 0 && len(failed) > 0 {
 		if err := s.importRepo.FailImportJob(ctx, jobID); err != nil {
 			log.Error("failed to mark import job as failed", zap.Error(err))
 		}
-	} else {
-		if err := s.importRepo.CompleteImportJob(ctx, jobID); err != nil {
-			log.Error("failed to mark import job as completed", zap.Error(err))
-		}
+	} else if err := s.importRepo.CompleteImportJob(ctx, jobID); err != nil {
+		log.Error("failed to mark import job as completed", zap.Error(err))
 	}
 
 	log.Info("import processing completed",
-		zap.String("job_id", jobID.String()),
-		zap.Int("success", successCount),
-		zap.Int("failed", failCount),
+		zap.Int("success", succeeded),
+		zap.Int("failed", len(failed)),
 	)
 }
 
-// autoAssignAdvisors assigns advisors to students using round-robin
-func (s *ImportService) autoAssignAdvisors(ctx context.Context, students []db.CreateStudentParams) error {
+func (s *ImportService) saveProgress(ctx context.Context, jobID uuid.UUID, succeeded int, failed []dto.ImportJobError) {
+	if failed == nil {
+		failed = []dto.ImportJobError{}
+	}
+	errorsJSON, err := json.Marshal(failed)
+	if err != nil {
+		logger.Error("failed to encode import errors", zap.Error(err), zap.String("job_id", jobID.String()))
+		errorsJSON = []byte("[]")
+	}
+	if err := s.importRepo.UpdateImportJobProgress(ctx, db.UpdateImportJobProgressParams{
+		ID:                utils.UUIDToPgtype(jobID),
+		ProcessedRecords:  utils.ClampToInt32(succeeded + len(failed)),
+		SuccessfulRecords: utils.ClampToInt32(succeeded),
+		FailedRecords:     utils.ClampToInt32(len(failed)),
+		Errors:            errorsJSON,
+	}); err != nil {
+		logger.Error("failed to update import job progress", zap.Error(err), zap.String("job_id", jobID.String()))
+	}
+}
+
+// createRowError reports a rejected row with the create path's own message
+// when it is the admin's to fix (duplicate number or e-mail); anything else
+// is an internal failure the admin cannot act on.
+func createRowError(row importRow, err error) dto.ImportJobError {
+	rowErr := dto.ImportJobError{
+		Row:           row.line,
+		StudentNumber: row.req.StudentNumber,
+		ErrorCode:     errors.ErrInternal.Code,
+		Message:       "Öğrenci oluşturulamadı",
+	}
+	if appErr, ok := errors.As(err); ok && appErr.HTTPStatus < http.StatusInternalServerError {
+		rowErr.ErrorCode = appErr.Code
+		rowErr.Message = appErr.Message
+	}
+	return rowErr
+}
+
+func firstCell(record []string) string {
+	if len(record) == 0 {
+		return ""
+	}
+	return strings.TrimSpace(record[0])
+}
+
+// autoAssignAdvisors gives each row an advisor from its department's
+// instructors, round-robin. A department staff cannot answer for keeps its
+// students without an advisor rather than failing the import.
+func (s *ImportService) autoAssignAdvisors(ctx context.Context, rows []importRow) {
 	log := logger.WithContextAndFields(ctx,
 		zap.String("service", "ImportService"),
 		zap.String("method", "autoAssignAdvisors"),
 	)
 
-	// Group students by department
-	departmentMap := make(map[string][]int)
-	for i, student := range students {
-		departmentMap[student.Department] = append(departmentMap[student.Department], i)
+	departmentRows := make(map[string][]int)
+	for i, row := range rows {
+		departmentRows[row.req.Department] = append(departmentRows[row.req.Department], i)
 	}
 
-	// For each department, get instructors and assign round-robin
-	for department, indices := range departmentMap {
-		// Get instructors for this department from staff service
+	for department, indices := range departmentRows {
 		instructors, err := s.staffService.GetInstructorsByDepartment(ctx, department)
 		if err != nil {
 			log.Warn("failed to get instructors for department",
@@ -239,7 +282,6 @@ func (s *ImportService) autoAssignAdvisors(ctx context.Context, students []db.Cr
 			)
 			continue
 		}
-
 		if len(instructors) == 0 {
 			log.Warn("no instructors found for department",
 				zap.String("department", department),
@@ -247,10 +289,9 @@ func (s *ImportService) autoAssignAdvisors(ctx context.Context, students []db.Cr
 			continue
 		}
 
-		// Round-robin assignment
-		for i, studentIdx := range indices {
-			instructorIdx := i % len(instructors)
-			students[studentIdx].AdvisorID = utils.UUIDToPgtype(instructors[instructorIdx])
+		for i, rowIdx := range indices {
+			advisorID := instructors[i%len(instructors)]
+			rows[rowIdx].req.AdvisorID = &advisorID
 		}
 
 		log.Info("assigned advisors for department",
@@ -259,8 +300,6 @@ func (s *ImportService) autoAssignAdvisors(ctx context.Context, students []db.Cr
 			zap.Int("instructor_count", len(instructors)),
 		)
 	}
-
-	return nil
 }
 
 // GetImportJobStatus retrieves import job status
@@ -355,42 +394,57 @@ func validateHeader(got, expected []string) bool {
 	return true
 }
 
-func parseStudentRecord(record []string, lineNumber int) (db.CreateStudentParams, error) {
-	if len(record) != 8 {
-		return db.CreateStudentParams{}, fmt.Errorf("line %d: expected 8 columns, got %d", lineNumber, len(record))
+// parseStudentRecord turns a CSV row into a create request. Its error is the
+// message the admin sees next to the row, so it is in Turkish.
+func parseStudentRecord(record []string) (dto.CreateStudentRequest, error) {
+	if len(record) != len(expectedImportHeader) {
+		return dto.CreateStudentRequest{}, fmt.Errorf("%d sütun bekleniyordu, %d sütun var", len(expectedImportHeader), len(record))
 	}
 
-	// Sanitize all fields to prevent CSV formula injection
 	for i := range record {
 		record[i] = sanitizeCSVCell(record[i])
 	}
 
-	// Parse enrollment year
-	enrollmentYear, err := strconv.Atoi(record[6])
-	if err != nil {
-		return db.CreateStudentParams{}, fmt.Errorf("line %d: invalid enrollment_year: %v", lineNumber, err)
+	required := []struct{ value, label string }{
+		{record[0], "öğrenci numarası"},
+		{record[1], "ad"},
+		{record[2], "soyad"},
+		{record[3], "e-posta"},
+		{record[4], "fakülte"},
+		{record[5], "bölüm"},
+	}
+	for _, field := range required {
+		if field.value == "" {
+			return dto.CreateStudentRequest{}, fmt.Errorf("%s boş", field.label)
+		}
 	}
 
-	// Parse class level
+	if addr, err := mail.ParseAddress(record[3]); err != nil || addr.Address != record[3] {
+		return dto.CreateStudentRequest{}, fmt.Errorf("geçersiz e-posta: %s", record[3])
+	}
+
+	enrollmentYear, err := strconv.Atoi(record[6])
+	if err != nil || enrollmentYear < 1900 || enrollmentYear > 2100 {
+		return dto.CreateStudentRequest{}, fmt.Errorf("geçersiz giriş yılı: %s", record[6])
+	}
+
 	classLevel, err := strconv.ParseInt(record[7], 10, 16)
 	if err != nil {
-		return db.CreateStudentParams{}, fmt.Errorf("line %d: invalid class_level: %v", lineNumber, err)
+		return dto.CreateStudentRequest{}, fmt.Errorf("geçersiz sınıf: %s", record[7])
 	}
-
 	if classLevel < 1 || classLevel > 6 {
-		return db.CreateStudentParams{}, fmt.Errorf("line %d: class_level must be between 1 and 6", lineNumber)
+		return dto.CreateStudentRequest{}, fmt.Errorf("sınıf 1 ile 6 arasında olmalı: %s", record[7])
 	}
 
-	return db.CreateStudentParams{
+	return dto.CreateStudentRequest{
 		StudentNumber:  record[0],
 		FirstName:      record[1],
 		LastName:       record[2],
 		Email:          record[3],
 		Faculty:        record[4],
 		Department:     record[5],
-		EnrollmentYear: utils.ClampToInt32(enrollmentYear),
+		EnrollmentYear: enrollmentYear,
 		ClassLevel:     int16(classLevel),
-		AdvisorID:      utils.UUIDToPgtype(uuid.Nil), // Will be assigned later
 	}, nil
 }
 
@@ -403,8 +457,14 @@ func (s *ImportService) toImportJobResponse(job db.ImportJob) dto.ImportJobRespo
 		completedAt = &job.CompletedAt.Time
 	}
 
-	// Parse errors JSON (simplified - just return empty array for now)
-	var errors []dto.ImportJobError
+	// Jobs written before row errors were structured hold plain strings;
+	// they show their counters without row details.
+	var rowErrors []dto.ImportJobError
+	if len(job.Errors) > 0 {
+		if err := json.Unmarshal(job.Errors, &rowErrors); err != nil {
+			rowErrors = nil
+		}
+	}
 
 	progressPercentage := 0
 	if job.TotalRecords > 0 {
@@ -425,7 +485,7 @@ func (s *ImportService) toImportJobResponse(job db.ImportJob) dto.ImportJobRespo
 		FailedRecords:      int(job.FailedRecords),
 		ProgressPercentage: progressPercentage,
 		Status:             status,
-		Errors:             errors,
+		Errors:             rowErrors,
 		CreatedBy:          utils.PgtypeToUUIDString(job.CreatedBy),
 		StartedAt:          startedAt,
 		CompletedAt:        completedAt,

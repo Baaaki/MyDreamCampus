@@ -9,7 +9,7 @@ import (
 )
 
 // expectedCSVHeader mirrors the header literal used by the production code
-// (import_service.go:56). Keeping it here so a header-shape change in
+// (expectedImportHeader). Keeping it here so a header-shape change in
 // production trips this test loudly.
 var expectedCSVHeader = []string{
 	"student_number", "first_name", "last_name", "email",
@@ -118,48 +118,86 @@ func TestParseStudentRecord(t *testing.T) {
 	}
 
 	t.Run("parses a well-formed row", func(t *testing.T) {
-		params, err := parseStudentRecord(validRecord(), 2)
+		req, err := parseStudentRecord(validRecord())
 		require.NoError(t, err)
 
-		assert.Equal(t, "20210001", params.StudentNumber)
-		assert.Equal(t, "Ahmet", params.FirstName)
-		assert.Equal(t, "Yılmaz", params.LastName)
-		assert.Equal(t, "ahmet@univ.edu", params.Email)
-		assert.Equal(t, "Engineering", params.Faculty)
-		assert.Equal(t, "Computer Science", params.Department)
-		assert.Equal(t, int32(2021), params.EnrollmentYear)
-		assert.Equal(t, int16(2), params.ClassLevel)
+		assert.Equal(t, "20210001", req.StudentNumber)
+		assert.Equal(t, "Ahmet", req.FirstName)
+		assert.Equal(t, "Yılmaz", req.LastName)
+		assert.Equal(t, "ahmet@univ.edu", req.Email)
+		assert.Equal(t, "Engineering", req.Faculty)
+		assert.Equal(t, "Computer Science", req.Department)
+		assert.Equal(t, 2021, req.EnrollmentYear)
+		assert.Equal(t, int16(2), req.ClassLevel)
 
-		// Advisor is set to the zero UUID — actual assignment happens later
-		// in the flow once an advisor is matched. The point here is that the
-		// row parser does not invent one.
-		assert.Equal(t, [16]byte{}, params.AdvisorID.Bytes)
+		// The advisor is assigned per department after parsing; the row
+		// parser does not invent one.
+		assert.Nil(t, req.AdvisorID)
 	})
 
 	t.Run("rejects rows with the wrong column count", func(t *testing.T) {
-		short := validRecord()[:7]
-		_, err := parseStudentRecord(short, 5)
+		_, err := parseStudentRecord(validRecord()[:7])
 		require.Error(t, err)
-		assert.Contains(t, err.Error(), "line 5")
-		assert.Contains(t, err.Error(), "expected 8 columns")
+		assert.Equal(t, "8 sütun bekleniyordu, 7 sütun var", err.Error())
+	})
+
+	t.Run("rejects an empty required field", func(t *testing.T) {
+		labels := map[int]string{
+			0: "öğrenci numarası", 1: "ad", 2: "soyad",
+			3: "e-posta", 4: "fakülte", 5: "bölüm",
+		}
+		for idx, label := range labels {
+			row := validRecord()
+			row[idx] = "   "
+			_, err := parseStudentRecord(row)
+			require.Error(t, err, "column=%d", idx)
+			assert.Equal(t, label+" boş", err.Error(), "column=%d", idx)
+		}
+	})
+
+	t.Run("rejects an invalid e-mail", func(t *testing.T) {
+		for _, email := range []string{"ahmet", "ahmet@", "Ahmet <ahmet@univ.edu>", "a b@univ.edu"} {
+			row := validRecord()
+			row[3] = email
+			_, err := parseStudentRecord(row)
+			require.Error(t, err, "email=%q", email)
+			assert.Contains(t, err.Error(), "geçersiz e-posta", "email=%q", email)
+		}
 	})
 
 	t.Run("rejects non-numeric enrollment_year", func(t *testing.T) {
 		row := validRecord()
 		row[6] = "twenty-one"
-		_, err := parseStudentRecord(row, 7)
+		_, err := parseStudentRecord(row)
 		require.Error(t, err)
-		assert.Contains(t, err.Error(), "line 7")
-		assert.Contains(t, err.Error(), "enrollment_year")
+		assert.Equal(t, "geçersiz giriş yılı: twenty-one", err.Error())
+	})
+
+	t.Run("rejects enrollment_year outside [1900,2100]", func(t *testing.T) {
+		for _, year := range []string{"1899", "2101", "0"} {
+			row := validRecord()
+			row[6] = year
+			_, err := parseStudentRecord(row)
+			require.Error(t, err, "year=%s", year)
+			assert.Contains(t, err.Error(), "geçersiz giriş yılı", "year=%s", year)
+		}
+	})
+
+	t.Run("accepts the enrollment_year bounds", func(t *testing.T) {
+		for _, year := range []string{"1900", "2100"} {
+			row := validRecord()
+			row[6] = year
+			_, err := parseStudentRecord(row)
+			assert.NoError(t, err, "year=%s", year)
+		}
 	})
 
 	t.Run("rejects non-numeric class_level", func(t *testing.T) {
 		row := validRecord()
 		row[7] = "freshman"
-		_, err := parseStudentRecord(row, 9)
+		_, err := parseStudentRecord(row)
 		require.Error(t, err)
-		assert.Contains(t, err.Error(), "line 9")
-		assert.Contains(t, err.Error(), "class_level")
+		assert.Equal(t, "geçersiz sınıf: freshman", err.Error())
 	})
 
 	t.Run("rejects class_level out of range [1,6]", func(t *testing.T) {
@@ -168,9 +206,9 @@ func TestParseStudentRecord(t *testing.T) {
 		for _, level := range []string{"0", "7", "100"} {
 			row := validRecord()
 			row[7] = level
-			_, err := parseStudentRecord(row, 3)
+			_, err := parseStudentRecord(row)
 			require.Error(t, err, "level=%s", level)
-			assert.Contains(t, err.Error(), "class_level must be between 1 and 6", "level=%s", level)
+			assert.Contains(t, err.Error(), "sınıf 1 ile 6 arasında olmalı", "level=%s", level)
 		}
 	})
 
@@ -182,36 +220,46 @@ func TestParseStudentRecord(t *testing.T) {
 		// load-bearing: it documents that sanitization runs before validation.
 		row := validRecord()
 		row[7] = "-1"
-		_, err := parseStudentRecord(row, 3)
+		_, err := parseStudentRecord(row)
 		require.Error(t, err)
-		assert.Contains(t, err.Error(), "invalid class_level")
+		assert.Equal(t, "geçersiz sınıf: '-1", err.Error())
 	})
 
 	t.Run("accepts the full valid class_level range", func(t *testing.T) {
 		for _, level := range []string{"1", "2", "3", "4", "5", "6"} {
 			row := validRecord()
 			row[7] = level
-			_, err := parseStudentRecord(row, 1)
+			_, err := parseStudentRecord(row)
 			assert.NoError(t, err, "level=%s", level)
 		}
+	})
+
+	t.Run("messages do not name the line", func(t *testing.T) {
+		// The row number travels in ImportJobError.Row; repeating it in the
+		// message would print it twice next to the row.
+		row := validRecord()
+		row[6] = "x"
+		_, err := parseStudentRecord(row)
+		require.Error(t, err)
+		assert.NotContains(t, strings.ToLower(err.Error()), "line")
 	})
 
 	t.Run("sanitizes formula-injection in any field", func(t *testing.T) {
 		row := validRecord()
 		row[1] = "=HYPERLINK(\"evil\")" // first_name with formula
-		params, err := parseStudentRecord(row, 4)
+		req, err := parseStudentRecord(row)
 		require.NoError(t, err)
-		assert.True(t, strings.HasPrefix(params.FirstName, "'="),
-			"first_name should be neutralized; got %q", params.FirstName)
+		assert.True(t, strings.HasPrefix(req.FirstName, "'="),
+			"first_name should be neutralized; got %q", req.FirstName)
 	})
 
 	t.Run("trims surrounding whitespace via cell sanitization", func(t *testing.T) {
 		row := validRecord()
 		row[0] = "  20210001  "
 		row[3] = "  ahmet@univ.edu\n"
-		params, err := parseStudentRecord(row, 2)
+		req, err := parseStudentRecord(row)
 		require.NoError(t, err)
-		assert.Equal(t, "20210001", params.StudentNumber)
-		assert.Equal(t, "ahmet@univ.edu", params.Email)
+		assert.Equal(t, "20210001", req.StudentNumber)
+		assert.Equal(t, "ahmet@univ.edu", req.Email)
 	})
 }
