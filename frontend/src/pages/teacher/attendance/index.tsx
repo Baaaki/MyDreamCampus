@@ -1,4 +1,3 @@
-import { useState, useEffect } from "react"
 import { Link } from "react-router"
 import {
   Calendar,
@@ -9,32 +8,15 @@ import {
   Loader2,
   AlertCircle,
 } from "lucide-react"
-import { semesterApi } from "@/lib/api-client"
-import { normalizeTeacherCourse } from "@/lib/normalize-schedule"
-import type { TeacherCoursesResponse, TeacherCourse } from "@/lib/types"
+import { useTeacherCourses } from "@/lib/services/teacher-service"
 
 export default function AttendancePage() {
-  const [courses, setCourses] = useState<TeacherCourse[]>([])
-  const [loading, setLoading] = useState(true)
-  const [error, setError] = useState("")
-
-  useEffect(() => {
-    const fetchCourses = async () => {
-      try {
-        const response = await semesterApi
-          .get("teacher/courses")
-          .json<TeacherCoursesResponse>()
-        setCourses((response.courses || []).map(normalizeTeacherCourse))
-      } catch (err) {
-        console.error("Failed to fetch courses:", err)
-        setError("Dersler yüklenirken bir hata oluştu.")
-      } finally {
-        setLoading(false)
-      }
-    }
-
-    fetchCourses()
-  }, [])
+  const {
+    data: courses = [],
+    isLoading: loading,
+    isError,
+  } = useTeacherCourses()
+  const error = isError ? "Dersler yüklenirken bir hata oluştu." : ""
 
   if (loading) {
     return (
@@ -109,7 +91,7 @@ export default function AttendancePage() {
                     <Users className="h-4 w-4" />
                     <span>{course.max_capacity} Kontenjan</span>
                   </div>
-                  {course.schedule?.map((s, idx) => (
+                  {course.schedule.map((s, idx) => (
                     <div key={idx} className="flex items-center gap-3">
                       <div className="flex items-center gap-1.5">
                         <Clock className="h-4 w-4" />

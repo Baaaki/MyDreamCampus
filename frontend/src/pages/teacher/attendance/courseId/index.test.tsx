@@ -1,6 +1,7 @@
 import { afterEach, describe, expect, it, vi } from "vitest"
 import { render, screen } from "@testing-library/react"
 import userEvent from "@testing-library/user-event"
+import { QueryClient, QueryClientProvider } from "@tanstack/react-query"
 import { MemoryRouter, Route, Routes } from "react-router"
 import type { TeacherCourseDTO } from "@/lib/types"
 import AttendanceStartPage from "./index"
@@ -30,7 +31,7 @@ function course(overrides: Partial<TeacherCourseDTO> = {}): TeacherCourseDTO {
   }
 }
 
-function stubBackend(courses: TeacherCourseDTO[]) {
+function stubBackend(courses: TeacherCourseDTO[], listStatus = 200) {
   const started: unknown[] = []
   vi.stubGlobal(
     "fetch",
@@ -39,11 +40,13 @@ function stubBackend(courses: TeacherCourseDTO[]) {
       const { pathname } = new URL(request.url)
       switch (`${request.method} ${pathname}`) {
         case "GET /api/semesters/teacher/courses":
-          return json({
-            instructor_id: "t-1",
-            total_courses: courses.length,
-            courses,
-          })
+          return listStatus === 200
+            ? json({
+                instructor_id: "t-1",
+                total_courses: courses.length,
+                courses,
+              })
+            : json({ error: "Sunucu hatası", code: "INTERNAL" }, listStatus)
         case "POST /api/attendance/sessions":
           started.push(await request.json())
           return json({ session_id: "s-1" }, 201)
@@ -56,19 +59,24 @@ function stubBackend(courses: TeacherCourseDTO[]) {
 }
 
 function renderPage() {
+  const queryClient = new QueryClient({
+    defaultOptions: { queries: { retry: false } },
+  })
   return render(
-    <MemoryRouter initialEntries={["/teacher/attendance/c-101"]}>
-      <Routes>
-        <Route
-          path="/teacher/attendance/:courseId"
-          element={<AttendanceStartPage />}
-        />
-        <Route
-          path="/teacher/attendance/:courseId/session/:sessionId"
-          element={<p>Oturum ekranı</p>}
-        />
-      </Routes>
-    </MemoryRouter>
+    <QueryClientProvider client={queryClient}>
+      <MemoryRouter initialEntries={["/teacher/attendance/c-101"]}>
+        <Routes>
+          <Route
+            path="/teacher/attendance/:courseId"
+            element={<AttendanceStartPage />}
+          />
+          <Route
+            path="/teacher/attendance/:courseId/session/:sessionId"
+            element={<p>Oturum ekranı</p>}
+          />
+        </Routes>
+      </MemoryRouter>
+    </QueryClientProvider>
   )
 }
 
@@ -113,5 +121,21 @@ describe("AttendanceStartPage", () => {
     expect(
       screen.queryByText("Ders programı tanımlanmamış")
     ).not.toBeInTheDocument()
+  })
+
+  it("says so when the course list cannot be loaded", async () => {
+    stubBackend([], 500)
+    renderPage()
+
+    expect(
+      await screen.findByText("Ders bilgileri yüklenirken bir hata oluştu.")
+    ).toBeInTheDocument()
+  })
+
+  it("says so when the course is not among the teacher's courses", async () => {
+    stubBackend([course({ id: "c-999" })])
+    renderPage()
+
+    expect(await screen.findByText("Ders bulunamadı.")).toBeInTheDocument()
   })
 })

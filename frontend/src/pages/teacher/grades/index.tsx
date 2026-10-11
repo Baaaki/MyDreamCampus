@@ -1,36 +1,20 @@
-import { useState, useEffect } from "react"
+import { useState } from "react"
 import { Calendar, Users, BookOpen, Loader2, AlertCircle } from "lucide-react"
-import { semesterApi } from "@/lib/api-client"
-import { normalizeTeacherCourse } from "@/lib/normalize-schedule"
-import type { TeacherCoursesResponse, TeacherCourse } from "@/lib/types"
+import { useTeacherCourses } from "@/lib/services/teacher-service"
+import type { TeacherCourse } from "@/lib/types"
 import { AssessmentSelectDialog } from "@/components/grades/assessment-select-dialog"
 
 export default function GradesPage() {
-  const [courses, setCourses] = useState<TeacherCourse[]>([])
-  const [loading, setLoading] = useState(true)
-  const [error, setError] = useState("")
+  const {
+    data: courses = [],
+    isLoading: loading,
+    isError,
+  } = useTeacherCourses()
+  const error = isError ? "Dersler yüklenirken bir hata oluştu." : ""
   const [selectedCourse, setSelectedCourse] = useState<TeacherCourse | null>(
     null
   )
   const [isDialogOpen, setIsDialogOpen] = useState(false)
-
-  useEffect(() => {
-    const fetchCourses = async () => {
-      try {
-        const response = await semesterApi
-          .get("teacher/courses")
-          .json<TeacherCoursesResponse>()
-        setCourses((response.courses || []).map(normalizeTeacherCourse))
-      } catch (err) {
-        console.error("Failed to fetch courses:", err)
-        setError("Dersler yüklenirken bir hata oluştu.")
-      } finally {
-        setLoading(false)
-      }
-    }
-
-    fetchCourses()
-  }, [])
 
   const handleGradeEntryClick = (course: TeacherCourse) => {
     setSelectedCourse(course)

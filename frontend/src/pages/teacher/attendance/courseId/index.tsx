@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react"
+import { useState } from "react"
 import { useParams, useNavigate } from "react-router"
 import { Link } from "react-router"
 import {
@@ -22,10 +22,9 @@ import {
   DialogFooter,
 } from "@/components/ui/dialog"
 import { Button } from "@/components/ui/button"
-import { attendanceApi, semesterApi } from "@/lib/api-client"
+import { attendanceApi } from "@/lib/api-client"
 import { apiErrorMessage } from "@/lib/api-error"
-import { normalizeTeacherCourse } from "@/lib/normalize-schedule"
-import type { TeacherCourse, TeacherCoursesResponse } from "@/lib/types"
+import { useTeacherCourses } from "@/lib/services/teacher-service"
 
 const WEEKS = Array.from({ length: 14 }, (_, i) => i + 1)
 
@@ -34,9 +33,9 @@ export default function AttendanceStartPage() {
   const navigate = useNavigate()
   const courseId = params.courseId as string
 
-  const [course, setCourse] = useState<TeacherCourse | null>(null)
-  const [pageLoading, setPageLoading] = useState(true)
-  const [pageError, setPageError] = useState("")
+  const { data: courses, isLoading: pageLoading, isError } = useTeacherCourses()
+  const course = courses?.find((c) => c.id === courseId) ?? null
+  const pageError = isError ? "Ders bilgileri yüklenirken bir hata oluştu." : ""
 
   const [dialogOpen, setDialogOpen] = useState(false)
   const [selectedWeek, setSelectedWeek] = useState<number | null>(null)
@@ -44,29 +43,6 @@ export default function AttendanceStartPage() {
   const [duration, setDuration] = useState(30)
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState("")
-
-  useEffect(() => {
-    const fetchCourse = async () => {
-      try {
-        const response = await semesterApi
-          .get("teacher/courses")
-          .json<TeacherCoursesResponse>()
-        const foundCourse = response.courses?.find((c) => c.id === courseId)
-        if (foundCourse) {
-          setCourse(normalizeTeacherCourse(foundCourse))
-        } else {
-          setPageError("Ders bulunamadı.")
-        }
-      } catch (err) {
-        console.error("Failed to fetch course:", err)
-        setPageError("Ders bilgileri yüklenirken bir hata oluştu.")
-      } finally {
-        setPageLoading(false)
-      }
-    }
-
-    fetchCourse()
-  }, [courseId])
 
   const handleStartAttendance = async () => {
     if (!selectedWeek) return
