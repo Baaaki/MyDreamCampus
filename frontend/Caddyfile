@@ -186,7 +186,13 @@
 			file_server
 		}
 
+		# index.html is the one file whose name never changes while its
+		# contents do: it points at the hashed chunks of the current build.
+		# A browser that keeps an old copy past an autodeploy asks for chunks
+		# the deploy removed. no-cache still lets it keep the file, but only
+		# after revalidating, so an unchanged index.html costs a 304.
 		handle {
+			header Cache-Control "no-cache"
 			try_files {path} /index.html
 			file_server
 		}
