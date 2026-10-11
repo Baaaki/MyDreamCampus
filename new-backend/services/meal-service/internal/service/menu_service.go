@@ -37,7 +37,7 @@ func NewMenuService(menuRepo MenuStore, logger *zap.Logger) *MenuService {
 // CreateOrUpdateMonthlyMenu creates or updates monthly menu (Admin only)
 func (s *MenuService) CreateOrUpdateMonthlyMenu(ctx context.Context, req dto.CreateMonthlyMenuRequest) (*dto.MonthlyMenuResponse, error) {
 	// Marshal menu data to JSONB
-	menuDataJSON, err := json.Marshal(req.MenuData)
+	menuDataJSON, err := json.Marshal(withDatedLunches(req.MenuData, req.Year, req.Month))
 	if err != nil {
 		s.logger.Error("failed to marshal menu data", zap.Error(err))
 		return nil, sharedErrors.ErrBadRequest
