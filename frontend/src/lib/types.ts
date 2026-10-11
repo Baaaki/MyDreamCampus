@@ -259,6 +259,16 @@ export interface MyEnrollmentsResponse {
   programs: EnrollmentProgramResponse[]
 }
 
+// A semester the enrollment screen can work on: its window is open, or it is
+// the current semester and the student already has a program there.
+export interface OpenSemester {
+  semester: string
+  enrollment_open: boolean
+  period_start: string
+  period_end: string
+  has_program: boolean
+}
+
 export interface AdvisorPendingProgramsResponse {
   advisor_id: string
   programs: EnrollmentProgramResponse[]

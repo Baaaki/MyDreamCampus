@@ -1,40 +1,27 @@
 import { useState, useEffect, useCallback } from "react"
+import { useQuery } from "@tanstack/react-query"
+import { AlertCircle, Loader2 } from "lucide-react"
 import { enrollmentApi } from "@/lib/api-client"
 import { apiErrorMessage } from "@/lib/api-error"
 import { normalizeAvailableCourse } from "@/lib/normalize-schedule"
+import {
+  defaultSemester,
+  enrollmentService,
+  semesterLabel,
+} from "@/lib/services/enrollment-service"
 import type {
   AvailableCourse,
   AvailableCourseDTO,
   MyEnrollmentsResponse,
   EnrollmentProgramResponse,
   LatestRejectionResponse,
+  OpenSemester,
   RejectionDetail,
 } from "@/lib/types"
+import { Button } from "@/components/ui/button"
 import CourseList from "@/components/enrollment/CourseList"
 import WeeklyScheduleGrid from "@/components/enrollment/WeeklyScheduleGrid"
 import Toast from "@/components/enrollment/Toast"
-
-// Determine current semester based on date:
-// Sep-Jan → Fall, Feb-Jun → Spring, Jul-Aug → Summer
-function getCurrentSemester(): string {
-  const now = new Date()
-  const month = now.getMonth() + 1 // 1-12
-  const year = now.getFullYear()
-
-  if (month >= 9) {
-    // Fall semester: Sep-Jan → "2025-2026-Fall"
-    return `${year}-${year + 1}-Fall`
-  } else if (month <= 1) {
-    // Still Fall semester from previous year: Jan → "2024-2025-Fall"
-    return `${year - 1}-${year}-Fall`
-  } else if (month >= 2 && month <= 6) {
-    // Spring semester: Feb-Jun → "2025-2026-Spring"
-    return `${year - 1}-${year}-Spring`
-  } else {
-    // Summer semester: Jul-Aug → "2025-2026-Summer"
-    return `${year - 1}-${year}-Summer`
-  }
-}
 
 interface AvailableCoursesResponse {
   student_id: string
@@ -45,6 +32,95 @@ interface AvailableCoursesResponse {
 }
 
 export default function StudentEnrollmentPage() {
+  const semestersQuery = useQuery({
+    queryKey: ["enrollment", "open-semesters"],
+    queryFn: () => enrollmentService.getOpenSemesters(),
+  })
+  const [chosenSemester, setChosenSemester] = useState<string | null>(null)
+
+  const semesters = semestersQuery.data ?? []
+  const wanted = chosenSemester ?? defaultSemester(semesters)
+  const current = semesters.find((s) => s.semester === wanted)
+
+  return (
+    <div className="container mx-auto p-4">
+      <h1 className="mb-6 text-3xl font-bold text-gray-800 dark:text-white">
+        Ders Kayıt Sistemi
+      </h1>
+
+      {semestersQuery.isLoading ? (
+        <div className="flex items-center gap-2 text-gray-500">
+          <Loader2 className="h-4 w-4 animate-spin" />
+          Kayıt dönemleri yükleniyor...
+        </div>
+      ) : semestersQuery.isError ? (
+        <div className="flex items-center gap-2 text-destructive">
+          <AlertCircle className="h-4 w-4" />
+          {apiErrorMessage(semestersQuery.error, "Kayıt dönemleri yüklenemedi")}
+        </div>
+      ) : !current ? (
+        <p className="text-gray-600 dark:text-gray-400">
+          Şu anda ders kaydına açık bir dönem bulunmuyor.
+        </p>
+      ) : (
+        <>
+          <SemesterPicker
+            semesters={semesters}
+            value={current.semester}
+            onChange={setChosenSemester}
+          />
+          {/* Keyed so a switch starts the next semester from a clean slate
+              and a late reply for the previous one has nowhere to land. */}
+          <EnrollmentWorkspace
+            key={current.semester}
+            semester={current.semester}
+            enrollmentOpen={current.enrollment_open}
+          />
+        </>
+      )}
+    </div>
+  )
+}
+
+function SemesterPicker({
+  semesters,
+  value,
+  onChange,
+}: {
+  semesters: OpenSemester[]
+  value: string
+  onChange: (semester: string) => void
+}) {
+  return (
+    <div
+      role="group"
+      aria-label="Dönem"
+      className="mb-4 flex flex-wrap items-center gap-2"
+    >
+      {semesters.map((s) => (
+        <Button
+          key={s.semester}
+          variant={s.semester === value ? "default" : "outline"}
+          aria-pressed={s.semester === value}
+          onClick={() => onChange(s.semester)}
+        >
+          {semesterLabel(s.semester)}
+          <span className="text-xs opacity-75">
+            {s.enrollment_open ? "Kayıt açık" : "Kayıt kapalı"}
+          </span>
+        </Button>
+      ))}
+    </div>
+  )
+}
+
+function EnrollmentWorkspace({
+  semester,
+  enrollmentOpen,
+}: {
+  semester: string
+  enrollmentOpen: boolean
+}) {
   const [selectedCourseIds, setSelectedCourseIds] = useState<string[]>([])
   const [courseColorMap, setCourseColorMap] = useState<Record<string, number>>(
     {}
@@ -73,10 +149,8 @@ export default function StudentEnrollmentPage() {
 
   const fetchLatestRejection = useCallback(async () => {
     try {
-      const semesterParam = getCurrentSemester()
-
       const response = await enrollmentApi
-        .get(`latest-rejection?semester=${semesterParam}`)
+        .get(`latest-rejection?semester=${semester}`)
         .json<LatestRejectionResponse>()
 
       if (response.has_rejection && response.latest_rejection) {
@@ -85,14 +159,12 @@ export default function StudentEnrollmentPage() {
     } catch (err) {
       console.error("Failed to fetch rejection info", err)
     }
-  }, [])
+  }, [semester])
 
   const fetchCourses = useCallback(async () => {
     try {
-      const semesterParam = getCurrentSemester()
-
       const response = await enrollmentApi
-        .get(`available-courses?semester=${semesterParam}`)
+        .get(`available-courses?semester=${semester}`)
         .json<AvailableCoursesResponse>()
 
       setAvailableCourses(
@@ -107,14 +179,12 @@ export default function StudentEnrollmentPage() {
         isVisible: true,
       })
     }
-  }, [])
+  }, [semester])
 
   const fetchEnrollmentStatus = useCallback(async () => {
     try {
-      const semesterParam = getCurrentSemester()
-
       const response = await enrollmentApi
-        .get(`my-enrollments?semester=${semesterParam}`)
+        .get(`my-enrollments?semester=${semester}`)
         .json<MyEnrollmentsResponse>()
 
       if (response.programs && response.programs.length > 0) {
@@ -169,18 +239,20 @@ export default function StudentEnrollmentPage() {
       // Still try to check for rejections
       await fetchLatestRejection()
     }
-  }, [fetchLatestRejection])
+  }, [semester, fetchLatestRejection])
 
   useEffect(() => {
     const init = async () => {
       setLoading(true)
-      await fetchCourses()
+      // A closed window only shows the program; the backend would refuse
+      // the course list anyway.
+      if (enrollmentOpen) await fetchCourses()
       // Fetch enrollment status after courses (though they can be parallel, doing sequential for simplicity)
       await fetchEnrollmentStatus()
       setLoading(false)
     }
     init()
-  }, [fetchCourses, fetchEnrollmentStatus])
+  }, [enrollmentOpen, fetchCourses, fetchEnrollmentStatus])
 
   // Use enrolled courses for the grid if read-only, otherwise use filtered available courses
   const selectedCourses = enrollmentStatus
@@ -279,14 +351,12 @@ export default function StudentEnrollmentPage() {
     }
 
     try {
-      const semesterParam = getCurrentSemester()
-
       // Apply the returned program directly — avoids a follow-up GET that can miss the
       // write on a read replica or expose a brief "no enrollment" flicker.
       const program = await enrollmentApi
         .post("programs", {
           json: {
-            semester: semesterParam,
+            semester,
             course_ids: selectedCourseIds,
           },
         })
@@ -335,8 +405,11 @@ export default function StudentEnrollmentPage() {
 
   // ReadOnly is true for pending or approved status (not for rejected - user can re-enroll)
   const isReadOnly =
-    enrollmentStatus === "pending" || enrollmentStatus === "approved"
-  const showSubmitButton = !enrollmentStatus || enrollmentStatus === "rejected"
+    !enrollmentOpen ||
+    enrollmentStatus === "pending" ||
+    enrollmentStatus === "approved"
+  const showSubmitButton =
+    enrollmentOpen && (!enrollmentStatus || enrollmentStatus === "rejected")
   const buttonText = "Ders Kaydını Tamamla"
 
   // Cancel current enrollment and allow re-registration
@@ -344,9 +417,7 @@ export default function StudentEnrollmentPage() {
     // Call DELETE API for both pending enrollment and rejected state
     if (enrollmentStatus === "pending" || rejectionInfo) {
       try {
-        const semesterParam = getCurrentSemester()
-
-        await enrollmentApi.delete(`programs?semester=${semesterParam}`)
+        await enrollmentApi.delete(`programs?semester=${semester}`)
 
         setEnrollmentStatus(null)
         setEnrolledCourses([])
@@ -383,11 +454,7 @@ export default function StudentEnrollmentPage() {
   }
 
   return (
-    <div className="container mx-auto p-4">
-      <h1 className="mb-6 text-3xl font-bold text-gray-800 dark:text-white">
-        Ders Kayıt Sistemi
-      </h1>
-
+    <>
       {/* Pending Status Banner */}
       {enrollmentStatus === "pending" && (
         <div className="mb-4 flex items-center justify-between rounded-lg border border-amber-200 bg-amber-50 p-4 dark:border-amber-700 dark:bg-amber-900/30">
@@ -409,12 +476,14 @@ export default function StudentEnrollmentPage() {
               Ders kaydınız danışman hoca tarafından onaylanmayı bekliyor
             </span>
           </div>
-          <button
-            onClick={handleCancelEnrollment}
-            className="rounded-lg bg-amber-600 px-4 py-2 font-medium text-white transition-colors hover:bg-amber-700"
-          >
-            Yeniden Ders Kaydı Yap
-          </button>
+          {enrollmentOpen && (
+            <button
+              onClick={handleCancelEnrollment}
+              className="rounded-lg bg-amber-600 px-4 py-2 font-medium text-white transition-colors hover:bg-amber-700"
+            >
+              Yeniden Ders Kaydı Yap
+            </button>
+          )}
         </div>
       )}
 
@@ -480,12 +549,14 @@ export default function StudentEnrollmentPage() {
                   </p>
                 </div>
               </div>
-              <button
-                onClick={handleCancelEnrollment}
-                className="flex-shrink-0 rounded-lg bg-red-600 px-4 py-2 font-medium text-white transition-colors hover:bg-red-700"
-              >
-                Yeniden Ders Kaydı Yap
-              </button>
+              {enrollmentOpen && (
+                <button
+                  onClick={handleCancelEnrollment}
+                  className="flex-shrink-0 rounded-lg bg-red-600 px-4 py-2 font-medium text-white transition-colors hover:bg-red-700"
+                >
+                  Yeniden Ders Kaydı Yap
+                </button>
+              )}
             </div>
           </div>
         )}
@@ -525,6 +596,6 @@ export default function StudentEnrollmentPage() {
           />
         </div>
       </div>
-    </div>
+    </>
   )
 }
