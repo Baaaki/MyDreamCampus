@@ -59,4 +59,5 @@ type attendanceRedis interface {
 
 type attendancePeriods interface {
 	GetActivePeriodBySemester(ctx context.Context, semester string) (*sharedRepo.SimplePeriod, error)
+	GetAllPeriods(ctx context.Context) ([]sharedRepo.SimplePeriod, error)
 }

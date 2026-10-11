@@ -451,6 +451,14 @@ func (s *AttendanceService) GetMyAttendance(ctx context.Context, studentID uuid.
 		return dto.GetMyAttendanceResponse{}, errors.ErrStudentNotFound
 	}
 
+	if semester == "" {
+		periods, err := s.periodRepo.GetAllPeriods(ctx)
+		if err != nil {
+			return dto.GetMyAttendanceResponse{}, fmt.Errorf("list academic periods: %w", err)
+		}
+		semester = currentSemester(periods, clock.Now())
+	}
+
 	// Get enrollments
 	enrollments, err := s.cacheRepo.GetStudentEnrollmentsBySemester(ctx, studentID, semester)
 	if err != nil {
@@ -526,6 +534,34 @@ func (s *AttendanceService) GetMyAttendance(ctx context.Context, studentID uuid.
 		Semester:      semester,
 		Courses:       courses,
 	}, nil
+}
+
+// currentSemester picks the semester whose attendance period holds now, on
+// the service clock so the time machine moves it too. After a period closes
+// students still look back at it, so between periods the latest one that has
+// started stands in; before the first one there is none.
+func currentSemester(periods []sharedRepo.SimplePeriod, now time.Time) string {
+	var current, latest *sharedRepo.SimplePeriod
+	for i := range periods {
+		p := &periods[i]
+		if !p.IsActive || p.PeriodStart.After(now) {
+			continue
+		}
+		if !now.After(p.PeriodEnd) && (current == nil || p.PeriodStart.After(current.PeriodStart)) {
+			current = p
+		}
+		if latest == nil || p.PeriodStart.After(latest.PeriodStart) {
+			latest = p
+		}
+	}
+	switch {
+	case current != nil:
+		return current.Semester
+	case latest != nil:
+		return latest.Semester
+	default:
+		return ""
+	}
 }
 
 // FinalizeAttendance finalizes attendance for a course and publishes events

@@ -11,6 +11,7 @@ import (
 	"github.com/baaaki/mydreamcampus/attendance/internal/dto"
 	attErrors "github.com/baaaki/mydreamcampus/attendance/internal/errors"
 	"github.com/baaaki/mydreamcampus/shared/client"
+	"github.com/baaaki/mydreamcampus/shared/platform/clock/clocktest"
 	"github.com/baaaki/mydreamcampus/shared/platform/logger"
 	sharedRepo "github.com/baaaki/mydreamcampus/shared/platform/repository"
 	"github.com/baaaki/mydreamcampus/shared/platform/utils"
@@ -33,7 +34,9 @@ type attWorld struct {
 	outbox   []attOutboxEvent
 
 	periodStart, periodEnd *time.Time
+	periods                []sharedRepo.SimplePeriod
 	failSessionTotals      bool
+	enrollmentSemester     string
 
 	redisDown   bool
 	enrolledSet map[string]map[string]bool
@@ -77,7 +80,8 @@ func (v attCacheView) GetEnrolledStudentsByCourse(_ context.Context, courseID uu
 	return out, nil
 }
 
-func (v attCacheView) GetStudentEnrollmentsBySemester(context.Context, uuid.UUID, string) ([]db.GetStudentEnrollmentsBySemesterRow, error) {
+func (v attCacheView) GetStudentEnrollmentsBySemester(_ context.Context, _ uuid.UUID, semester string) ([]db.GetStudentEnrollmentsBySemesterRow, error) {
+	v.w.enrollmentSemester = semester
 	return nil, nil
 }
 
@@ -322,6 +326,10 @@ func (v attPeriodView) GetActivePeriodBySemester(_ context.Context, semester str
 		return nil, pgx.ErrNoRows
 	}
 	return &sharedRepo.SimplePeriod{Semester: semester, PeriodStart: *v.w.periodStart, PeriodEnd: *v.w.periodEnd, IsActive: true}, nil
+}
+
+func (v attPeriodView) GetAllPeriods(context.Context) ([]sharedRepo.SimplePeriod, error) {
+	return v.w.periods, nil
 }
 
 type attSemesterClient struct {
@@ -709,4 +717,52 @@ func TestFinalizeAttendance_SessionTotalsUnreadable_Fails(t *testing.T) {
 
 	assert.Error(t, err)
 	assert.Empty(t, w.outbox)
+}
+
+// ----------------------------------------------------------- GetMyAttendance
+
+func TestCurrentSemester_PicksPeriodHoldingNow(t *testing.T) {
+	day := func(m time.Month, d int) time.Time { return time.Date(2026, m, d, 12, 0, 0, 0, time.UTC) }
+	periods := []sharedRepo.SimplePeriod{
+		{Semester: "2025-2026-Spring", PeriodStart: day(2, 1), PeriodEnd: day(6, 1), IsActive: true},
+		{Semester: "2026-2027-Fall", PeriodStart: day(9, 15), PeriodEnd: day(12, 31), IsActive: true},
+		{Semester: "2026-2027-Draft", PeriodStart: day(9, 1), PeriodEnd: day(12, 31), IsActive: false},
+	}
+
+	cases := []struct {
+		name string
+		now  time.Time
+		want string
+	}{
+		{"inside the fall period", day(10, 11), "2026-2027-Fall"},
+		{"between periods falls back to the latest started", day(7, 1), "2025-2026-Spring"},
+		{"an inactive period never counts", day(9, 5), "2025-2026-Spring"},
+		{"before the first period", day(1, 1), ""},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			assert.Equal(t, tc.want, currentSemester(periods, tc.now))
+		})
+	}
+}
+
+// Without a semester the page used to come back empty; the service clock
+// (time machine included) now chooses it.
+func TestGetMyAttendance_NoSemester_UsesActivePeriod(t *testing.T) {
+	w, _, s := newAttWorld(t)
+	now := time.Date(2026, time.October, 11, 9, 0, 0, 0, time.UTC)
+	clocktest.Freeze(t, now)
+	w.periods = []sharedRepo.SimplePeriod{
+		{Semester: "2025-2026-Spring", PeriodStart: now.AddDate(0, -8, 0), PeriodEnd: now.AddDate(0, -4, 0), IsActive: true},
+		{Semester: semester, PeriodStart: now.AddDate(0, 0, -20), PeriodEnd: now.AddDate(0, 2, 0), IsActive: true},
+	}
+
+	resp, err := w.service(nil).GetMyAttendance(context.Background(), s[0], "")
+	require.NoError(t, err)
+	assert.Equal(t, semester, resp.Semester)
+	assert.Equal(t, semester, w.enrollmentSemester)
+
+	resp, err = w.service(nil).GetMyAttendance(context.Background(), s[0], "2025-2026-Spring")
+	require.NoError(t, err)
+	assert.Equal(t, "2025-2026-Spring", resp.Semester, "an explicit semester is kept")
 }
