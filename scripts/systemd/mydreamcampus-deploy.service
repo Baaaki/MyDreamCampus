@@ -1,6 +1,8 @@
 # Installed to ~/.config/systemd/user/ by `make autodeploy-install`, which
-# substitutes @REPO@ and @UID@. A *user* unit, not a system one: rootless
-# docker's socket lives in the user session.
+# substitutes @REPO@. A *user* unit, not a system one: it deploys as the user
+# who owns the checkout. auto-deploy.sh finds the Docker socket itself, so the
+# same unit works with rootless Docker and with a rootful daemon reached
+# through the docker group.
 [Unit]
 Description=MyDreamCampus auto-deploy (poll origin and rebuild on change)
 After=docker.service
@@ -9,7 +11,6 @@ Wants=network-online.target
 [Service]
 Type=oneshot
 WorkingDirectory=@REPO@
-Environment=DOCKER_HOST=unix:///run/user/@UID@/docker.sock
 ExecStart=@REPO@/scripts/auto-deploy.sh
 
 # A hung build must not block every later tick.

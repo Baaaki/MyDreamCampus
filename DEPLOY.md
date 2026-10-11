@@ -410,6 +410,13 @@ listener'ı sonradan eklemek mümkün.
 
 - **Linger şart.** `sudo loginctl enable-linger $USER` yapılmadıysa timer
   yalnızca sen SSH ile bağlıyken çalışır (adım A1).
+- **Docker'a sudo'suz erişim şart.** Script önce kullanıcının rootless soketini
+  (`$XDG_RUNTIME_DIR/docker.sock`) dener; yoksa `DOCKER_HOST` boş kalır ve
+  klasik daemon'ın soketine (`docker` grubu) bağlanır. İkisi de olmazsa
+  `cannot reach Docker` hatasıyla çıkar — sudo'ya düşmez, çünkü systemd altında
+  sudo şifre soramaz ve deploy sessizce hiç olmazdı. Başka bir daemon için
+  `systemctl --user edit mydreamcampus-deploy.service` ile `[Service]` altına
+  `Environment=DOCKER_HOST=...` yaz; script dolu `DOCKER_HOST`'a dokunmaz.
 - **Sunucuda elle commit atma.** Script `--ff-only` kullanır; sunucudaki local
   değişiklik deploy'u sessizce bozmak yerine yüksek sesle patlatır.
 - **`.env` güvende.** `.gitignore`'da ve takipli değil — `git pull` sunucudaki
@@ -709,6 +716,8 @@ make autodeploy-install
 `origin/main` dalını 2 dakikada bir kontrol eden systemd user timer'ı kurulur.
 Yeni commit geldiğinde GitHub API üzerinden `ci-passed` kontrolünün başarılı olduğunu
 doğrular ve yalnızca CI'dan geçmiş sürümleri deploy eder; katmanı yine `.env`'deki `EDGE` belirler.
+Timer Docker'a sudo'suz ulaşabilmeli — rootless daemon ya da `docker` grubu; ayrıntı otomatik deploy
+notlarında.
 
 ---
 

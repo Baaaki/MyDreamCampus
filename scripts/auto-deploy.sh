@@ -5,12 +5,24 @@
 # in to trigger a deploy. The server reaching out always works, needs no
 # inbound port, and keeps no CI credentials on the box.
 #
-# Installed as a systemd *user* timer (`make autodeploy-install`) so it shares
-# the rootless docker socket with the deploy itself.
+# Installed as a systemd *user* timer (`make autodeploy-install`).
 
 set -euo pipefail
 
 cd "$(dirname "$0")/.."
+
+# make falls back to sudo when `docker info` fails, and under systemd sudo has
+# no terminal to ask for a password, so the deploy would silently never happen.
+# Prefer the rootless daemon when this user runs one; otherwise DOCKER_HOST
+# stays unset and docker uses the system socket (docker group).
+rootless_sock="${XDG_RUNTIME_DIR:-/run/user/$(id -u)}/docker.sock"
+if [ -z "${DOCKER_HOST:-}" ] && [ -S "$rootless_sock" ]; then
+	export DOCKER_HOST="unix://$rootless_sock"
+fi
+if ! docker info >/dev/null 2>&1; then
+	echo "!! $(id -un) cannot reach Docker (DOCKER_HOST=${DOCKER_HOST:-unset}); auto-deploy never uses sudo — run rootless Docker or add the user to the docker group" >&2
+	exit 1
+fi
 
 BRANCH="${DEPLOY_BRANCH:-main}"
 STATE=".git/last-deployed-sha"
