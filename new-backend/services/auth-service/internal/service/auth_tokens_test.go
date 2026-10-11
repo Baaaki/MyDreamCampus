@@ -68,6 +68,30 @@ func TestGenerateAccessToken_SuperAdminClaim(t *testing.T) {
 	assert.False(t, regClaims.SuperAdmin)
 }
 
+// The shared rate limiter gives each visitor of a demo account a bucket of
+// their own by this claim; a refresh carries no access token, so both kinds
+// need it.
+func TestGenerateTokens_DemoClaim_OnlyOnDemoAccounts(t *testing.T) {
+	s := newTokenTestService()
+
+	for _, isDemo := range []bool{true, false} {
+		user := tokenTestUser()
+		user.IsDemo = isDemo
+
+		access, err := s.generateAccessToken(user)
+		require.NoError(t, err)
+		claims, err := utils.ValidateAccessTokenWithSecret(access, []byte(tokenTestSecret))
+		require.NoError(t, err)
+		assert.Equal(t, isDemo, claims.Demo, "access token")
+
+		refresh, _, err := s.generateRefreshToken(user)
+		require.NoError(t, err)
+		claims, err = utils.ValidateTokenWithSecret(refresh, []byte(tokenTestSecret))
+		require.NoError(t, err)
+		assert.Equal(t, isDemo, claims.Demo, "refresh token")
+	}
+}
+
 func TestGenerateRefreshToken_RejectedAsAccessToken(t *testing.T) {
 	s := newTokenTestService()
 

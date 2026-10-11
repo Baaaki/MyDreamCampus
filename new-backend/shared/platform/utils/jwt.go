@@ -44,6 +44,9 @@ type Claims struct {
 	JTI                 string `json:"jti,omitempty"` // JWT ID for token blacklisting/revocation
 	ForcePasswordChange bool   `json:"force_password_change,omitempty"`
 	SuperAdmin          bool   `json:"super_admin,omitempty"`
+	// Demo marks one of the public demo accounts, whose login is printed on
+	// the login page for every visitor.
+	Demo bool `json:"demo,omitempty"`
 	jwt.RegisteredClaims
 }
 
