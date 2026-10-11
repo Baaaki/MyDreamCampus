@@ -34,20 +34,35 @@ ON CONFLICT (semester) DO NOTHING;
 -- ============================================================
 -- Weeks 1-4: closed theory sessions, one a week per course
 -- ============================================================
--- Spread over the weekdays by course so a week does not read as six classes
--- on one morning. Four, not three: attendance requires 10 of 14 sessions
+-- Each held at the course's first theory block of the week in its schedule
+-- (02-catalog.sql), at that block's first bell, so the history and the
+-- weekly grid agree. The bell times are the clients' TIME_SLOTS, Istanbul
+-- wall clock. Four weeks, not three: attendance requires 10 of 14 sessions
 -- pro rata, and at three held sessions a single absence already reads as
 -- failing the course.
 INSERT INTO attendance.attendance_sessions
   (course_id, instructor_id, semester, week_number, session_date, session_type,
    qr_secret, started_at, expires_at, is_active)
 SELECT cv.id, cv.instructor_id, :'semester', w.week, d.day, 'theory',
-       substr(md5(random()::text), 1, 32), d.day + TIME '09:00', d.day + TIME '09:15', false
+       substr(md5(random()::text), 1, 32), d.starts, d.starts + INTERVAL '15 minutes', false
 FROM attendance.courses_view cv
+CROSS JOIN LATERAL (
+    SELECT array_position(ARRAY['monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday', 'sunday'],
+                          sch.day_of_week) - 1 AS day_offset,
+           bell.starts
+    FROM _schedule sch
+    JOIN (VALUES (1, TIME '08:30'), (2, TIME '09:25'), (3, TIME '10:20'), (4, TIME '11:15'),
+                 (5, TIME '12:10'), (6, TIME '13:00'), (7, TIME '13:55'), (8, TIME '14:50'),
+                 (9, TIME '15:45')) AS bell(slot, starts) ON bell.slot = sch.slot_number
+    WHERE sch.semester_course_id = cv.id AND sch.session_type = 'theory'
+    ORDER BY 1, sch.slot_number
+    LIMIT 1
+) first_block
 CROSS JOIN (VALUES (1), (2), (3), (4)) AS w(week)
 CROSS JOIN LATERAL (
-    SELECT (date_trunc('week', CURRENT_DATE)::date - (5 - w.week) * 7
-            + (abs(hashtext(cv.course_code)) % 5)) AS day
+    SELECT dd.day, (dd.day + first_block.starts) AT TIME ZONE 'Europe/Istanbul' AS starts
+    FROM (SELECT date_trunc('week', CURRENT_DATE)::date - (5 - w.week) * 7
+                 + first_block.day_offset AS day) dd
 ) d
 WHERE cv.semester = :'semester'
 ON CONFLICT (course_id, week_number, session_type) DO NOTHING;

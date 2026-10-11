@@ -1,10 +1,11 @@
 -- Staging rows the grades / attendance / enrollment / meal seeds need from
 -- OTHER databases: students from the student database, courses, semester
--- offerings and academic periods from catalog. Exported by seed.sh after the
--- catalog seed has run, so the offerings and periods already exist.
+-- offerings, their weekly schedule and academic periods from catalog.
+-- Exported by seed.sh after the catalog seed has run, so the offerings and
+-- periods already exist.
 --
--- All four are loaded in every one of those sessions even where only some are
--- read — a few hundred rows, and one file beats four near-identical ones.
+-- All of them are loaded in every one of those sessions even where only some
+-- are read — a few hundred rows, and one file beats four near-identical ones.
 CREATE TEMP TABLE _students (
     id              uuid,
     student_number  text,
@@ -42,6 +43,14 @@ CREATE TEMP TABLE _semester_courses (
     prerequisites       jsonb
 );
 \copy _semester_courses FROM '/tmp/seed-stage/semester_courses.csv' CSV
+
+CREATE TEMP TABLE _schedule (
+    semester_course_id uuid,
+    day_of_week        text,
+    slot_number        smallint,
+    session_type       text
+);
+\copy _schedule FROM '/tmp/seed-stage/schedule.csv' CSV
 
 CREATE TEMP TABLE _periods (
     id           uuid,

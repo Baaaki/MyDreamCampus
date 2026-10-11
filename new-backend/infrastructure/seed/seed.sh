@@ -262,6 +262,8 @@ psql "$(svc_url catalog)" -v ON_ERROR_STOP=1 -q -c \
 psql "$(svc_url catalog)" -v ON_ERROR_STOP=1 -q -c \
 	"\copy (SELECT id, semester, course_code, credits, class_level, instructor_id, instructor_fullname, assessment_schema, prerequisites FROM course_catalog.semester_courses) TO '$STAGE/semester_courses.csv' CSV"
 psql "$(svc_url catalog)" -v ON_ERROR_STOP=1 -q -c \
+	"\copy (SELECT semester_course_id, day_of_week, slot_number, session_type FROM course_catalog.course_schedule_sessions) TO '$STAGE/schedule.csv' CSV"
+psql "$(svc_url catalog)" -v ON_ERROR_STOP=1 -q -c \
 	"\copy (SELECT id, semester, period_start, period_end, is_active, period_type FROM course_catalog.academic_periods) TO '$STAGE/periods.csv' CSV"
 
 run_sql grades     03-grades.sql
