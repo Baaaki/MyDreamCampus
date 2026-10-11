@@ -315,6 +315,26 @@ PUBLIC_ORIGIN=https://campus.example.com
 > compose onu publish ettiği için diğer projelerle çakışmayan, `127.0.0.1`'e
 > bağlı bir değer ver.
 
+#### 6. Cloudflare panel ayarları
+
+Varsayılanların çoğu doğru, ama biri değişirse uygulama kırılır:
+
+- **Bot Fight Mode kapalı** (Security → Bots): açıkken mobil uygulamanın ve
+  sayfanın XHR isteklerini challenge'a sokar, bu istemciler challenge
+  çözemez. Free planda WAF kuralıyla istisna yazılamıyor; tek yol kapatmak.
+- **Security Level "I'm Under Attack" olmasın** (Security → Settings): bu mod
+  her isteğe tarayıcı doğrulaması koyar, API ve mobil aynı sebeple kırılır.
+- **Rocket Loader kapalı** (Speed → Optimization → Content Optimization):
+  script'leri kendi yükleyicisiyle değiştirir; CSP'deki `script-src 'self'`
+  ile çakışır.
+- **Web Analytics otomatik enjeksiyonu kapalı** (Analytics & Logs → Web
+  Analytics → siteyi otomatik kurulumla ekleme): enjekte ettiği
+  `static.cloudflareinsights.com` script'ini CSP engeller, her sayfada konsol
+  hatası çıkar.
+- **`/api/*` için cache kuralı yazma** (Caching → Cache Rules): API yanıtları
+  kullanıcıya özel; önbelleğe alınırsa bir ziyaretçinin verisi başkasına
+  gider.
+
 ---
 
 ## Aynı sunucuda birden fazla proje
@@ -742,6 +762,8 @@ notlarında.
      - If incoming requests match: `URI Path equals /api/auth/login`
      - Rate: `10 requests per 1 minute` (IP başına).
      - Action: `Block` (veya Managed Challenge), Süre: `10 minutes`.
+   - Bot Fight Mode, Security Level, Rocket Loader, Web Analytics ve `/api/*` cache ayarları
+     demoyu kırabilir; doğru değerler için bkz. A8 → 6. Cloudflare panel ayarları.
 
 4. **Kalıcı Veri Uçlarını Koruma (K4 Kararı — Cloudflare Access):**
    - Zero Trust -> Access -> Applications -> **Add an Application** -> **Self-hosted**:

@@ -230,6 +230,24 @@ Süper admin olarak gir:
 **HTTPS zorunlu:** alan adı → SSL/TLS → Edge Certificates →
 **Always Use HTTPS**: açık.
 
+**Demonun bağlı olduğu ayarlar** — varsayılanlar çoğunda doğru, ama biri
+değişirse uygulama kırılır:
+- **Bot Fight Mode kapalı** (Security → Bots): açıkken mobil uygulamanın ve
+  sayfanın XHR isteklerini challenge'a sokar, bu istemciler challenge
+  çözemez. Free planda WAF kuralıyla istisna yazılamıyor; tek yol kapatmak.
+- **Security Level "I'm Under Attack" olmasın** (Security → Settings): bu mod
+  her isteğe tarayıcı doğrulaması koyar, API ve mobil aynı sebeple kırılır.
+- **Rocket Loader kapalı** (Speed → Optimization → Content Optimization):
+  script'leri kendi yükleyicisiyle değiştirir; CSP'deki `script-src 'self'`
+  ile çakışır.
+- **Web Analytics otomatik enjeksiyonu kapalı** (Analytics & Logs → Web
+  Analytics → siteyi otomatik kurulumla ekleme): enjekte ettiği
+  `static.cloudflareinsights.com` script'ini CSP engeller, her sayfada konsol
+  hatası çıkar.
+- **`/api/*` için cache kuralı yazma** (Caching → Cache Rules): API yanıtları
+  kullanıcıya özel; önbelleğe alınırsa bir ziyaretçinin verisi başkasına
+  gider.
+
 **Giriş için rate limit:** alan adı → Security → WAF → **Rate limiting
 rules** → Create rule:
 - Ad: `login`
