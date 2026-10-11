@@ -17,6 +17,20 @@ describe("schedule normalization", () => {
     expect(normalizeTeacherCourse(wire)).toEqual({ id: "c-1", schedule: [] })
   })
 
+  it("names a teacher's session days in Turkish", () => {
+    const wire = {
+      id: "c-1",
+      schedule: [
+        { day: "wednesday", time: "08:30-09:15", room: "A Blok 305" },
+        { day: "Friday", time: "13:00-13:45", room: "A Blok 305" },
+      ],
+    } as TeacherCourseDTO
+
+    expect(
+      normalizeTeacherCourse(wire).schedule.map((session) => session.day)
+    ).toEqual(["Çarşamba", "Cuma"])
+  })
+
   it("turns null semester course sessions into an empty list", () => {
     const wire = { id: "c-1", schedule_sessions: null } as SemesterCourseDTO
 
