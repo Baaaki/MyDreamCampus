@@ -75,6 +75,36 @@ describe("authService.login for non-students", () => {
     expect(await SecureStore.getItemAsync("refresh_token")).toBeNull();
     expect(await SecureStore.getItemAsync("user_data")).toBeNull();
   });
+
+  it("ends the server session it just opened", async () => {
+    apiMock.post
+      .mockResolvedValueOnce({
+        data: { access_token: "at-x", refresh_token: "rt-x", user: { id: "u", role: "admin" } },
+      })
+      .mockResolvedValueOnce({ data: { message: "ok" } });
+
+    await expect(authService.login({ email: "a@y.tr", password: "p" })).rejects.toBeInstanceOf(
+      StudentOnlyError
+    );
+
+    expect(apiMock.post).toHaveBeenLastCalledWith(
+      "/auth/logout",
+      { refresh_token: "rt-x" },
+      { headers: { Authorization: "Bearer at-x" } }
+    );
+  });
+
+  it("still rejects when the server logout fails", async () => {
+    apiMock.post
+      .mockResolvedValueOnce({
+        data: { access_token: "at", refresh_token: "rt", user: { id: "u", role: "teacher" } },
+      })
+      .mockRejectedValueOnce(new Error("down"));
+
+    await expect(authService.login({ email: "t@y.tr", password: "p" })).rejects.toBeInstanceOf(
+      StudentOnlyError
+    );
+  });
 });
 
 describe("authService.restoreStudent", () => {

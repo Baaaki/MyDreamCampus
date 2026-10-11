@@ -33,8 +33,19 @@ export const authService = {
   async login(data: LoginRequest): Promise<LoginResponse> {
     const response = await api.post<LoginResponse>('/auth/login', data);
     // The app only calls student endpoints; any other role would get a 403
-    // on every screen. Nothing is persisted so no session is left behind.
+    // on every screen. Nothing is persisted locally, and the session the
+    // server just opened is ended with the tokens still in hand (nothing is
+    // in SecureStore yet for the request interceptor to attach).
     if (response.data.user && response.data.user.role !== 'student') {
+      try {
+        await api.post(
+          '/auth/logout',
+          { refresh_token: response.data.refresh_token },
+          { headers: { Authorization: `Bearer ${response.data.access_token}` } }
+        );
+      } catch {
+        // Best effort: the user is turned away either way.
+      }
       await authService.clearAuth();
       throw new StudentOnlyError();
     }
