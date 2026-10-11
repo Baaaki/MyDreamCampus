@@ -76,3 +76,36 @@ describe("mealService envelope unwrapping", () => {
     expect(apiMock.delete).toHaveBeenCalledWith("/meals/reservations/r-1");
   });
 });
+
+describe("mealService.useReservation", () => {
+  it("posts the raw QR text and unwraps the envelope", async () => {
+    apiMock.post.mockResolvedValueOnce({
+      data: {
+        success: true,
+        data: {
+          message: "ok",
+          reservation_id: "r-1",
+          cafeteria_name: "Merkez",
+          meal_time: "lunch",
+          menu_type: "vegan",
+        },
+      },
+    });
+
+    const res = await mealService.useReservation({ qr_payload: "c:2026-10-12:lunch:1:sig" });
+
+    expect(apiMock.post).toHaveBeenCalledWith("/meals/reservations/use", {
+      qr_payload: "c:2026-10-12:lunch:1:sig",
+    });
+    expect(res.cafeteria_name).toBe("Merkez");
+    expect(res.menu_type).toBe("vegan");
+  });
+
+  it("propagates a backend rejection so the screen can show its message", async () => {
+    const rejection = { response: { data: { error: "Rezervasyon zaten kullanildi" } } };
+    apiMock.post.mockRejectedValueOnce(rejection);
+
+    await expect(mealService.useReservation({ qr_payload: "x" })).rejects.toBe(rejection);
+  });
+});
+

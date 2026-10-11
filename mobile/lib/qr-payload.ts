@@ -24,6 +24,24 @@ export function parseQRPayload(raw: string): QRPayload | null {
   return null;
 }
 
+// Cafeteria QR is plain text, not JSON (meal-service generateQRPayload):
+// "<cafeteria uuid>:<YYYY-MM-DD>:<lunch|dinner>:<window>:<hmac-sha256 hex>".
+// The signature is the backend's to verify; this only tells the two QR kinds
+// apart so a meal code is not sent to the attendance endpoint (or vice versa).
+const MEAL_QR =
+  /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}:\d{4}-\d{2}-\d{2}:(?:lunch|dinner):\d+:[0-9a-f]{64}$/i;
+
+export type ScannedQR =
+  | { kind: 'attendance'; payload: QRPayload }
+  | { kind: 'meal'; qrPayload: string };
+
+export function parseScannedQR(raw: string): ScannedQR | null {
+  const text = raw.trim();
+  if (MEAL_QR.test(text)) return { kind: 'meal', qrPayload: text };
+  const payload = parseQRPayload(text);
+  return payload ? { kind: 'attendance', payload } : null;
+}
+
 // ScanGate guards against the camera firing onBarcodeScanned multiple times
 // per second for the same physical QR. The component fix (handledRef.current)
 // implements the same state machine inline; pulling it out lets us pin the

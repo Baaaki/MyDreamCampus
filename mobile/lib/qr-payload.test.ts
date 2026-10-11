@@ -1,4 +1,4 @@
-import { createScanGate, parseQRPayload } from './qr-payload';
+import { createScanGate, parseQRPayload, parseScannedQR } from './qr-payload';
 
 // parseQRPayload tests pin the contract every QR-driven UI relies on:
 // - returns null for unparseable input rather than throwing,
@@ -114,5 +114,46 @@ describe('createScanGate', () => {
     expect(a.tryConsume()).toBe(true);
     expect(b.tryConsume()).toBe(true);
     expect(b.isOpen()).toBe(false);
+  });
+});
+
+describe('parseScannedQR', () => {
+  const SIG = 'a'.repeat(64);
+  const MEAL = `0b1f6c52-9a4e-4d3e-8f10-2c5d7e9a1b34:2026-10-12:lunch:123456:${SIG}`;
+
+  it('recognises an attendance QR', () => {
+    const raw = JSON.stringify({ sid: 's-1', win: 7, sig: 'sig-1' });
+    expect(parseScannedQR(raw)).toEqual({
+      kind: 'attendance',
+      payload: { sid: 's-1', win: 7, sig: 'sig-1' },
+    });
+  });
+
+  it('recognises a cafeteria QR and keeps the raw text', () => {
+    expect(parseScannedQR(MEAL)).toEqual({ kind: 'meal', qrPayload: MEAL });
+    expect(parseScannedQR(MEAL.replace('lunch', 'dinner'))).toEqual({
+      kind: 'meal',
+      qrPayload: MEAL.replace('lunch', 'dinner'),
+    });
+  });
+
+  it('trims surrounding whitespace before matching', () => {
+    expect(parseScannedQR(`  ${MEAL}\n`)).toEqual({ kind: 'meal', qrPayload: MEAL });
+  });
+
+  it.each([
+    ['unknown meal time', MEAL.replace('lunch', 'brunch')],
+    ['short signature', MEAL.slice(0, -1)],
+    ['non-hex signature', MEAL.slice(0, -1) + 'z'],
+    ['non-uuid cafeteria', MEAL.replace('0b1f6c52-9a4e-4d3e-8f10-2c5d7e9a1b34', 'cafe-1')],
+    ['bad date', MEAL.replace('2026-10-12', '12.10.2026')],
+    ['missing window', `0b1f6c52-9a4e-4d3e-8f10-2c5d7e9a1b34:2026-10-12:lunch:${SIG}`],
+  ])('rejects a meal-looking text with %s', (_label, raw) => {
+    expect(parseScannedQR(raw)).toBeNull();
+  });
+
+  it('rejects text that is neither kind', () => {
+    expect(parseScannedQR('https://example.com')).toBeNull();
+    expect(parseScannedQR('')).toBeNull();
   });
 });

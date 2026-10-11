@@ -5,6 +5,7 @@ import type {
   BatchReservationRequest,
   CreateReservationRequest,
   Reservation,
+  UseReservationRequest,
 } from '@/types/meal.types';
 import type { ConfirmPaymentRequest } from '@/types/payment.types';
 
@@ -33,6 +34,16 @@ export const useCreateReservation = () => {
   const queryClient = useQueryClient();
   return useMutation({
     mutationFn: (data: CreateReservationRequest) => mealService.createReservation(data),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['my-reservations'] });
+    },
+  });
+};
+
+export const useUseReservation = () => {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (data: UseReservationRequest) => mealService.useReservation(data),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['my-reservations'] });
     },

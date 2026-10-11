@@ -70,7 +70,7 @@ export default function TabLayout() {
       <Tabs.Screen
         name="scan"
         options={{
-          title: 'Yoklama',
+          title: 'QR Tara',
           tabBarButton: (props) => <ScanTabButton onPress={props.onPress} />,
         }}
       />

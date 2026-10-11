@@ -7,6 +7,8 @@ import type {
   CreateReservationRequest,
   MonthlyMenuData,
   MyReservationsData,
+  UseReservationData,
+  UseReservationRequest,
 } from '@/types/meal.types';
 
 // meal endpoint'leri yaniti {success, data} zarfiyla dondurur. Diger
@@ -41,6 +43,14 @@ export const mealService = {
   ): Promise<CreateBatchReservationData> {
     const response = await api.post<Envelope<CreateBatchReservationData>>(
       '/meals/reservations/batch',
+      data
+    );
+    return response.data.data;
+  },
+
+  async useReservation(data: UseReservationRequest): Promise<UseReservationData> {
+    const response = await api.post<Envelope<UseReservationData>>(
+      '/meals/reservations/use',
       data
     );
     return response.data.data;

@@ -17,20 +17,24 @@ import Animated, {
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { Button, Card, Text } from '@/components/ui';
+import { MEAL_LABEL, MENU_LABEL } from '@/constants/meal';
 import { SESSION_TYPE_LABEL } from '@/constants/schedule';
 import { useTheme } from '@/contexts/ThemeContext';
 import { useScanQR } from '@/hooks/useAttendance';
 import { useHaptic } from '@/hooks/useHaptic';
+import { useUseReservation } from '@/hooks/useMeals';
 import { apiErrorMessage } from '@/lib/api-error';
-import { createScanGate, parseQRPayload } from '@/lib/qr-payload';
+import { createScanGate, parseScannedQR } from '@/lib/qr-payload';
 import { COLORS } from '@/lib/theme';
 import type { ScanQRResponse } from '@/types/attendance.types';
+import type { UseReservationData } from '@/types/meal.types';
 
 const FRAME_SIZE = 260;
 
 type ScanResult =
   | { type: 'success'; data: ScanQRResponse }
-  | { type: 'error'; message: string };
+  | { type: 'meal'; data: UseReservationData }
+  | { type: 'error'; title: string; message: string };
 
 function formatTime(iso: string): string {
   const d = new Date(iso);
@@ -61,6 +65,7 @@ export default function ScanScreen() {
   const [result, setResult] = useState<ScanResult | null>(null);
   const gateRef = useRef(createScanGate());
   const scanMutation = useScanQR();
+  const mealMutation = useUseReservation();
 
   // Sekme her odaklandiginda temiz durumla basla.
   useEffect(() => {
@@ -88,8 +93,8 @@ export default function ScanScreen() {
     ({ data }: { data: string }) => {
       if (!gateRef.current.tryConsume()) return;
 
-      const payload = parseQRPayload(data);
-      if (!payload) {
+      const scanned = parseScannedQR(data);
+      if (!scanned) {
         haptic.error();
         setInvalid(true);
         // Kisa kilit: ayni bozuk QR her karede tekrar tetiklenmesin,
@@ -102,8 +107,30 @@ export default function ScanScreen() {
       }
 
       haptic.medium();
+
+      if (scanned.kind === 'meal') {
+        mealMutation.mutate(
+          { qr_payload: scanned.qrPayload },
+          {
+            onSuccess: (data) => {
+              haptic.success();
+              setResult({ type: 'meal', data });
+            },
+            onError: (error) => {
+              haptic.error();
+              setResult({
+                type: 'error',
+                title: 'Yemek kullanilamadi',
+                message: apiErrorMessage(error, 'Yemek kullanilamadi. Tekrar dene.'),
+              });
+            },
+          }
+        );
+        return;
+      }
+
       scanMutation.mutate(
-        { qr_payload: payload },
+        { qr_payload: scanned.payload },
         {
           onSuccess: (data) => {
             haptic.success();
@@ -113,13 +140,14 @@ export default function ScanScreen() {
             haptic.error();
             setResult({
               type: 'error',
+              title: 'Yoklama alinamadi',
               message: apiErrorMessage(error, 'Yoklama alinamadi. Tekrar dene.'),
             });
           },
         }
       );
     },
-    [haptic, scanMutation]
+    [haptic, scanMutation, mealMutation]
   );
 
   const closeResult = () => {
@@ -160,7 +188,9 @@ export default function ScanScreen() {
           style={StyleSheet.absoluteFill}
           facing="back"
           barcodeScannerSettings={{ barcodeTypes: ['qr'] }}
-          onBarcodeScanned={result || scanMutation.isPending ? undefined : handleBarcode}
+          onBarcodeScanned={
+            result || scanMutation.isPending || mealMutation.isPending ? undefined : handleBarcode
+          }
         />
       )}
 
@@ -168,9 +198,9 @@ export default function ScanScreen() {
       <SafeAreaView className="flex-1" edges={['top']} pointerEvents="box-none">
         <Animated.View entering={FadeIn.duration(400)} className="items-center pt-6">
           <Text className="font-mono text-xs uppercase tracking-widest text-white/70">
-            Yoklama Modu
+            Yoklama · Yemekhane
           </Text>
-          <Text className="mt-1 text-2xl font-extrabold text-white">QR Kodu Tara</Text>
+          <Text className="mt-1 text-2xl font-extrabold text-white">QR Tara</Text>
         </Animated.View>
 
         <View className="flex-1 items-center justify-center">
@@ -194,15 +224,17 @@ export default function ScanScreen() {
           </View>
 
           <Animated.View entering={FadeInDown.delay(150).duration(400)} className="mt-8 px-10">
-            {scanMutation.isPending ? (
+            {scanMutation.isPending || mealMutation.isPending ? (
               <View className="flex-row items-center gap-2 rounded-full bg-black/50 px-5 py-2.5">
                 <Ionicons name="sync" size={16} color="#fff" />
-                <Text className="text-sm font-medium text-white">Yoklama gonderiliyor...</Text>
+                <Text className="text-sm font-medium text-white">
+                  {mealMutation.isPending ? 'Yemek kullaniliyor...' : 'Yoklama gonderiliyor...'}
+                </Text>
               </View>
             ) : invalid ? (
               <View className="rounded-full bg-destructive/90 px-5 py-2.5">
                 <Text className="text-center text-sm font-semibold text-white">
-                  Gecersiz QR — ders QR kodunu tara
+                  Gecersiz QR — ders veya yemekhane QR kodunu tara
                 </Text>
               </View>
             ) : (
@@ -245,6 +277,31 @@ export default function ScanScreen() {
             </Animated.View>
           )}
 
+          {result?.type === 'meal' && (
+            <Animated.View
+              entering={ZoomIn.springify().damping(14)}
+              className="w-full items-center rounded-4xl bg-card p-8"
+            >
+              <Animated.View
+                entering={ZoomIn.delay(120).springify().damping(10)}
+                className="mb-5 h-24 w-24 items-center justify-center rounded-full bg-success"
+              >
+                <Ionicons name="restaurant" size={44} color={colors.background} />
+              </Animated.View>
+              <Text className="mb-1 text-2xl font-extrabold text-foreground">Afiyet olsun</Text>
+              <Text className="mb-4 text-center text-base text-muted-foreground">
+                {result.data.cafeteria_name}
+              </Text>
+              <Text className="mb-6 font-mono text-xs uppercase tracking-widest text-muted-foreground">
+                {MEAL_LABEL[result.data.meal_time] ?? result.data.meal_time} ·{' '}
+                {MENU_LABEL[result.data.menu_type] ?? result.data.menu_type}
+              </Text>
+              <Button className="w-full" onPress={closeResult} accessibilityLabel="Kapat">
+                <Text>Tamam</Text>
+              </Button>
+            </Animated.View>
+          )}
+
           {result?.type === 'error' && (
             <Animated.View
               entering={ZoomIn.springify().damping(14)}
@@ -257,7 +314,7 @@ export default function ScanScreen() {
                 <Ionicons name="close" size={52} color="#fff" />
               </Animated.View>
               <Text className="mb-2 text-2xl font-extrabold text-foreground">
-                Yoklama alinamadi
+                {result.title}
               </Text>
               <Text className="mb-6 text-center text-base text-muted-foreground">
                 {result.message}

@@ -99,3 +99,15 @@ export interface CreateBatchReservationData {
   expires_at: string;
   reservations: Reservation[];
 }
+
+export interface UseReservationRequest {
+  qr_payload: string;
+}
+
+export interface UseReservationData {
+  message: string;
+  reservation_id: string;
+  cafeteria_name: string;
+  meal_time: MealTime;
+  menu_type: MenuType;
+}
