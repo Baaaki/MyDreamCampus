@@ -1,35 +1,17 @@
-import { useState, useEffect, useCallback } from "react"
-import { useQuery } from "@tanstack/react-query"
+import { useState } from "react"
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query"
 import { AlertCircle, Loader2 } from "lucide-react"
-import { enrollmentApi } from "@/lib/api-client"
 import { apiErrorMessage } from "@/lib/api-error"
-import { normalizeAvailableCourse } from "@/lib/normalize-schedule"
 import {
   defaultSemester,
   enrollmentService,
   semesterLabel,
 } from "@/lib/services/enrollment-service"
-import type {
-  AvailableCourse,
-  AvailableCourseDTO,
-  MyEnrollmentsResponse,
-  EnrollmentProgramResponse,
-  LatestRejectionResponse,
-  OpenSemester,
-  RejectionDetail,
-} from "@/lib/types"
+import type { AvailableCourse, CourseBasic, OpenSemester } from "@/lib/types"
 import { Button } from "@/components/ui/button"
 import CourseList from "@/components/enrollment/CourseList"
 import WeeklyScheduleGrid from "@/components/enrollment/WeeklyScheduleGrid"
 import Toast from "@/components/enrollment/Toast"
-
-interface AvailableCoursesResponse {
-  student_id: string
-  department: string
-  class_level: number
-  semester: string
-  available_courses: AvailableCourseDTO[]
-}
 
 export default function StudentEnrollmentPage() {
   const semestersQuery = useQuery({
@@ -114,6 +96,23 @@ function SemesterPicker({
   )
 }
 
+type ToastType = "error" | "warning" | "success" | "info"
+
+// A program's course in the shape the schedule grid draws.
+function toAvailableCourse(course: CourseBasic): AvailableCourse {
+  return {
+    id: course.id,
+    course_code: course.course_code,
+    course_name: course.course_name,
+    credits: course.credits,
+    schedule_sessions: course.schedule_sessions ?? [],
+    max_capacity: 0,
+    current_enrollment: 0,
+    available_seats: 0,
+    instructor: course.instructor ?? "",
+  }
+}
+
 function EnrollmentWorkspace({
   semester,
   enrollmentOpen,
@@ -121,287 +120,52 @@ function EnrollmentWorkspace({
   semester: string
   enrollmentOpen: boolean
 }) {
-  const [selectedCourseIds, setSelectedCourseIds] = useState<string[]>([])
+  const queryClient = useQueryClient()
+  const programKey = ["enrollment", "latest-program", semester]
+  const rejectionKey = ["enrollment", "latest-rejection", semester]
+
+  const coursesQuery = useQuery({
+    queryKey: ["enrollment", "available-courses", semester],
+    queryFn: () => enrollmentService.getAvailableCourses(semester),
+    // A closed window only shows the program; the backend would refuse the
+    // course list anyway.
+    enabled: enrollmentOpen,
+  })
+  const programQuery = useQuery({
+    queryKey: programKey,
+    queryFn: () => enrollmentService.getLatestProgram(semester),
+  })
+  // A failed read must not block the page; it then offers a fresh program.
+  const program = programQuery.data ?? null
+  const enrollmentStatus = program?.status ?? null
+  const rejectionQuery = useQuery({
+    queryKey: rejectionKey,
+    queryFn: () => enrollmentService.getLatestRejection(semester),
+    enabled:
+      !programQuery.isPending && (!program || program.status === "rejected"),
+    // Only this page's own submit and withdraw change it, and they write it.
+    staleTime: Infinity,
+  })
+  const rejectionInfo = rejectionQuery.data ?? null
+  const availableCourses = coursesQuery.data ?? []
+
+  // null until the student picks; until then a rejected program's courses
+  // stay chosen so it can be adjusted and sent again.
+  const [picked, setPicked] = useState<string[] | null>(null)
   const [courseColorMap, setCourseColorMap] = useState<Record<string, number>>(
     {}
   )
-  const [nextColorIndex, setNextColorIndex] = useState(0)
-  const [availableCourses, setAvailableCourses] = useState<AvailableCourse[]>(
-    []
-  )
-  const [, setStudentId] = useState<string>("")
-  const [enrollmentStatus, setEnrollmentStatus] = useState<string | null>(null)
-  const [rejectionInfo, setRejectionInfo] = useState<RejectionDetail | null>(
-    null
-  )
-  const [, setLoading] = useState(true)
   const [toast, setToast] = useState<{
     message: string
-    type: "error" | "warning" | "success" | "info"
+    type: ToastType
     isVisible: boolean
   }>({
     message: "",
     type: "warning",
     isVisible: false,
   })
-
-  const [enrolledCourses, setEnrolledCourses] = useState<AvailableCourse[]>([])
-
-  const fetchLatestRejection = useCallback(async () => {
-    try {
-      const response = await enrollmentApi
-        .get(`latest-rejection?semester=${semester}`)
-        .json<LatestRejectionResponse>()
-
-      if (response.has_rejection && response.latest_rejection) {
-        setRejectionInfo(response.latest_rejection)
-      }
-    } catch (err) {
-      console.error("Failed to fetch rejection info", err)
-    }
-  }, [semester])
-
-  const fetchCourses = useCallback(async () => {
-    try {
-      const response = await enrollmentApi
-        .get(`available-courses?semester=${semester}`)
-        .json<AvailableCoursesResponse>()
-
-      setAvailableCourses(
-        (response.available_courses || []).map(normalizeAvailableCourse)
-      )
-      setStudentId(response.student_id)
-    } catch (err: unknown) {
-      setAvailableCourses([])
-      setToast({
-        message: apiErrorMessage(err, "Dersler yüklenemedi"),
-        type: "error",
-        isVisible: true,
-      })
-    }
-  }, [semester])
-
-  const fetchEnrollmentStatus = useCallback(async () => {
-    try {
-      const response = await enrollmentApi
-        .get(`my-enrollments?semester=${semester}`)
-        .json<MyEnrollmentsResponse>()
-
-      if (response.programs && response.programs.length > 0) {
-        // Assume the most recent one is relevant (or the only one for this semester)
-        // Sort by created_at desc just in case
-        const program = response.programs.sort(
-          (a, b) =>
-            new Date(b.created_at).getTime() - new Date(a.created_at).getTime()
-        )[0]
-
-        setEnrollmentStatus(program.status)
-
-        // If rejected, fetch rejection details
-        if (program.status === "rejected") {
-          await fetchLatestRejection()
-        }
-
-        // Populate selected courses
-        const courseIds = program.courses.map((c) => c.id)
-        setSelectedCourseIds(courseIds)
-
-        // Convert enrolled CourseBasic to AvailableCourse format for grid display
-        const enrolledAsAvailable: AvailableCourse[] = program.courses.map(
-          (c) => ({
-            id: c.id,
-            course_code: c.course_code,
-            course_name: c.course_name,
-            credits: c.credits,
-            schedule_sessions: c.schedule_sessions || [],
-            max_capacity: 0,
-            current_enrollment: 0,
-            available_seats: 0,
-            instructor: c.instructor || "",
-          })
-        )
-        setEnrolledCourses(enrolledAsAvailable)
-
-        // Assign colors to these courses
-        const newColorMap: Record<string, number> = {}
-        courseIds.forEach((id, index) => {
-          newColorMap[id] = index
-        })
-        setCourseColorMap(newColorMap)
-        setNextColorIndex(courseIds.length)
-      } else {
-        // No active enrollment, check for rejections
-        await fetchLatestRejection()
-      }
-    } catch (err) {
-      console.error("Failed to fetch enrollments", err)
-      // Don't block the page if this fails, just assume no enrollment
-      // Still try to check for rejections
-      await fetchLatestRejection()
-    }
-  }, [semester, fetchLatestRejection])
-
-  useEffect(() => {
-    const init = async () => {
-      setLoading(true)
-      // A closed window only shows the program; the backend would refuse
-      // the course list anyway.
-      if (enrollmentOpen) await fetchCourses()
-      // Fetch enrollment status after courses (though they can be parallel, doing sequential for simplicity)
-      await fetchEnrollmentStatus()
-      setLoading(false)
-    }
-    init()
-  }, [enrollmentOpen, fetchCourses, fetchEnrollmentStatus])
-
-  // Use enrolled courses for the grid if read-only, otherwise use filtered available courses
-  const selectedCourses = enrollmentStatus
-    ? enrolledCourses
-    : availableCourses.filter((course) => selectedCourseIds.includes(course.id))
-
-  // Check for conflicts
-  const checkForConflicts = useCallback(
-    (courseIdToAdd: string) => {
-      const newCourse = availableCourses.find((c) => c.id === courseIdToAdd)
-      if (!newCourse) return []
-
-      const existingCourses = availableCourses.filter((c) =>
-        selectedCourseIds.includes(c.id)
-      )
-
-      const conflicts: string[] = []
-
-      newCourse.schedule_sessions.forEach((newSession) => {
-        existingCourses.forEach((existingCourse) => {
-          existingCourse.schedule_sessions.forEach((existingSession) => {
-            if (
-              newSession.day_of_week.toLowerCase() ===
-              existingSession.day_of_week.toLowerCase()
-            ) {
-              const commonSlots = newSession.slot_numbers.filter((slot) =>
-                existingSession.slot_numbers.includes(slot)
-              )
-
-              if (commonSlots.length > 0) {
-                const conflictStr = `${newCourse.course_code} & ${existingCourse.course_code}`
-                if (!conflicts.includes(conflictStr)) {
-                  conflicts.push(conflictStr)
-                }
-              }
-            }
-          })
-        })
-      })
-
-      return conflicts
-    },
-    [selectedCourseIds, availableCourses]
-  )
-
-  // Toggle course selection
-  const handleCourseToggle = (courseId: string) => {
-    // Read-only for pending or approved status
-    if (isReadOnly) return
-
-    // Check if already selected
-    if (selectedCourseIds.includes(courseId)) {
-      handleRemoveCourse(courseId)
-      return
-    }
-
-    // Check for conflicts before adding
-    const conflicts = checkForConflicts(courseId)
-    if (conflicts.length > 0) {
-      setToast({
-        message: `Çakışma var: ${conflicts.join(", ")}`,
-        type: "error",
-        isVisible: true,
-      })
-      return
-    }
-
-    setSelectedCourseIds((prev) => [...prev, courseId])
-
-    // Assign a color if not already assigned
-    if (!courseColorMap[courseId]) {
-      setCourseColorMap((prev) => ({
-        ...prev,
-        [courseId]: nextColorIndex,
-      }))
-      setNextColorIndex((prev) => prev + 1)
-    }
-  }
-
-  // Remove course
-  const handleRemoveCourse = (courseId: string) => {
-    // Read-only for pending or approved status
-    if (isReadOnly) return
-    setSelectedCourseIds((prev) => prev.filter((id) => id !== courseId))
-  }
-
-  // Submit enrollment
-  const handleEnrollment = async () => {
-    if (selectedCourseIds.length === 0) {
-      setToast({
-        message: "Lütfen en az bir ders seçin",
-        type: "warning",
-        isVisible: true,
-      })
-      return
-    }
-
-    try {
-      // Apply the returned program directly — avoids a follow-up GET that can miss the
-      // write on a read replica or expose a brief "no enrollment" flicker.
-      const program = await enrollmentApi
-        .post("programs", {
-          json: {
-            semester,
-            course_ids: selectedCourseIds,
-          },
-        })
-        .json<EnrollmentProgramResponse>()
-
-      setEnrollmentStatus(program.status)
-      setRejectionInfo(null)
-
-      const enrolledAsAvailable: AvailableCourse[] = program.courses.map(
-        (c) => ({
-          id: c.id,
-          course_code: c.course_code,
-          course_name: c.course_name,
-          credits: c.credits,
-          schedule_sessions: c.schedule_sessions || [],
-          max_capacity: 0,
-          current_enrollment: 0,
-          available_seats: 0,
-          instructor: c.instructor || "",
-        })
-      )
-      setEnrolledCourses(enrolledAsAvailable)
-
-      const newCourseIds = program.courses.map((c) => c.id)
-      setSelectedCourseIds(newCourseIds)
-      const newColorMap: Record<string, number> = {}
-      newCourseIds.forEach((id, index) => {
-        newColorMap[id] = index
-      })
-      setCourseColorMap(newColorMap)
-      setNextColorIndex(newCourseIds.length)
-
-      setToast({
-        message: "Ders kaydı başarıyla oluşturuldu",
-        type: "success",
-        isVisible: true,
-      })
-    } catch (err: unknown) {
-      setToast({
-        message: apiErrorMessage(err, "Kayıt işlemi başarısız"),
-        type: "error",
-        isVisible: true,
-      })
-    }
-  }
+  const showToast = (message: string, type: ToastType) =>
+    setToast({ message, type, isVisible: true })
 
   // ReadOnly is true for pending or approved status (not for rejected - user can re-enroll)
   const isReadOnly =
@@ -412,41 +176,125 @@ function EnrollmentWorkspace({
     enrollmentOpen && (!enrollmentStatus || enrollmentStatus === "rejected")
   const buttonText = "Ders Kaydını Tamamla"
 
-  // Cancel current enrollment and allow re-registration
-  const handleCancelEnrollment = async () => {
-    // Call DELETE API for both pending enrollment and rejected state
-    if (enrollmentStatus === "pending" || rejectionInfo) {
-      try {
-        await enrollmentApi.delete(`programs?semester=${semester}`)
+  const programCourses = (program?.courses ?? []).map(toAvailableCourse)
+  const programCourseIds = programCourses.map((c) => c.id)
+  const selectedCourseIds = isReadOnly
+    ? programCourseIds
+    : (picked ?? (enrollmentStatus === "rejected" ? programCourseIds : []))
+  const selectedCourses = isReadOnly
+    ? programCourses
+    : availableCourses.filter((course) => selectedCourseIds.includes(course.id))
+  const colors = Object.fromEntries(
+    selectedCourseIds.map((id, index) => [id, courseColorMap[id] ?? index])
+  )
 
-        setEnrollmentStatus(null)
-        setEnrolledCourses([])
-        setSelectedCourseIds([])
-        setCourseColorMap({})
-        setNextColorIndex(0)
-        setRejectionInfo(null)
+  // Check for conflicts
+  const checkForConflicts = (courseIdToAdd: string) => {
+    const newCourse = availableCourses.find((c) => c.id === courseIdToAdd)
+    if (!newCourse) return []
 
-        setToast({
-          message: "Yeni ders kaydı yapabilirsiniz",
-          type: "success",
-          isVisible: true,
+    const existingCourses = availableCourses.filter((c) =>
+      selectedCourseIds.includes(c.id)
+    )
+
+    const conflicts: string[] = []
+
+    newCourse.schedule_sessions.forEach((newSession) => {
+      existingCourses.forEach((existingCourse) => {
+        existingCourse.schedule_sessions.forEach((existingSession) => {
+          if (
+            newSession.day_of_week.toLowerCase() ===
+            existingSession.day_of_week.toLowerCase()
+          ) {
+            const commonSlots = newSession.slot_numbers.filter((slot) =>
+              existingSession.slot_numbers.includes(slot)
+            )
+
+            if (commonSlots.length > 0) {
+              const conflictStr = `${newCourse.course_code} & ${existingCourse.course_code}`
+              if (!conflicts.includes(conflictStr)) {
+                conflicts.push(conflictStr)
+              }
+            }
+          }
         })
-      } catch {
-        // If DELETE fails (e.g., no enrollment to delete), just clear UI state
-        setEnrollmentStatus(null)
-        setEnrolledCourses([])
-        setSelectedCourseIds([])
-        setCourseColorMap({})
-        setNextColorIndex(0)
-        setRejectionInfo(null)
+      })
+    })
 
-        setToast({
-          message: "Yeni ders kaydı yapabilirsiniz",
-          type: "info",
-          isVisible: true,
-        })
-      }
+    return conflicts
+  }
+
+  // Toggle course selection
+  const handleCourseToggle = (courseId: string) => {
+    if (isReadOnly) return
+
+    if (selectedCourseIds.includes(courseId)) {
+      handleRemoveCourse(courseId)
+      return
     }
+
+    const conflicts = checkForConflicts(courseId)
+    if (conflicts.length > 0) {
+      showToast(`Çakışma var: ${conflicts.join(", ")}`, "error")
+      return
+    }
+
+    setPicked([...selectedCourseIds, courseId])
+
+    // A course keeps its color if it is dropped and picked again.
+    if (courseColorMap[courseId] === undefined) {
+      const nextColor = Math.max(-1, ...Object.values(colors)) + 1
+      setCourseColorMap((prev) => ({ ...prev, [courseId]: nextColor }))
+    }
+  }
+
+  const handleRemoveCourse = (courseId: string) => {
+    if (isReadOnly) return
+    setPicked(selectedCourseIds.filter((id) => id !== courseId))
+  }
+
+  const submit = useMutation({
+    mutationFn: (courseIds: string[]) =>
+      enrollmentService.submitProgram(semester, courseIds),
+    // Apply the returned program directly — avoids a follow-up GET that can
+    // miss the write on a read replica or expose a brief "no enrollment"
+    // flicker.
+    onSuccess: (created) => {
+      queryClient.setQueryData(programKey, created)
+      queryClient.setQueryData(rejectionKey, null)
+      setPicked(null)
+      showToast("Ders kaydı başarıyla oluşturuldu", "success")
+    },
+    onError: (err) =>
+      showToast(apiErrorMessage(err, "Kayıt işlemi başarısız"), "error"),
+  })
+
+  const handleEnrollment = () => {
+    if (submit.isPending) return
+    if (selectedCourseIds.length === 0) {
+      showToast("Lütfen en az bir ders seçin", "warning")
+      return
+    }
+    submit.mutate(selectedCourseIds)
+  }
+
+  const withdraw = useMutation({
+    mutationFn: () => enrollmentService.withdrawProgram(semester),
+    onSuccess: () => showToast("Yeni ders kaydı yapabilirsiniz", "success"),
+    // Nothing left to withdraw still leaves the student free to start over.
+    onError: () => showToast("Yeni ders kaydı yapabilirsiniz", "info"),
+    onSettled: () => {
+      queryClient.setQueryData(programKey, null)
+      queryClient.setQueryData(rejectionKey, null)
+      setPicked(null)
+      setCourseColorMap({})
+    },
+  })
+
+  // Cancel current enrollment and allow re-registration
+  const handleCancelEnrollment = () => {
+    if (withdraw.isPending) return
+    if (enrollmentStatus === "pending" || rejectionInfo) withdraw.mutate()
   }
 
   const closeToast = () => {
@@ -561,41 +409,55 @@ function EnrollmentWorkspace({
           </div>
         )}
 
-      <div className="flex flex-1 overflow-hidden rounded-lg bg-gray-100 dark:bg-gray-900">
-        {/* Toast Notification */}
-        <Toast
-          message={toast.message}
-          type={toast.type}
-          isVisible={toast.isVisible}
-          onClose={closeToast}
-          duration={5000}
-        />
+      {!isReadOnly && coursesQuery.isError && (
+        <div className="mb-4 flex items-center gap-2 rounded-lg border border-red-200 bg-red-50 p-3 text-sm text-red-700 dark:border-red-700 dark:bg-red-900/30 dark:text-red-300">
+          <AlertCircle className="h-4 w-4" />
+          {apiErrorMessage(coursesQuery.error, "Dersler yüklenemedi")}
+        </div>
+      )}
 
-        {/* Left Panel - Course List (hidden when enrolled) */}
-        {!isReadOnly && (
-          <div className="w-80 flex-shrink-0 shadow-lg transition-all duration-300">
-            <CourseList
-              courses={availableCourses}
+      {programQuery.isPending ? (
+        <div className="flex items-center gap-2 text-gray-500">
+          <Loader2 className="h-4 w-4 animate-spin" />
+          Ders kaydı yükleniyor...
+        </div>
+      ) : (
+        <div className="flex flex-1 overflow-hidden rounded-lg bg-gray-100 dark:bg-gray-900">
+          {/* Toast Notification */}
+          <Toast
+            message={toast.message}
+            type={toast.type}
+            isVisible={toast.isVisible}
+            onClose={closeToast}
+            duration={5000}
+          />
+
+          {/* Left Panel - Course List (hidden when enrolled) */}
+          {!isReadOnly && (
+            <div className="w-80 flex-shrink-0 shadow-lg transition-all duration-300">
+              <CourseList
+                courses={availableCourses}
+                selectedCourseIds={selectedCourseIds}
+                onSelectCourse={handleCourseToggle}
+              />
+            </div>
+          )}
+
+          {/* Right Panel - Weekly Schedule Grid */}
+          <div className="relative flex-1 shadow-lg">
+            <WeeklyScheduleGrid
+              sessions={selectedCourses}
               selectedCourseIds={selectedCourseIds}
-              onSelectCourse={handleCourseToggle}
+              courseColorMap={colors}
+              onRemoveCourse={handleRemoveCourse}
+              onEnroll={handleEnrollment}
+              readOnly={isReadOnly}
+              submitButtonText={buttonText}
+              showSubmitButton={showSubmitButton}
             />
           </div>
-        )}
-
-        {/* Right Panel - Weekly Schedule Grid */}
-        <div className="relative flex-1 shadow-lg">
-          <WeeklyScheduleGrid
-            sessions={selectedCourses}
-            selectedCourseIds={selectedCourseIds}
-            courseColorMap={courseColorMap}
-            onRemoveCourse={handleRemoveCourse}
-            onEnroll={handleEnrollment}
-            readOnly={isReadOnly}
-            submitButtonText={buttonText}
-            showSubmitButton={showSubmitButton}
-          />
         </div>
-      </div>
+      )}
     </>
   )
 }

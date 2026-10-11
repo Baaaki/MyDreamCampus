@@ -366,6 +366,53 @@ describe("StudentEnrollmentPage", () => {
     expect(submitButton(0)).toBeEnabled()
   })
 
+  it("keeps a rejected program's courses chosen so it can be adjusted and sent again", async () => {
+    const sent = stubBackend({
+      programs: [program("rejected", [CENG101])],
+      rejection: REJECTION,
+    })
+    const user = userEvent.setup()
+    renderPage()
+
+    expect(
+      await screen.findByText(REJECTION.rejection_reason)
+    ).toBeInTheDocument()
+    expect(screen.getByText("3 ders • 1 seçili")).toBeInTheDocument()
+
+    await user.click(screen.getByText("MATH101"))
+    await user.click(submitButton(2))
+
+    expect(
+      await screen.findByText(
+        "Ders kaydınız danışman hoca tarafından onaylanmayı bekliyor"
+      )
+    ).toBeInTheDocument()
+    expect(sent.submitted).toEqual([
+      { semester: FALL, course_ids: ["c-101", "c-m101"] },
+    ])
+  })
+
+  it("does not bring back an older rejection once a pending program is withdrawn", async () => {
+    stubBackend({
+      programs: [program("pending", [CENG101])],
+      rejection: REJECTION,
+    })
+    const user = userEvent.setup()
+    renderPage()
+
+    await user.click(
+      await screen.findByRole("button", { name: "Yeniden Ders Kaydı Yap" })
+    )
+
+    expect(
+      await screen.findByText("Yeni ders kaydı yapabilirsiniz")
+    ).toBeInTheDocument()
+    expect(screen.getByText("3 ders • 0 seçili")).toBeInTheDocument()
+    expect(
+      screen.queryByText(REJECTION.rejection_reason)
+    ).not.toBeInTheDocument()
+  })
+
   it("opens the semester whose window is open and still shows the current program", async () => {
     const sent = stubBackend({
       semesters: [openSemester(FALL, false, true), openSemester(SPRING, true)],

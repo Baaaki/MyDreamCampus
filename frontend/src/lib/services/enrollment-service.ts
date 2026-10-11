@@ -1,9 +1,14 @@
 import { enrollmentApi } from "@/lib/api-client"
+import { normalizeAvailableCourse } from "@/lib/normalize-schedule"
 import type {
   AdvisorPendingProgramsResponse,
+  AvailableCourse,
+  AvailableCourseDTO,
   EnrollmentProgramResponse,
+  LatestRejectionResponse,
   MyEnrollmentsResponse,
   OpenSemester,
+  RejectionDetail,
 } from "@/lib/types"
 
 const TERM_LABELS: Record<string, string> = {
@@ -42,6 +47,61 @@ export function currentProgram(
 }
 
 export const enrollmentService = {
+  /**
+   * Courses the logged-in student may take in a semester
+   */
+  async getAvailableCourses(semester: string): Promise<AvailableCourse[]> {
+    const response = await enrollmentApi
+      .get("available-courses", { searchParams: { semester } })
+      .json<{ available_courses: AvailableCourseDTO[] | null }>()
+    return (response.available_courses ?? []).map(normalizeAvailableCourse)
+  },
+
+  /**
+   * The logged-in student's most recent program in a semester, if any
+   */
+  async getLatestProgram(
+    semester: string
+  ): Promise<EnrollmentProgramResponse | null> {
+    const response = await enrollmentApi
+      .get("my-enrollments", { searchParams: { semester } })
+      .json<MyEnrollmentsResponse>()
+    const programs = [...(response.programs ?? [])].sort(
+      (a, b) =>
+        new Date(b.created_at).getTime() - new Date(a.created_at).getTime()
+    )
+    return programs[0] ?? null
+  },
+
+  /**
+   * The advisor's latest rejection of the student's program in a semester
+   */
+  async getLatestRejection(semester: string): Promise<RejectionDetail | null> {
+    const response = await enrollmentApi
+      .get("latest-rejection", { searchParams: { semester } })
+      .json<LatestRejectionResponse>()
+    return response.has_rejection ? response.latest_rejection : null
+  },
+
+  /**
+   * Send the chosen courses to the advisor as the semester's program
+   */
+  async submitProgram(
+    semester: string,
+    courseIds: string[]
+  ): Promise<EnrollmentProgramResponse> {
+    return enrollmentApi
+      .post("programs", { json: { semester, course_ids: courseIds } })
+      .json<EnrollmentProgramResponse>()
+  },
+
+  /**
+   * Withdraw the semester's pending or rejected program to start over
+   */
+  async withdrawProgram(semester: string): Promise<void> {
+    await enrollmentApi.delete("programs", { searchParams: { semester } })
+  },
+
   /**
    * The logged-in student's approved programs across semesters
    */
