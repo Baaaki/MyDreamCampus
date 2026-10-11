@@ -1001,3 +1001,32 @@ export interface ConfirmPaymentRequest {
   cvc: string
   cardholder_name: string
 }
+
+// Student service: CSV import. The upload answers with a job id at once; the
+// rows are created in the background and the job's counters advance as they go.
+export type StudentImportStatus =
+  "pending" | "processing" | "completed" | "failed"
+
+export interface StudentImportRowError {
+  /** Line in the file; the header is line 1. */
+  row: number
+  student_number: string
+  error_code: string
+  message: string
+}
+
+export interface StudentImportJob {
+  job_id: string
+  file_name: string
+  status: StudentImportStatus
+  total_records: number
+  processed_records: number
+  successful_records: number
+  failed_records: number
+  progress_percentage?: number
+  errors?: StudentImportRowError[]
+  created_by: string
+  started_at?: string
+  completed_at?: string
+  created_at: string
+}

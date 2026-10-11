@@ -39,12 +39,12 @@ import {
   ArrowDown,
   ArrowUpDown,
   Plus,
-  Upload,
   Users,
   Loader2,
   AlertCircle,
 } from "lucide-react"
 import { Link } from "react-router"
+import { StudentImportDialog } from "./import-dialog"
 
 type Student = {
   id: string
@@ -98,12 +98,9 @@ export default function StudentsPage() {
   const [limit] = useState(10)
   const [isCreateOpen, setIsCreateOpen] = useState(false)
   const [isEditOpen, setIsEditOpen] = useState(false)
-  const [isImportOpen, setIsImportOpen] = useState(false)
   const [editingStudent, setEditingStudent] = useState<Student | null>(null)
   const [sortField, setSortField] = useState<SortField>("first_name")
   const [sortDirection, setSortDirection] = useState<SortDirection>("asc")
-  const [selectedFile, setSelectedFile] = useState<File | null>(null)
-  const [importing, setImporting] = useState(false)
 
   // Faculty/Department selection
   const [createDepartments, setCreateDepartments] = useState<Department[]>([])
@@ -292,39 +289,6 @@ export default function StudentsPage() {
     setIsEditOpen(true)
   }
 
-  const handleBulkImport = async (e: React.FormEvent) => {
-    e.preventDefault()
-    if (!selectedFile) return
-
-    setImporting(true)
-    try {
-      const formData = new FormData()
-      formData.append("file", selectedFile)
-
-      // studentApi (ky) attaches cookies + CSRF header; raw fetch would 403
-      // on the CSRF-protected admin route.
-      const result = await studentApi
-        .post("bulk-import", { body: formData })
-        .json<{ job_id: string }>()
-
-      alert(`İçe aktarma işi oluşturuldu. İş no: ${result.job_id}`)
-      setIsImportOpen(false)
-      setSelectedFile(null)
-      fetchStudents()
-    } catch (error) {
-      console.error("Failed to import students:", error)
-      alert(apiErrorMessage(error, "İçe aktarma başarısız"))
-    } finally {
-      setImporting(false)
-    }
-  }
-
-  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    if (e.target.files && e.target.files[0]) {
-      setSelectedFile(e.target.files[0])
-    }
-  }
-
   const handleSort = (field: SortField) => {
     if (sortField === field) {
       setSortDirection(sortDirection === "asc" ? "desc" : "asc")
@@ -371,51 +335,7 @@ export default function StudentsPage() {
               <Users className="mr-2 h-4 w-4" /> Danışman İşleri
             </Button>
           </Link>
-          <Dialog open={isImportOpen} onOpenChange={setIsImportOpen}>
-            <DialogTrigger asChild>
-              <Button variant="outline">
-                <Upload className="mr-2 h-4 w-4" /> Toplu İçe Aktar
-              </Button>
-            </DialogTrigger>
-            <DialogContent>
-              <DialogHeader>
-                <DialogTitle>Öğrencileri Toplu İçe Aktar</DialogTitle>
-                <DialogDescription>
-                  Birden fazla öğrenciyi tek seferde eklemek için bir CSV
-                  dosyası yükleyin.
-                </DialogDescription>
-              </DialogHeader>
-              <form onSubmit={handleBulkImport} className="space-y-4">
-                <div>
-                  <Label htmlFor="csv_file">CSV Dosyası</Label>
-                  <Input
-                    id="csv_file"
-                    type="file"
-                    accept=".csv"
-                    onChange={handleFileChange}
-                    required
-                  />
-                  <p className="mt-2 text-sm text-muted-foreground">
-                    CSV şu sütunları içermelidir: student_number, first_name,
-                    last_name, email, faculty, department, enrollment_year,
-                    class_level
-                  </p>
-                </div>
-                <div className="flex justify-end space-x-2">
-                  <Button
-                    type="button"
-                    variant="outline"
-                    onClick={() => setIsImportOpen(false)}
-                  >
-                    İptal
-                  </Button>
-                  <Button type="submit" disabled={importing || !selectedFile}>
-                    {importing ? "İçe aktarılıyor..." : "İçe Aktar"}
-                  </Button>
-                </div>
-              </form>
-            </DialogContent>
-          </Dialog>
+          <StudentImportDialog />
 
           <Dialog open={isCreateOpen} onOpenChange={setIsCreateOpen}>
             <DialogTrigger asChild>
