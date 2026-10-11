@@ -26,6 +26,7 @@ function course(
     theory,
     lab,
     weekly_records: [],
+    missed_sessions: [],
   }
 }
 

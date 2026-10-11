@@ -40,6 +40,7 @@ const CENG201: CourseAttendanceDetail = {
       marked_via: "qr_scan",
     },
   ],
+  missed_sessions: [{ week: 2, session_type: "theory", date: "2026-10-06" }],
 }
 
 const MATH201: CourseAttendanceDetail = {
@@ -56,6 +57,7 @@ const MATH201: CourseAttendanceDetail = {
     passed: true,
   },
   weekly_records: [],
+  missed_sessions: [],
 }
 
 function stubAttendance(response: Response) {
@@ -121,9 +123,10 @@ describe("StudentAttendancePage", () => {
     expect(lab.getByText("Sınırın altında")).toBeInTheDocument()
 
     const weeks = ceng.getAllByRole("listitem").map((li) => li.textContent)
-    expect(weeks, "oldest week first").toEqual([
+    expect(weeks, "oldest week first, missed ones among them").toEqual([
       "1. haftaTeori29 EylQR",
       "2. haftaLab8 EkiHoca",
+      "2. haftaTeori6 EkiKatılmadınız",
     ])
   })
 
@@ -135,7 +138,7 @@ describe("StudentAttendancePage", () => {
     const math = within(courseCard(/MATH201/))
     expect(math.getByRole("region", { name: "Teori" })).toBeInTheDocument()
     expect(math.queryByRole("region", { name: "Lab" })).not.toBeInTheDocument()
-    expect(math.queryByText("Katıldığınız oturumlar")).not.toBeInTheDocument()
+    expect(math.queryByText("Oturumlar")).not.toBeInTheDocument()
   })
 
   it("says so when the student has no courses this semester", async () => {

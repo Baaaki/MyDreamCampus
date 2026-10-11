@@ -56,6 +56,7 @@ function course(
     theory: stats(theoryAbsent),
     lab: labAbsent === undefined ? undefined : stats(labAbsent),
     weekly_records: [],
+    missed_sessions: [],
   }
 }
 

@@ -338,7 +338,7 @@ export interface SessionTypeAttendance {
   passed: boolean
 }
 
-// One session the student attended; missed sessions are not listed.
+// One session the student attended.
 export interface WeeklyAttendanceRecord {
   week: number
   session_type: "theory" | "lab"
@@ -357,6 +357,14 @@ export interface CourseAttendanceDetail {
   theory?: SessionTypeAttendance
   lab?: SessionTypeAttendance
   weekly_records: WeeklyAttendanceRecord[]
+  // Sessions held without the student; a session still open is not listed.
+  missed_sessions: MissedSession[]
+}
+
+export interface MissedSession {
+  week: number
+  session_type: "theory" | "lab"
+  date: string // YYYY-MM-DD
 }
 
 export interface MyAttendanceResponse {

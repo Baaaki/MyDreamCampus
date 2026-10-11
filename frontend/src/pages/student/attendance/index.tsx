@@ -7,9 +7,14 @@ import { getMyAttendance } from "@/lib/services/attendance-service"
 import { semesterLabel } from "@/lib/services/enrollment-service"
 import type {
   CourseAttendanceDetail,
+  MissedSession,
   SessionTypeAttendance,
   WeeklyAttendanceRecord,
 } from "@/lib/types"
+
+type SessionRow =
+  | (WeeklyAttendanceRecord & { attended: true })
+  | (MissedSession & { attended: false })
 
 const SESSION_LABELS: Record<WeeklyAttendanceRecord["session_type"], string> = {
   theory: "Teori",
@@ -88,7 +93,10 @@ export default function StudentAttendancePage() {
 }
 
 function CourseAttendanceCard({ course }: { course: CourseAttendanceDetail }) {
-  const records = [...course.weekly_records].sort(
+  const sessions: SessionRow[] = [
+    ...course.weekly_records.map((r) => ({ ...r, attended: true as const })),
+    ...course.missed_sessions.map((m) => ({ ...m, attended: false as const })),
+  ].sort(
     (a, b) => a.week - b.week || a.session_type.localeCompare(b.session_type)
   )
 
@@ -120,13 +128,13 @@ function CourseAttendanceCard({ course }: { course: CourseAttendanceDetail }) {
           </div>
         )}
 
-        {records.length > 0 && (
+        {sessions.length > 0 && (
           <div>
             <p className="mb-2 text-sm font-medium text-gray-700 dark:text-gray-300">
-              Katıldığınız oturumlar
+              Oturumlar
             </p>
             <ul className="divide-y rounded-md border text-sm dark:divide-gray-700 dark:border-gray-700">
-              {records.map((r) => (
+              {sessions.map((r) => (
                 <li
                   key={`${r.week}-${r.session_type}`}
                   className="flex flex-wrap items-center gap-x-3 gap-y-1 px-3 py-2"
@@ -136,9 +144,15 @@ function CourseAttendanceCard({ course }: { course: CourseAttendanceDetail }) {
                   <span className="text-gray-500 dark:text-gray-400">
                     {formatSessionDate(r.date)}
                   </span>
-                  <span className="ml-auto text-xs text-gray-500 dark:text-gray-400">
-                    {MARKED_VIA_LABELS[r.marked_via] ?? r.marked_via}
-                  </span>
+                  {r.attended ? (
+                    <span className="ml-auto text-xs text-gray-500 dark:text-gray-400">
+                      {MARKED_VIA_LABELS[r.marked_via] ?? r.marked_via}
+                    </span>
+                  ) : (
+                    <span className="ml-auto text-xs font-medium text-destructive">
+                      Katılmadınız
+                    </span>
+                  )}
                 </li>
               ))}
             </ul>
