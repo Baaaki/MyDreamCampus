@@ -1,51 +1,49 @@
 import { Link } from "react-router"
+import { useQuery } from "@tanstack/react-query"
 import {
   Users,
   GraduationCap,
   BookOpen,
-  ClipboardCheck,
   FileCheck,
   BarChart3,
   UtensilsCrossed,
   UserCheck,
   Calendar,
+  Loader2,
 } from "lucide-react"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
+import { getAdminDashboardStats } from "@/lib/services/admin-dashboard-service"
 
-const stats = [
+const statCards = [
   {
+    key: "students",
     title: "Toplam Öğrenci",
-    value: "12,543",
-    change: "+2.5%",
-    changeType: "positive" as const,
     icon: GraduationCap,
     color: "bg-blue-500",
   },
   {
+    key: "staff",
     title: "Toplam Personel",
-    value: "1,234",
-    change: "+1.2%",
-    changeType: "positive" as const,
     icon: Users,
     color: "bg-green-500",
   },
   {
-    title: "Aktif Ders",
-    value: "456",
-    change: "+5 yeni",
-    changeType: "positive" as const,
+    key: "openedCourses",
+    title: "Aktif Dönemde Açılan Ders",
     icon: BookOpen,
     color: "bg-purple-500",
   },
   {
-    title: "Bugünkü Yoklama",
-    value: "89%",
-    change: "+3%",
-    changeType: "positive" as const,
+    key: "todaySessions",
+    title: "Bugünkü Yoklama Oturumu",
     icon: UserCheck,
     color: "bg-orange-500",
   },
-]
+] as const
+
+function formatCount(value: number | null | undefined): string {
+  return value == null ? "—" : value.toLocaleString("tr-TR")
+}
 
 const quickLinks = [
   {
@@ -70,23 +68,16 @@ const quickLinks = [
     color: "from-purple-500 to-pink-600",
   },
   {
-    title: "Ders Kayıt",
-    description: "Ders kayıt işlemlerini yönet",
-    href: "/enrollment",
-    icon: ClipboardCheck,
-    color: "from-pink-500 to-rose-600",
-  },
-  {
     title: "Yoklama Sistemi",
     description: "Yoklama takibi ve raporları",
-    href: "/attendance/teacher",
+    href: "/attendance",
     icon: FileCheck,
     color: "from-red-500 to-orange-600",
   },
   {
     title: "Not Yönetimi",
     description: "Not girişi ve transkript",
-    href: "/grades/teacher",
+    href: "/grades",
     icon: BarChart3,
     color: "from-indigo-500 to-blue-600",
   },
@@ -107,6 +98,11 @@ const quickLinks = [
 ]
 
 export default function DashboardPage() {
+  const { data: stats, isLoading } = useQuery({
+    queryKey: ["admin", "dashboard", "stats"],
+    queryFn: () => getAdminDashboardStats(),
+  })
+
   return (
     <div className="space-y-6">
       {/* Header */}
@@ -121,7 +117,7 @@ export default function DashboardPage() {
 
       {/* Stats Grid */}
       <div className="grid grid-cols-1 gap-4 md:grid-cols-2 lg:grid-cols-4">
-        {stats.map((stat) => {
+        {statCards.map((stat) => {
           const Icon = stat.icon
           return (
             <Card
@@ -135,16 +131,11 @@ export default function DashboardPage() {
                       {stat.title}
                     </p>
                     <p className="mt-1 text-2xl font-bold text-gray-900 dark:text-white">
-                      {stat.value}
-                    </p>
-                    <p
-                      className={`mt-1 text-sm ${
-                        stat.changeType === "positive"
-                          ? "text-green-600"
-                          : "text-red-600"
-                      }`}
-                    >
-                      {stat.change}
+                      {isLoading ? (
+                        <Loader2 className="h-6 w-6 animate-spin text-gray-400" />
+                      ) : (
+                        formatCount(stats?.[stat.key])
+                      )}
                     </p>
                   </div>
                   <div className={`rounded-lg p-3 ${stat.color}`}>
