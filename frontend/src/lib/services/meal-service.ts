@@ -215,16 +215,11 @@ export function getEndOfPreviousWeek(): Date {
   return sunday
 }
 
-// Helper function to format date as YYYY-MM-DD
-export function formatDateForApi(date: Date): string {
-  return date.toISOString().split("T")[0]
-}
-
 // Helper functions for frontend filtering (week-based)
 export function filterActiveReservations(
   reservations: Reservation[]
 ): Reservation[] {
-  const weekStart = formatDateForApi(getStartOfCurrentWeek())
+  const weekStart = toLocalISODate(getStartOfCurrentWeek())
   return reservations.filter(
     (r) => r.status === "confirmed" && !r.is_used && r.date >= weekStart
   )
@@ -233,7 +228,7 @@ export function filterActiveReservations(
 export function filterPastReservations(
   reservations: Reservation[]
 ): Reservation[] {
-  const weekStart = formatDateForApi(getStartOfCurrentWeek())
+  const weekStart = toLocalISODate(getStartOfCurrentWeek())
   return reservations.filter(
     (r) =>
       r.is_used ||
@@ -247,7 +242,7 @@ export function filterPastReservations(
 export function getDisplayStatus(
   reservation: Reservation
 ): "upcoming" | "completed" | "missed" | "cancelled" {
-  const weekStart = formatDateForApi(getStartOfCurrentWeek())
+  const weekStart = toLocalISODate(getStartOfCurrentWeek())
 
   if (reservation.status === "cancelled") {
     return "cancelled"

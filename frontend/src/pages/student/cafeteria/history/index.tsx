@@ -16,7 +16,7 @@ import {
   getMyReservations,
   getStartOfCurrentWeek,
   getEndOfPreviousWeek,
-  formatDateForApi,
+  toLocalISODate,
   type Reservation,
 } from "@/lib/services/meal-service"
 
@@ -38,11 +38,11 @@ export default function CafeteriaHistoryPage() {
 
   // Calculate date boundaries
   const weekStartDate = useMemo(
-    () => formatDateForApi(getStartOfCurrentWeek()),
+    () => toLocalISODate(getStartOfCurrentWeek()),
     []
   )
   const previousWeekEnd = useMemo(
-    () => formatDateForApi(getEndOfPreviousWeek()),
+    () => toLocalISODate(getEndOfPreviousWeek()),
     []
   )
 
