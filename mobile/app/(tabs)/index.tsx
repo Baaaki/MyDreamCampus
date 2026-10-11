@@ -83,6 +83,15 @@ export default function HomeScreen() {
       tintBg: isDark ? 'rgba(59,130,246,0.18)' : 'rgba(37,99,235,0.10)',
     },
     {
+      key: 'attendance',
+      label: 'Devamsızlık',
+      hint: 'Derslere devam durumun',
+      icon: 'checkmark-done',
+      href: '/attendance',
+      tint: isDark ? '#34d399' : '#059669',
+      tintBg: isDark ? 'rgba(52,211,153,0.16)' : 'rgba(5,150,105,0.10)',
+    },
+    {
       key: 'grades',
       label: 'Notlarım',
       hint: 'Sınav sonuçların',

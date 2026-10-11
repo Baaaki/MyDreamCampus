@@ -34,7 +34,7 @@ export interface WeeklyRecord {
   session_type: 'theory' | 'lab';
   date: string;
   marked_via: 'qr' | 'manual';
-  note: string;
+  note?: string;
 }
 
 export interface CourseAttendance {
@@ -43,8 +43,9 @@ export interface CourseAttendance {
   course_name: string;
   instructor: string;
   total_weeks: number;
-  theory: AttendanceStats;
-  lab: AttendanceStats;
+  // Omitted by the backend (omitempty) when the course has no such session type.
+  theory?: AttendanceStats;
+  lab?: AttendanceStats;
   weekly_records: WeeklyRecord[];
 }
 

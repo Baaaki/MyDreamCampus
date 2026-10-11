@@ -102,6 +102,7 @@ function RootLayoutNav() {
               <Stack.Screen name="(auth)" />
               <Stack.Screen name="(tabs)" />
               <Stack.Screen name="grades" />
+              <Stack.Screen name="attendance" />
               <Stack.Screen name="cafeteria" />
               <Stack.Screen name="schedule" />
               <Stack.Screen
