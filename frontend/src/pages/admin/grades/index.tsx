@@ -36,6 +36,7 @@ import type {
   CourseStatusResponse,
   StudentGrades,
   SemesterCourse,
+  SemesterCourseDTO,
 } from "@/lib/types"
 import { useFaculties } from "@/lib/services/catalog-service"
 import { getActiveSemester } from "@/lib/services/system-service"
@@ -118,7 +119,7 @@ export default function AdminGradesPage() {
             limit: 100,
           },
         })
-        .json<{ data: SemesterCourse[] | null }>()
+        .json<{ data: SemesterCourseDTO[] | null }>()
 
       const q = searchQuery.trim().toLowerCase()
       const filtered = (resp.data || []).filter(

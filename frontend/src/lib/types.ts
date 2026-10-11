@@ -237,7 +237,8 @@ export interface CourseBasic {
   course_name: string
   credits: number
   instructor?: string
-  schedule_sessions?: ScheduleSessionDTO[]
+  // Absent or null for a course without a weekly schedule.
+  schedule_sessions?: ScheduleSessionDTO[] | null
 }
 
 // Enrollment types
