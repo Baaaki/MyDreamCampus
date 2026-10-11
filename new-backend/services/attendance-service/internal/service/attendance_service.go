@@ -35,6 +35,11 @@ const (
 	MinLabAttendance      = 11 // per 14 sessions
 )
 
+// campusZone dates sessions by the campus's local day, as meal-service does:
+// Turkey keeps UTC+3 all year, and on the UTC day a session opened before
+// 03:00 would land on the day before.
+var campusZone = time.FixedZone("UTC+3", 3*3600)
+
 type AttendanceService struct {
 	cacheRepo      attendanceCache
 	sessionRepo    sessionStore
@@ -117,13 +122,14 @@ func (s *AttendanceService) CreateSession(ctx context.Context, instructorID uuid
 	// 4. Create session in DB
 	now := clock.Now()
 	expiresAt := now.Add(time.Duration(req.DurationMinutes) * time.Minute)
+	sessionDay := now.In(campusZone)
 
 	session, err := s.sessionRepo.CreateAttendanceSession(ctx, db.CreateAttendanceSessionParams{
 		CourseID:     utils.UUIDToPgUUID(req.CourseID),
 		InstructorID: utils.UUIDToPgUUID(instructorID),
 		Semester:     course.Semester,
 		WeekNumber:   req.WeekNumber,
-		SessionDate:  utils.TimeToPgDate(now),
+		SessionDate:  utils.TimeToPgDate(sessionDay),
 		QrSecret:     qrSecret,
 		// Stored per session so a later change to the default cannot
 		// invalidate codes already on screen.
@@ -175,7 +181,7 @@ func (s *AttendanceService) CreateSession(ctx context.Context, instructorID uuid
 		CourseName:           course.CourseName,
 		WeekNumber:           req.WeekNumber,
 		SessionType:          req.SessionType,
-		SessionDate:          now.Format("2006-01-02"),
+		SessionDate:          sessionDay.Format("2006-01-02"),
 		StartedAt:            now,
 		ExpiresAt:            expiresAt,
 		EnrolledStudentCount: len(enrolledStudents),

@@ -793,3 +793,33 @@ func jsonField(t *testing.T, raw []byte, field string) string {
 	require.NoError(t, json.Unmarshal(raw, &obj))
 	return string(obj[field])
 }
+
+// ---------------------------------------------------------- session date
+
+func TestCreateSession_SessionDate_IsCampusLocalDay(t *testing.T) {
+	cases := []struct {
+		name string
+		at   time.Time
+		want string
+	}{
+		{"01:30 local belongs to the local day, not the UTC one", time.Date(2026, 10, 11, 22, 30, 0, 0, time.UTC), "2026-10-12"},
+		{"afternoon matches the UTC day", time.Date(2026, 10, 12, 12, 0, 0, 0, time.UTC), "2026-10-12"},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			w, courseID, _ := newAttWorld(t)
+			clocktest.Freeze(t, tc.at)
+			start, end := tc.at.Add(-24*time.Hour), tc.at.Add(30*24*time.Hour)
+			w.periodStart, w.periodEnd = &start, &end
+
+			resp, err := w.service(attSemesterClient{hardDeadline: tc.at.Add(60 * 24 * time.Hour)}).CreateSession(context.Background(), teacherID, dto.CreateSessionRequest{
+				CourseID: courseID, WeekNumber: 1, SessionType: "theory", DurationMinutes: 15,
+			})
+			require.NoError(t, err)
+
+			assert.Equal(t, tc.want, resp.SessionDate)
+			stored := w.sessions[resp.SessionID].SessionDate.Time
+			assert.Equal(t, tc.want, stored.Format("2006-01-02"), "pgx encodes the date from its calendar fields")
+		})
+	}
+}
