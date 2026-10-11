@@ -3,8 +3,12 @@
 -- periods, the next semester's prerequisite enrollment window, and every
 -- offering's weekly schedule.
 --
--- Everything is relative to the seed day: periods are open today, and the
--- hard deadline is a full term away.
+-- Everything is relative to the seed day, and it has to hold for six months:
+-- the hourly rewind always returns to this state, so its dates never move on
+-- their own. Every period stays open 180 days; the active semester's hard
+-- deadline falls just after (catalog refuses a period ending past it, and
+-- completes the semester once it passes), the next one's a term later.
+-- DEPLOY.md says how to refresh the state when the six months run out.
 --
 -- Instructor ids come from _staff — staff.staff is another database now.
 \i /seed/sql/_staging-for-catalog.sql
@@ -13,13 +17,13 @@
 -- Semesters
 -- ============================================================
 INSERT INTO course_catalog.semesters (name, status, hard_deadline, activated_at)
-VALUES (:'semester', 'active', NOW() + INTERVAL '120 days', NOW())
+VALUES (:'semester', 'active', NOW() + INTERVAL '200 days', NOW())
 ON CONFLICT (name) DO NOTHING;
 
 -- Planned, so an admin can still add offerings to it from the UI: catalog
 -- freezes a semester's course list once it is active.
 INSERT INTO course_catalog.semesters (name, status, hard_deadline)
-VALUES (:'next_semester', 'planned', NOW() + INTERVAL '300 days')
+VALUES (:'next_semester', 'planned', NOW() + INTERVAL '380 days')
 ON CONFLICT (name) DO NOTHING;
 
 -- ============================================================
@@ -63,7 +67,7 @@ ON CONFLICT (semester, course_code, department) DO NOTHING;
 -- Opened five weeks back rather than today: attendance has four weeks of
 -- history (04-attendance.sql) that should fall inside its own period.
 INSERT INTO course_catalog.academic_periods (semester, period_start, period_end, is_active, period_type)
-SELECT :'semester', NOW() - INTERVAL '35 days', NOW() + INTERVAL '45 days', true, t.period_type
+SELECT :'semester', NOW() - INTERVAL '35 days', NOW() + INTERVAL '180 days', true, t.period_type
 FROM (VALUES ('catalog'), ('enrollment'), ('grading'), ('attendance')) AS t(period_type)
 ON CONFLICT (semester, period_type) DO NOTHING;
 
@@ -83,7 +87,7 @@ ON CONFLICT (semester, period_type) DO NOTHING;
 --   reject  → Kerem, Naz    (class_level 1 < 2 → ErrInvalidClassLevel, a
 --             different, earlier guard — not the prerequisite check)
 INSERT INTO course_catalog.academic_periods (semester, period_start, period_end, is_active, period_type)
-SELECT :'next_semester', NOW() - INTERVAL '1 day', NOW() + INTERVAL '45 days', true, t.period_type
+SELECT :'next_semester', NOW() - INTERVAL '1 day', NOW() + INTERVAL '180 days', true, t.period_type
 FROM (VALUES ('catalog'), ('enrollment'), ('grading'), ('attendance')) AS t(period_type)
 ON CONFLICT (semester, period_type) DO NOTHING;
 

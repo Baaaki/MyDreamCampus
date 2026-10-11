@@ -1,5 +1,6 @@
--- meal database: cafeterias, the student projection, this month's and next
--- month's weekday menus, and reservations for this week and next.
+-- meal database: cafeterias, the student projection, weekday menus for this
+-- month and the six after it (the demo state has to last six months, see
+-- 02-catalog.sql), and reservations for this week and next.
 --
 -- seed.sh passes data/cafeterias.json in as :'cafeterias' and
 -- data/menu_dishes.json (the admin menu page's dish pools) as :'dishes'.
@@ -39,7 +40,7 @@ CROSS JOIN LATERAL jsonb_array_elements(:'dishes'::jsonb -> k.kind) WITH ORDINAL
 CREATE TEMP TABLE _menu_days AS
 WITH months AS (
     SELECT (date_trunc('month', CURRENT_DATE) + m * INTERVAL '1 month')::date AS first_day
-    FROM generate_series(0, 1) AS m
+    FROM generate_series(0, 6) AS m
 ), shaped AS (
     SELECT first_day,
            EXTRACT(ISODOW FROM first_day)::int - 1 AS lead_days,
