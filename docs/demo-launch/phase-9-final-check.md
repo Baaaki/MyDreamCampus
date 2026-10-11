@@ -57,7 +57,11 @@
     sonra kendiliğinden kapanma yok.)
 
 ### Korumalar
-- [ ] Demo hesabında şifre değiştirme ve "tüm cihazlardan çık" kapalı.
+- [ ] Demo hesabında şifre değiştirme ve "tüm cihazlardan çık" kapalı:
+  Oturumlar sayfasındaki "Tüm Cihazlardan Çık" düğmesi demo hesabında devre
+  dışı ve nedenini yazıyor (API de 403 `DEMO_ACCOUNT_ACTION_FORBIDDEN`
+  döner). Süper adminde onaydan sonra bütün oturumlar kapanıyor ve giriş
+  sayfasına dönülüyor.
 - [ ] Demo admin demo öğrenciyi silemiyor, pasifleştiremiyor ve e-postasını
   değiştiremiyor.
 - [ ] Oturumlar sayfasında diğer ziyaretçilerin IP'leri maskeli.
