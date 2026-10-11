@@ -6,8 +6,50 @@ import type {
   SubmitScoreResponse,
   BulkSubmitScoresRequest,
   BulkSubmitScoresResponse,
+  GradeAppealRequest,
+  GradeAppealResponse,
   MyGradesResponse,
 } from "@/lib/types"
+
+/** The backend's minimum, so a short reason is caught before the request. */
+export const APPEAL_REASON_MIN_LENGTH = 10
+
+export interface AppealForm {
+  slug: string
+  newScore: string
+  reason: string
+}
+
+export type AppealFormErrors = Partial<Record<keyof AppealForm, string>>
+
+export function validateAppealForm(form: AppealForm): AppealFormErrors {
+  const errors: AppealFormErrors = {}
+  if (!form.slug) errors.slug = "Değerlendirme seçin"
+  const score = Number(form.newScore.replace(",", "."))
+  if (form.newScore.trim() === "" || Number.isNaN(score)) {
+    errors.newScore = "Yeni notu girin"
+  } else if (score < 0 || score > 100) {
+    errors.newScore = "Not 0 ile 100 arasında olmalı"
+  }
+  if (form.reason.trim().length < APPEAL_REASON_MIN_LENGTH) {
+    errors.reason = `Gerekçe en az ${APPEAL_REASON_MIN_LENGTH} karakter olmalı`
+  }
+  return errors
+}
+
+export function toAppealRequest(
+  form: AppealForm,
+  studentId: string,
+  courseId: string
+): GradeAppealRequest {
+  return {
+    student_id: studentId,
+    course_id: courseId,
+    slug: form.slug,
+    new_score: Number(form.newScore.replace(",", ".")),
+    reason: form.reason.trim(),
+  }
+}
 
 export const gradesService = {
   /**
@@ -95,6 +137,13 @@ export const gradesService = {
       console.error("Failed to unlock score:", error)
       throw error
     }
+  },
+
+  /** Admin: corrects one score of a finalized course and regrades it. */
+  async processAppeal(data: GradeAppealRequest): Promise<GradeAppealResponse> {
+    return gradesApi
+      .post("admin/appeals", { json: data })
+      .json<GradeAppealResponse>()
   },
 
   async lockScore(data: {

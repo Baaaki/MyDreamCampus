@@ -1060,3 +1060,29 @@ export interface AttendanceFinalizationStatus {
   finalized: boolean
   result?: AttendanceFinalization
 }
+
+// Grades service: an admin corrects one assessment score of a finalized
+// course. The grade is recomputed with the class statistics frozen at
+// finalization, so the rest of the class keeps its grades.
+export interface GradeAppealRequest {
+  student_id: string
+  course_id: string
+  slug: string
+  new_score: number
+  reason: string
+}
+
+export interface GradeAppealResponse {
+  student_id: string
+  course_code: string
+  slug: string
+  old_score: number
+  new_score: number
+  old_weighted_average: number
+  new_weighted_average: number
+  old_grade_point: string
+  new_grade_point: string
+  grading_type: string
+  frozen_class_mean: number
+  frozen_class_stddev?: number
+}

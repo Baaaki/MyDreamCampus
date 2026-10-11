@@ -9,6 +9,7 @@ import {
   Unlock,
   Calendar,
   GraduationCap,
+  Scale,
 } from "lucide-react"
 import { Input } from "@/components/ui/input"
 import { Button } from "@/components/ui/button"
@@ -40,6 +41,7 @@ import type {
 } from "@/lib/types"
 import { useFaculties } from "@/lib/services/catalog-service"
 import { getActiveSemester } from "@/lib/services/system-service"
+import { GradeAppealDialog } from "./appeal-dialog"
 
 type AdminCourseRow = Pick<
   SemesterCourse,
@@ -83,6 +85,7 @@ export default function AdminGradesPage() {
     assessmentName?: string
   } | null
   const [lockAction, setLockAction] = useState<LockActionState>(null)
+  const [appealStudent, setAppealStudent] = useState<StudentGrades | null>(null)
 
   const {
     data: faculties = [],
@@ -356,6 +359,9 @@ export default function AdminGradesPage() {
 
   const renderStudents = () => {
     const assessments = courseStatus?.assessments || []
+    // Appeals regrade a finalized course; before that the teacher edits.
+    const canAppeal = courseStatus?.is_finalized ?? false
+    const columnCount = 2 + assessments.length + (canAppeal ? 1 : 0)
 
     return (
       <div className="space-y-6">
@@ -402,6 +408,13 @@ export default function AdminGradesPage() {
           </div>
         </div>
 
+        {canAppeal && (
+          <p className="text-sm text-gray-500">
+            Ders kesinleşti. Not itirazlarını öğrenci satırındaki &quot;Not
+            İtirazı&quot; düğmesiyle işleyebilirsiniz.
+          </p>
+        )}
+
         <div className="overflow-x-auto rounded-lg border bg-white dark:border-gray-800 dark:bg-gray-900">
           <Table>
             <TableHeader>
@@ -416,22 +429,24 @@ export default function AdminGradesPage() {
                     {a.name}
                   </TableHead>
                 ))}
+                {canAppeal && (
+                  <TableHead className="text-right whitespace-nowrap">
+                    İtiraz
+                  </TableHead>
+                )}
               </TableRow>
             </TableHeader>
             <TableBody>
               {loading ? (
                 <TableRow>
-                  <TableCell
-                    colSpan={2 + assessments.length}
-                    className="h-24 text-center"
-                  >
+                  <TableCell colSpan={columnCount} className="h-24 text-center">
                     <Loader2 className="mx-auto h-6 w-6 animate-spin text-blue-600" />
                   </TableCell>
                 </TableRow>
               ) : students.length === 0 ? (
                 <TableRow>
                   <TableCell
-                    colSpan={2 + assessments.length}
+                    colSpan={columnCount}
                     className="h-24 text-center text-gray-500"
                   >
                     Öğrenci bulunamadı.
@@ -503,6 +518,17 @@ export default function AdminGradesPage() {
                         </TableCell>
                       )
                     })}
+                    {canAppeal && (
+                      <TableCell className="text-right align-top">
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          onClick={() => setAppealStudent(student)}
+                        >
+                          <Scale className="mr-1 h-3 w-3" /> Not İtirazı
+                        </Button>
+                      </TableCell>
+                    )}
                   </TableRow>
                 ))
               )}
@@ -545,6 +571,15 @@ export default function AdminGradesPage() {
 
       {view === "COURSES" && renderCourses()}
       {view === "STUDENTS" && renderStudents()}
+
+      {selectedCourse && (
+        <GradeAppealDialog
+          courseId={selectedCourse.id}
+          student={appealStudent}
+          assessments={courseStatus?.assessments || []}
+          onOpenChange={(open) => !open && setAppealStudent(null)}
+        />
+      )}
 
       <AlertDialog
         open={!!lockAction}
