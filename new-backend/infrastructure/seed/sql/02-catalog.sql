@@ -5,10 +5,12 @@
 --
 -- Everything is relative to the seed day, and it has to hold for six months:
 -- the hourly rewind always returns to this state, so its dates never move on
--- their own. Every period stays open 180 days; the active semester's hard
--- deadline falls just after (catalog refuses a period ending past it, and
--- completes the semester once it passes), the next one's a term later.
--- DEPLOY.md says how to refresh the state when the six months run out.
+-- their own. Every period stays open 180 days; DEPLOY.md says how to extend
+-- them when that runs out. The active semester's hard deadline is a year out
+-- on purpose: once it passes, catalog completes the semester for good and no
+-- edit brings it back. Six months past the periods, it leaves time to notice
+-- they have closed and move them on (none may end past the deadline) before
+-- only a re-seed would help. The next semester's deadline is a term later.
 --
 -- Instructor ids come from _staff — staff.staff is another database now.
 \i /seed/sql/_staging-for-catalog.sql
@@ -17,13 +19,13 @@
 -- Semesters
 -- ============================================================
 INSERT INTO course_catalog.semesters (name, status, hard_deadline, activated_at)
-VALUES (:'semester', 'active', NOW() + INTERVAL '200 days', NOW())
+VALUES (:'semester', 'active', NOW() + INTERVAL '365 days', NOW())
 ON CONFLICT (name) DO NOTHING;
 
 -- Planned, so an admin can still add offerings to it from the UI: catalog
 -- freezes a semester's course list once it is active.
 INSERT INTO course_catalog.semesters (name, status, hard_deadline)
-VALUES (:'next_semester', 'planned', NOW() + INTERVAL '380 days')
+VALUES (:'next_semester', 'planned', NOW() + INTERVAL '545 days')
 ON CONFLICT (name) DO NOTHING;
 
 -- ============================================================

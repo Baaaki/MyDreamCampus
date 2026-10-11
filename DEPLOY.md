@@ -599,16 +599,19 @@ docker compose logs seed        # ">> seed complete" görmelisin
 
 Seed'in tarihleri seed gününe sabitlenir ve saatlik geri dönüş hep bu kalıcı
 duruma döndüğü için kendiliğinden ilerlemez. Ufuk **yaklaşık 6 ay**: periyotlar
-seed'den 180 gün sonra kapanır (ders seçimi, not ve yoklama girişi durur),
-menü 6 ay sonra biter, aktif dönemin `hard_deadline`'ı ~200. günde dolar ve
-dönem kendiliğinden tamamlanır — tamamlanan dönem geri açılmaz. O tarihten
-önce iki yoldan biri:
+seed'den 180 gün sonra kapanır (ders seçimi, not ve yoklama girişi durur) ve
+menü 6 ay sonra biter. Bunlar geri alınabilir. Geri alınamayan sınır aktif
+dönemin `hard_deadline`'ı: geçtiği an dönem kendiliğinden tamamlanır ve
+tamamlanan dönem geri açılmaz. Seed onu bu yüzden 1 yıl ileri koyar;
+periyotlar kapandıktan sonra ~6 ay pay kalır. O pay içinde iki yoldan biri:
 
 1. **Kalıcı durumu uzat (düzenlemeler korunur):** süper admin Kalıcı Veri
    sayfasında bir düzenleme oturumu açar, aktif dönemin periyot bitişlerini
-   ileri alır (periyot `hard_deadline`'ı geçemez; gerekiyorsa önce onu da
+   ileri alır (periyot `hard_deadline`'ı geçemez; ikinci yıla taşırken onu da
    uzatır), gerekirse yeni ayların menüsünü ekler ve "Kaydet ve Yayına Al" ile
-   kaydeder. Geri dönüş bundan sonra yeni tarihlere döner.
+   kaydeder. Geri dönüş bundan sonra yeni tarihlere döner. Düzenleme
+   oturumunda zaman makinesini `hard_deadline`'ın ötesine götürme: dönem o an
+   tamamlanabilir ve kaydedilirse bu da kalıcı olur.
 2. **Baştan seed (kalıcı düzenlemeler kaybolur):** `make clean && make deploy`.
    Volume'lar silinir, seed bugünün tarihleriyle yeniden yazar; süper adminin
    kaydettiği her şey gider.
