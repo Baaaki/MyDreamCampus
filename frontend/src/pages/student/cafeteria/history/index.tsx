@@ -1,8 +1,19 @@
-import { useState, useMemo } from "react"
-import { useQuery } from "@tanstack/react-query"
+import { useState, useMemo, useCallback } from "react"
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog"
+import Toast from "@/components/enrollment/Toast"
 import {
   History,
   CalendarCheck,
@@ -13,12 +24,15 @@ import {
   AlertCircle,
 } from "lucide-react"
 import {
+  cancelReservation,
+  canCancelReservation,
   getMyReservations,
   getStartOfCurrentWeek,
   getEndOfPreviousWeek,
   toLocalISODate,
   type Reservation,
 } from "@/lib/services/meal-service"
+import { apiErrorMessage } from "@/lib/api-error"
 
 const ITEMS_PER_PAGE = 10
 
@@ -34,7 +48,44 @@ const DAY_NAMES: Record<number, string> = {
 }
 
 export default function CafeteriaHistoryPage() {
+  const queryClient = useQueryClient()
   const [pastPage, setPastPage] = useState(1)
+  const [toCancel, setToCancel] = useState<Reservation | null>(null)
+  const [toast, setToast] = useState<{
+    message: string
+    type: "success" | "error"
+    isVisible: boolean
+  }>({ message: "", type: "success", isVisible: false })
+  const closeToast = useCallback(
+    () => setToast((prev) => ({ ...prev, isVisible: false })),
+    []
+  )
+
+  const cancelMutation = useMutation({
+    mutationFn: (reservationId: string) => cancelReservation(reservationId),
+    onSuccess: (result) => {
+      setToast({
+        message:
+          result.refund_amount > 0
+            ? `Rezervasyon iptal edildi, ${result.refund_amount.toFixed(2)} ₺ iade edildi.`
+            : "Rezervasyon iptal edildi.",
+        type: "success",
+        isVisible: true,
+      })
+      // The cafeteria page and the dashboard list the same reservations.
+      queryClient.invalidateQueries({ queryKey: ["current-reservations"] })
+      queryClient.invalidateQueries({ queryKey: ["my-reservations"] })
+      queryClient.invalidateQueries({ queryKey: ["meals", "reservations"] })
+    },
+    onError: (err) => {
+      setToast({
+        message: apiErrorMessage(err, "Rezervasyon iptal edilemedi."),
+        type: "error",
+        isVisible: true,
+      })
+    },
+    onSettled: () => setToCancel(null),
+  })
 
   // Calculate date boundaries
   const weekStartDate = useMemo(
@@ -204,6 +255,9 @@ export default function CafeteriaHistoryPage() {
                     <th className="px-4 py-3 text-left text-sm font-medium text-gray-500">
                       Durum
                     </th>
+                    <th className="px-4 py-3 text-right text-sm font-medium text-gray-500">
+                      İşlem
+                    </th>
                   </tr>
                 </thead>
                 <tbody className="divide-y dark:divide-gray-700">
@@ -241,6 +295,22 @@ export default function CafeteriaHistoryPage() {
                         {getMealTypeLabel(res.menu_type)}
                       </td>
                       <td className="px-4 py-3">{getStatusBadge(res)}</td>
+                      <td className="px-4 py-3 text-right">
+                        {canCancelReservation(res) ? (
+                          <Button
+                            variant="destructive"
+                            size="sm"
+                            disabled={cancelMutation.isPending}
+                            onClick={() => setToCancel(res)}
+                          >
+                            İptal Et
+                          </Button>
+                        ) : (
+                          <span className="text-xs text-gray-500">
+                            İptal süresi doldu
+                          </span>
+                        )}
+                      </td>
                     </tr>
                   ))}
                 </tbody>
@@ -372,6 +442,53 @@ export default function CafeteriaHistoryPage() {
           )}
         </CardContent>
       </Card>
+
+      <AlertDialog
+        open={toCancel !== null}
+        onOpenChange={(open) => {
+          if (!open && !cancelMutation.isPending) setToCancel(null)
+        }}
+      >
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Rezervasyonu iptal et</AlertDialogTitle>
+            <AlertDialogDescription>
+              {toCancel &&
+                `${new Date(toCancel.date).toLocaleDateString("tr-TR", {
+                  day: "numeric",
+                  month: "long",
+                  weekday: "long",
+                })} ${getMealTimeLabel(toCancel.meal_time).toLowerCase()} yemeği rezervasyonunuz iptal edilecek ve ödemesi iade edilecek.`}
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel disabled={cancelMutation.isPending}>
+              Vazgeç
+            </AlertDialogCancel>
+            <AlertDialogAction
+              variant="destructive"
+              disabled={cancelMutation.isPending}
+              onClick={(e) => {
+                // Stay open until meal answers; onSettled closes it.
+                e.preventDefault()
+                if (toCancel) cancelMutation.mutate(toCancel.id)
+              }}
+            >
+              {cancelMutation.isPending && (
+                <Loader2 className="h-4 w-4 animate-spin" />
+              )}
+              İptal Et
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
+      <Toast
+        message={toast.message}
+        type={toast.type}
+        isVisible={toast.isVisible}
+        onClose={closeToast}
+      />
     </div>
   )
 }

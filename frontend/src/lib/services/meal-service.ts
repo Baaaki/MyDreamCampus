@@ -289,6 +289,30 @@ export function getEndOfPreviousWeek(): Date {
   return sunday
 }
 
+/**
+ * The last moment a reservation can be cancelled: 23:59:59 Istanbul time on
+ * the Friday before its week, when the kitchen fixes the week's headcount
+ * (meal-service validateCancelCutoff). Istanbul keeps UTC+3 all year, so the
+ * deadline is the same instant wherever the browser is.
+ */
+export function reservationCancelDeadline(date: string): Date {
+  const [y, m, d] = date.split("-").map(Number)
+  const daysSinceMonday = (new Date(Date.UTC(y, m - 1, d)).getUTCDay() + 6) % 7
+  return new Date(Date.UTC(y, m - 1, d - daysSinceMonday - 3, 20, 59, 59))
+}
+
+/** Whether meal would still accept a cancel; it stays the final judge. */
+export function canCancelReservation(
+  reservation: Reservation,
+  now: Date = new Date()
+): boolean {
+  return (
+    (reservation.status === "confirmed" || reservation.status === "pending") &&
+    !reservation.is_used &&
+    now <= reservationCancelDeadline(reservation.date)
+  )
+}
+
 // Helper functions for frontend filtering (week-based)
 export function filterActiveReservations(
   reservations: Reservation[]

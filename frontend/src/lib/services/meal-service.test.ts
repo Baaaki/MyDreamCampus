@@ -1,9 +1,11 @@
 import { afterEach, describe, expect, it, vi } from "vitest"
 import {
+  canCancelReservation,
   checkoutOutcome,
   getMonthlyMenu,
   menuForDay,
   nextWeekWeekdays,
+  reservationCancelDeadline,
   toLocalISODate,
   type MonthlyMenuData,
   type Reservation,
@@ -105,6 +107,43 @@ describe("nextWeekWeekdays", () => {
       "2026-11-05",
       "2026-11-06",
     ])
+  })
+})
+
+describe("canCancelReservation", () => {
+  // Thursday 15 Oct 2026's week starts on Monday the 12th, so its cancel
+  // window closes on Friday the 9th at 23:59:59 Istanbul (20:59:59 UTC).
+  const thursday = { ...reservation("r", "confirmed"), date: "2026-10-15" }
+
+  it("allows a cancel until the Friday before the reservation's week", () => {
+    expect(
+      canCancelReservation(thursday, new Date("2026-10-09T20:59:59Z"))
+    ).toBe(true)
+  })
+
+  it("refuses a cancel once that Friday has ended", () => {
+    expect(
+      canCancelReservation(thursday, new Date("2026-10-09T21:00:00Z"))
+    ).toBe(false)
+  })
+
+  it("puts a Monday reservation's deadline three days before it", () => {
+    expect(reservationCancelDeadline("2026-10-12")).toEqual(
+      new Date("2026-10-09T20:59:59Z")
+    )
+  })
+
+  it("refuses a used or cancelled reservation", () => {
+    const early = new Date("2026-10-01T09:00:00Z")
+    expect(canCancelReservation({ ...thursday, is_used: true }, early)).toBe(
+      false
+    )
+    expect(
+      canCancelReservation(
+        { ...reservation("r", "cancelled"), date: "2026-10-15" },
+        early
+      )
+    ).toBe(false)
   })
 })
 
