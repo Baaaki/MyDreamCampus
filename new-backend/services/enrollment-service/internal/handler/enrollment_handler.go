@@ -605,6 +605,49 @@ func (h *EnrollmentHandler) GetPendingProgramsByAdvisor(c *gin.Context) {
 	c.JSON(http.StatusOK, response)
 }
 
+// GetOpenSemesters godoc
+// @Summary Get semesters open for enrollment
+// @Description Semesters whose enrollment window is open on the service clock, plus the current semester when the student has a program in it
+// @Tags enrollment
+// @Produce json
+// @Security BearerAuth
+// @Success 200 {array} dto.OpenSemester
+// @Failure 401 {object} gin.H
+// @Failure 500 {object} gin.H
+// @Router /enrollment/open-semesters [get]
+func (h *EnrollmentHandler) GetOpenSemesters(c *gin.Context) {
+	ctx, cancel := context.WithTimeout(c.Request.Context(), requestTimeout)
+	defer cancel()
+
+	handlerLogger := logger.WithContextAndFields(ctx,
+		zap.String("handler", "EnrollmentHandler"),
+		zap.String("method", "GetOpenSemesters"),
+	)
+
+	studentIDStr, exists := c.Get("user_id")
+	if !exists {
+		handlerLogger.Error("user_id not found in context")
+		c.JSON(http.StatusUnauthorized, gin.H{"error": sharedErrors.ErrUnauthorized.Message})
+		return
+	}
+
+	studentID, err := uuid.Parse(studentIDStr.(string))
+	if err != nil {
+		handlerLogger.Error("invalid user_id format", zap.Error(err))
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Geçersiz kullanıcı kimliği"})
+		return
+	}
+
+	semesters, err := h.enrollmentService.GetOpenSemesters(ctx, studentID)
+	if err != nil {
+		handlerLogger.Error("failed to get open semesters", zap.Error(err))
+		h.handleError(c, err)
+		return
+	}
+
+	c.JSON(http.StatusOK, semesters)
+}
+
 // handleError maps service errors to HTTP status codes
 func (h *EnrollmentHandler) handleError(c *gin.Context, err error) {
 	reqLogger := logger.WithContextAndFields(c.Request.Context(),

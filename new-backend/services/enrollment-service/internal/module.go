@@ -101,6 +101,7 @@ func (m *Module) RegisterRoutes(rg *gin.RouterGroup) {
 		student := rg.Group("")
 		student.Use(platformMiddleware.RequireStudent())
 		{
+			student.GET("/open-semesters", m.enrollmentHandler.GetOpenSemesters)
 			student.GET("/available-courses", m.enrollmentHandler.GetAvailableCourses)
 			// Submitting a program consumes course quota, so a retry must
 			// not book a second seat.

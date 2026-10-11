@@ -41,12 +41,21 @@ type EnrollmentStore interface {
 
 var _ EnrollmentStore = (*repository.EnrollmentRepository)(nil)
 
+// PeriodStore is the slice of the academic_periods projection the service
+// reads, so the enrollment window can be tested without a database.
+type PeriodStore interface {
+	GetActivePeriodBySemester(ctx context.Context, semester string) (*sharedRepo.SimplePeriod, error)
+	GetAllPeriods(ctx context.Context) ([]sharedRepo.SimplePeriod, error)
+}
+
+var _ PeriodStore = (*sharedRepo.SimplePeriodRepository)(nil)
+
 type EnrollmentService struct {
 	enrollmentRepo      EnrollmentStore
 	passedPrereqRepo    *repository.PassedPrerequisitesRepository
 	studentClient       StudentClient
 	courseCatalogClient CourseCatalogClient
-	periodRepo          *sharedRepo.SimplePeriodRepository
+	periodRepo          PeriodStore
 }
 
 func NewEnrollmentService(
@@ -54,7 +63,7 @@ func NewEnrollmentService(
 	passedPrereqRepo *repository.PassedPrerequisitesRepository,
 	studentClient StudentClient,
 	courseCatalogClient CourseCatalogClient,
-	periodRepo *sharedRepo.SimplePeriodRepository,
+	periodRepo PeriodStore,
 ) *EnrollmentService {
 	return &EnrollmentService{
 		enrollmentRepo:      enrollmentRepo,

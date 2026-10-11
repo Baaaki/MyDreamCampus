@@ -66,6 +66,17 @@ type MyEnrollmentsResponse struct {
 	Programs  []EnrollmentProgramResponse `json:"programs"`
 }
 
+// OpenSemester is one semester the student can act on in the enrollment
+// screen: its window is open, or it is the current semester and the student
+// already has a program there.
+type OpenSemester struct {
+	Semester       string    `json:"semester"`
+	EnrollmentOpen bool      `json:"enrollment_open"`
+	PeriodStart    time.Time `json:"period_start"`
+	PeriodEnd      time.Time `json:"period_end"`
+	HasProgram     bool      `json:"has_program"`
+}
+
 // LatestRejectionRequest represents the request to get latest rejection
 type LatestRejectionRequest struct {
 	Semester string `form:"semester" binding:"required"`
