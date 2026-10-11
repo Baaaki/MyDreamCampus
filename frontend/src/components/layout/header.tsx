@@ -26,6 +26,14 @@ const roleLabels: Record<string, string> = {
   student: "Ogrenci",
 }
 
+// The roles have no shared profile page, so each lands on the page that
+// holds its own account details or day-to-day view.
+const profilePaths: Record<string, string> = {
+  admin: "/settings",
+  teacher: "/teacher/attendance",
+  student: "/student/dashboard",
+}
+
 export function Header() {
   const { theme, toggleTheme } = useTheme()
   const navigate = useNavigate()
@@ -56,6 +64,7 @@ export function Header() {
 
   const isDemo = useIsDemoMode()
   const panelTitle = roleTitles[user?.role ?? ""] ?? "Panel"
+  const profilePath = profilePaths[user?.role ?? ""]
   const roleLabel = roleLabels[user?.role ?? ""] ?? "Kullanici"
 
   return (
@@ -76,11 +85,8 @@ export function Header() {
         {/* Right side - Actions */}
         <div className="flex items-center gap-3">
           {/* Notifications */}
-          <Button variant="ghost" size="icon" className="relative">
+          <Button variant="ghost" size="icon">
             <Bell className="h-5 w-5 text-gray-600 dark:text-gray-400" />
-            <span className="absolute -top-1 -right-1 flex h-4 w-4 items-center justify-center rounded-full bg-red-500 text-[10px] font-medium text-white">
-              3
-            </span>
           </Button>
 
           {/* Theme Toggle */}
@@ -115,10 +121,12 @@ export function Header() {
               </Button>
             </DropdownMenuTrigger>
             <DropdownMenuContent align="end" className="w-56">
-              <DropdownMenuItem onClick={() => navigate("/staff/profile")}>
-                <User className="mr-2 h-4 w-4" />
-                Profil
-              </DropdownMenuItem>
+              {profilePath && (
+                <DropdownMenuItem onClick={() => navigate(profilePath)}>
+                  <User className="mr-2 h-4 w-4" />
+                  Profil
+                </DropdownMenuItem>
+              )}
               <DropdownMenuItem
                 onClick={() => navigate("/auth/change-password")}
               >
