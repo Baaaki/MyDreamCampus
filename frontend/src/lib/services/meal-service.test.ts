@@ -1,5 +1,10 @@
 import { describe, expect, it } from "vitest"
-import { checkoutOutcome, type Reservation } from "./meal-service"
+import {
+  checkoutOutcome,
+  nextWeekWeekdays,
+  toLocalISODate,
+  type Reservation,
+} from "./meal-service"
 
 function reservation(id: string, status: Reservation["status"]): Reservation {
   return {
@@ -49,5 +54,59 @@ describe("checkoutOutcome", () => {
     expect(checkoutOutcome(ids, [reservation("a", "confirmed")])).toBe(
       "pending"
     )
+  })
+})
+
+describe("nextWeekWeekdays", () => {
+  const nextWeek = [
+    "2026-10-12",
+    "2026-10-13",
+    "2026-10-14",
+    "2026-10-15",
+    "2026-10-16",
+  ]
+
+  // 5 Oct 2026 is a Monday, 11 Oct the Sunday of the same week.
+  it.each([5, 6, 7, 8, 9, 10, 11])(
+    "offers Monday to Friday of the following week on 2026-10-%i",
+    (day) => {
+      const now = new Date(2026, 9, day, 23, 30)
+      const days = nextWeekWeekdays(now)
+
+      expect(days.map(toLocalISODate)).toEqual(nextWeek)
+      for (const d of days) {
+        expect(d.getTime(), "never a past day").toBeGreaterThan(now.getTime())
+      }
+    }
+  )
+
+  it("moves on to the week after once Monday begins", () => {
+    expect(
+      nextWeekWeekdays(new Date(2026, 9, 12, 0, 0)).map(toLocalISODate)
+    ).toEqual([
+      "2026-10-19",
+      "2026-10-20",
+      "2026-10-21",
+      "2026-10-22",
+      "2026-10-23",
+    ])
+  })
+
+  it("runs across the end of a month", () => {
+    expect(
+      nextWeekWeekdays(new Date(2026, 9, 28, 12, 0)).map(toLocalISODate)
+    ).toEqual([
+      "2026-11-02",
+      "2026-11-03",
+      "2026-11-04",
+      "2026-11-05",
+      "2026-11-06",
+    ])
+  })
+})
+
+describe("toLocalISODate", () => {
+  it("keeps the local day at midnight", () => {
+    expect(toLocalISODate(new Date(2026, 9, 12, 0, 0))).toBe("2026-10-12")
   })
 })

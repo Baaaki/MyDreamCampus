@@ -169,6 +169,32 @@ export function checkoutOutcome(
   return mine.every((r) => r.status === "confirmed") ? "confirmed" : "pending"
 }
 
+/**
+ * Monday to Friday of the week after `now`'s. Students book the coming week,
+ * as on mobile: meal locks a week at the Friday before it, so the current
+ * week is already settled and, on a weekend, entirely in the past.
+ */
+export function nextWeekWeekdays(now: Date = new Date()): Date[] {
+  const monday = new Date(now)
+  monday.setHours(0, 0, 0, 0)
+  const sinceMonday = (monday.getDay() + 6) % 7
+  monday.setDate(monday.getDate() - sinceMonday + 7)
+  return Array.from({ length: 5 }, (_, i) => {
+    const day = new Date(monday)
+    day.setDate(monday.getDate() + i)
+    return day
+  })
+}
+
+// The calendar day as the student sees it; toISOString would shift a local
+// midnight east of UTC back to the previous day.
+export function toLocalISODate(date: Date): string {
+  const y = date.getFullYear()
+  const m = String(date.getMonth() + 1).padStart(2, "0")
+  const d = String(date.getDate()).padStart(2, "0")
+  return `${y}-${m}-${d}`
+}
+
 // Helper function to get the start of the current week (Monday)
 export function getStartOfCurrentWeek(): Date {
   const now = new Date()

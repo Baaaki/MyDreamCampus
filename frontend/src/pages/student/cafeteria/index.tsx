@@ -13,6 +13,8 @@ import {
 import { UtensilsCrossed, CreditCard, X, MapPin, Loader2 } from "lucide-react"
 import {
   getCafeterias,
+  nextWeekWeekdays,
+  toLocalISODate,
   type CreateReservationRequest,
 } from "@/lib/services/meal-service"
 import { CheckoutDialog, type CheckoutItem } from "./checkout-dialog"
@@ -84,28 +86,17 @@ export default function StudentCafeteriaPage() {
 
   const cafeterias = cafeteriaData?.cafeterias || []
 
-  // Get current week dates
-  const getWeekDates = () => {
-    const today = new Date()
-    const dayOfWeek = today.getDay()
-    const monday = new Date(today)
-    monday.setDate(today.getDate() - (dayOfWeek === 0 ? 6 : dayOfWeek - 1))
-
-    return weekDays.map((day, index) => {
-      const date = new Date(monday)
-      date.setDate(monday.getDate() + index)
-      return {
-        ...day,
-        date: date.toLocaleDateString("tr-TR", {
-          day: "numeric",
-          month: "short",
-        }),
-        fullDate: date,
-      }
-    })
-  }
-
-  const weekDates = getWeekDates()
+  // Recomputed on every render so a page left open over a weekend never
+  // offers a day that has already passed.
+  const nextWeek = nextWeekWeekdays()
+  const weekDates = weekDays.map((day, index) => ({
+    ...day,
+    date: nextWeek[index].toLocaleDateString("tr-TR", {
+      day: "numeric",
+      month: "short",
+    }),
+    isoDate: toLocalISODate(nextWeek[index]),
+  }))
 
   // Set specific meal type
   const setMealType = (day: string, type: MealType) => {
@@ -131,7 +122,7 @@ export default function StudentCafeteriaPage() {
       .filter((day) => mealSelections[day.key] !== "none")
       .map((day) => ({
         cafeteria_id: selectedCafeteria,
-        date: day.fullDate.toISOString().split("T")[0],
+        date: day.isoDate,
         meal_time: "lunch" as const, // Default to lunch, could be made selectable
         menu_type: mealSelections[day.key] as "normal" | "vegan",
       }))
@@ -204,9 +195,10 @@ export default function StudentCafeteriaPage() {
       {selectedCafeteria && (
         <Card>
           <CardHeader>
-            <CardTitle>Haftalık Yemek Seçimi</CardTitle>
+            <CardTitle>Gelecek Haftanın Yemek Seçimi</CardTitle>
             <p className="text-sm text-gray-500 dark:text-gray-400">
-              Yemek almak istediğiniz günleri ve menü tipini seçin
+              {weekDates[0].date} – {weekDates[4].date} haftası için yemek almak
+              istediğiniz günleri ve menü tipini seçin
             </p>
           </CardHeader>
           <CardContent>
