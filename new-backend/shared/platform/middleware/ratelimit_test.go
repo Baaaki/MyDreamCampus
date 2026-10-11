@@ -15,6 +15,7 @@ import (
 	"github.com/baaaki/mydreamcampus/shared/platform/logger"
 	"github.com/baaaki/mydreamcampus/shared/platform/utils"
 	"github.com/gin-gonic/gin"
+	"github.com/golang-jwt/jwt/v5"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -265,8 +266,12 @@ func identityRouter(t *testing.T, store *fakeStore) *gin.Engine {
 }
 
 func sameIPRequest(method, path, bearer string, body string) *http.Request {
+	return requestFrom("203.0.113.10", method, path, bearer, body) // one campus NAT address for everyone
+}
+
+func requestFrom(ip, method, path, bearer string, body string) *http.Request {
 	req := httptest.NewRequest(method, path, strings.NewReader(body))
-	req.RemoteAddr = "203.0.113.10:5000" // one campus NAT address for everyone
+	req.RemoteAddr = ip + ":5000"
 	if bearer != "" {
 		req.Header.Set("Authorization", "Bearer "+bearer)
 	}
@@ -346,4 +351,123 @@ func TestEndpointRateLimit_Refresh_KeyedByTokenOwnerAndBodyKept(t *testing.T) {
 		assert.Equal(t, 200, w.Code, "%s shares the NAT address but not the refresh bucket", user)
 		assert.Equal(t, body, w.Body.String(), "the handler must still see the body")
 	}
+}
+
+// Two visitors of the same demo account, each on their own connection.
+const (
+	visitorA = "198.51.100.1"
+	visitorB = "198.51.100.2"
+)
+
+// issueDemoToken signs a token the way auth does for one of the public demo
+// accounts.
+func issueDemoToken(t *testing.T, userID string, tokenType utils.TokenType) string {
+	t.Helper()
+	now := time.Now()
+	tok, err := jwt.NewWithClaims(jwt.SigningMethodHS256, &utils.Claims{
+		UserID:    userID,
+		Role:      "student",
+		TokenType: string(tokenType),
+		Demo:      true,
+		RegisteredClaims: jwt.RegisteredClaims{
+			ExpiresAt: jwt.NewNumericDate(now.Add(time.Minute)),
+			IssuedAt:  jwt.NewNumericDate(now),
+		},
+	}).SignedString([]byte(authTestSecret))
+	require.NoError(t, err)
+	return tok
+}
+
+func TestIPRateLimit_DemoAccountFromTwoIPs_GetSeparateBuckets(t *testing.T) {
+	r := identityRouter(t, newFakeStore(true))
+	token := issueDemoToken(t, "demo-student", utils.AccessToken)
+
+	for range 5 { // identityRouter's UserLimit
+		w := httptest.NewRecorder()
+		r.ServeHTTP(w, requestFrom(visitorA, "GET", "/api/x", token, ""))
+		require.Equal(t, 200, w.Code)
+	}
+	exhausted, other := httptest.NewRecorder(), httptest.NewRecorder()
+	r.ServeHTTP(exhausted, requestFrom(visitorA, "GET", "/api/x", token, ""))
+	r.ServeHTTP(other, requestFrom(visitorB, "GET", "/api/x", token, ""))
+
+	assert.Equal(t, http.StatusTooManyRequests, exhausted.Code)
+	assert.Equal(t, 200, other.Code, "another visitor of the demo account must not inherit the 429")
+}
+
+func TestUserRateLimit_DemoAccountFromTwoIPs_GetSeparateBuckets(t *testing.T) {
+	require.NoError(t, logger.Init("test"))
+	gin.SetMode(gin.TestMode)
+	SetRateLimiter(NewRateLimiter(newFakeStore(true), RateLimitConfig{
+		ServiceName: "test", UserLimit: 1, UserWindow: time.Minute,
+	}))
+	t.Cleanup(func() { SetRateLimiter(nil) })
+
+	r := gin.New()
+	// JWTAuth would have set these from a demo token.
+	r.Use(func(c *gin.Context) { c.Set("user_id", "demo-student"); c.Set("is_demo", true); c.Next() })
+	r.GET("/", UserRateLimit(), func(c *gin.Context) { c.Status(200) })
+
+	first, again, other := httptest.NewRecorder(), httptest.NewRecorder(), httptest.NewRecorder()
+	r.ServeHTTP(first, requestFrom(visitorA, "GET", "/", "", ""))
+	r.ServeHTTP(again, requestFrom(visitorA, "GET", "/", "", ""))
+	r.ServeHTTP(other, requestFrom(visitorB, "GET", "/", "", ""))
+
+	assert.Equal(t, 200, first.Code)
+	assert.Equal(t, http.StatusTooManyRequests, again.Code)
+	assert.Equal(t, 200, other.Code, "another visitor of the demo account must not inherit the 429")
+}
+
+func TestIPRateLimit_DemoAccount_ChargedOnce(t *testing.T) {
+	require.NoError(t, logger.Init("test"))
+	gin.SetMode(gin.TestMode)
+	utils.InitJWTSecret(authTestSecret)
+	store := newFakeStore(true)
+	SetRateLimiter(NewRateLimiter(store, RateLimitConfig{
+		ServiceName: "test", UserLimit: 5, UserWindow: time.Minute,
+	}))
+	t.Cleanup(func() { SetRateLimiter(nil) })
+
+	r := gin.New()
+	r.Use(IPRateLimit())
+	r.Use(func(c *gin.Context) { c.Set("user_id", "demo-student"); c.Set("is_demo", true); c.Next() })
+	r.GET("/api/x", UserRateLimit(), func(c *gin.Context) { c.Status(200) })
+
+	w := httptest.NewRecorder()
+	r.ServeHTTP(w, requestFrom(visitorA, "GET", "/api/x", issueDemoToken(t, "demo-student", utils.AccessToken), ""))
+
+	assert.Equal(t, 200, w.Code)
+	assert.Equal(t, map[string]int{"ratelimit:test:user:demo-student:ip:" + visitorA + ":global": 1}, store.counts,
+		"global and user limiters must spend the visitor's one bucket once")
+}
+
+func TestEndpointRateLimit_DemoRefreshFromTwoIPs_GetSeparateBuckets(t *testing.T) {
+	r := identityRouter(t, newFakeStore(true))
+	body := `{"refresh_token":"` + issueDemoToken(t, "demo-student", utils.RefreshToken) + `"}`
+
+	first, again, other := httptest.NewRecorder(), httptest.NewRecorder(), httptest.NewRecorder()
+	r.ServeHTTP(first, requestFrom(visitorA, "POST", "/api/auth/refresh", "", body))
+	r.ServeHTTP(again, requestFrom(visitorA, "POST", "/api/auth/refresh", "", body))
+	r.ServeHTTP(other, requestFrom(visitorB, "POST", "/api/auth/refresh", "", body))
+
+	assert.Equal(t, 200, first.Code)
+	assert.Equal(t, http.StatusTooManyRequests, again.Code)
+	assert.Equal(t, 200, other.Code, "another visitor of the demo account must not inherit the 429")
+}
+
+func TestIPRateLimit_RealUserFromTwoIPs_SharesOneBucket(t *testing.T) {
+	store := newFakeStore(true)
+	r := identityRouter(t, store)
+	token := issueToken(t, "student-a", "student", 1)
+
+	for range 5 { // identityRouter's UserLimit
+		w := httptest.NewRecorder()
+		r.ServeHTTP(w, requestFrom(visitorA, "GET", "/api/x", token, ""))
+		require.Equal(t, 200, w.Code)
+	}
+	w := httptest.NewRecorder()
+	r.ServeHTTP(w, requestFrom(visitorB, "GET", "/api/x", token, ""))
+
+	assert.Equal(t, http.StatusTooManyRequests, w.Code, "a real user's bucket follows the user, not the address")
+	assert.Equal(t, map[string]int{"ratelimit:public:user:student-a:global": 6}, store.counts)
 }

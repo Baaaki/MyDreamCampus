@@ -82,11 +82,11 @@ func exemptFromGlobalLimit(path string) bool {
 // token can only spend its own bucket.
 func requestIdentity(c *gin.Context) string {
 	if userID := c.GetString("user_id"); userID != "" {
-		return "user:" + userID
+		return "user:" + userBucketID(c, userID, c.GetBool("is_demo"))
 	}
 	if token := accessTokenFromRequest(c); token != "" {
 		if claims, err := utils.ValidateAccessToken(token); err == nil {
-			return "user:" + claims.UserID
+			return "user:" + userBucketID(c, claims.UserID, claims.Demo)
 		}
 	}
 	// A refresh carries no access token by definition; without this every
@@ -130,18 +130,29 @@ func refreshIdentity(c *gin.Context) string {
 	}
 	if token != "" {
 		if claims, err := utils.ValidateToken(token); err == nil && claims.TokenType == string(utils.RefreshToken) {
-			return "user:" + claims.UserID
+			return "user:" + userBucketID(c, claims.UserID, claims.Demo)
 		}
 	}
 	return "ip:" + c.ClientIP()
+}
+
+// userBucketID names the bucket a user's requests spend. A demo account's
+// login is printed on the login page and every visitor shares it, so keyed
+// by the user alone one visitor's traffic throttled all the others; each
+// visitor of a demo account gets a bucket per client IP instead.
+func userBucketID(c *gin.Context, userID string, demo bool) string {
+	if demo {
+		return userID + ":ip:" + c.ClientIP()
+	}
+	return userID
 }
 
 // userBucketCounted marks a request whose user bucket IPRateLimit already
 // charged.
 const userBucketCounted = "ratelimit_user_counted"
 
-func userBucketKey(service, userID string) string {
-	return fmt.Sprintf("ratelimit:%s:user:%s:global", service, userID)
+func userBucketKey(service, bucketID string) string {
+	return fmt.Sprintf("ratelimit:%s:user:%s:global", service, bucketID)
 }
 
 // maxRefreshBodyBytes caps what refreshIdentity reads; a refresh body is a
@@ -163,9 +174,9 @@ func IPRateLimit() gin.HandlerFunc {
 
 		limit, window := rl.config.IPLimit, rl.config.IPWindow
 		key := fmt.Sprintf("ratelimit:%s:ip:%s:global", rl.config.ServiceName, c.ClientIP())
-		if userID, isUser := strings.CutPrefix(requestIdentity(c), "user:"); isUser {
+		if bucketID, isUser := strings.CutPrefix(requestIdentity(c), "user:"); isUser {
 			limit, window = rl.config.UserLimit, rl.config.UserWindow
-			key = userBucketKey(rl.config.ServiceName, userID)
+			key = userBucketKey(rl.config.ServiceName, bucketID)
 			// UserRateLimit further down the chain spends this same bucket;
 			// counting the request twice would halve the user's limit.
 			c.Set(userBucketCounted, true)
@@ -214,7 +225,7 @@ func UserRateLimit() gin.HandlerFunc {
 			return
 		}
 
-		key := userBucketKey(rl.config.ServiceName, userID)
+		key := userBucketKey(rl.config.ServiceName, userBucketID(c, userID, c.GetBool("is_demo")))
 		allowed, remaining, retryAfter, err := rl.store.CheckRateLimit(
 			c.Request.Context(), key,
 			rl.config.UserLimit, rl.config.UserWindow,
