@@ -450,6 +450,57 @@ func (h *StudentHandler) ListStudentsByAdvisor(c *gin.Context) {
 	c.JSON(http.StatusOK, response)
 }
 
+// ListAdvisorAdvisees serves GET /api/students/advisors/:advisor_id/advisees
+// for the admin advisor screen. The advisor comes from the path, so the
+// route must stay behind RequireAdmin.
+func (h *StudentHandler) ListAdvisorAdvisees(c *gin.Context) {
+	ctx, cancel := context.WithTimeout(c.Request.Context(), requestTimeout)
+	defer cancel()
+
+	reqLogger := logger.WithContextAndFields(ctx,
+		zap.String("handler", "StudentHandler"),
+		zap.String("method", "ListAdvisorAdvisees"),
+	)
+
+	advisorID, err := uuid.Parse(c.Param("advisor_id"))
+	if err != nil {
+		c.JSON(http.StatusBadRequest, dto.ErrorResponse{
+			Error: "Geçersiz danışman kimliği",
+			Code:  errors.ErrValidation.Code,
+		})
+		return
+	}
+
+	var query dto.PaginationQuery
+	if err := c.ShouldBindQuery(&query); err != nil {
+		c.JSON(http.StatusBadRequest, dto.ErrorResponse{
+			Error: errors.ErrValidation.Message,
+			Code:  errors.ErrValidation.Code,
+		})
+		return
+	}
+
+	response, err := h.service.ListAdviseesPage(ctx, advisorID, query.Page, query.Limit)
+	if err != nil {
+		if appErr, ok := errors.As(err); ok {
+			reqLogger.Warn("failed to list advisees", zap.Error(err))
+			c.JSON(appErr.HTTPStatus, dto.ErrorResponse{
+				Error: appErr.Message,
+				Code:  appErr.Code,
+			})
+			return
+		}
+		reqLogger.Error("unexpected error listing advisees", zap.Error(err))
+		c.JSON(http.StatusInternalServerError, dto.ErrorResponse{
+			Error: errors.ErrInternal.Message,
+			Code:  errors.ErrInternal.Code,
+		})
+		return
+	}
+
+	c.JSON(http.StatusOK, response)
+}
+
 // ListOrphanedStudents lists students without advisor
 func (h *StudentHandler) ListOrphanedStudents(c *gin.Context) {
 	ctx, cancel := context.WithTimeout(c.Request.Context(), requestTimeout)

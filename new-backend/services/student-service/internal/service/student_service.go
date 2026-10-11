@@ -545,6 +545,36 @@ func (s *StudentService) ListStudentsByAdvisor(ctx context.Context, advisorID uu
 	}, nil
 }
 
+// ListAdviseesPage pages one advisor's advisees for the admin screen. It
+// reuses the advisee query and slices in memory: an advisor carries a few
+// dozen students at most, and the same predicate as my-advisees keeps both
+// views showing the same people.
+func (s *StudentService) ListAdviseesPage(ctx context.Context, advisorID uuid.UUID, page, limit int) (dto.StudentListResponse, error) {
+	students, err := s.studentRepo.ListStudentsByAdvisor(ctx, advisorID)
+	if err != nil {
+		return dto.StudentListResponse{}, sharedErrors.Wrap(sharedErrors.ErrInternal, err)
+	}
+
+	total := len(students)
+	start := min((page-1)*limit, total)
+	end := min(start+limit, total)
+
+	studentResponses := make([]dto.StudentResponse, 0, end-start)
+	for _, student := range students[start:end] {
+		studentResponses = append(studentResponses, s.toStudentResponse(student))
+	}
+
+	return dto.StudentListResponse{
+		Data: studentResponses,
+		Pagination: dto.PaginationResponse{
+			Page:       page,
+			Limit:      limit,
+			Total:      total,
+			TotalPages: (total + limit - 1) / limit,
+		},
+	}, nil
+}
+
 // ListOrphanedStudents lists students without advisor
 func (s *StudentService) ListOrphanedStudents(ctx context.Context, query dto.PaginationQuery) (dto.OrphanedStudentsResponse, error) {
 	limit := utils.ClampToInt32(query.Limit)

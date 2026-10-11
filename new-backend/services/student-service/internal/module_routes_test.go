@@ -8,6 +8,8 @@ import (
 	"io"
 	"net/http"
 	"net/http/httptest"
+	"slices"
+	"strings"
 	"testing"
 
 	"github.com/baaaki/mydreamcampus/shared/config"
@@ -114,6 +116,8 @@ func (f *fakeStudentStore) ListStudentsByAdvisor(_ context.Context, advisorID uu
 			out = append(out, s)
 		}
 	}
+	// The real query has an ORDER BY; map order would make pages overlap.
+	slices.SortFunc(out, func(a, b db.Student) int { return strings.Compare(a.StudentNumber, b.StudentNumber) })
 	return out, nil
 }
 
@@ -264,6 +268,7 @@ func TestStudentRoutes_AdminOnlyRoutes_RejectOthers(t *testing.T) {
 		{"bulk import as teacher", http.MethodPost, "/api/students/bulk-import", teacher},
 		{"import jobs as student", http.MethodGet, "/api/students/bulk-import", student},
 		{"advisees as student", http.MethodGet, "/api/students/my-advisees", student},
+		{"an advisor's advisees as teacher", http.MethodGet, "/api/students/advisors/" + s.advisorID.String() + "/advisees", teacher},
 	}
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {
@@ -297,6 +302,36 @@ func TestStudentRoutes_AdvisorSeesOnlyOwnAdvisees(t *testing.T) {
 	assert.Contains(t, body, s.adviseeID.String())
 	assert.Contains(t, body, s.demoID.String())
 	assert.NotContains(t, body, s.otherID.String())
+}
+
+// The advisor screen pages one advisor's advisees. The path sits next to
+// /:id, so it must reach its own handler rather than a single-record read.
+func TestStudentRoutes_AdvisorAdvisees_PagedForAdmin(t *testing.T) {
+	s := newStudentRoutes(t)
+	admin := bearer(t, uuid.New(), "admin")
+	path := "/api/students/advisors/" + s.advisorID.String() + "/advisees"
+
+	var first, second dto.StudentListResponse
+	w := s.do(http.MethodGet, path+"?page=1&limit=1", admin, "")
+	require.Equal(t, http.StatusOK, w.Code, w.Body.String())
+	require.NoError(t, json.Unmarshal(w.Body.Bytes(), &first))
+	assert.Equal(t, dto.PaginationResponse{Page: 1, Limit: 1, Total: 2, TotalPages: 2}, first.Pagination)
+	require.Len(t, first.Data, 1)
+
+	w = s.do(http.MethodGet, path+"?page=2&limit=1", admin, "")
+	require.Equal(t, http.StatusOK, w.Code, w.Body.String())
+	require.NoError(t, json.Unmarshal(w.Body.Bytes(), &second))
+	require.Len(t, second.Data, 1)
+	assert.ElementsMatch(t, []string{s.adviseeID.String(), s.demoID.String()},
+		[]string{first.Data[0].ID, second.Data[0].ID})
+
+	w = s.do(http.MethodGet, "/api/students/advisors/"+uuid.NewString()+"/advisees", admin, "")
+	require.Equal(t, http.StatusOK, w.Code, w.Body.String())
+	assert.Contains(t, w.Body.String(), `"data":[]`, "an advisor with no advisees is an empty page, not null")
+
+	assert.Equal(t, http.StatusBadRequest, s.do(http.MethodGet, "/api/students/advisors/not-a-uuid/advisees", admin, "").Code)
+	assert.Equal(t, http.StatusOK, s.do(http.MethodGet, "/api/students/"+s.adviseeID.String(), admin, "").Code,
+		"the single-record read still answers next to the advisors path")
 }
 
 func TestStudentRoutes_AdminLifecycle_WritesThroughOutbox(t *testing.T) {

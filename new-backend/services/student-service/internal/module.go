@@ -130,6 +130,7 @@ func (m *Module) RegisterRoutes(rg *gin.RouterGroup) {
 			admin.PUT("/:id", m.studentHandler.UpdateStudent)
 			admin.DELETE("/:id", m.studentHandler.DeleteStudent)
 			admin.GET("/orphaned", m.studentHandler.ListOrphanedStudents)
+			admin.GET("/advisors/:advisor_id/advisees", m.studentHandler.ListAdvisorAdvisees)
 			admin.PUT("/bulk-advisor-assign", m.studentHandler.BulkAssignAdvisor)
 			admin.POST("/bulk-import", m.studentHandler.BulkImport)
 			admin.GET("/bulk-import/:job_id", m.studentHandler.GetImportJobStatus)
