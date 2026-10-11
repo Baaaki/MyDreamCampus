@@ -57,7 +57,7 @@ x-service-env: &service-env
   # server 20s > internal client 10s. An inner timeout that outlives its caller
   # only turns one slow hop into two.
   REQUEST_TIMEOUT_SECONDS: ${REQUEST_TIMEOUT_SECONDS:-20}
-  DB_MAX_CONNS: ${DB_MAX_CONNS:-10}
+  DB_MAX_CONNS: ${DB_MAX_CONNS:-8}
   DEMO_MODE: ${DEMO_MODE:-false}
   DEMO_ADMIN_EMAIL: ${DEMO_ADMIN_EMAIL:-demo.admin@mydreamcampus.com}
   DEMO_TEACHER_EMAIL: ${DEMO_TEACHER_EMAIL:-ahmet.yilmaz@uni.edu.tr}
@@ -356,7 +356,7 @@ services:
     environment:
       # Its own NOTIF_-prefixed config, and its own role on the shared Postgres
       # — the separate notification-postgres container is gone.
-      NOTIF_DATABASE_URL: postgres://notification_svc:${SERVICE_DB_PASSWORD:?}@postgres:5432/notification?sslmode=disable
+      NOTIF_DATABASE_URL: postgres://notification_svc:${SERVICE_DB_PASSWORD:?}@postgres:5432/notification?sslmode=disable&pool_max_conns=4
       NOTIF_RABBITMQ_URL: amqp://${RABBITMQ_USER:-rabbitmq}:${RABBITMQ_PASSWORD:?RABBITMQ_PASSWORD is required — see .env.example}@rabbitmq:5672/
       # MailHog catches everything by default — nothing leaves the host.
       # Point SMTP_* in .env at a real relay for reset and welcome mail to
