@@ -17,13 +17,13 @@ import { useIsDemoMode } from "@/lib/services/demo-service"
 const roleTitles: Record<string, string> = {
   admin: "Admin Panel",
   teacher: "Akademisyen Paneli",
-  student: "Ogrenci Paneli",
+  student: "Öğrenci Paneli",
 }
 
 const roleLabels: Record<string, string> = {
   admin: "Admin",
   teacher: "Akademisyen",
-  student: "Ogrenci",
+  student: "Öğrenci",
 }
 
 // The roles have no shared profile page, so each lands on the page that
@@ -65,7 +65,7 @@ export function Header() {
   const isDemo = useIsDemoMode()
   const panelTitle = roleTitles[user?.role ?? ""] ?? "Panel"
   const profilePath = profilePaths[user?.role ?? ""]
-  const roleLabel = roleLabels[user?.role ?? ""] ?? "Kullanici"
+  const roleLabel = roleLabels[user?.role ?? ""] ?? "Kullanıcı"
 
   return (
     <header
