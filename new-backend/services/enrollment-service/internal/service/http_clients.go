@@ -79,23 +79,30 @@ func NewHTTPCourseCatalogClient(base *client.Base) *HTTPCourseCatalogClient {
 	return &HTTPCourseCatalogClient{base: base}
 }
 
+// GetAvailableCourses lists the department's offerings at or below classLevel,
+// the same rule validateCoursesAgainstStudent enforces on submit. catalog's
+// class_level filter is an exact match, so it is applied here instead: asking
+// catalog for it hid every lower-year course a student is allowed to take.
 func (c *HTTPCourseCatalogClient) GetAvailableCourses(ctx context.Context, department string, classLevel int16, semester string) ([]contracts.SemesterCourseListItem, error) {
 	var all []contracts.SemesterCourseListItem
 
 	for page := 1; page <= maxCatalogPages; page++ {
 		query := url.Values{
-			"semester":    {semester},
-			"department":  {department},
-			"class_level": {strconv.Itoa(int(classLevel))},
-			"page":        {strconv.Itoa(page)},
-			"limit":       {strconv.Itoa(catalogPageSize)},
+			"semester":   {semester},
+			"department": {department},
+			"page":       {strconv.Itoa(page)},
+			"limit":      {strconv.Itoa(catalogPageSize)},
 		}
 
 		var resp semesterCourseList
 		if err := c.base.Get(ctx, "/internal/semester-courses?"+query.Encode(), &resp); err != nil {
 			return nil, err
 		}
-		all = append(all, resp.Data...)
+		for _, course := range resp.Data {
+			if course.ClassLevel <= classLevel {
+				all = append(all, course)
+			}
+		}
 
 		// A short page is the last page.
 		if len(resp.Data) < catalogPageSize {

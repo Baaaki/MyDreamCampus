@@ -101,9 +101,32 @@ func TestHTTPCourseCatalogClient_GetAvailableCourses_SendsFilters(t *testing.T) 
 	assert.Equal(t, "BLM101", courses[0].CourseCode)
 	assert.Equal(t, "2025-2026-Fall", gotQuery.Get("semester"))
 	assert.Equal(t, "Bilgisayar", gotQuery.Get("department"))
-	assert.Equal(t, "1", gotQuery.Get("class_level"))
+	// catalog's class_level is an exact match; the client filters instead.
+	assert.False(t, gotQuery.Has("class_level"))
 	// catalog binds limit with max=100 and answers 400 above it.
 	assert.Equal(t, "100", gotQuery.Get("limit"))
+}
+
+func TestHTTPCourseCatalogClient_GetAvailableCourses_KeepsLowerYears(t *testing.T) {
+	c := NewHTTPCourseCatalogClient(newTestBase(t, func(w http.ResponseWriter, _ *http.Request) {
+		_ = json.NewEncoder(w).Encode(semesterCourseList{
+			Data: []contracts.SemesterCourseListItem{
+				{CourseCode: "CENG101", ClassLevel: 1},
+				{CourseCode: "CENG201", ClassLevel: 2},
+				{CourseCode: "CENG301", ClassLevel: 3},
+				{CourseCode: "CENG401", ClassLevel: 4},
+			},
+		})
+	}))
+
+	courses, err := c.GetAvailableCourses(context.Background(), "Bilgisayar", 3, "2025-2026-Spring")
+	require.NoError(t, err)
+
+	codes := make([]string, 0, len(courses))
+	for _, course := range courses {
+		codes = append(codes, course.CourseCode)
+	}
+	assert.Equal(t, []string{"CENG101", "CENG201", "CENG301"}, codes)
 }
 
 func TestHTTPCourseCatalogClient_GetAvailableCourses_WalksEveryPage(t *testing.T) {
