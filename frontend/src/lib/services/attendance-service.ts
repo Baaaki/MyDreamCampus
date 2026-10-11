@@ -5,6 +5,13 @@ import type {
   SessionTypeAttendance,
 } from "@/lib/types"
 
+// An attendance service older than missed sessions sends none; the page
+// lists them unconditionally, so they are filled in where the reply is read.
+type MyAttendanceDTO = Omit<MyAttendanceResponse, "courses"> & {
+  courses: (Omit<CourseAttendanceDetail, "missed_sessions"> &
+    Partial<Pick<CourseAttendanceDetail, "missed_sessions">>)[]
+}
+
 /**
  * The logged-in student's attendance per course. Without a semester the
  * backend answers for the active one.
@@ -12,9 +19,16 @@ import type {
 export async function getMyAttendance(
   semester?: string
 ): Promise<MyAttendanceResponse> {
-  return attendanceApi
+  const response = await attendanceApi
     .get("my", { searchParams: semester ? { semester } : undefined })
-    .json<MyAttendanceResponse>()
+    .json<MyAttendanceDTO>()
+  return {
+    ...response,
+    courses: response.courses.map((course) => ({
+      ...course,
+      missed_sessions: course.missed_sessions ?? [],
+    })),
+  }
 }
 
 // Sessions out of every 14 a student must attend, as attendance-service

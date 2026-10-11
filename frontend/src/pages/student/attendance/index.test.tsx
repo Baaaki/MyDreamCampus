@@ -141,6 +141,19 @@ describe("StudentAttendancePage", () => {
     expect(math.queryByText("Oturumlar")).not.toBeInTheDocument()
   })
 
+  it("copes with an attendance service that predates missed sessions", async () => {
+    const { missed_sessions: _missed, ...older } = CENG201
+    stubAttendance(json({ ...attendance([]), courses: [older] }))
+    renderPage()
+
+    await screen.findByText(/CENG201/)
+    expect(
+      within(courseCard(/CENG201/))
+        .getAllByRole("listitem")
+        .map((li) => li.textContent)
+    ).toEqual(["1. haftaTeori29 EylQR", "2. haftaLab8 EkiHoca"])
+  })
+
   it("says so when the student has no courses this semester", async () => {
     stubAttendance(json(attendance([])))
     renderPage()
