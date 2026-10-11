@@ -69,6 +69,8 @@ func (h *MealHandler) GetCafeterias(c *gin.Context) {
 		h.handleError(c, err)
 		return
 	}
+	cafeterias.MealPrice = h.reservationService.MealPrice()
+	cafeterias.Currency = "TRY"
 
 	c.JSON(http.StatusOK, dto.SuccessResponse{
 		Success: true,

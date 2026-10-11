@@ -100,6 +100,11 @@ func NewReservationService(
 	}
 }
 
+// MealPrice is what one meal costs, as configured for this deployment.
+func (s *ReservationService) MealPrice() float64 {
+	return s.cfg.Reservation.MealPriceTRY
+}
+
 // CreateReservation creates a single reservation
 func (s *ReservationService) CreateReservation(ctx context.Context, studentID uuid.UUID, req dto.CreateReservationRequest) (*dto.CreateReservationResponse, error) {
 	// 1. Check if student is active

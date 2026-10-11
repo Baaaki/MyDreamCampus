@@ -35,6 +35,10 @@ type CafeteriaResponse struct {
 // CafeteriaListResponse represents list of cafeterias
 type CafeteriaListResponse struct {
 	Cafeterias []CafeteriaResponse `json:"cafeterias"`
+	// MealPrice lets a client show a total before checkout; the batch
+	// response carries the amount actually charged.
+	MealPrice float64 `json:"meal_price"`
+	Currency  string  `json:"currency"`
 }
 
 // GenerateQRRequest query parameters for QR generation
