@@ -30,6 +30,7 @@ import { Label } from "@/components/ui/label"
 import { Badge } from "@/components/ui/badge"
 import { studentApi } from "@/lib/api-client"
 import { useFaculties } from "@/lib/services/catalog-service"
+import { toCreateStudentPayload } from "@/lib/services/admin-student-service"
 import { staffApi } from "@/lib/api-client"
 import type { Department, Staff } from "@/lib/types"
 import {
@@ -189,7 +190,7 @@ export default function StudentsPage() {
     try {
       console.log("[Students Page] Calling studentApi.post...")
       const response = await studentApi
-        .post("", { json: createFormData })
+        .post("", { json: toCreateStudentPayload(createFormData) })
         .json()
       console.log("[Students Page] POST Response:", response)
       setIsCreateOpen(false)
