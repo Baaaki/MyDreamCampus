@@ -328,24 +328,34 @@ export interface SessionListItem {
   status?: string
 }
 
+// A student's standing in one session type. min_required is drawn over the
+// sessions held so far, so it grows as the semester goes on.
+export interface SessionTypeAttendance {
+  present_count: number
+  absent_count: number
+  total_sessions: number
+  min_required: number
+  passed: boolean
+}
+
+// One session the student attended; missed sessions are not listed.
 export interface WeeklyAttendanceRecord {
   week: number
-  date: string
-  is_present: boolean
-  marked_via: string
+  session_type: "theory" | "lab"
+  date: string // YYYY-MM-DD
+  marked_via: "qr_scan" | "manual" | "admin"
   note?: string
 }
 
+// theory or lab is absent until the course has held a session of that type.
 export interface CourseAttendanceDetail {
   course_id: string
   course_code: string
   course_name: string
   instructor: string
   total_weeks: number
-  completed_weeks: number
-  present_count: number
-  absent_count: number
-  absent_weeks: number[]
+  theory?: SessionTypeAttendance
+  lab?: SessionTypeAttendance
   weekly_records: WeeklyAttendanceRecord[]
 }
 
