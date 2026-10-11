@@ -1,50 +1,16 @@
 import { useState, useEffect, useMemo } from "react"
 import { useQuery } from "@tanstack/react-query"
-import { mealApi } from "@/lib/api-client"
+import {
+  getMonthlyMenu,
+  menuForDay,
+  type MonthlyMenuData,
+} from "@/lib/services/meal-service"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import { CalendarDays, Utensils, Leaf, Loader2 } from "lucide-react"
-import {
-  format,
-  getDay,
-  getDate,
-  getMonth,
-  getYear,
-  getDaysInMonth,
-} from "date-fns"
+import { format, getDay, getMonth, getYear, getDaysInMonth } from "date-fns"
 import { tr } from "date-fns/locale"
-
-// Types - Backend'den gelen veri yapısı
-interface DayMenu {
-  items: [string, string, string, string, string] // [çorba, ana yemek, yan yemek, tatlı, diğer]
-  calories: number
-}
-
-interface WeeklyMenu {
-  monday: DayMenu
-  tuesday: DayMenu
-  wednesday: DayMenu
-  thursday: DayMenu
-  friday: DayMenu
-}
-
-interface MonthlyMenuData {
-  cafeteria_id: string
-  normalMenus: WeeklyMenu[]
-  veganMenus: WeeklyMenu[]
-}
-
-interface MonthlyMenuResponse {
-  success: boolean
-  data: {
-    year: number
-    month: number
-    menu_data: MonthlyMenuData
-    created_at: string
-    updated_at: string
-  }
-}
 
 // Görüntüleme için dönüştürülmüş menü yapısı
 interface DisplayMenuItem {
@@ -69,44 +35,6 @@ interface DisplayDailyMenu {
   }
   totalNormalCalories: number
   totalVeganCalories: number
-}
-
-// API function - aylık menüyü çek
-const fetchMonthlyMenu = async (
-  year: number,
-  month: number
-): Promise<MonthlyMenuResponse> => {
-  return mealApi
-    .get(`menu/monthly?year=${year}&month=${month}`)
-    .json<MonthlyMenuResponse>()
-}
-
-// Günün haftanın hangi günü olduğunu belirle
-const getDayKey = (date: Date): keyof WeeklyMenu | null => {
-  const dayOfWeek = getDay(date) // 0 = Pazar, 1 = Pazartesi, ...
-  const dayMap: { [key: number]: keyof WeeklyMenu | null } = {
-    0: null, // Pazar - menü yok
-    1: "monday",
-    2: "tuesday",
-    3: "wednesday",
-    4: "thursday",
-    5: "friday",
-    6: null, // Cumartesi - menü yok
-  }
-  return dayMap[dayOfWeek]
-}
-
-// Tarihin ayın kaçıncı haftasında olduğunu hesapla
-const getWeekOfMonth = (date: Date): number => {
-  const dayOfMonth = getDate(date)
-  const firstDayOfMonth = new Date(getYear(date), getMonth(date), 1)
-  const firstDayOfWeek = getDay(firstDayOfMonth)
-
-  // Haftanın Pazartesi'den başladığını varsayarak hesapla
-  const adjustedFirstDay = firstDayOfWeek === 0 ? 6 : firstDayOfWeek - 1
-  const adjustedDayOfMonth = dayOfMonth + adjustedFirstDay
-
-  return Math.floor((adjustedDayOfMonth - 1) / 7)
 }
 
 // Boş menü item
@@ -137,30 +65,8 @@ const extractDailyMenu = (
   menuData: MonthlyMenuData | null,
   date: Date
 ): DisplayDailyMenu => {
-  if (!menuData) return emptyDailyMenu
-
-  const dayKey = getDayKey(date)
-  if (!dayKey) {
-    // Hafta sonu - menü yok
-    return emptyDailyMenu
-  }
-
-  const weekIndex = getWeekOfMonth(date)
-
-  // Hafta index'i menü dizisinin dışındaysa boş döndür
-  if (weekIndex >= menuData.normalMenus.length) {
-    return emptyDailyMenu
-  }
-
-  const normalWeek = menuData.normalMenus[weekIndex]
-  const veganWeek = menuData.veganMenus[weekIndex]
-
-  if (!normalWeek || !veganWeek) {
-    return emptyDailyMenu
-  }
-
-  const normalDay = normalWeek[dayKey]
-  const veganDay = veganWeek[dayKey]
+  const normalDay = menuForDay(menuData, date, "normal")
+  const veganDay = menuForDay(menuData, date, "vegan")
 
   if (!normalDay || !veganDay) {
     return emptyDailyMenu
@@ -204,18 +110,18 @@ export default function MealMenuPage() {
 
   // Fetch monthly menu from backend
   const {
-    data: monthlyMenuResponse,
+    data: monthlyMenu,
     isLoading,
     error,
   } = useQuery({
     queryKey: ["monthlyMenu", currentYear, currentMonth],
-    queryFn: () => fetchMonthlyMenu(currentYear, currentMonth),
+    queryFn: () => getMonthlyMenu(currentYear, currentMonth),
     retry: 1,
     staleTime: 5 * 60 * 1000, // 5 dakika cache
   })
 
   // Backend'den veri varsa onu kullan
-  const menuData = monthlyMenuResponse?.data?.menu_data || null
+  const menuData = monthlyMenu?.menu_data ?? null
   const hasNoMenu = !menuData || !!error
 
   // Seçilen gün için menüyü hesapla

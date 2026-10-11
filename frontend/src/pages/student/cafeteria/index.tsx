@@ -13,9 +13,12 @@ import {
 import { UtensilsCrossed, CreditCard, X, MapPin, Loader2 } from "lucide-react"
 import {
   getCafeterias,
+  getMonthlyMenu,
+  menuForDay,
   nextWeekWeekdays,
   toLocalISODate,
   type CreateReservationRequest,
+  type MonthlyMenu,
 } from "@/lib/services/meal-service"
 import { CheckoutDialog, type CheckoutItem } from "./checkout-dialog"
 
@@ -28,35 +31,6 @@ const weekDays = [
   { key: "friday", label: "Cuma", shortLabel: "Cum" },
 ]
 
-// Weekly menu data
-const weeklyMenu: Record<string, { normal: string[]; vegan: string[] }> = {
-  monday: {
-    normal: ["Mercimek Çorbası", "Etli Nohut", "Pirinç Pilavı", "Ayran"],
-    vegan: [
-      "Mercimek Çorbası",
-      "Zeytinyağlı Fasulye",
-      "Bulgur Pilavı",
-      "Ayran",
-    ],
-  },
-  tuesday: {
-    normal: ["Ezogelin Çorbası", "Tavuk Sote", "Makarna", "Cacık"],
-    vegan: ["Ezogelin Çorbası", "Sebzeli Güveç", "Makarna", "Cacık"],
-  },
-  wednesday: {
-    normal: ["Domates Çorbası", "Köfte", "Patates Püresi", "Salata"],
-    vegan: ["Domates Çorbası", "Mercimek Köftesi", "Patates Püresi", "Salata"],
-  },
-  thursday: {
-    normal: ["Yayla Çorbası", "Etli Kuru Fasulye", "Pirinç Pilavı", "Turşu"],
-    vegan: ["Yayla Çorbası", "Barbunya Pilaki", "Bulgur Pilavı", "Turşu"],
-  },
-  friday: {
-    normal: ["Tarhana Çorbası", "Balık", "Patates Kızartması", "Salata"],
-    vegan: ["Tarhana Çorbası", "Ispanaklı Börek", "Patates Fırın", "Salata"],
-  },
-}
-
 // Meal types
 type MealType = "none" | "normal" | "vegan"
 
@@ -64,8 +38,25 @@ interface MealSelection {
   [day: string]: MealType
 }
 
-// Prices
-const MEAL_PRICE = 25 // TL
+function monthlyMenuQuery(date: Date) {
+  const year = date.getFullYear()
+  const month = date.getMonth() + 1
+  return {
+    queryKey: ["monthlyMenu", year, month],
+    queryFn: () => getMonthlyMenu(year, month),
+  }
+}
+
+// The dish names of a day's menu; null when the month's menu leaves it out.
+function dishes(
+  menu: MonthlyMenu | null | undefined,
+  date: Date,
+  type: "normal" | "vegan"
+): string[] | null {
+  const items = menuForDay(menu?.menu_data, date, type)?.items ?? []
+  const named = items.filter((item) => item && item.trim() !== "")
+  return named.length > 0 ? named : null
+}
 
 export default function StudentCafeteriaPage() {
   const [selectedCafeteria, setSelectedCafeteria] = useState<string>("")
@@ -85,18 +76,53 @@ export default function StudentCafeteriaPage() {
   })
 
   const cafeterias = cafeteriaData?.cafeterias || []
+  const mealPrice = cafeteriaData?.meal_price ?? 0
+  const canVegan =
+    cafeterias.find((c) => c.id === selectedCafeteria)?.has_vegan_menu ?? false
 
   // Recomputed on every render so a page left open over a weekend never
   // offers a day that has already passed.
   const nextWeek = nextWeekWeekdays()
-  const weekDates = weekDays.map((day, index) => ({
-    ...day,
-    date: nextWeek[index].toLocaleDateString("tr-TR", {
-      day: "numeric",
-      month: "short",
-    }),
-    isoDate: toLocalISODate(nextWeek[index]),
-  }))
+  // Next week can run into the following month, whose menu is separate.
+  const firstMenu = useQuery(monthlyMenuQuery(nextWeek[0]))
+  const lastMenu = useQuery(monthlyMenuQuery(nextWeek[4]))
+  const isLoadingMenu = firstMenu.isLoading || lastMenu.isLoading
+  const menuFailed = firstMenu.isError || lastMenu.isError
+
+  const weekDates = weekDays.map((day, index) => {
+    const date = nextWeek[index]
+    const menu =
+      date.getMonth() === nextWeek[0].getMonth()
+        ? firstMenu.data
+        : lastMenu.data
+    return {
+      ...day,
+      date: date.toLocaleDateString("tr-TR", {
+        day: "numeric",
+        month: "short",
+      }),
+      isoDate: toLocalISODate(date),
+      dishes: {
+        normal: dishes(menu, date, "normal"),
+        vegan: dishes(menu, date, "vegan"),
+      },
+    }
+  })
+
+  const selectCafeteria = (id: string) => {
+    setSelectedCafeteria(id)
+    // The backend refuses a vegan meal where no vegan menu is served.
+    if (!cafeterias.find((c) => c.id === id)?.has_vegan_menu) {
+      setMealSelections((prev) =>
+        Object.fromEntries(
+          Object.entries(prev).map(([day, type]) => [
+            day,
+            type === "vegan" ? "normal" : type,
+          ])
+        )
+      )
+    }
+  }
 
   // Set specific meal type
   const setMealType = (day: string, type: MealType) => {
@@ -107,7 +133,7 @@ export default function StudentCafeteriaPage() {
   const selectedMealsCount = Object.values(mealSelections).filter(
     (m) => m !== "none"
   ).length
-  const totalPrice = selectedMealsCount * MEAL_PRICE
+  const totalPrice = selectedMealsCount * mealPrice
 
   const checkoutItems: CheckoutItem[] = weekDates
     .filter((day) => mealSelections[day.key] !== "none")
@@ -168,10 +194,7 @@ export default function StudentCafeteriaPage() {
               Yemekhaneler yükleniyor...
             </div>
           ) : (
-            <Select
-              value={selectedCafeteria}
-              onValueChange={setSelectedCafeteria}
-            >
+            <Select value={selectedCafeteria} onValueChange={selectCafeteria}>
               <SelectTrigger className="w-full md:w-96">
                 <SelectValue placeholder="Yemekhane seçin..." />
               </SelectTrigger>
@@ -216,12 +239,14 @@ export default function StudentCafeteriaPage() {
                   Normal Menü
                 </span>
               </div>
-              <div className="flex items-center gap-2">
-                <div className="h-4 w-4 rounded bg-green-500"></div>
-                <span className="text-sm text-gray-600 dark:text-gray-400">
-                  Vegan Menü
-                </span>
-              </div>
+              {canVegan && (
+                <div className="flex items-center gap-2">
+                  <div className="h-4 w-4 rounded bg-green-500"></div>
+                  <span className="text-sm text-gray-600 dark:text-gray-400">
+                    Vegan Menü
+                  </span>
+                </div>
+              )}
             </div>
 
             {/* Weekly Table */}
@@ -250,8 +275,8 @@ export default function StudentCafeteriaPage() {
                       const selection = mealSelections[day.key]
                       const menuItems =
                         selection === "vegan"
-                          ? weeklyMenu[day.key].vegan
-                          : weeklyMenu[day.key].normal
+                          ? day.dishes.vegan
+                          : day.dishes.normal
 
                       return (
                         <td
@@ -304,29 +329,39 @@ export default function StudentCafeteriaPage() {
                               </div>
 
                               {/* Menu Items List */}
-                              <ul className="w-full space-y-1.5 px-2 text-left text-xs">
-                                {menuItems.map((item, idx) => (
-                                  <li
-                                    key={idx}
-                                    className={`flex items-start gap-1.5 ${
-                                      selection === "none"
-                                        ? "text-gray-400 dark:text-gray-500"
-                                        : "text-gray-700 dark:text-gray-300"
-                                    }`}
-                                  >
-                                    <span
-                                      className={`mt-0.5 h-1 w-1 flex-shrink-0 rounded-full ${
+                              {isLoadingMenu ? (
+                                <Loader2 className="h-4 w-4 animate-spin text-gray-400" />
+                              ) : menuItems ? (
+                                <ul className="w-full space-y-1.5 px-2 text-left text-xs">
+                                  {menuItems.map((item, idx) => (
+                                    <li
+                                      key={idx}
+                                      className={`flex items-start gap-1.5 ${
                                         selection === "none"
-                                          ? "bg-gray-300"
-                                          : selection === "normal"
-                                            ? "bg-orange-400"
-                                            : "bg-green-400"
+                                          ? "text-gray-400 dark:text-gray-500"
+                                          : "text-gray-700 dark:text-gray-300"
                                       }`}
-                                    />
-                                    <span>{item}</span>
-                                  </li>
-                                ))}
-                              </ul>
+                                    >
+                                      <span
+                                        className={`mt-0.5 h-1 w-1 flex-shrink-0 rounded-full ${
+                                          selection === "none"
+                                            ? "bg-gray-300"
+                                            : selection === "normal"
+                                              ? "bg-orange-400"
+                                              : "bg-green-400"
+                                        }`}
+                                      />
+                                      <span>{item}</span>
+                                    </li>
+                                  ))}
+                                </ul>
+                              ) : (
+                                <p className="text-xs text-gray-400 dark:text-gray-500">
+                                  {menuFailed
+                                    ? "Menü yüklenemedi"
+                                    : "Menü henüz yayınlanmadı"}
+                                </p>
+                              )}
                             </div>
 
                             {/* Quick Selection Buttons */}
@@ -341,16 +376,18 @@ export default function StudentCafeteriaPage() {
                               >
                                 Normal
                               </button>
-                              <button
-                                onClick={() => setMealType(day.key, "vegan")}
-                                className={`flex-1 rounded-md px-2 py-1.5 text-xs font-medium transition-all ${
-                                  selection === "vegan"
-                                    ? "bg-green-500 text-white shadow-md"
-                                    : "border border-gray-200 bg-white text-gray-600 hover:bg-green-50 dark:border-gray-700 dark:bg-gray-800 dark:text-gray-300 dark:hover:bg-green-900/20"
-                                }`}
-                              >
-                                Vegan
-                              </button>
+                              {canVegan && (
+                                <button
+                                  onClick={() => setMealType(day.key, "vegan")}
+                                  className={`flex-1 rounded-md px-2 py-1.5 text-xs font-medium transition-all ${
+                                    selection === "vegan"
+                                      ? "bg-green-500 text-white shadow-md"
+                                      : "border border-gray-200 bg-white text-gray-600 hover:bg-green-50 dark:border-gray-700 dark:bg-gray-800 dark:text-gray-300 dark:hover:bg-green-900/20"
+                                  }`}
+                                >
+                                  Vegan
+                                </button>
+                              )}
                             </div>
                           </div>
                         </td>
@@ -378,6 +415,9 @@ export default function StudentCafeteriaPage() {
                   </p>
                   <p className="text-2xl font-bold text-emerald-600">
                     {totalPrice.toFixed(2)} ₺
+                  </p>
+                  <p className="text-xs text-gray-500 dark:text-gray-400">
+                    Öğün başı {mealPrice.toFixed(2)} ₺
                   </p>
                 </div>
                 <Button

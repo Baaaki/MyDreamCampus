@@ -1,3 +1,4 @@
+import { HTTPError } from "ky"
 import { mealApi } from "../api-client"
 
 // Types
@@ -50,11 +51,43 @@ export interface Cafeteria {
   id: string
   name: string
   location: string
+  has_vegan_menu: boolean
+  serves_dinner: boolean
   is_active: boolean
 }
 
 export interface CafeteriaListResponse {
   cafeterias: Cafeteria[]
+  // What one meal costs, for the total shown before checkout; the batch
+  // response carries the amount actually charged.
+  meal_price: number
+  currency: string
+}
+
+// A month's menu as the web admin writes it: week i is the i-th
+// Monday-to-Sunday week touching the month, and a day's items run soup,
+// main, side, dessert, other.
+export interface MenuDay {
+  items: string[]
+  calories: number
+}
+
+export type MenuWeekday =
+  "monday" | "tuesday" | "wednesday" | "thursday" | "friday"
+
+export type MenuWeek = Partial<Record<MenuWeekday, MenuDay>>
+
+export interface MonthlyMenuData {
+  normalMenus: MenuWeek[]
+  veganMenus: MenuWeek[]
+}
+
+export interface MonthlyMenu {
+  year: number
+  month: number
+  menu_data: MonthlyMenuData | null
+  created_at: string
+  updated_at: string
 }
 
 export interface CreateReservationRequest {
@@ -123,6 +156,47 @@ export async function getCafeterias(): Promise<CafeteriaListResponse> {
     .get("cafeterias")
     .json<ApiResponse<CafeteriaListResponse>>()
   return response.data
+}
+
+/** The month's menu, or null while none has been published for it. */
+export async function getMonthlyMenu(
+  year: number,
+  month: number
+): Promise<MonthlyMenu | null> {
+  try {
+    const response = await mealApi
+      .get("menu/monthly", { searchParams: { year, month } })
+      .json<ApiResponse<MonthlyMenu>>()
+    return response.data
+  } catch (err) {
+    if (err instanceof HTTPError && err.response.status === 404) return null
+    throw err
+  }
+}
+
+const MENU_WEEKDAYS: (MenuWeekday | null)[] = [
+  null,
+  "monday",
+  "tuesday",
+  "wednesday",
+  "thursday",
+  "friday",
+  null,
+]
+
+/** The menu of the given type served on `date`, if the month's menu has one. */
+export function menuForDay(
+  menu: MonthlyMenuData | null | undefined,
+  date: Date,
+  type: "normal" | "vegan"
+): MenuDay | null {
+  const weekday = MENU_WEEKDAYS[date.getDay()]
+  if (!menu || !weekday) return null
+  const firstOfMonth = new Date(date.getFullYear(), date.getMonth(), 1)
+  const sinceMonday = (firstOfMonth.getDay() + 6) % 7
+  const week = Math.floor((date.getDate() + sinceMonday - 1) / 7)
+  const weeks = type === "vegan" ? menu.veganMenus : menu.normalMenus
+  return weeks?.[week]?.[weekday] ?? null
 }
 
 export async function createReservation(

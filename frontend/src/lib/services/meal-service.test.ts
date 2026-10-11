@@ -1,8 +1,11 @@
-import { describe, expect, it } from "vitest"
+import { afterEach, describe, expect, it, vi } from "vitest"
 import {
   checkoutOutcome,
+  getMonthlyMenu,
+  menuForDay,
   nextWeekWeekdays,
   toLocalISODate,
+  type MonthlyMenuData,
   type Reservation,
 } from "./meal-service"
 
@@ -108,5 +111,52 @@ describe("nextWeekWeekdays", () => {
 describe("toLocalISODate", () => {
   it("keeps the local day at midnight", () => {
     expect(toLocalISODate(new Date(2026, 9, 12, 0, 0))).toBe("2026-10-12")
+  })
+})
+
+describe("menuForDay", () => {
+  const day = (name: string) => ({ items: [name], calories: 500 })
+  // 1 Oct 2026 is a Thursday, so week 0 runs 28 Sep - 4 Oct and 12 Oct
+  // opens week 2.
+  const menu: MonthlyMenuData = {
+    normalMenus: [{}, {}, { monday: day("Etli Nohut") }],
+    veganMenus: [{}, {}, { monday: day("Nohut Yemeği") }],
+  }
+
+  it("finds a day by its Monday-to-Sunday week of the month", () => {
+    expect(menuForDay(menu, new Date(2026, 9, 12), "normal")?.items).toEqual([
+      "Etli Nohut",
+    ])
+    expect(menuForDay(menu, new Date(2026, 9, 12), "vegan")?.items).toEqual([
+      "Nohut Yemeği",
+    ])
+  })
+
+  it("has nothing for a weekend or a day the menu leaves out", () => {
+    expect(menuForDay(menu, new Date(2026, 9, 11), "normal")).toBeNull()
+    expect(menuForDay(menu, new Date(2026, 9, 13), "normal")).toBeNull()
+    expect(menuForDay(menu, new Date(2026, 9, 26), "normal")).toBeNull()
+    expect(menuForDay(null, new Date(2026, 9, 12), "normal")).toBeNull()
+  })
+})
+
+describe("getMonthlyMenu", () => {
+  afterEach(() => {
+    vi.unstubAllGlobals()
+  })
+
+  it("reads an unpublished month as no menu rather than an error", async () => {
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(
+        async () =>
+          new Response(
+            JSON.stringify({ error: "Kayıt bulunamadı", code: "NOT_FOUND" }),
+            { status: 404, headers: { "Content-Type": "application/json" } }
+          )
+      )
+    )
+
+    await expect(getMonthlyMenu(2026, 11)).resolves.toBeNull()
   })
 })
