@@ -1,6 +1,7 @@
 -- catalog database: the current semester (:'semester', active) and the next
 -- one (:'next_semester', planned), this semester's course offerings, the open
--- periods, and the next semester's prerequisite enrollment window.
+-- periods, the next semester's prerequisite enrollment window, and every
+-- offering's weekly schedule.
 --
 -- Everything is relative to the seed day: periods are open today, and the
 -- hard deadline is a full term away.
@@ -95,3 +96,35 @@ FROM course_catalog.course_catalog c
 JOIN _staff s ON s.email = 'elif.aydin@uni.edu.tr'
 WHERE c.course_code = 'CENG201'
 ON CONFLICT (semester, course_code, department) DO NOTHING;
+
+-- ============================================================
+-- Weekly schedule — every offering of both semesters
+-- ============================================================
+-- What the offering form would have saved: one slot per catalog hour, theory
+-- and lab counted apart (the API refuses any other count). Slot 5 is the
+-- lunch break. No two offerings of a semester share a slot, so a teacher's
+-- courses never collide (trg_instructor_schedule_conflict would refuse it) and
+-- neither does any pair a student takes together (CENG301+CENG350,
+-- CENG102+CENG202). Next semester's CENG201 keeps this term's hours.
+--
+-- NOT EXISTS rather than ON CONFLICT: the conflict trigger fires before the
+-- arbiter, and on a re-run it would take an offering's own rows for a clash.
+INSERT INTO course_catalog.course_schedule_sessions (semester_course_id, day_of_week, slot_number, session_type)
+SELECT sc.id, s.day::course_catalog.day_of_week_enum, slot.n,
+       s.session_type::course_catalog.schedule_session_type_enum
+FROM course_catalog.semester_courses sc
+JOIN (VALUES
+   ('CENG101', 'monday',    'theory', ARRAY[1, 2, 3]),
+   ('CENG101', 'wednesday', 'lab',    ARRAY[6, 7]),
+   ('CENG102', 'tuesday',   'theory', ARRAY[1, 2, 3]),
+   ('CENG102', 'thursday',  'lab',    ARRAY[6, 7]),
+   ('CENG201', 'monday',    'theory', ARRAY[6, 7, 8]),
+   ('CENG202', 'tuesday',   'theory', ARRAY[6, 7]),
+   ('CENG202', 'friday',    'lab',    ARRAY[1, 2]),
+   ('CENG301', 'wednesday', 'theory', ARRAY[1, 2, 3]),
+   ('CENG350', 'thursday',  'theory', ARRAY[1, 2, 3])
+ ) AS s(course_code, day, session_type, slots) ON s.course_code = sc.course_code
+CROSS JOIN LATERAL unnest(s.slots) AS slot(n)
+WHERE sc.semester IN (:'semester', :'next_semester')
+  AND NOT EXISTS (SELECT 1 FROM course_catalog.course_schedule_sessions x
+                  WHERE x.semester_course_id = sc.id);
