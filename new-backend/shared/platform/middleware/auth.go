@@ -208,6 +208,7 @@ func JWTAuth(opts ...AuthOption) gin.HandlerFunc {
 		c.Set("department", claims.Department)
 		c.Set("token_version", claims.TokenVersion)
 		c.Set("jti", claims.JTI)
+		c.Set("sid", claims.SessionID)
 		c.Set("force_password_change", claims.ForcePasswordChange)
 		c.Set("is_superadmin", claims.SuperAdmin)
 		c.Set("is_demo", claims.Demo)

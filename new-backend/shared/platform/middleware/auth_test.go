@@ -271,3 +271,35 @@ func TestJWTAuth_WithoutForcePasswordChange_Unaffected(t *testing.T) {
 
 	assert.Equal(t, http.StatusNoContent, w.Code)
 }
+
+// The session list marks the caller's own entry by this value; the access
+// token's own jti never matches a session.
+func TestJWTAuth_SessionIDClaim_SetInContext(t *testing.T) {
+	r := setupAuthTest(t, nil)
+	r.GET("/sid", JWTAuth(), func(c *gin.Context) {
+		c.JSON(http.StatusOK, gin.H{"jti": c.GetString("jti"), "sid": c.GetString("sid")})
+	})
+	now := time.Now()
+	claims := &utils.Claims{
+		UserID:       "user-1",
+		Role:         "student",
+		TokenVersion: 1,
+		TokenType:    string(utils.AccessToken),
+		JTI:          "access-jti",
+		SessionID:    "refresh-jti",
+		RegisteredClaims: jwt.RegisteredClaims{
+			ExpiresAt: jwt.NewNumericDate(now.Add(15 * time.Minute)),
+			IssuedAt:  jwt.NewNumericDate(now),
+		},
+	}
+	tok, err := jwt.NewWithClaims(jwt.SigningMethodHS256, claims).SignedString([]byte(authTestSecret))
+	require.NoError(t, err)
+
+	req := httptest.NewRequest(http.MethodGet, "/sid", nil)
+	req.Header.Set("Authorization", "Bearer "+tok)
+	w := httptest.NewRecorder()
+	r.ServeHTTP(w, req)
+
+	require.Equal(t, http.StatusOK, w.Code)
+	assert.JSONEq(t, `{"jti":"access-jti","sid":"refresh-jti"}`, w.Body.String())
+}

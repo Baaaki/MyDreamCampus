@@ -36,7 +36,7 @@ func tokenTestUser() db.User {
 func TestGenerateAccessToken_PassesSharedAccessValidation(t *testing.T) {
 	s := newTokenTestService()
 
-	token, err := s.generateAccessToken(tokenTestUser())
+	token, err := s.generateAccessToken(tokenTestUser(), "")
 	require.NoError(t, err)
 
 	claims, err := utils.ValidateAccessTokenWithSecret(token, []byte(tokenTestSecret))
@@ -51,7 +51,7 @@ func TestGenerateAccessToken_SuperAdminClaim(t *testing.T) {
 
 	superUser := tokenTestUser()
 	superUser.IsSuperadmin = true
-	token, err := s.generateAccessToken(superUser)
+	token, err := s.generateAccessToken(superUser, "")
 	require.NoError(t, err)
 
 	claims, err := utils.ValidateAccessTokenWithSecret(token, []byte(tokenTestSecret))
@@ -60,7 +60,7 @@ func TestGenerateAccessToken_SuperAdminClaim(t *testing.T) {
 
 	regularUser := tokenTestUser()
 	regularUser.IsSuperadmin = false
-	regToken, err := s.generateAccessToken(regularUser)
+	regToken, err := s.generateAccessToken(regularUser, "")
 	require.NoError(t, err)
 
 	regClaims, err := utils.ValidateAccessTokenWithSecret(regToken, []byte(tokenTestSecret))
@@ -78,7 +78,7 @@ func TestGenerateTokens_DemoClaim_OnlyOnDemoAccounts(t *testing.T) {
 		user := tokenTestUser()
 		user.IsDemo = isDemo
 
-		access, err := s.generateAccessToken(user)
+		access, err := s.generateAccessToken(user, "")
 		require.NoError(t, err)
 		claims, err := utils.ValidateAccessTokenWithSecret(access, []byte(tokenTestSecret))
 		require.NoError(t, err)
@@ -104,7 +104,7 @@ func TestGenerateRefreshToken_RejectedAsAccessToken(t *testing.T) {
 
 func TestParseRefreshToken_AccessToken_Rejected(t *testing.T) {
 	s := newTokenTestService()
-	access, err := s.generateAccessToken(tokenTestUser())
+	access, err := s.generateAccessToken(tokenTestUser(), "")
 	require.NoError(t, err)
 
 	_, err = s.parseRefreshToken(access)

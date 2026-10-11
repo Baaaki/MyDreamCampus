@@ -188,15 +188,14 @@ func (s *AuthService) Login(ctx context.Context, req dto.LoginRequest, deviceInf
 		serviceLogger.Warn("failed to clear login failures", zap.Error(err))
 	}
 
-	// Generate tokens
-	accessToken, err := s.generateAccessToken(user)
+	// Generate refresh token
+	refreshToken, jti, err := s.generateRefreshToken(user)
 	if err != nil {
 		// Wrap and return, handler will log
 		return dto.LoginResponse{}, "", sharedErrors.Wrap(sharedErrors.ErrInternal, err)
 	}
 
-	// Generate refresh token
-	refreshToken, jti, err := s.generateRefreshToken(user)
+	accessToken, err := s.generateAccessToken(user, jti)
 	if err != nil {
 		// Wrap and return, handler will log
 		return dto.LoginResponse{}, "", sharedErrors.Wrap(sharedErrors.ErrInternal, err)
@@ -527,12 +526,12 @@ func (s *AuthService) RefreshAccessToken(ctx context.Context, refreshToken strin
 	}
 
 	// Generate new tokens (Token Rotation)
-	accessToken, err := s.generateAccessToken(user)
+	newRefreshToken, newJTI, err := s.generateRefreshToken(user)
 	if err != nil {
 		return dto.RefreshResponse{}, "", sharedErrors.Wrap(sharedErrors.ErrInternal, err)
 	}
 
-	newRefreshToken, newJTI, err := s.generateRefreshToken(user)
+	accessToken, err := s.generateAccessToken(user, newJTI)
 	if err != nil {
 		return dto.RefreshResponse{}, "", sharedErrors.Wrap(sharedErrors.ErrInternal, err)
 	}
@@ -638,12 +637,12 @@ func (s *AuthService) ChangePassword(ctx context.Context, userID uuid.UUID, req 
 	}
 
 	// Generate new tokens for current session
-	accessToken, err := s.generateAccessToken(user)
+	refreshToken, jti, err := s.generateRefreshToken(user)
 	if err != nil {
 		return dto.ChangePasswordResponse{}, "", sharedErrors.Wrap(sharedErrors.ErrInternal, err)
 	}
 
-	refreshToken, jti, err := s.generateRefreshToken(user)
+	accessToken, err := s.generateAccessToken(user, jti)
 	if err != nil {
 		return dto.ChangePasswordResponse{}, "", sharedErrors.Wrap(sharedErrors.ErrInternal, err)
 	}
@@ -781,8 +780,10 @@ func (s *AuthService) ResetPassword(ctx context.Context, token, newPassword stri
 	return nil
 }
 
-// GetUserSessions returns all active sessions for a user
-func (s *AuthService) GetUserSessions(ctx context.Context, userID uuid.UUID, currentJTI string) (dto.SessionsResponse, error) {
+// GetUserSessions returns all active sessions for a user. currentSessionJTI
+// is the caller's sid claim: the refresh JTI of the session their access
+// token was issued for.
+func (s *AuthService) GetUserSessions(ctx context.Context, userID uuid.UUID, currentSessionJTI string) (dto.SessionsResponse, error) {
 	sessions, err := s.sessionRepo.GetSessionsByUserID(ctx, userID)
 	if err != nil {
 		return dto.SessionsResponse{}, sharedErrors.Wrap(sharedErrors.ErrInternal, err)
@@ -793,7 +794,7 @@ func (s *AuthService) GetUserSessions(ctx context.Context, userID uuid.UUID, cur
 
 	sessionResponses := make([]dto.SessionResponse, 0, len(sessions))
 	for _, session := range sessions {
-		isCurrent := session.RefreshTokenJti == currentJTI
+		isCurrent := session.RefreshTokenJti == currentSessionJTI
 		ipAddress := session.IpAddress
 		deviceInfo := session.DeviceInfo
 
@@ -823,7 +824,7 @@ func (s *AuthService) GetUserSessions(ctx context.Context, userID uuid.UUID, cur
 }
 
 // DeleteSession deletes a specific session
-func (s *AuthService) DeleteSession(ctx context.Context, sessionID, userID uuid.UUID, currentJTI string) error {
+func (s *AuthService) DeleteSession(ctx context.Context, sessionID, userID uuid.UUID, currentSessionJTI string) error {
 	// Get session to check if it's current
 	sessions, err := s.sessionRepo.GetSessionsByUserID(ctx, userID)
 	if err != nil {
@@ -832,7 +833,7 @@ func (s *AuthService) DeleteSession(ctx context.Context, sessionID, userID uuid.
 
 	for _, session := range sessions {
 		if utils.PgtypeToUUID(session.ID) == sessionID {
-			if session.RefreshTokenJti == currentJTI {
+			if session.RefreshTokenJti == currentSessionJTI {
 				return serviceErrors.ErrCannotTerminateSession
 			}
 		}
@@ -1075,8 +1076,9 @@ func (s *AuthService) StartCleanupScheduler(ctx context.Context) {
 	logger.Info("cleanup scheduler started")
 }
 
-// generateAccessToken creates a JWT access token
-func (s *AuthService) generateAccessToken(user db.User) (string, error) {
+// generateAccessToken creates a JWT access token for the session whose
+// refresh token carries sessionJTI.
+func (s *AuthService) generateAccessToken(user db.User, sessionJTI string) (string, error) {
 	// Tokens, sessions and reset links run on the real clock: JWT
 	// validation and sessions.sql compare against real time, and a
 	// simulated issue time would log everyone out when the time machine
@@ -1091,6 +1093,7 @@ func (s *AuthService) generateAccessToken(user db.User) (string, error) {
 		"department":            utils.StringPointerToString(user.Department),
 		"token_version":         utils.DerefInt32(user.TokenVersion, 0),
 		"jti":                   jti,
+		"sid":                   sessionJTI,
 		"force_password_change": utils.DerefBool(user.ForcePasswordChange, false),
 		"token_type":            string(utils.AccessToken),
 		"exp":                   expiresAt.Unix(),

@@ -47,6 +47,10 @@ type Claims struct {
 	// Demo marks one of the public demo accounts, whose login is printed on
 	// the login page for every visitor.
 	Demo bool `json:"demo,omitempty"`
+	// SessionID is the refresh JTI of the session that issued an access
+	// token. Its own JTI differs, so without this a session list cannot
+	// tell which entry is the caller's.
+	SessionID string `json:"sid,omitempty"`
 	jwt.RegisteredClaims
 }
 

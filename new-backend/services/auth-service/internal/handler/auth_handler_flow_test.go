@@ -31,6 +31,8 @@ type fakeAuthService struct {
 	demoAccounts  []dto.DemoAccountResponse
 	logoutRefresh string
 	logoutAccess  string
+	// currentSession records the session JTI the handler passed on.
+	currentSession string
 }
 
 func (f *fakeAuthService) Login(context.Context, dto.LoginRequest, string, string) (dto.LoginResponse, string, error) {
@@ -65,11 +67,13 @@ func (f *fakeAuthService) RequestPasswordReset(context.Context, string) error { 
 
 func (f *fakeAuthService) ResetPassword(context.Context, string, string) error { return nil }
 
-func (f *fakeAuthService) GetUserSessions(context.Context, uuid.UUID, string) (dto.SessionsResponse, error) {
+func (f *fakeAuthService) GetUserSessions(_ context.Context, _ uuid.UUID, currentSessionJTI string) (dto.SessionsResponse, error) {
+	f.currentSession = currentSessionJTI
 	return dto.SessionsResponse{}, nil
 }
 
-func (f *fakeAuthService) DeleteSession(context.Context, uuid.UUID, uuid.UUID, string) error {
+func (f *fakeAuthService) DeleteSession(_ context.Context, _, _ uuid.UUID, currentSessionJTI string) error {
+	f.currentSession = currentSessionJTI
 	return f.deleteErr
 }
 
@@ -99,11 +103,17 @@ func newFlowRouterWithConfig(t *testing.T, svc *fakeAuthService, cfg *config.Con
 	h := NewAuthHandler(svc, cfg)
 
 	r := gin.New()
-	authed := func(c *gin.Context) { c.Set("user_id", flowUserID); c.Set("jti", "jti-1"); c.Next() }
+	authed := func(c *gin.Context) {
+		c.Set("user_id", flowUserID)
+		c.Set("jti", "jti-1")
+		c.Set("sid", "sid-1")
+		c.Next()
+	}
 	r.POST("/api/auth/login", h.Login)
 	r.POST("/api/auth/refresh", h.RefreshToken)
 	r.POST("/api/auth/logout", authed, h.Logout)
 	r.POST("/api/auth/change-password", authed, h.ChangePassword)
+	r.GET("/api/auth/sessions", authed, h.GetSessions)
 	r.DELETE("/api/auth/sessions/:id", authed, h.DeleteSession)
 	r.GET("/api/auth/demo-accounts", h.GetDemoAccounts)
 	return r
@@ -272,6 +282,21 @@ func TestDeleteSession_CurrentSession_Returns400WithCode(t *testing.T) {
 	assert.Equal(t, http.StatusBadRequest, w.Code)
 	code, _ := bodyField(t, w, "error")
 	assert.Equal(t, "CANNOT_TERMINATE_CURRENT_SESSION", code)
+}
+
+// The access token's own jti never names a session; the sid claim does.
+func TestSessions_PassTheCallersSessionID(t *testing.T) {
+	svc := &fakeAuthService{}
+	r := newFlowRouter(t, svc)
+
+	w := do(r, "GET", "/api/auth/sessions", "", nil)
+	require.Equal(t, http.StatusOK, w.Code)
+	assert.Equal(t, "sid-1", svc.currentSession, "list")
+
+	svc.currentSession = ""
+	w = do(r, "DELETE", "/api/auth/sessions/"+uuid.NewString(), "", nil)
+	require.Equal(t, http.StatusOK, w.Code)
+	assert.Equal(t, "sid-1", svc.currentSession, "delete")
 }
 
 func TestGetDemoAccounts_DemoModeDisabled_Returns404(t *testing.T) {

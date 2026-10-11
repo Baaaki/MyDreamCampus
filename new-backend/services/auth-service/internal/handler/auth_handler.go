@@ -46,8 +46,8 @@ type authService interface {
 	ChangePassword(ctx context.Context, userID uuid.UUID, req dto.ChangePasswordRequest) (dto.ChangePasswordResponse, string, error)
 	RequestPasswordReset(ctx context.Context, email string) error
 	ResetPassword(ctx context.Context, token, newPassword string) error
-	GetUserSessions(ctx context.Context, userID uuid.UUID, currentJTI string) (dto.SessionsResponse, error)
-	DeleteSession(ctx context.Context, sessionID, userID uuid.UUID, currentJTI string) error
+	GetUserSessions(ctx context.Context, userID uuid.UUID, currentSessionJTI string) (dto.SessionsResponse, error)
+	DeleteSession(ctx context.Context, sessionID, userID uuid.UUID, currentSessionJTI string) error
 	GetDemoAccounts(ctx context.Context) ([]dto.DemoAccountResponse, error)
 }
 
@@ -396,7 +396,7 @@ func (h *AuthHandler) GetSessions(c *gin.Context) {
 		return
 	}
 
-	response, err := h.authService.GetUserSessions(ctx, userID, c.GetString("jti"))
+	response, err := h.authService.GetUserSessions(ctx, userID, c.GetString("sid"))
 	if err != nil {
 		logger.WithContextAndFields(ctx, zap.String("handler", "AuthHandler"), zap.String("method", "GetSessions")).
 			Error("get sessions failed", zap.Error(err), zap.String("user_id", userID.String()))
@@ -423,7 +423,7 @@ func (h *AuthHandler) DeleteSession(c *gin.Context) {
 		return
 	}
 
-	if err := h.authService.DeleteSession(ctx, sessionID, userID, c.GetString("jti")); err != nil {
+	if err := h.authService.DeleteSession(ctx, sessionID, userID, c.GetString("sid")); err != nil {
 		logger.WithContextAndFields(ctx, zap.String("handler", "AuthHandler"), zap.String("method", "DeleteSession")).
 			Warn("delete session failed", zap.Error(err), zap.String("session_id", sessionID.String()))
 		respondError(c, err)
