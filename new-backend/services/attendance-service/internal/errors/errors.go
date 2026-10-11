@@ -34,6 +34,11 @@ var (
 	ErrCourseNotFound  = sharedErrors.New("COURSE_NOT_FOUND", "Ders bulunamadı", http.StatusNotFound)
 	ErrLabNotAvailable = sharedErrors.New("LAB_NOT_AVAILABLE", "Bu dersin uygulama (lab) saati bulunmamaktadır", http.StatusBadRequest)
 
+	// Finalization errors (AppError for HTTP responses)
+	ErrAttendanceFinalized = sharedErrors.New("ATTENDANCE_FINALIZED", "Bu dersin yoklaması zaten kesinleştirildi", http.StatusConflict)
+	ErrOpenSessionExists   = sharedErrors.New("OPEN_SESSION_EXISTS", "Açık yoklama oturumu var; kesinleştirmeden önce oturumu kapatın", http.StatusConflict)
+	ErrSemesterMismatch    = sharedErrors.New("SEMESTER_MISMATCH", "Ders bu döneme ait değil", http.StatusBadRequest)
+
 	// Authorization errors (AppError for HTTP responses)
 	ErrForbidden = sharedErrors.New("FORBIDDEN", "Bu işlem için yetkiniz yok", http.StatusForbidden)
 

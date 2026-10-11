@@ -139,6 +139,14 @@ type AttendanceSession struct {
 	CreatedAt          pgtype.Timestamp `json:"created_at"`
 }
 
+type CourseFinalization struct {
+	CourseID    pgtype.UUID        `json:"course_id"`
+	Semester    string             `json:"semester"`
+	FinalizedBy pgtype.UUID        `json:"finalized_by"`
+	FinalizedAt pgtype.Timestamptz `json:"finalized_at"`
+	Result      []byte             `json:"result"`
+}
+
 type CourseView struct {
 	ID                 pgtype.UUID      `json:"id"`
 	CourseCode         string           `json:"course_code"`

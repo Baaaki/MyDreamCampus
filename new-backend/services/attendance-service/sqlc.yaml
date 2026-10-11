@@ -27,6 +27,7 @@ sql:
           attendance_attendance_session: "AttendanceSession"
           attendance_attendance_record: "AttendanceRecord"
           attendance_academic_period: "AcademicPeriod"
+          attendance_course_finalization: "CourseFinalization"
           attendance_outbox_event: "OutboxEvent"
           attendance_processed_event: "ProcessedEvent"
           attendance_session_type_enum: "SessionTypeEnum"

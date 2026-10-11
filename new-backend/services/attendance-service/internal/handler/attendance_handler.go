@@ -368,8 +368,9 @@ func (h *AttendanceHandler) GetMyAttendance(c *gin.Context) {
 // @Tags attendance
 // @Produce json
 // @Param courseId path string true "Course ID"
-// @Param semester query string true "Semester"
+// @Param semester query string false "Semester; must be the course's own when given"
 // @Success 200 {object} dto.FinalizeAttendanceResponse
+// @Failure 409 {object} dto.ErrorResponse "already finalized or a session is still open"
 // @Router /api/v1/attendance/courses/{courseId}/finalize [post]
 func (h *AttendanceHandler) FinalizeAttendance(c *gin.Context) {
 	ctx, cancel := context.WithTimeout(c.Request.Context(), requestTimeout)
@@ -390,15 +391,8 @@ func (h *AttendanceHandler) FinalizeAttendance(c *gin.Context) {
 		return
 	}
 
+	// Optional: the course id already names its semester.
 	semester := c.Query("semester")
-	if semester == "" {
-		handlerLogger.Error("semester query parameter is required")
-		c.JSON(http.StatusBadRequest, dto.ErrorResponse{
-			Error: "Dönem bilgisi zorunludur",
-			Code:  "VALIDATION_ERROR",
-		})
-		return
-	}
 
 	instructorID, err := parseUserID(c)
 	if err != nil {
@@ -427,6 +421,49 @@ func (h *AttendanceHandler) FinalizeAttendance(c *gin.Context) {
 		zap.Int("total_students", resp.TotalStudents),
 		zap.Int("failed_students", len(resp.FailedStudents)),
 	)
+	c.JSON(http.StatusOK, resp)
+}
+
+// GetFinalization godoc
+// @Summary Whether a course's attendance was finalized, with the saved summary
+// @Tags attendance
+// @Produce json
+// @Param courseId path string true "Course ID"
+// @Success 200 {object} dto.FinalizationStatusResponse
+// @Router /api/v1/attendance/courses/{courseId}/finalization [get]
+func (h *AttendanceHandler) GetFinalization(c *gin.Context) {
+	ctx, cancel := context.WithTimeout(c.Request.Context(), requestTimeout)
+	defer cancel()
+
+	handlerLogger := logger.WithContextAndFields(ctx,
+		zap.String("handler", "AttendanceHandler"),
+		zap.String("method", "GetFinalization"),
+	)
+
+	courseID, err := uuid.Parse(c.Param("course_id"))
+	if err != nil {
+		c.JSON(http.StatusBadRequest, dto.ErrorResponse{
+			Error: "Geçersiz ders kimliği",
+			Code:  "INVALID_ID",
+		})
+		return
+	}
+
+	callerID, err := parseUserID(c)
+	if err != nil {
+		handlerLogger.Error("failed to parse user_id", zap.Error(err))
+		c.JSON(http.StatusUnauthorized, dto.ErrorResponse{
+			Error: "Oturum açmanız gerekiyor",
+			Code:  "UNAUTHORIZED",
+		})
+		return
+	}
+
+	resp, err := h.service.GetFinalization(ctx, courseID, callerID, isAdmin(c))
+	if err != nil {
+		h.handleError(c, err)
+		return
+	}
 	c.JSON(http.StatusOK, resp)
 }
 

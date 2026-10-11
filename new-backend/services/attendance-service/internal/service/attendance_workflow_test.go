@@ -10,6 +10,7 @@ import (
 	"github.com/baaaki/mydreamcampus/attendance/internal/db"
 	"github.com/baaaki/mydreamcampus/attendance/internal/dto"
 	attErrors "github.com/baaaki/mydreamcampus/attendance/internal/errors"
+	"github.com/baaaki/mydreamcampus/attendance/internal/repository"
 	"github.com/baaaki/mydreamcampus/shared/client"
 	"github.com/baaaki/mydreamcampus/shared/platform/clock/clocktest"
 	"github.com/baaaki/mydreamcampus/shared/platform/logger"
@@ -32,6 +33,9 @@ type attWorld struct {
 	sessions map[uuid.UUID]db.AttendanceSession
 	records  []db.AttendanceRecord
 	outbox   []attOutboxEvent
+
+	finalizations    map[uuid.UUID]db.CourseFinalization
+	failFinalizeSave bool
 
 	periodStart, periodEnd *time.Time
 	periods                []sharedRepo.SimplePeriod
@@ -134,8 +138,14 @@ func (v attSessionView) GetSessionByID(_ context.Context, id uuid.UUID) (db.Atte
 	return s, nil
 }
 
-func (v attSessionView) GetSessionsByCourse(context.Context, uuid.UUID, string) ([]db.GetSessionsByCourseRow, error) {
-	return nil, nil
+func (v attSessionView) GetSessionsByCourse(_ context.Context, courseID uuid.UUID, _ string) ([]db.GetSessionsByCourseRow, error) {
+	var out []db.GetSessionsByCourseRow
+	for _, s := range v.w.sessions {
+		if utils.PgUUIDToUUID(s.CourseID) == courseID {
+			out = append(out, db.GetSessionsByCourseRow{ID: s.ID, WeekNumber: s.WeekNumber, IsActive: s.IsActive, SessionType: s.SessionType})
+		}
+	}
+	return out, nil
 }
 
 func (v attSessionView) GetSessionsByDateRange(context.Context, db.GetSessionsByDateRangeParams) ([]db.GetSessionsByDateRangeRow, error) {
@@ -245,11 +255,28 @@ func (v attRecordView) GetFailingStudentsByCourseByType(_ context.Context, cours
 	return out, nil
 }
 
-type attOutboxView struct{ w *attWorld }
+// attFinalizationView keeps the record and its events together like the
+// repository's transaction: a refused or failed save queues nothing.
+type attFinalizationView struct{ w *attWorld }
 
-func (v attOutboxView) CreateOutboxEvent(_ context.Context, eventType, _ string, payload []byte) error {
-	v.w.outbox = append(v.w.outbox, attOutboxEvent{eventType, payload})
-	return nil
+func (v attFinalizationView) GetCourseFinalization(_ context.Context, courseID uuid.UUID) (db.CourseFinalization, bool, error) {
+	row, ok := v.w.finalizations[courseID]
+	return row, ok, nil
+}
+
+func (v attFinalizationView) SaveCourseFinalization(_ context.Context, p db.InsertCourseFinalizationParams, events []repository.OutboxEvent) (bool, error) {
+	if v.w.failFinalizeSave {
+		return false, errors.New("insert course finalization: connection reset")
+	}
+	courseID := utils.PgUUIDToUUID(p.CourseID)
+	if _, ok := v.w.finalizations[courseID]; ok {
+		return false, nil
+	}
+	v.w.finalizations[courseID] = db.CourseFinalization(p)
+	for _, e := range events {
+		v.w.outbox = append(v.w.outbox, attOutboxEvent{e.EventType, e.Payload})
+	}
+	return true, nil
 }
 
 type attRedisView struct{ w *attWorld }
@@ -364,7 +391,8 @@ func newAttWorld(t *testing.T) (*attWorld, uuid.UUID, []uuid.UUID) {
 		}},
 		students: map[uuid.UUID]db.StudentView{}, enrolled: map[uuid.UUID][]uuid.UUID{},
 		sessions: map[uuid.UUID]db.AttendanceSession{}, periodStart: &start, periodEnd: &end,
-		enrolledSet: map[string]map[string]bool{}, scanned: map[string]map[string]bool{},
+		finalizations: map[uuid.UUID]db.CourseFinalization{},
+		enrolledSet:   map[string]map[string]bool{}, scanned: map[string]map[string]bool{},
 		buffer: map[string]map[string]string{}, cache: map[string]map[string]any{},
 	}
 	var ids []uuid.UUID
@@ -387,7 +415,7 @@ func (w *attWorld) service(semesters SemesterClient) *AttendanceService {
 	}
 	return &AttendanceService{
 		cacheRepo: attCacheView{w}, sessionRepo: attSessionView{w}, attendanceRepo: attRecordView{w},
-		outboxRepo: attOutboxView{w}, qrService: NewQRService(), redisService: attRedisView{w},
+		finalizations: attFinalizationView{w}, qrService: NewQRService(), redisService: attRedisView{w},
 		semesterClient: semesters, periodRepo: attPeriodView{w},
 	}
 }
@@ -647,13 +675,14 @@ func TestCloseSession_CountsBufferedScansAndKeepsTheBuffer(t *testing.T) {
 
 // --------------------------------------------------------- FinalizeAttendance
 
-// holdSessions opens n sessions of a kind and marks each student present in
-// the first present[i] of them.
+// holdSessions holds n closed sessions of a kind and marks each student
+// present in the first present[i] of them.
 func holdSessions(w *attWorld, courseID uuid.UUID, kind db.SessionTypeEnum, n int, students []uuid.UUID, present []int) {
 	for week := 0; week < n; week++ {
 		s, _ := attSessionView{w}.CreateAttendanceSession(context.Background(), db.CreateAttendanceSessionParams{
 			CourseID: utils.UUIDToPgUUID(courseID), Semester: semester, WeekNumber: int16(week + 1), SessionType: kind,
 		})
+		_ = attSessionView{w}.DeactivateSession(context.Background(), utils.PgUUIDToUUID(s.ID))
 		for i, id := range students {
 			if week < present[i] {
 				_, _ = attRecordView{w}.CreateAttendanceRecordQR(context.Background(), db.CreateAttendanceRecordQRParams{
@@ -718,6 +747,124 @@ func TestFinalizeAttendance_SessionTotalsUnreadable_Fails(t *testing.T) {
 
 	assert.Error(t, err)
 	assert.Empty(t, w.outbox)
+}
+
+// A second finalize must not queue every failed student's event again.
+func TestFinalizeAttendance_SecondCall_RefusedWithoutNewEvents(t *testing.T) {
+	w, courseID, s := newAttWorld(t)
+	holdSessions(w, courseID, db.AttendanceSessionTypeEnumTheory, 14, s, []int{14, 3, 14})
+	svc := w.service(nil)
+
+	first, err := svc.FinalizeAttendance(context.Background(), courseID, teacherID, semester)
+	require.NoError(t, err)
+	require.Len(t, w.outbox, 1)
+
+	_, err = svc.FinalizeAttendance(context.Background(), courseID, teacherID, semester)
+	assert.ErrorIs(t, err, attErrors.ErrAttendanceFinalized)
+	assert.Len(t, w.outbox, 1, "no event is queued twice")
+
+	status, err := svc.GetFinalization(context.Background(), courseID, teacherID, false)
+	require.NoError(t, err)
+	require.True(t, status.Finalized)
+	assert.Equal(t, first.FinalizationSummary, status.Result.FinalizationSummary)
+	assert.Equal(t, first.FailedStudents, status.Result.FailedStudents)
+}
+
+// A concurrent call that wins the insert leaves this one with a refusal,
+// not a second set of events.
+func TestFinalizeAttendance_LostRace_Refused(t *testing.T) {
+	w, courseID, s := newAttWorld(t)
+	holdSessions(w, courseID, db.AttendanceSessionTypeEnumTheory, 14, s, []int{14, 3, 14})
+	svc := w.service(nil)
+	svc.finalizations = racingFinalizations{attFinalizationView{w}}
+
+	_, err := svc.FinalizeAttendance(context.Background(), courseID, teacherID, semester)
+
+	assert.ErrorIs(t, err, attErrors.ErrAttendanceFinalized)
+	assert.Empty(t, w.outbox)
+}
+
+// racingFinalizations reports "not finalized" on the read and lets another
+// caller finalize just before the save.
+type racingFinalizations struct{ attFinalizationView }
+
+func (r racingFinalizations) GetCourseFinalization(context.Context, uuid.UUID) (db.CourseFinalization, bool, error) {
+	return db.CourseFinalization{}, false, nil
+}
+
+func (r racingFinalizations) SaveCourseFinalization(ctx context.Context, p db.InsertCourseFinalizationParams, events []repository.OutboxEvent) (bool, error) {
+	r.w.finalizations[utils.PgUUIDToUUID(p.CourseID)] = db.CourseFinalization{CourseID: p.CourseID}
+	return r.attFinalizationView.SaveCourseFinalization(ctx, p, events)
+}
+
+func TestFinalizeAttendance_SaveFails_NothingQueuedAndRetryable(t *testing.T) {
+	w, courseID, s := newAttWorld(t)
+	holdSessions(w, courseID, db.AttendanceSessionTypeEnumTheory, 14, s, []int{14, 3, 14})
+	w.failFinalizeSave = true
+
+	_, err := w.service(nil).FinalizeAttendance(context.Background(), courseID, teacherID, semester)
+	require.Error(t, err)
+	assert.Empty(t, w.outbox)
+
+	w.failFinalizeSave = false
+	_, err = w.service(nil).FinalizeAttendance(context.Background(), courseID, teacherID, semester)
+	require.NoError(t, err)
+	assert.Len(t, w.outbox, 1)
+}
+
+func TestFinalizeAttendance_OpenSession_Refused(t *testing.T) {
+	w, courseID, s := newAttWorld(t)
+	holdSessions(w, courseID, db.AttendanceSessionTypeEnumTheory, 13, s, []int{13, 13, 13})
+	openTheory(t, w, courseID, 14)
+
+	_, err := w.service(nil).FinalizeAttendance(context.Background(), courseID, teacherID, semester)
+
+	assert.ErrorIs(t, err, attErrors.ErrOpenSessionExists)
+	assert.Empty(t, w.finalizations)
+}
+
+// Under another semester name the course has no sessions and nobody would
+// fail; an empty semester means the course's own.
+func TestFinalizeAttendance_Semester(t *testing.T) {
+	w, courseID, s := newAttWorld(t)
+	holdSessions(w, courseID, db.AttendanceSessionTypeEnumTheory, 14, s, []int{14, 3, 14})
+
+	_, err := w.service(nil).FinalizeAttendance(context.Background(), courseID, teacherID, "2020-2021-Fall")
+	assert.ErrorIs(t, err, attErrors.ErrSemesterMismatch)
+	assert.Empty(t, w.outbox)
+
+	resp, err := w.service(nil).FinalizeAttendance(context.Background(), courseID, teacherID, "")
+	require.NoError(t, err)
+	assert.Equal(t, semester, resp.Semester)
+	assert.Equal(t, 1, resp.FinalizationSummary.FailingCount)
+}
+
+func TestCreateSession_AfterFinalize_Refused(t *testing.T) {
+	w, courseID, s := newAttWorld(t)
+	holdSessions(w, courseID, db.AttendanceSessionTypeEnumTheory, 13, s, []int{13, 13, 13})
+	_, err := w.service(nil).FinalizeAttendance(context.Background(), courseID, teacherID, semester)
+	require.NoError(t, err)
+
+	_, err = w.service(nil).CreateSession(context.Background(), teacherID, dto.CreateSessionRequest{
+		CourseID: courseID, WeekNumber: 14, SessionType: "theory", DurationMinutes: 15,
+	})
+
+	assert.ErrorIs(t, err, attErrors.ErrAttendanceFinalized)
+}
+
+func TestGetFinalization_NotFinalizedYet_AndOwnership(t *testing.T) {
+	w, courseID, _ := newAttWorld(t)
+	svc := w.service(nil)
+
+	status, err := svc.GetFinalization(context.Background(), courseID, teacherID, false)
+	require.NoError(t, err)
+	assert.False(t, status.Finalized)
+	assert.Nil(t, status.Result)
+
+	_, err = svc.GetFinalization(context.Background(), courseID, uuid.New(), false)
+	assert.ErrorIs(t, err, attErrors.ErrForbidden)
+	_, err = svc.GetFinalization(context.Background(), courseID, uuid.New(), true)
+	assert.NoError(t, err, "an admin reads any course")
 }
 
 // ----------------------------------------------------------- GetMyAttendance

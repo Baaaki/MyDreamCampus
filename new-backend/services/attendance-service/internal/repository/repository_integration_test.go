@@ -165,3 +165,67 @@ func TestFailingStudents_AbsencesCountedAgainstTheSessionsHeld(t *testing.T) {
 	require.Len(t, stats, 3, "a student who never came still appears, with zero")
 	assert.Equal(t, int64(0), stats[2].PresentCount)
 }
+
+// The finalization record and its events commit together, and the primary
+// key turns a second finalize into "already done" with nothing queued.
+func TestSaveCourseFinalization_OnceWithItsEvents(t *testing.T) {
+	a := newAttendanceDB(t)
+	ctx := context.Background()
+	repo := NewFinalizationRepository(a.pool)
+	params := db.InsertCourseFinalizationParams{
+		CourseID: utils.UUIDToPgtype(a.course), Semester: fall, FinalizedBy: utils.UUIDToPgtype(uuid.New()),
+		FinalizedAt: pgtype.Timestamptz{Time: time.Now(), Valid: true}, Result: []byte(`{"course_code":"BLM101"}`),
+	}
+	events := []OutboxEvent{
+		{EventType: "attendance.semester.failed", RoutingKey: "attendance.semester.failed", Payload: []byte(`{"n":1}`)},
+		{EventType: "attendance.semester.failed", RoutingKey: "attendance.semester.failed", Payload: []byte(`{"n":2}`)},
+	}
+
+	_, found, err := repo.GetCourseFinalization(ctx, a.course)
+	require.NoError(t, err)
+	assert.False(t, found)
+
+	saved, err := repo.SaveCourseFinalization(ctx, params, events)
+	require.NoError(t, err)
+	assert.True(t, saved)
+
+	saved, err = repo.SaveCourseFinalization(ctx, params, events)
+	require.NoError(t, err)
+	assert.False(t, saved, "second finalize is refused")
+
+	var queued int
+	require.NoError(t, a.pool.QueryRow(ctx, `SELECT count(*) FROM attendance.outbox_events`).Scan(&queued))
+	assert.Equal(t, 2, queued, "the refused call queued nothing")
+
+	row, found, err := repo.GetCourseFinalization(ctx, a.course)
+	require.NoError(t, err)
+	require.True(t, found)
+	assert.JSONEq(t, `{"course_code":"BLM101"}`, string(row.Result))
+}
+
+// An event that cannot be queued takes the finalization record down with it,
+// so the course stays open for a retry.
+func TestSaveCourseFinalization_EventFails_RollsBackRecord(t *testing.T) {
+	a := newAttendanceDB(t)
+	ctx := context.Background()
+	repo := NewFinalizationRepository(a.pool)
+	params := db.InsertCourseFinalizationParams{
+		CourseID: utils.UUIDToPgtype(a.course), Semester: fall, FinalizedBy: utils.UUIDToPgtype(uuid.New()),
+		FinalizedAt: pgtype.Timestamptz{Time: time.Now(), Valid: true}, Result: []byte(`{}`),
+	}
+	// outbox_events.payload is JSONB: a non-JSON payload fails the insert.
+	events := []OutboxEvent{
+		{EventType: "attendance.semester.failed", RoutingKey: "attendance.semester.failed", Payload: []byte(`{"n":1}`)},
+		{EventType: "attendance.semester.failed", RoutingKey: "attendance.semester.failed", Payload: []byte(`not json`)},
+	}
+
+	_, err := repo.SaveCourseFinalization(ctx, params, events)
+	require.Error(t, err)
+
+	_, found, err := repo.GetCourseFinalization(ctx, a.course)
+	require.NoError(t, err)
+	assert.False(t, found)
+	var queued int
+	require.NoError(t, a.pool.QueryRow(ctx, `SELECT count(*) FROM attendance.outbox_events`).Scan(&queued))
+	assert.Zero(t, queued)
+}

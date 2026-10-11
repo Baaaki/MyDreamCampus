@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	goerrors "errors"
 	"fmt"
+	"sort"
 	"strings"
 	"time"
 
@@ -44,7 +45,7 @@ type AttendanceService struct {
 	cacheRepo      attendanceCache
 	sessionRepo    sessionStore
 	attendanceRepo attendanceStore
-	outboxRepo     attendanceOutbox
+	finalizations  finalizationStore
 	qrService      *QRService
 	redisService   attendanceRedis
 	semesterClient SemesterClient
@@ -55,7 +56,7 @@ func NewAttendanceService(
 	cacheRepo *repository.CacheRepository,
 	sessionRepo *repository.SessionRepository,
 	attendanceRepo *repository.AttendanceRepository,
-	outboxRepo *repository.OutboxRepository,
+	finalizations *repository.FinalizationRepository,
 	qrService *QRService,
 	redisService *RedisService,
 	semesterClient SemesterClient,
@@ -65,7 +66,7 @@ func NewAttendanceService(
 		cacheRepo:      cacheRepo,
 		sessionRepo:    sessionRepo,
 		attendanceRepo: attendanceRepo,
-		outboxRepo:     outboxRepo,
+		finalizations:  finalizations,
 		qrService:      qrService,
 		redisService:   redisService,
 		semesterClient: semesterClient,
@@ -90,6 +91,14 @@ func (s *AttendanceService) CreateSession(ctx context.Context, instructorID uuid
 	if utils.PgUUIDToUUID(course.InstructorID) != instructorID {
 		logger.Error("instructor does not own course")
 		return dto.CreateSessionResponse{}, errors.ErrForbidden
+	}
+
+	// A session opened after finalization would count for nothing: grades
+	// already has the outcome.
+	if _, finalized, err := s.finalizations.GetCourseFinalization(ctx, req.CourseID); err != nil {
+		return dto.CreateSessionResponse{}, fmt.Errorf("read course finalization: %w", err)
+	} else if finalized {
+		return dto.CreateSessionResponse{}, errors.ErrAttendanceFinalized
 	}
 
 	// 2. Semester enforcement: checks hard_deadline + period window
@@ -603,8 +612,12 @@ func currentSemester(periods []sharedRepo.SimplePeriod, now time.Time) string {
 	}
 }
 
-// FinalizeAttendance finalizes attendance for a course and publishes events
-// Checks theory (min 10/14) and lab (min 11/14) separately
+// FinalizeAttendance closes a course's attendance once. Students below the
+// theory (10/14) or lab (11/14) threshold fail, and the record of the
+// finalization is written with an attendance.semester.failed event for each
+// of them, so a second call is refused instead of queuing the events again.
+// semester may be empty: a course id belongs to one semester and that one
+// is used.
 func (s *AttendanceService) FinalizeAttendance(ctx context.Context, courseID, instructorID uuid.UUID, semester string) (dto.FinalizeAttendanceResponse, error) {
 	logger.Info("Finalizing attendance",
 		zap.String("course_id", courseID.String()),
@@ -618,6 +631,30 @@ func (s *AttendanceService) FinalizeAttendance(ctx context.Context, courseID, in
 	}
 	if utils.PgUUIDToUUID(course.InstructorID) != instructorID {
 		return dto.FinalizeAttendanceResponse{}, errors.ErrForbidden
+	}
+	// Under any other semester name the course has no sessions, every
+	// threshold is zero and the whole class would pass.
+	if semester != "" && semester != course.Semester {
+		return dto.FinalizeAttendanceResponse{}, errors.ErrSemesterMismatch
+	}
+	semester = course.Semester
+
+	if _, finalized, err := s.finalizations.GetCourseFinalization(ctx, courseID); err != nil {
+		return dto.FinalizeAttendanceResponse{}, fmt.Errorf("read course finalization: %w", err)
+	} else if finalized {
+		return dto.FinalizeAttendanceResponse{}, errors.ErrAttendanceFinalized
+	}
+
+	// An open session's scans wait in Redis until it closes; counting now
+	// would miss them and fail students who were there.
+	sessions, err := s.sessionRepo.GetSessionsByCourse(ctx, courseID, semester)
+	if err != nil {
+		return dto.FinalizeAttendanceResponse{}, fmt.Errorf("list course sessions: %w", err)
+	}
+	for _, session := range sessions {
+		if session.IsActive.Bool {
+			return dto.FinalizeAttendanceResponse{}, errors.ErrOpenSessionExists
+		}
 	}
 
 	// Get total sessions by type. Thresholds scale with the sessions
@@ -662,8 +699,8 @@ func (s *AttendanceService) FinalizeAttendance(ctx context.Context, courseID, in
 		return dto.FinalizeAttendanceResponse{}, err
 	}
 
-	var failed []dto.FailedStudent
-	eventsPublished := 0
+	failed := []dto.FailedStudent{}
+	var failedEvents []repository.OutboxEvent
 
 	for studentID, info := range failMap {
 		failedType := deriveFailedType(info.TheoryFailed, info.LabFailed)
@@ -697,7 +734,6 @@ func (s *AttendanceService) FinalizeAttendance(ctx context.Context, courseID, in
 
 		failed = append(failed, failedStudent)
 
-		// Publish event
 		eventData := dto.AttendanceSemesterFailedEventData{
 			StudentID:     studentID,
 			StudentNumber: info.StudentNumber,
@@ -728,12 +764,19 @@ func (s *AttendanceService) FinalizeAttendance(ctx context.Context, courseID, in
 			}
 		}
 
-		if err := s.publishFailedAttendanceEvent(ctx, eventData); err == nil {
-			eventsPublished++
+		payload, err := failedAttendancePayload(eventData)
+		if err != nil {
+			return dto.FinalizeAttendanceResponse{}, err
 		}
+		failedEvents = append(failedEvents, repository.OutboxEvent{
+			EventType:  events.EventAttendanceSemesterFailed,
+			RoutingKey: events.EventAttendanceSemesterFailed,
+			Payload:    payload,
+		})
 	}
+	sort.Slice(failed, func(i, j int) bool { return failed[i].StudentNumber < failed[j].StudentNumber })
 
-	return dto.FinalizeAttendanceResponse{
+	resp := dto.FinalizeAttendanceResponse{
 		CourseID:      courseID,
 		CourseCode:    course.CourseCode,
 		Semester:      semester,
@@ -754,9 +797,54 @@ func (s *AttendanceService) FinalizeAttendance(ctx context.Context, courseID, in
 			FailingCount: len(failMap),
 		},
 		FailedStudents:  failed,
-		EventsPublished: eventsPublished,
+		EventsPublished: len(failedEvents),
 		FinalizedAt:     clock.Now(),
-	}, nil
+	}
+
+	result, err := json.Marshal(resp)
+	if err != nil {
+		return dto.FinalizeAttendanceResponse{}, fmt.Errorf("encode finalization result: %w", err)
+	}
+	saved, err := s.finalizations.SaveCourseFinalization(ctx, db.InsertCourseFinalizationParams{
+		CourseID:    utils.UUIDToPgUUID(courseID),
+		Semester:    semester,
+		FinalizedBy: utils.UUIDToPgUUID(instructorID),
+		FinalizedAt: pgtype.Timestamptz{Time: resp.FinalizedAt, Valid: true},
+		Result:      result,
+	}, failedEvents)
+	if err != nil {
+		return dto.FinalizeAttendanceResponse{}, fmt.Errorf("save course finalization: %w", err)
+	}
+	if !saved {
+		// A concurrent call finalized the course between the check and here.
+		return dto.FinalizeAttendanceResponse{}, errors.ErrAttendanceFinalized
+	}
+	return resp, nil
+}
+
+// GetFinalization tells the course's teacher, or an admin, whether its
+// attendance was finalized and, if so, the summary saved with it.
+func (s *AttendanceService) GetFinalization(ctx context.Context, courseID, callerID uuid.UUID, isAdmin bool) (dto.FinalizationStatusResponse, error) {
+	course, err := s.cacheRepo.GetCourseCacheByID(ctx, courseID)
+	if err != nil {
+		return dto.FinalizationStatusResponse{}, errors.ErrCourseNotFound
+	}
+	if !canManageSession(course.InstructorID, callerID, isAdmin) {
+		return dto.FinalizationStatusResponse{}, errors.ErrForbidden
+	}
+
+	row, finalized, err := s.finalizations.GetCourseFinalization(ctx, courseID)
+	if err != nil {
+		return dto.FinalizationStatusResponse{}, fmt.Errorf("read course finalization: %w", err)
+	}
+	if !finalized {
+		return dto.FinalizationStatusResponse{Finalized: false}, nil
+	}
+	var result dto.FinalizeAttendanceResponse
+	if err := json.Unmarshal(row.Result, &result); err != nil {
+		return dto.FinalizationStatusResponse{}, fmt.Errorf("decode course finalization: %w", err)
+	}
+	return dto.FinalizationStatusResponse{Finalized: true, Result: &result}, nil
 }
 
 // GetCourseSessions returns all sessions for a course
@@ -858,8 +946,9 @@ func (s *AttendanceService) checkEnrollmentWithFallback(ctx context.Context, ses
 	return s.cacheRepo.CheckEnrollment(ctx, studentID, courseID, semester)
 }
 
-// publishFailedAttendanceEvent publishes event to outbox
-func (s *AttendanceService) publishFailedAttendanceEvent(ctx context.Context, data dto.AttendanceSemesterFailedEventData) error {
+// failedAttendancePayload wraps the event data in the BaseEvent envelope
+// grades' consumer reads.
+func failedAttendancePayload(data dto.AttendanceSemesterFailedEventData) ([]byte, error) {
 	payload, err := json.Marshal(dto.BaseEvent{
 		EventID:   uuid.New(),
 		EventType: events.EventAttendanceSemesterFailed,
@@ -867,10 +956,9 @@ func (s *AttendanceService) publishFailedAttendanceEvent(ctx context.Context, da
 		Data:      data,
 	})
 	if err != nil {
-		return err
+		return nil, fmt.Errorf("encode %s: %w", events.EventAttendanceSemesterFailed, err)
 	}
-
-	return s.outboxRepo.CreateOutboxEvent(ctx, events.EventAttendanceSemesterFailed, events.EventAttendanceSemesterFailed, payload)
+	return payload, nil
 }
 
 // GetSessionDetails returns session details for instructor

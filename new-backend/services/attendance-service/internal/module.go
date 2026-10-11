@@ -62,7 +62,7 @@ func New(
 	redisService := service.NewRedisService(redisClient)
 
 	attendanceSvc := service.NewAttendanceService(
-		cacheRepo, sessionRepo, attendanceRepo, outboxRepo,
+		cacheRepo, sessionRepo, attendanceRepo, repository.NewFinalizationRepository(pool),
 		qrService, redisService, semesterClient, periodRepo,
 	)
 
@@ -133,6 +133,7 @@ func (m *Module) RegisterRoutes(rg *gin.RouterGroup) {
 		protected.GET("/sessions/:session_id/qr", platformMiddleware.RequireRole("teacher", "admin"), m.attendanceHandler.GetQRCode)
 
 		protected.POST("/courses/:course_id/finalize", platformMiddleware.RequireRole("teacher", "admin"), m.attendanceHandler.FinalizeAttendance)
+		protected.GET("/courses/:course_id/finalization", platformMiddleware.RequireRole("teacher", "admin"), m.attendanceHandler.GetFinalization)
 
 		// Student routes
 		protected.POST("/scan", platformMiddleware.RequireRole("student"), m.attendanceHandler.ScanQR)

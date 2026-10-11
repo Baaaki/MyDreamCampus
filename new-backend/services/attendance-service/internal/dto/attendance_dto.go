@@ -213,6 +213,13 @@ type FinalizeAttendanceResponse struct {
 	FinalizedAt     time.Time       `json:"finalized_at"`
 }
 
+// FinalizationStatusResponse says whether a course's attendance was finalized;
+// Result is the summary saved when it was.
+type FinalizationStatusResponse struct {
+	Finalized bool                        `json:"finalized"`
+	Result    *FinalizeAttendanceResponse `json:"result,omitempty"`
+}
+
 // AdminSessionItem represents a session in admin list view
 type AdminSessionItem struct {
 	SessionID     uuid.UUID `json:"session_id"`

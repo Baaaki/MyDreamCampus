@@ -5,6 +5,7 @@ import (
 	"time"
 
 	"github.com/baaaki/mydreamcampus/attendance/internal/db"
+	"github.com/baaaki/mydreamcampus/attendance/internal/repository"
 	sharedRepo "github.com/baaaki/mydreamcampus/shared/platform/repository"
 	"github.com/google/uuid"
 )
@@ -43,8 +44,9 @@ type attendanceStore interface {
 	GetFailingStudentsByCourseByType(ctx context.Context, courseID uuid.UUID, semester string, sessionType db.SessionTypeEnum, totalSessions int64, minRequired int64) ([]db.GetFailingStudentsByCourseByTypeRow, error)
 }
 
-type attendanceOutbox interface {
-	CreateOutboxEvent(ctx context.Context, eventType, routingKey string, payload []byte) error
+type finalizationStore interface {
+	GetCourseFinalization(ctx context.Context, courseID uuid.UUID) (db.CourseFinalization, bool, error)
+	SaveCourseFinalization(ctx context.Context, params db.InsertCourseFinalizationParams, events []repository.OutboxEvent) (bool, error)
 }
 
 type attendanceRedis interface {
