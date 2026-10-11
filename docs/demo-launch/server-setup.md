@@ -214,7 +214,14 @@ Telefondan **mobil veriyle** (Wi-Fi kapalı) aç:
 Süper admin olarak gir:
 
 1. `ADMIN_EMAIL` + `ADMIN_INITIAL_PASSWORD` ile giriş yap. Şifre değiştirme
-   ekranına yönlendirilirsin; güçlü yeni bir şifre belirle.
+   ekranına yönlendirilirsin; güçlü yeni bir şifre belirle. Bu adım
+   zorunlu: şifre değişmeden başka hiçbir admin işlemi çalışmaz.
+   - `ADMIN_INITIAL_PASSWORD` yalnız ilk açılışta, süper admin
+     oluşturulurken kullanılır. Sonradan `.env`'de değiştirmek şifreyi
+     değiştirmez; şifre arayüzden değişir.
+   - Yeni şifren ve açık oturumların saatlik geri dönüşten, "Düzenlemeye
+     Başla"dan ve "Vazgeç ve Sıfırla"dan etkilenmez; kalıcı durum ilk şifreyi
+     taşısa da geri dönüş onu geri getirmez.
 2. Menüden **Kalıcı Veri** sayfasını aç (`/system/baseline`).
    `YYYYMMDD-HHMMSS` adlı bir sürüm listelenmeli.
 
@@ -343,7 +350,9 @@ Her şey ayaktayken
 APK'da sırayla dene. Saatlik geri dönüş maddesi için:
 `.env`'de `REVERT_AFTER_MINUTES=2` yap, `make deploy`, demo admin ile bir
 kayıt ekle, 2-3 dakika sonra kaydın gittiğini gözle, değeri 60'a döndür,
-yine `make deploy`.
+yine `make deploy`. Geri dönüşten sonra süper admin oturumun açık kalmalı ve
+adım 7'de belirlediğin şifreyle giriş yapabilmelisin; `ADMIN_INITIAL_PASSWORD`
+artık reddedilir.
 
 Sonuçları bana madde madde yaz (geçti / şu hata). Faz 9'u birlikte
 işaretleyip kapatalım; hata çıkan maddeleri düzeltirim.

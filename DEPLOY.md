@@ -556,7 +556,9 @@ Tarayıcıda: **`https://203-0-113-5.sslip.io`** (kendi host'unla).
 Manuel bir şey yapman gerekmez:
 
 - **Admin** ilk açılışta otomatik oluşur (`.env`'deki `ADMIN_EMAIL` /
-  `ADMIN_INITIAL_PASSWORD`).
+  `ADMIN_INITIAL_PASSWORD`). `ADMIN_INITIAL_PASSWORD` yalnız bu ilk açılışta
+  kullanılır; sonradan `.env`'de değiştirmek şifreyi değiştirmez. İlk girişte
+  şifreyi değiştirmek zorunludur, o zamana kadar başka admin işlemi çalışmaz.
 - **`seed` servisi** auth/staff/student/catalog ayağa kalkınca otomatik çalışır;
   öğretmen, ders, öğrenci ve profilleri **gerçek admin API üzerinden** oluşturur
   (event zinciri düzgün dolsun diye — ham SQL değil), fakülte/bölüm listesini
@@ -577,13 +579,13 @@ docker compose logs seed        # ">> seed complete" görmelisin
 
 | Rol | E-posta | Şifre |
 |---|---|---|
-| Admin | `.env`'deki `ADMIN_EMAIL` | `.env`'deki `ADMIN_INITIAL_PASSWORD` |
+| Admin | `.env`'deki `ADMIN_EMAIL` | `.env`'deki `ADMIN_INITIAL_PASSWORD` (ilk girişte değiştirilir) |
 | Öğretmen | `ahmet.yilmaz@uni.edu.tr` | `ahmet.yilmaz@uni.edu.tr` |
 | Öğrenci | `zeynep.sahin@uni.edu.tr` | `zeynep.sahin@uni.edu.tr` |
 
 > Provisioned kullanıcıların şifresi **e-posta adreslerinin aynısıdır**. Seed,
 > seed'lediği hesaplarda "ilk girişte şifre değiştir" bayrağını kapatır, böylece
-> giriş kesintisiz olur. Tüm demo içeriği
+> giriş kesintisiz olur. Süper adminin bayrağı açık kalır. Tüm demo içeriği
 > [seed/data/](new-backend/infrastructure/seed/data/) altında.
 
 > Seed içeriğini değiştirmek (örn.
@@ -629,7 +631,9 @@ aracılığıyla dış dünyaya (`https://mydreamcampus.madebybaki.com`) açıl�
 - **Güvenli ve İzole:** Statik varlıklar Cloudflare tarafından önbelleğe alınır,
   yönetim uçları Cloudflare Access ile korunur. Ziyaretçilerin değişiklikleri en
   fazla 1 saat yaşar: son geri dönüşten sonraki ilk değişiklik 1 saatlik olunca
-  sistem süper adminin kaydettiği kalıcı duruma döner.
+  sistem süper adminin kaydettiği kalıcı duruma döner. Süper adminin şifresi ve
+  oturumları bu geri dönüşten (ve "Düzenlemeye Başla" / "Vazgeç ve Sıfırla"dan)
+  etkilenmez.
 
 ---
 
@@ -649,7 +653,7 @@ nano new-backend/infrastructure/.env
 Gereken temel değerler:
 - Tüm secret'ları `openssl rand -hex 32` ile üret (base64 değil: `/` karakteri RabbitMQ ve Postgres URL'lerini bozar).
 - `ADMIN_EMAIL`: Tahmin edilemez gerçek süper admin e-postası.
-- `ADMIN_INITIAL_PASSWORD`: Güçlü geçici ilk şifre (ilk girişte değiştirilmesi zorunludur).
+- `ADMIN_INITIAL_PASSWORD`: Güçlü geçici ilk şifre. Yalnız ilk açılışta, süper admin oluşturulurken kullanılır; ilk girişte değiştirilmesi zorunludur.
 - `DEMO_MODE=true`
 - `SEED_DEMO=true`
 - `DEMO_ADMIN_EMAIL=demo.admin@mydreamcampus.com`
@@ -693,6 +697,8 @@ docker logs mydreamcampus-demo-ops | grep "Snapshot completed"
 1. Tarayıcıda `https://mydreamcampus.madebybaki.com` adresini aç.
 2. `ADMIN_EMAIL` ve `ADMIN_INITIAL_PASSWORD` ile giriş yap.
 3. Sunucu seni otomatik olarak `/change-password` ekranına yönlendirecektir; güçlü yeni şifreni belirle.
+   Bu adım zorunludur: şifre değişmeden başka admin işlemi çalışmaz. Yeni şifren ve açık oturumların saatlik
+   geri dönüşte ve düzenleme oturumlarında korunur; kalıcı durum ilk şifreyi taşısa da geri dönüş onu geri getirmez.
 4. `/system/baseline` ("Kalıcı Veri") sayfasına git ve ilk kalıcı durumun (`YYYYMMDD-HHMMSS` adlı sürüm)
    listelendiğini gör. Cloudflare Access'i (aşağıda 4. adım) kurduysan sayfa önce Access doğrulaması ister.
 
