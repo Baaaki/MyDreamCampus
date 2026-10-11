@@ -2,6 +2,7 @@ package service
 
 import (
 	"context"
+	"errors"
 	"sync"
 	"testing"
 
@@ -410,11 +411,14 @@ func TestGetPendingProgramsByAdvisor(t *testing.T) {
 		stClient := &mockStudentClient{
 			students: map[uuid.UUID]contracts.StudentResponse{
 				s1: {
-					ID:        s1.String(),
-					FirstName: "Ahmet",
-					LastName:  "Kaya",
-					AdvisorID: &advStr,
-					Status:    "active",
+					ID:            s1.String(),
+					StudentNumber: "2024001",
+					FirstName:     "Ahmet",
+					LastName:      "Kaya",
+					Department:    "Fizik",
+					ClassLevel:    2,
+					AdvisorID:     &advStr,
+					Status:        "active",
 				},
 				s2: {
 					ID:        s2.String(),
@@ -426,20 +430,40 @@ func TestGetPendingProgramsByAdvisor(t *testing.T) {
 			},
 		}
 
+		catalog := &mockCourseCatalogClient{
+			coursesByIDs: []contracts.SemesterCourseResponse{
+				{ID: c1, InstructorFullname: "Prof. Dr. Marie Curie"},
+			},
+		}
 		svc := &EnrollmentService{
-			enrollmentRepo: store,
-			studentClient:  stClient,
+			enrollmentRepo:      store,
+			studentClient:       stClient,
+			courseCatalogClient: catalog,
 		}
 
 		resp, err := svc.GetPendingProgramsByAdvisor(ctx, advisorID)
 		require.NoError(t, err)
 		assert.Equal(t, advisorID, resp.AdvisorID)
 		require.Len(t, resp.Programs, 1)
-		assert.Equal(t, p1, resp.Programs[0].ID)
-		assert.Equal(t, s1, resp.Programs[0].StudentID)
-		assert.Equal(t, "Ahmet Kaya", resp.Programs[0].StudentName)
-		require.Len(t, resp.Programs[0].Courses, 1)
-		assert.Equal(t, "PHYS101", resp.Programs[0].Courses[0].CourseCode)
+		got := resp.Programs[0]
+		assert.Equal(t, p1, got.ID)
+		assert.Equal(t, s1, got.StudentID)
+		assert.Equal(t, "Ahmet Kaya", got.StudentName)
+		assert.Equal(t, "2024001", got.StudentNumber)
+		assert.Equal(t, "Fizik", got.Department)
+		assert.Equal(t, int16(2), got.ClassLevel)
+		require.Len(t, got.Courses, 1)
+		assert.Equal(t, "PHYS101", got.Courses[0].CourseCode)
+		assert.Equal(t, "Prof. Dr. Marie Curie", got.Courses[0].InstructorName)
+
+		// The instructor is a label: a catalog outage must not hide the
+		// programs waiting for the advisor's decision.
+		catalog.getByIDsErr = errors.New("catalog down")
+		resp, err = svc.GetPendingProgramsByAdvisor(ctx, advisorID)
+		require.NoError(t, err)
+		require.Len(t, resp.Programs, 1)
+		assert.Equal(t, "2024001", resp.Programs[0].StudentNumber)
+		assert.Empty(t, resp.Programs[0].Courses[0].InstructorName)
 	})
 }
 

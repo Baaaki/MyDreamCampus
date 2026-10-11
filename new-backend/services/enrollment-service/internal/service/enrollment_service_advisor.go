@@ -7,6 +7,7 @@ import (
 	"github.com/baaaki/mydreamcampus/enrollment/internal/db"
 	"github.com/baaaki/mydreamcampus/enrollment/internal/dto"
 	serviceErrors "github.com/baaaki/mydreamcampus/enrollment/internal/errors"
+	"github.com/baaaki/mydreamcampus/shared/contracts"
 	sharedErrors "github.com/baaaki/mydreamcampus/shared/platform/errors"
 	"github.com/baaaki/mydreamcampus/shared/platform/logger"
 	"github.com/baaaki/mydreamcampus/shared/platform/utils"
@@ -231,11 +232,11 @@ func (s *EnrollmentService) GetPendingProgramsByAdvisor(ctx context.Context, adv
 	}
 
 	studentIDs := make([]uuid.UUID, len(students))
-	studentMap := make(map[uuid.UUID]string)
+	studentMap := make(map[uuid.UUID]contracts.StudentResponse, len(students))
 	for i, st := range students {
 		id, _ := uuid.Parse(st.ID)
 		studentIDs[i] = id
-		studentMap[id] = st.FirstName + " " + st.LastName
+		studentMap[id] = st
 	}
 
 	programs, err := s.enrollmentRepo.GetPendingProgramsByStudentIDs(ctx, studentIDs)
@@ -243,11 +244,15 @@ func (s *EnrollmentService) GetPendingProgramsByAdvisor(ctx context.Context, adv
 		return dto.AdvisorPendingProgramsResponse{}, sharedErrors.Wrap(sharedErrors.ErrInternal, err)
 	}
 
-	programsDTO := make([]dto.EnrollmentProgramResponse, 0, len(programs))
+	type pendingProgram struct {
+		program db.EnrollmentProgram
+		courses []db.EnrollmentProgramCourse
+	}
+	loaded := make([]pendingProgram, 0, len(programs))
+	courseIDsBySemester := make(map[string][]uuid.UUID)
+	seen := make(map[uuid.UUID]bool)
 	for _, program := range programs {
 		programID := utils.PgtypeToUUID(program.ID)
-		studentID := utils.PgtypeToUUID(program.StudentID)
-
 		coursesRows, err := s.enrollmentRepo.GetCoursesByProgramID(ctx, programID)
 		if err != nil {
 			serviceLogger.Error("failed to get courses for program",
@@ -256,25 +261,63 @@ func (s *EnrollmentService) GetPendingProgramsByAdvisor(ctx context.Context, adv
 			)
 			continue
 		}
-
-		coursesDTO := make([]dto.CourseBasic, 0, len(coursesRows))
+		loaded = append(loaded, pendingProgram{program: program, courses: coursesRows})
 		for _, row := range coursesRows {
+			courseID := utils.PgtypeToUUID(row.CourseID)
+			if !seen[courseID] {
+				seen[courseID] = true
+				courseIDsBySemester[program.Semester] = append(courseIDsBySemester[program.Semester], courseID)
+			}
+		}
+	}
+
+	// Advisees share most of their courses, so each offering is asked for
+	// once per semester rather than once per program. The instructor is only
+	// a label on the review dialog: a catalog outage leaves it blank instead
+	// of hiding the programs waiting for a decision.
+	instructors := make(map[uuid.UUID]string, len(seen))
+	for semester, ids := range courseIDsBySemester {
+		courses, err := s.courseCatalogClient.GetCoursesByIDs(ctx, semester, ids)
+		if err != nil {
+			serviceLogger.Warn("failed to get instructors from catalog",
+				zap.String("semester", semester),
+				zap.Error(err),
+			)
+			continue
+		}
+		for _, c := range courses {
+			instructors[c.ID] = c.InstructorFullname
+		}
+	}
+
+	programsDTO := make([]dto.EnrollmentProgramResponse, 0, len(loaded))
+	for _, p := range loaded {
+		studentID := utils.PgtypeToUUID(p.program.StudentID)
+		student := studentMap[studentID]
+
+		coursesDTO := make([]dto.CourseBasic, 0, len(p.courses))
+		for _, row := range p.courses {
+			courseID := utils.PgtypeToUUID(row.CourseID)
 			coursesDTO = append(coursesDTO, dto.CourseBasic{
-				ID:         utils.PgtypeToUUID(row.CourseID).String(),
-				CourseCode: row.CourseCode,
-				CourseName: row.CourseName,
-				Credits:    row.Credits,
+				ID:             courseID.String(),
+				CourseCode:     row.CourseCode,
+				CourseName:     row.CourseName,
+				Credits:        row.Credits,
+				InstructorName: instructors[courseID],
 			})
 		}
 
 		programsDTO = append(programsDTO, dto.EnrollmentProgramResponse{
-			ID:          programID,
-			StudentID:   studentID,
-			StudentName: studentMap[studentID],
-			Semester:    program.Semester,
-			Status:      string(program.Status.EnrollmentStatusEnum),
-			Courses:     coursesDTO,
-			CreatedAt:   program.CreatedAt.Time,
+			ID:            utils.PgtypeToUUID(p.program.ID),
+			StudentID:     studentID,
+			StudentNumber: student.StudentNumber,
+			StudentName:   student.FirstName + " " + student.LastName,
+			Department:    student.Department,
+			ClassLevel:    student.ClassLevel,
+			Semester:      p.program.Semester,
+			Status:        string(p.program.Status.EnrollmentStatusEnum),
+			Courses:       coursesDTO,
+			CreatedAt:     p.program.CreatedAt.Time,
 		})
 	}
 
