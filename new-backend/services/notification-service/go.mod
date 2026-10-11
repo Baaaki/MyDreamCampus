@@ -10,6 +10,7 @@ require (
 	github.com/jordan-wright/email v4.0.1-0.20210109023952-943e75fe5223+incompatible
 	github.com/rabbitmq/amqp091-go v1.15.0
 	github.com/spf13/viper v1.21.0
+	github.com/stretchr/testify v1.12.1
 	go.uber.org/zap v1.28.0
 )
 
