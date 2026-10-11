@@ -1,5 +1,10 @@
 import { enrollmentApi } from "@/lib/api-client"
-import type { AdvisorPendingProgramsResponse, OpenSemester } from "@/lib/types"
+import type {
+  AdvisorPendingProgramsResponse,
+  EnrollmentProgramResponse,
+  MyEnrollmentsResponse,
+  OpenSemester,
+} from "@/lib/types"
 
 const TERM_LABELS: Record<string, string> = {
   Fall: "Güz",
@@ -22,7 +27,31 @@ export function defaultSemester(semesters: OpenSemester[]): string | null {
   )
 }
 
+// The approved program of the active semester; failing that, the latest
+// one. Semester ids sort chronologically: Fall < Spring < Summer.
+export function currentProgram(
+  programs: EnrollmentProgramResponse[],
+  activeSemester?: string
+): EnrollmentProgramResponse | null {
+  const approved = programs.filter((p) => p.status === "approved")
+  return (
+    approved.find((p) => p.semester === activeSemester) ??
+    approved.sort((a, b) => b.semester.localeCompare(a.semester))[0] ??
+    null
+  )
+}
+
 export const enrollmentService = {
+  /**
+   * The logged-in student's approved programs across semesters
+   */
+  async getApprovedPrograms(): Promise<EnrollmentProgramResponse[]> {
+    const response = await enrollmentApi
+      .get("my-enrollments", { searchParams: { status: "approved" } })
+      .json<MyEnrollmentsResponse>()
+    return response.programs ?? []
+  },
+
   /**
    * Semesters the logged-in student can enroll in or look back at, oldest first
    */

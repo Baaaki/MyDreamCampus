@@ -17,13 +17,9 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table"
-import { gradesApi } from "@/lib/api-client"
+import { gradesService } from "@/lib/services/grades-service"
 import { apiErrorMessage } from "@/lib/api-error"
-import type {
-  MyGradesResponse,
-  ActiveCourse,
-  CompletedCourse,
-} from "@/lib/types"
+import type { ActiveCourse, CompletedCourse } from "@/lib/types"
 import {
   GraduationCap,
   Trophy,
@@ -157,15 +153,7 @@ export default function StudentGradesPage() {
     error: queryError,
   } = useQuery({
     queryKey: ["grades", "my"],
-    queryFn: async (): Promise<MyGradesResponse> => {
-      const res = await gradesApi.get("my/grades").json<MyGradesResponse>()
-      // Backend ders listesi boşsa null dönüyor — array'e normalize et
-      return {
-        ...res,
-        active_courses: res.active_courses ?? [],
-        completed_courses: res.completed_courses ?? [],
-      }
-    },
+    queryFn: () => gradesService.getMyGrades(),
   })
   const error = queryError
     ? apiErrorMessage(queryError, "Notlar yüklenemedi")

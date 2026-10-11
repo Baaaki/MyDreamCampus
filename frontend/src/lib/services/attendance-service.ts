@@ -1,5 +1,9 @@
 import { attendanceApi } from "@/lib/api-client"
-import type { MyAttendanceResponse } from "@/lib/types"
+import type {
+  CourseAttendanceDetail,
+  MyAttendanceResponse,
+  SessionTypeAttendance,
+} from "@/lib/types"
 
 /**
  * The logged-in student's attendance per course. Without a semester the
@@ -11,4 +15,60 @@ export async function getMyAttendance(
   return attendanceApi
     .get("my", { searchParams: semester ? { semester } : undefined })
     .json<MyAttendanceResponse>()
+}
+
+// Sessions out of every 14 a student must attend, as attendance-service
+// enforces at finalization (MinTheoryAttendance, MinLabAttendance).
+const REQUIRED_PER_14 = { theory: 10, lab: 11 } as const
+const STANDARD_SEMESTER_WEEKS = 14
+const NEAR_LIMIT = 1
+
+export type SessionType = keyof typeof REQUIRED_PER_14
+
+/**
+ * Absences the student can still afford in a session type over the whole
+ * semester; negative once the limit is past. min_required in the response is
+ * drawn over the sessions held so far, which makes one early absence look
+ * like failing, so a warning looks at the semester instead.
+ */
+export function absencesLeft(
+  type: SessionType,
+  stats: SessionTypeAttendance,
+  totalWeeks: number
+): number {
+  const weeks = totalWeeks > 0 ? totalWeeks : STANDARD_SEMESTER_WEEKS
+  const required = Math.ceil(
+    (weeks * REQUIRED_PER_14[type]) / STANDARD_SEMESTER_WEEKS
+  )
+  return weeks - required - stats.absent_count
+}
+
+export interface AbsenceWarning {
+  course_id: string
+  course_code: string
+  session_type: SessionType
+  absences_left: number
+}
+
+// Session types with at most one absence to spare, tightest first.
+export function absenceWarnings(
+  courses: CourseAttendanceDetail[]
+): AbsenceWarning[] {
+  const warnings: AbsenceWarning[] = []
+  for (const course of courses) {
+    for (const type of ["theory", "lab"] as const) {
+      const stats = course[type]
+      if (!stats) continue
+      const left = absencesLeft(type, stats, course.total_weeks)
+      if (left <= NEAR_LIMIT) {
+        warnings.push({
+          course_id: course.course_id,
+          course_code: course.course_code,
+          session_type: type,
+          absences_left: left,
+        })
+      }
+    }
+  }
+  return warnings.sort((a, b) => a.absences_left - b.absences_left)
 }

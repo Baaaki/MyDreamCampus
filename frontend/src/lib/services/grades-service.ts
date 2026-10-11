@@ -6,9 +6,23 @@ import type {
   SubmitScoreResponse,
   BulkSubmitScoresRequest,
   BulkSubmitScoresResponse,
+  MyGradesResponse,
 } from "@/lib/types"
 
 export const gradesService = {
+  /**
+   * The logged-in student's courses and GPA. The backend sends null for an
+   * empty course list; both lists come back as arrays.
+   */
+  async getMyGrades(): Promise<MyGradesResponse> {
+    const res = await gradesApi.get("my/grades").json<MyGradesResponse>()
+    return {
+      ...res,
+      active_courses: res.active_courses ?? [],
+      completed_courses: res.completed_courses ?? [],
+    }
+  },
+
   async getCourseStatus(courseId: string): Promise<CourseStatusResponse> {
     try {
       const response = await gradesApi

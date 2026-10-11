@@ -1,18 +1,36 @@
-import { useEffect, useState } from "react"
+import { useEffect, useState, type ComponentType, type ReactNode } from "react"
+import { Link } from "react-router"
+import { useQuery } from "@tanstack/react-query"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
-import { Badge } from "@/components/ui/badge"
 import {
   User,
   Quote,
-  Megaphone,
-  Wifi,
-  Bell,
-  Mail,
-  ExternalLink,
-  Sparkles,
-  Calendar,
+  AlertCircle,
+  AlertTriangle,
+  ArrowRight,
+  BookOpen,
+  GraduationCap,
+  Loader2,
+  UtensilsCrossed,
 } from "lucide-react"
 import { studentApi } from "@/lib/api-client"
+import { apiErrorMessage } from "@/lib/api-error"
+import {
+  absenceWarnings,
+  getMyAttendance,
+  type AbsenceWarning,
+} from "@/lib/services/attendance-service"
+import {
+  currentProgram,
+  enrollmentService,
+  semesterLabel,
+} from "@/lib/services/enrollment-service"
+import { gradesService } from "@/lib/services/grades-service"
+import {
+  getMyReservations,
+  toLocalISODate,
+  type Reservation,
+} from "@/lib/services/meal-service"
 
 interface StudentInfo {
   name: string
@@ -49,62 +67,35 @@ const quotes = [
   { text: "Başlamak, bitirmenin yarısıdır.", author: "Aristoteles" },
 ]
 
-const announcements = [
-  {
-    id: 1,
-    title: "Bahar Dönemi Ders Kayıtları Başladı",
-    date: "2026-01-15",
-    isNew: true,
-    category: "Akademik",
-  },
-  {
-    id: 2,
-    title: "Kütüphane Çalışma Saatleri Güncellendi",
-    date: "2026-01-14",
-    isNew: true,
-    category: "Duyuru",
-  },
-  {
-    id: 3,
-    title: "Kariyer Günleri Etkinliği - 20 Ocak",
-    date: "2026-01-12",
-    isNew: false,
-    category: "Etkinlik",
-  },
-]
+const SESSION_LABELS: Record<AbsenceWarning["session_type"], string> = {
+  theory: "Teori",
+  lab: "Lab",
+}
 
-const itAnnouncements = [
-  {
-    id: 1,
-    title: "E-posta sistemi bakım çalışması",
-    date: "2026-01-16",
-    description:
-      "16 Ocak Cumartesi 02:00-06:00 arası e-posta sistemi bakımda olacaktır.",
-  },
-  {
-    id: 2,
-    title: "VPN erişimi güncellendi",
-    date: "2026-01-10",
-    description: "Kampüs dışından VPN bağlantısı için yeni ayarlar yayınlandı.",
-  },
-]
+const MEAL_TIME_LABELS: Record<Reservation["meal_time"], string> = {
+  lunch: "Öğle",
+  dinner: "Akşam",
+}
 
-const messages = [
-  {
-    id: 1,
-    from: "Danışman",
-    subject: "Ders Seçimi Hakkında",
-    date: "2026-01-14",
-    unread: true,
-  },
-  {
-    id: 2,
-    from: "Öğrenci İşleri",
-    subject: "Belge Talebi Onaylandı",
-    date: "2026-01-13",
-    unread: false,
-  },
-]
+const UPCOMING_MEALS_SHOWN = 4
+
+function absenceWarningText(left: number): string {
+  if (left < 0) return "Devamsızlık sınırı aşıldı"
+  if (left === 0) return "Devamsızlık hakkınız kalmadı"
+  return `${left} devamsızlık hakkınız kaldı`
+}
+
+// Reservation dates are campus calendar days; parsing them as UTC would
+// show the previous day west of Greenwich.
+function formatMealDay(date: string): string {
+  const [y, m, d] = date.slice(0, 10).split("-").map(Number)
+  if (!y || !m || !d) return date
+  return new Date(y, m - 1, d).toLocaleDateString("tr-TR", {
+    weekday: "short",
+    day: "numeric",
+    month: "short",
+  })
+}
 
 export default function StudentDashboardPage() {
   const [studentInfo, setStudentInfo] = useState<StudentInfo>({
@@ -180,6 +171,31 @@ export default function StudentDashboardPage() {
     return () => clearInterval(interval)
   }, [])
 
+  const today = toLocalISODate(new Date())
+  const grades = useQuery({
+    queryKey: ["grades", "my"],
+    queryFn: () => gradesService.getMyGrades(),
+  })
+  const attendance = useQuery({
+    queryKey: ["attendance", "my"],
+    queryFn: () => getMyAttendance(),
+  })
+  const meals = useQuery({
+    queryKey: ["meals", "reservations", "my", { from_date: today }],
+    queryFn: () => getMyReservations({ from_date: today }),
+  })
+  const programs = useQuery({
+    queryKey: ["enrollment", "programs", "approved"],
+    queryFn: () => enrollmentService.getApprovedPrograms(),
+  })
+
+  const warnings = absenceWarnings(attendance.data?.courses ?? [])
+  const upcomingMeals = (meals.data?.reservations ?? [])
+    .filter((r) => r.status === "confirmed" && !r.is_used)
+    .sort((a, b) => a.date.localeCompare(b.date))
+    .slice(0, UPCOMING_MEALS_SHOWN)
+  const program = currentProgram(programs.data ?? [], attendance.data?.semester)
+
   const currentHour = new Date().getHours()
   const greeting =
     currentHour < 12
@@ -250,160 +266,183 @@ export default function StudentDashboardPage() {
           </CardContent>
         </Card>
 
-        {/* Duyurular - Announcements */}
-        <Card>
-          <CardHeader className="pb-3">
-            <CardTitle className="flex items-center gap-2 text-gray-900 dark:text-white">
-              <Megaphone className="h-5 w-5 text-orange-500" />
-              Kurumsal Duyurular
-            </CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="space-y-3">
-              {announcements.map((item) => (
-                <div
-                  key={item.id}
-                  className="flex cursor-pointer items-start gap-3 rounded-lg bg-gray-50 p-3 transition-colors hover:bg-gray-100 dark:bg-gray-800 dark:hover:bg-gray-700"
-                >
-                  <div className="flex-1">
-                    <div className="mb-1 flex items-center gap-2">
-                      {item.isNew && (
-                        <Badge className="bg-red-500 px-1.5 py-0 text-[10px] text-white">
-                          YENİ
-                        </Badge>
-                      )}
-                      <Badge variant="outline" className="text-[10px]">
-                        {item.category}
-                      </Badge>
-                    </div>
-                    <p className="text-sm font-medium text-gray-900 dark:text-white">
-                      {item.title}
-                    </p>
-                    <p className="mt-1 text-xs text-gray-500 dark:text-gray-400">
-                      <Calendar className="mr-1 inline h-3 w-3" />
-                      {new Date(item.date).toLocaleDateString("tr-TR")}
-                    </p>
-                  </div>
-                  <ExternalLink className="h-4 w-4 text-gray-400" />
-                </div>
-              ))}
-            </div>
-          </CardContent>
-        </Card>
-
-        {/* Bilgi İşlem Duyuruları - IT Announcements */}
-        <Card>
-          <CardHeader className="pb-3">
-            <CardTitle className="flex items-center gap-2 text-gray-900 dark:text-white">
-              <Bell className="h-5 w-5 text-purple-500" />
-              Bilgi İşlem Duyuruları
-            </CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="space-y-3">
-              {itAnnouncements.map((item) => (
-                <div
-                  key={item.id}
-                  className="rounded-lg bg-gray-50 p-3 dark:bg-gray-800"
-                >
-                  <p className="mb-1 text-sm font-medium text-gray-900 dark:text-white">
-                    {item.title}
-                  </p>
-                  <p className="text-xs text-gray-600 dark:text-gray-400">
-                    {item.description}
-                  </p>
-                  <p className="mt-2 text-xs text-gray-500 dark:text-gray-500">
-                    <Calendar className="mr-1 inline h-3 w-3" />
-                    {new Date(item.date).toLocaleDateString("tr-TR")}
-                  </p>
-                </div>
-              ))}
-            </div>
-          </CardContent>
-        </Card>
-
-        {/* Mesajlar - Messages */}
-        <Card>
-          <CardHeader className="pb-3">
-            <CardTitle className="flex items-center gap-2 text-gray-900 dark:text-white">
-              <Mail className="h-5 w-5 text-indigo-500" />
-              Mesajlar
-              {messages.filter((m) => m.unread).length > 0 && (
-                <Badge className="bg-red-500 text-xs text-white">
-                  {messages.filter((m) => m.unread).length} yeni
-                </Badge>
-              )}
-            </CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="space-y-2">
-              {messages.map((msg) => (
-                <div
-                  key={msg.id}
-                  className={`flex cursor-pointer items-center gap-3 rounded-lg p-3 transition-colors ${
-                    msg.unread
-                      ? "bg-indigo-50 hover:bg-indigo-100 dark:bg-indigo-900/30 dark:hover:bg-indigo-900/50"
-                      : "bg-gray-50 hover:bg-gray-100 dark:bg-gray-800 dark:hover:bg-gray-700"
-                  }`}
-                >
-                  <div
-                    className={`h-2 w-2 rounded-full ${msg.unread ? "bg-indigo-500" : "bg-transparent"}`}
-                  />
-                  <div className="flex-1">
-                    <p
-                      className={`text-sm ${msg.unread ? "font-semibold" : "font-medium"} text-gray-900 dark:text-white`}
-                    >
-                      {msg.subject}
-                    </p>
-                    <p className="text-xs text-gray-500 dark:text-gray-400">
-                      {msg.from} •{" "}
-                      {new Date(msg.date).toLocaleDateString("tr-TR")}
-                    </p>
-                  </div>
-                </div>
-              ))}
-              {messages.length === 0 && (
-                <p className="py-4 text-center text-sm text-gray-500 dark:text-gray-400">
-                  Yeni mesajınız yok.
-                </p>
-              )}
-            </div>
-          </CardContent>
-        </Card>
-
-        {/* Kablosuz Ağ Bağlantısı - WiFi Connection */}
-        <Card className="border-0 bg-gradient-to-br from-cyan-500 to-cyan-600 text-white">
-          <CardHeader className="pb-2">
-            <CardTitle className="flex items-center gap-2 text-white">
-              <Wifi className="h-5 w-5" />
-              Kablosuz Ağ Bağlantısı
-            </CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="space-y-3">
-              <p className="text-sm text-cyan-100">
-                Kampüs WiFi ağına bağlanmak için <strong>eduroam</strong> ağını
-                seçin.
-              </p>
-              <div className="rounded-lg bg-white/20 p-3 text-sm">
-                <p>
-                  <strong>Ağ Adı:</strong> eduroam
-                </p>
-                <p>
-                  <strong>Kullanıcı Adı:</strong> ogrenci_no@ogrenci.edu.tr
-                </p>
-                <p>
-                  <strong>Şifre:</strong> E-posta şifreniz
+        <SummaryCard
+          title="Akademik Durum"
+          icon={GraduationCap}
+          to="/student/grades"
+          linkLabel="Notlarım"
+          isLoading={grades.isLoading}
+          error={grades.error}
+          errorMessage="Not bilgileri yüklenemedi"
+        >
+          {grades.data && grades.data.completed_courses.length > 0 ? (
+            <div className="flex gap-8">
+              <div>
+                <p className="text-sm text-gray-500 dark:text-gray-400">GNO</p>
+                <p className="text-3xl font-bold text-gray-900 dark:text-white">
+                  {grades.data.cumulative_gpa.toFixed(2)}
                 </p>
               </div>
-              <button className="flex w-full items-center justify-center gap-2 rounded-lg bg-white/20 px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-white/30">
-                <Sparkles className="h-4 w-4" />
-                Detaylı Kurulum Kılavuzu
-              </button>
+              <div>
+                <p className="text-sm text-gray-500 dark:text-gray-400">
+                  Toplam kredi
+                </p>
+                <p className="text-3xl font-bold text-gray-900 dark:text-white">
+                  {grades.data.total_credits}
+                </p>
+              </div>
             </div>
-          </CardContent>
-        </Card>
+          ) : (
+            <EmptyText>Henüz not ortalamanız oluşmadı.</EmptyText>
+          )}
+        </SummaryCard>
+
+        <SummaryCard
+          title="Devamsızlık"
+          icon={AlertTriangle}
+          to="/student/attendance"
+          linkLabel="Yoklama durumum"
+          isLoading={attendance.isLoading}
+          error={attendance.error}
+          errorMessage="Yoklama bilgileri yüklenemedi"
+        >
+          {warnings.length > 0 ? (
+            <ul className="space-y-2">
+              {warnings.map((w) => (
+                <li
+                  key={`${w.course_id}-${w.session_type}`}
+                  className="flex items-center justify-between gap-3 rounded-lg bg-amber-50 p-3 text-sm dark:bg-amber-900/30"
+                >
+                  <span className="font-medium text-gray-900 dark:text-white">
+                    {w.course_code} · {SESSION_LABELS[w.session_type]}
+                  </span>
+                  <span
+                    className={
+                      w.absences_left < 0
+                        ? "text-destructive"
+                        : "text-amber-700 dark:text-amber-300"
+                    }
+                  >
+                    {absenceWarningText(w.absences_left)}
+                  </span>
+                </li>
+              ))}
+            </ul>
+          ) : (
+            <EmptyText>Devamsızlık sınırına yaklaşan dersiniz yok.</EmptyText>
+          )}
+        </SummaryCard>
+
+        <SummaryCard
+          title="Yaklaşan Yemekler"
+          icon={UtensilsCrossed}
+          to="/student/cafeteria"
+          linkLabel="Yemekhane"
+          isLoading={meals.isLoading}
+          error={meals.error}
+          errorMessage="Yemek rezervasyonları yüklenemedi"
+        >
+          {upcomingMeals.length > 0 ? (
+            <ul className="space-y-2">
+              {upcomingMeals.map((r) => (
+                <li
+                  key={r.id}
+                  className="flex items-center justify-between gap-3 rounded-lg bg-gray-50 p-3 text-sm dark:bg-gray-800"
+                >
+                  <span className="font-medium text-gray-900 dark:text-white">
+                    {formatMealDay(r.date)} · {MEAL_TIME_LABELS[r.meal_time]}
+                  </span>
+                  <span className="text-gray-500 dark:text-gray-400">
+                    {r.cafeteria_name}
+                  </span>
+                </li>
+              ))}
+            </ul>
+          ) : (
+            <EmptyText>Yaklaşan yemek rezervasyonunuz yok.</EmptyText>
+          )}
+        </SummaryCard>
+
+        <SummaryCard
+          title="Ders Programı"
+          icon={BookOpen}
+          to="/student/enrollment"
+          linkLabel="Ders kaydı"
+          isLoading={programs.isLoading || attendance.isLoading}
+          error={programs.error}
+          errorMessage="Ders programı yüklenemedi"
+        >
+          {program ? (
+            <div>
+              <p className="text-sm text-gray-500 dark:text-gray-400">
+                {semesterLabel(program.semester)} onaylı programınız
+              </p>
+              <p className="text-3xl font-bold text-gray-900 dark:text-white">
+                {program.courses.length} ders
+              </p>
+            </div>
+          ) : (
+            <EmptyText>Onaylı bir ders programınız yok.</EmptyText>
+          )}
+        </SummaryCard>
       </div>
     </div>
   )
+}
+
+function SummaryCard({
+  title,
+  icon: Icon,
+  to,
+  linkLabel,
+  isLoading,
+  error,
+  errorMessage,
+  children,
+}: {
+  title: string
+  icon: ComponentType<{ className?: string }>
+  to: string
+  linkLabel: string
+  isLoading: boolean
+  error: unknown
+  errorMessage: string
+  children: ReactNode
+}) {
+  return (
+    <Card>
+      <CardHeader className="pb-3">
+        <CardTitle className="flex items-center gap-2 text-gray-900 dark:text-white">
+          <Icon className="h-5 w-5 text-emerald-600" />
+          {title}
+        </CardTitle>
+      </CardHeader>
+      <CardContent className="space-y-4">
+        {isLoading ? (
+          <div className="flex items-center gap-2 text-sm text-gray-500">
+            <Loader2 className="h-4 w-4 animate-spin" />
+            Yükleniyor...
+          </div>
+        ) : error ? (
+          <div className="flex items-center gap-2 text-sm text-destructive">
+            <AlertCircle className="h-4 w-4" />
+            {apiErrorMessage(error, errorMessage)}
+          </div>
+        ) : (
+          children
+        )}
+        <Link
+          to={to}
+          className="inline-flex items-center gap-1 text-sm font-medium text-emerald-600 hover:underline"
+        >
+          {linkLabel}
+          <ArrowRight className="h-4 w-4" />
+        </Link>
+      </CardContent>
+    </Card>
+  )
+}
+
+function EmptyText({ children }: { children: ReactNode }) {
+  return <p className="text-sm text-gray-500 dark:text-gray-400">{children}</p>
 }
