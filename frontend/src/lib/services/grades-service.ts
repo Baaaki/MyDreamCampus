@@ -6,6 +6,8 @@ import type {
   SubmitScoreResponse,
   BulkSubmitScoresRequest,
   BulkSubmitScoresResponse,
+  CourseResult,
+  CourseResultsResponse,
   GradeAppealRequest,
   GradeAppealResponse,
   MyGradesResponse,
@@ -35,6 +37,10 @@ export function validateAppealForm(form: AppealForm): AppealFormErrors {
     errors.reason = `Gerekçe en az ${APPEAL_REASON_MIN_LENGTH} karakter olmalı`
   }
   return errors
+}
+
+export function courseResultsKey(courseId: string) {
+  return ["grades", "results", courseId] as const
 }
 
 export function toAppealRequest(
@@ -137,6 +143,17 @@ export const gradesService = {
       console.error("Failed to unlock score:", error)
       throw error
     }
+  },
+
+  /**
+   * Admin: the frozen results of a finalized course. Its registrations are
+   * gone by then, so getCourseStudents comes back empty.
+   */
+  async getCourseResults(courseId: string): Promise<CourseResult[]> {
+    const res = await gradesApi
+      .get(`admin/courses/${courseId}/results`)
+      .json<CourseResultsResponse>()
+    return res.results ?? []
   },
 
   /** Admin: corrects one score of a finalized course and regrades it. */

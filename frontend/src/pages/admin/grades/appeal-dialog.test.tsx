@@ -2,7 +2,7 @@ import { afterEach, describe, expect, it, vi } from "vitest"
 import { render, screen } from "@testing-library/react"
 import userEvent from "@testing-library/user-event"
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query"
-import type { AssessmentStatus, StudentGrades } from "@/lib/types"
+import type { AssessmentStatus, CourseResult } from "@/lib/types"
 import { GradeAppealDialog } from "./appeal-dialog"
 
 function json(body: unknown, status = 200) {
@@ -12,17 +12,15 @@ function json(body: unknown, status = 200) {
   })
 }
 
-const student: StudentGrades = {
-  registration_id: "r-1",
+const student: CourseResult = {
   student_id: "st-1",
   student_number: "2024001",
   first_name: "Ali",
   last_name: "Veli",
-  scores: {
-    midterm: { score: 40, is_absent: false, is_locked: true },
-    final: { score: 55, is_absent: false, is_locked: true },
-  },
-  current_average: 49,
+  scores: { midterm: 40, final: 55 },
+  weighted_average: 49,
+  grade_point: "DD",
+  is_attendance_failed: false,
 }
 
 const assessments: AssessmentStatus[] = [

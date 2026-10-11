@@ -90,4 +90,20 @@ describe("grade appeals", () => {
     })
     expect(result.new_grade_point).toBe("BB")
   })
+
+  it("reads a finalized course's results from the admin route", async () => {
+    const fetchSpy = stubFetch({
+      course_id: "c-1",
+      results: [{ student_id: "st-1", grade_point: "CC" }],
+    })
+    const { gradesService } = await loadService()
+
+    const results = await gradesService.getCourseResults("c-1")
+
+    const req = fetchSpy.mock.calls[0]![0] as Request
+    expect(new URL(req.url).pathname).toBe(
+      "/api/grades/admin/courses/c-1/results"
+    )
+    expect(results).toEqual([{ student_id: "st-1", grade_point: "CC" }])
+  })
 })

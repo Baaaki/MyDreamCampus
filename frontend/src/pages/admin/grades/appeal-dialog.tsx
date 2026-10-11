@@ -1,5 +1,5 @@
 import { useState } from "react"
-import { useMutation } from "@tanstack/react-query"
+import { useMutation, useQueryClient } from "@tanstack/react-query"
 import { AlertCircle, ArrowRight, CheckCircle2, Loader2 } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import {
@@ -15,6 +15,7 @@ import { Label } from "@/components/ui/label"
 import { Textarea } from "@/components/ui/textarea"
 import { apiErrorMessage } from "@/lib/api-error"
 import {
+  courseResultsKey,
   gradesService,
   toAppealRequest,
   validateAppealForm,
@@ -23,15 +24,15 @@ import {
 } from "@/lib/services/grades-service"
 import type {
   AssessmentStatus,
+  CourseResult,
   GradeAppealResponse,
-  StudentGrades,
 } from "@/lib/types"
 
 const EMPTY_FORM: AppealForm = { slug: "", newScore: "", reason: "" }
 
 interface GradeAppealDialogProps {
   courseId: string
-  student: StudentGrades | null
+  student: CourseResult | null
   assessments: AssessmentStatus[]
   onOpenChange: (open: boolean) => void
 }
@@ -50,8 +51,14 @@ export function GradeAppealDialog({
   const [form, setForm] = useState<AppealForm>(EMPTY_FORM)
   const [errors, setErrors] = useState<AppealFormErrors>({})
 
+  const queryClient = useQueryClient()
   const appeal = useMutation({
     mutationFn: gradesService.processAppeal,
+    // The results table reads the same frozen record the appeal changed.
+    onSuccess: () =>
+      queryClient.invalidateQueries({
+        queryKey: courseResultsKey(courseId),
+      }),
   })
 
   const handleOpenChange = (open: boolean) => {
@@ -113,10 +120,9 @@ export function GradeAppealDialog({
                 ))}
               </select>
               {errors.slug && <FieldError message={errors.slug} />}
-              {currentScore && (
+              {currentScore !== undefined && (
                 <p className="text-sm text-muted-foreground">
-                  Mevcut not:{" "}
-                  {currentScore.is_absent ? "Girmedi" : currentScore.score}
+                  Mevcut not: {currentScore}
                 </p>
               )}
             </div>

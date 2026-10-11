@@ -9,7 +9,6 @@ import {
   Unlock,
   Calendar,
   GraduationCap,
-  Scale,
 } from "lucide-react"
 import { Input } from "@/components/ui/input"
 import { Button } from "@/components/ui/button"
@@ -34,6 +33,7 @@ import {
 import { semesterApi } from "@/lib/api-client"
 import { gradesService } from "@/lib/services/grades-service"
 import type {
+  CourseResult,
   CourseStatusResponse,
   StudentGrades,
   SemesterCourse,
@@ -42,6 +42,7 @@ import type {
 import { useFaculties } from "@/lib/services/catalog-service"
 import { getActiveSemester } from "@/lib/services/system-service"
 import { GradeAppealDialog } from "./appeal-dialog"
+import { CourseResultsTable } from "./course-results"
 
 type AdminCourseRow = Pick<
   SemesterCourse,
@@ -85,7 +86,7 @@ export default function AdminGradesPage() {
     assessmentName?: string
   } | null
   const [lockAction, setLockAction] = useState<LockActionState>(null)
-  const [appealStudent, setAppealStudent] = useState<StudentGrades | null>(null)
+  const [appealStudent, setAppealStudent] = useState<CourseResult | null>(null)
 
   const {
     data: faculties = [],
@@ -359,9 +360,10 @@ export default function AdminGradesPage() {
 
   const renderStudents = () => {
     const assessments = courseStatus?.assessments || []
-    // Appeals regrade a finalized course; before that the teacher edits.
-    const canAppeal = courseStatus?.is_finalized ?? false
-    const columnCount = 2 + assessments.length + (canAppeal ? 1 : 0)
+    // A finalized course has no registrations left: its frozen results are
+    // what an appeal regrades. Before that the teacher edits the scores.
+    const isFinalized = courseStatus?.is_finalized ?? false
+    const columnCount = 2 + assessments.length
 
     return (
       <div className="space-y-6">
@@ -408,133 +410,132 @@ export default function AdminGradesPage() {
           </div>
         </div>
 
-        {canAppeal && (
-          <p className="text-sm text-gray-500">
-            Ders kesinleşti. Not itirazlarını öğrenci satırındaki &quot;Not
-            İtirazı&quot; düğmesiyle işleyebilirsiniz.
-          </p>
+        {isFinalized && selectedCourse && (
+          <>
+            <p className="text-sm text-gray-500">
+              Ders kesinleşti. Not itirazlarını öğrenci satırındaki &quot;Not
+              İtirazı&quot; düğmesiyle işleyebilirsiniz.
+            </p>
+            <CourseResultsTable
+              courseId={selectedCourse.id}
+              assessments={assessments}
+              onAppeal={setAppealStudent}
+            />
+          </>
         )}
 
-        <div className="overflow-x-auto rounded-lg border bg-white dark:border-gray-800 dark:bg-gray-900">
-          <Table>
-            <TableHeader>
-              <TableRow>
-                <TableHead className="whitespace-nowrap">Öğrenci No</TableHead>
-                <TableHead className="whitespace-nowrap">Ad Soyad</TableHead>
-                {assessments.map((a) => (
-                  <TableHead
-                    key={a.slug}
-                    className="min-w-[140px] text-center whitespace-nowrap"
-                  >
-                    {a.name}
-                  </TableHead>
-                ))}
-                {canAppeal && (
-                  <TableHead className="text-right whitespace-nowrap">
-                    İtiraz
-                  </TableHead>
-                )}
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              {loading ? (
+        {!isFinalized && (
+          <div className="overflow-x-auto rounded-lg border bg-white dark:border-gray-800 dark:bg-gray-900">
+            <Table>
+              <TableHeader>
                 <TableRow>
-                  <TableCell colSpan={columnCount} className="h-24 text-center">
-                    <Loader2 className="mx-auto h-6 w-6 animate-spin text-blue-600" />
-                  </TableCell>
+                  <TableHead className="whitespace-nowrap">
+                    Öğrenci No
+                  </TableHead>
+                  <TableHead className="whitespace-nowrap">Ad Soyad</TableHead>
+                  {assessments.map((a) => (
+                    <TableHead
+                      key={a.slug}
+                      className="min-w-[140px] text-center whitespace-nowrap"
+                    >
+                      {a.name}
+                    </TableHead>
+                  ))}
                 </TableRow>
-              ) : students.length === 0 ? (
-                <TableRow>
-                  <TableCell
-                    colSpan={columnCount}
-                    className="h-24 text-center text-gray-500"
-                  >
-                    Öğrenci bulunamadı.
-                  </TableCell>
-                </TableRow>
-              ) : (
-                students.map((student) => (
-                  <TableRow key={student.registration_id}>
-                    <TableCell className="font-mono text-sm">
-                      {student.student_number}
+              </TableHeader>
+              <TableBody>
+                {loading ? (
+                  <TableRow>
+                    <TableCell
+                      colSpan={columnCount}
+                      className="h-24 text-center"
+                    >
+                      <Loader2 className="mx-auto h-6 w-6 animate-spin text-blue-600" />
                     </TableCell>
-                    <TableCell className="whitespace-nowrap">
-                      {student.first_name} {student.last_name}
-                    </TableCell>
-                    {assessments.map((a) => {
-                      const existingScore = student.scores[a.slug]
-                      const isLocked = existingScore?.is_locked ?? false
-                      const isLoading =
-                        actionLoading === `${student.registration_id}-${a.slug}`
-
-                      return (
-                        <TableCell
-                          key={a.slug}
-                          className="py-4 text-center align-top"
-                        >
-                          <div className="flex flex-col items-center justify-center gap-2">
-                            <span className="text-lg font-bold">
-                              {existingScore
-                                ? existingScore.is_absent
-                                  ? "D."
-                                  : existingScore.score
-                                : "-"}
-                            </span>
-                            {existingScore && (
-                              <Button
-                                variant={isLocked ? "default" : "destructive"}
-                                size="sm"
-                                className="h-8 w-full max-w-[100px] text-xs"
-                                disabled={isLoading}
-                                onClick={() =>
-                                  setLockAction({
-                                    student,
-                                    slug: a.slug,
-                                    isLocked,
-                                    assessmentName: a.name,
-                                  })
-                                }
-                              >
-                                {isLoading ? (
-                                  <Loader2 className="h-3 w-3 animate-spin" />
-                                ) : isLocked ? (
-                                  <>
-                                    <Unlock className="mr-1 h-3 w-3" /> Kilidi
-                                    Aç
-                                  </>
-                                ) : (
-                                  <>
-                                    <Lock className="mr-1 h-3 w-3" /> Kilitle
-                                  </>
-                                )}
-                              </Button>
-                            )}
-                            {!existingScore && (
-                              <span className="text-xs text-gray-400">
-                                Not Girilmemiş
-                              </span>
-                            )}
-                          </div>
-                        </TableCell>
-                      )
-                    })}
-                    {canAppeal && (
-                      <TableCell className="text-right align-top">
-                        <Button
-                          variant="outline"
-                          size="sm"
-                          onClick={() => setAppealStudent(student)}
-                        >
-                          <Scale className="mr-1 h-3 w-3" /> Not İtirazı
-                        </Button>
-                      </TableCell>
-                    )}
                   </TableRow>
-                ))
-              )}
-            </TableBody>
-          </Table>
-        </div>
+                ) : students.length === 0 ? (
+                  <TableRow>
+                    <TableCell
+                      colSpan={columnCount}
+                      className="h-24 text-center text-gray-500"
+                    >
+                      Öğrenci bulunamadı.
+                    </TableCell>
+                  </TableRow>
+                ) : (
+                  students.map((student) => (
+                    <TableRow key={student.registration_id}>
+                      <TableCell className="font-mono text-sm">
+                        {student.student_number}
+                      </TableCell>
+                      <TableCell className="whitespace-nowrap">
+                        {student.first_name} {student.last_name}
+                      </TableCell>
+                      {assessments.map((a) => {
+                        const existingScore = student.scores[a.slug]
+                        const isLocked = existingScore?.is_locked ?? false
+                        const isLoading =
+                          actionLoading ===
+                          `${student.registration_id}-${a.slug}`
+
+                        return (
+                          <TableCell
+                            key={a.slug}
+                            className="py-4 text-center align-top"
+                          >
+                            <div className="flex flex-col items-center justify-center gap-2">
+                              <span className="text-lg font-bold">
+                                {existingScore
+                                  ? existingScore.is_absent
+                                    ? "D."
+                                    : existingScore.score
+                                  : "-"}
+                              </span>
+                              {existingScore && (
+                                <Button
+                                  variant={isLocked ? "default" : "destructive"}
+                                  size="sm"
+                                  className="h-8 w-full max-w-[100px] text-xs"
+                                  disabled={isLoading}
+                                  onClick={() =>
+                                    setLockAction({
+                                      student,
+                                      slug: a.slug,
+                                      isLocked,
+                                      assessmentName: a.name,
+                                    })
+                                  }
+                                >
+                                  {isLoading ? (
+                                    <Loader2 className="h-3 w-3 animate-spin" />
+                                  ) : isLocked ? (
+                                    <>
+                                      <Unlock className="mr-1 h-3 w-3" /> Kilidi
+                                      Aç
+                                    </>
+                                  ) : (
+                                    <>
+                                      <Lock className="mr-1 h-3 w-3" /> Kilitle
+                                    </>
+                                  )}
+                                </Button>
+                              )}
+                              {!existingScore && (
+                                <span className="text-xs text-gray-400">
+                                  Not Girilmemiş
+                                </span>
+                              )}
+                            </div>
+                          </TableCell>
+                        )
+                      })}
+                    </TableRow>
+                  ))
+                )}
+              </TableBody>
+            </Table>
+          </div>
+        )}
       </div>
     )
   }
