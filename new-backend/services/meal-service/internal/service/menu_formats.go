@@ -70,3 +70,37 @@ func dishNames(items any) []any {
 	}
 	return names
 }
+
+// isWeekMenu reports whether a save comes in the web's week format.
+func isWeekMenu(menu map[string]any) bool {
+	_, ok := menu["normalMenus"].([]any)
+	return ok
+}
+
+// withDinnersKept carries the stored dinners into a week-format save. The
+// web editor has no dinner to send, so without this an edit would drop the
+// dinners mobile shows; a date the save already gives a dinner keeps its own.
+func withDinnersKept(menu, stored map[string]any) map[string]any {
+	out := make(map[string]any, len(menu))
+	for k, v := range menu {
+		out[k] = v
+	}
+	for key, value := range stored {
+		day, _ := value.(map[string]any)
+		dinner, ok := day["dinner"]
+		if !ok {
+			continue
+		}
+		entry, _ := out[key].(map[string]any)
+		if _, own := entry["dinner"]; own {
+			continue
+		}
+		merged := make(map[string]any, len(entry)+1)
+		for k, v := range entry {
+			merged[k] = v
+		}
+		merged["dinner"] = dinner
+		out[key] = merged
+	}
+	return out
+}

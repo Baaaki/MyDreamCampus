@@ -36,8 +36,17 @@ func NewMenuService(menuRepo MenuStore, logger *zap.Logger) *MenuService {
 
 // CreateOrUpdateMonthlyMenu creates or updates monthly menu (Admin only)
 func (s *MenuService) CreateOrUpdateMonthlyMenu(ctx context.Context, req dto.CreateMonthlyMenuRequest) (*dto.MonthlyMenuResponse, error) {
+	toSave := withDatedLunches(req.MenuData, req.Year, req.Month)
+	if isWeekMenu(req.MenuData) {
+		stored, err := s.storedMenuData(ctx, req.Year, req.Month)
+		if err != nil {
+			return nil, err
+		}
+		toSave = withDinnersKept(toSave, stored)
+	}
+
 	// Marshal menu data to JSONB
-	menuDataJSON, err := json.Marshal(withDatedLunches(req.MenuData, req.Year, req.Month))
+	menuDataJSON, err := json.Marshal(toSave)
 	if err != nil {
 		s.logger.Error("failed to marshal menu data", zap.Error(err))
 		return nil, sharedErrors.ErrBadRequest
@@ -69,6 +78,27 @@ func (s *MenuService) CreateOrUpdateMonthlyMenu(ctx context.Context, req dto.Cre
 		CreatedAt: menu.CreatedAt.Time,
 		UpdatedAt: menu.UpdatedAt.Time,
 	}, nil
+}
+
+// storedMenuData is the month's saved menu, or nil before its first save.
+func (s *MenuService) storedMenuData(ctx context.Context, year, month int) (map[string]any, error) {
+	menu, err := s.menuRepo.GetMonthlyMenu(ctx, db.GetMonthlyMenuParams{
+		Year:  utils.ClampToInt16(year),
+		Month: utils.ClampToInt16(month),
+	})
+	if errors.Is(err, sharedErrors.ErrNotFoundRepo) {
+		return nil, nil
+	}
+	if err != nil {
+		s.logger.Error("failed to read monthly menu before saving", zap.Error(err))
+		return nil, err
+	}
+	var stored map[string]any
+	if err := json.Unmarshal(menu.MenuData, &stored); err != nil {
+		s.logger.Error("failed to unmarshal stored menu data", zap.Error(err))
+		return nil, sharedErrors.ErrQueryFailed
+	}
+	return stored, nil
 }
 
 // GetMonthlyMenu returns monthly menu (Public - no auth required)

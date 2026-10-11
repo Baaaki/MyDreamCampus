@@ -64,3 +64,63 @@ func TestMenuService_SaveWebWeeks_MobileReadsTheDates(t *testing.T) {
 	require.NoError(t, err)
 	assert.Equal(t, map[string]any{"lunch": []any{"Etli Nohut"}}, saved.MenuData["2026-10-12"])
 }
+
+func TestWithDinnersKept_WebSave_KeepsStoredDinners(t *testing.T) {
+	stored := map[string]any{
+		"normalMenus": []any{},
+		"2026-10-12":  map[string]any{"lunch": []any{"Eski Pilav"}, "dinner": []any{"Köfte"}},
+		"2026-10-13":  map[string]any{"dinner": []any{"Balık"}},
+		"2026-10-14":  map[string]any{"lunch": []any{"Çorba"}},
+	}
+	menu := withDatedLunches(octoberWeeks(), 2026, 10)
+
+	kept := withDinnersKept(menu, stored)
+
+	assert.Equal(t, map[string]any{"lunch": []any{"Etli Nohut"}, "dinner": []any{"Köfte"}}, kept["2026-10-12"])
+	assert.Equal(t, map[string]any{"dinner": []any{"Balık"}}, kept["2026-10-13"], "a dinner outlives a day the web leaves empty")
+	assert.NotContains(t, kept, "2026-10-14", "a stored lunch is the save's to replace")
+	assert.NotContains(t, menu["2026-10-12"], "dinner", "the save itself is not changed")
+}
+
+func TestWithDinnersKept_DinnerInSave_SaveWins(t *testing.T) {
+	stored := map[string]any{"2026-10-12": map[string]any{"dinner": []any{"Köfte"}}}
+	menu := map[string]any{"2026-10-12": map[string]any{"dinner": []any{"Mantı"}}}
+
+	assert.Equal(t, menu["2026-10-12"], withDinnersKept(menu, stored)["2026-10-12"])
+}
+
+func TestMenuService_WebEditAfterSeed_MobileKeepsDinner(t *testing.T) {
+	freezeAt(t, 2026, time.October, 5, 9, 0)
+	svc := NewMenuService(&fakeMenus{rows: map[string]db.MonthlyMenu{}}, zap.NewNop())
+	ctx := context.Background()
+	seeded := octoberWeeks()
+	seeded["2026-10-12"] = map[string]any{"lunch": []any{"Etli Nohut"}, "dinner": []any{"Köfte"}}
+	_, err := svc.CreateOrUpdateMonthlyMenu(ctx, dto.CreateMonthlyMenuRequest{Year: 2026, Month: 10, MenuData: seeded})
+	require.NoError(t, err)
+
+	edited := octoberWeeks()
+	edited["normalMenus"].([]any)[2] = map[string]any{"monday": webDay("Kuru Fasulye")}
+	_, err = svc.CreateOrUpdateMonthlyMenu(ctx, dto.CreateMonthlyMenuRequest{Year: 2026, Month: 10, MenuData: edited})
+	require.NoError(t, err)
+
+	saved, err := svc.GetMonthlyMenu(ctx, 2026, 10)
+	require.NoError(t, err)
+	assert.Equal(t, map[string]any{"lunch": []any{"Kuru Fasulye"}, "dinner": []any{"Köfte"}}, saved.MenuData["2026-10-12"])
+}
+
+func TestMenuService_DateFormatSave_ReplacesDinners(t *testing.T) {
+	freezeAt(t, 2026, time.October, 5, 9, 0)
+	svc := NewMenuService(&fakeMenus{rows: map[string]db.MonthlyMenu{}}, zap.NewNop())
+	ctx := context.Background()
+	for _, day := range []map[string]any{
+		{"lunch": []any{"Çorba"}, "dinner": []any{"Köfte"}},
+		{"lunch": []any{"Çorba"}},
+	} {
+		_, err := svc.CreateOrUpdateMonthlyMenu(ctx, dto.CreateMonthlyMenuRequest{Year: 2026, Month: 10, MenuData: map[string]any{"2026-10-12": day}})
+		require.NoError(t, err)
+	}
+
+	saved, err := svc.GetMonthlyMenu(ctx, 2026, 10)
+	require.NoError(t, err)
+	assert.Equal(t, map[string]any{"lunch": []any{"Çorba"}}, saved.MenuData["2026-10-12"], "a client that speaks dates owns the dinner too")
+}
