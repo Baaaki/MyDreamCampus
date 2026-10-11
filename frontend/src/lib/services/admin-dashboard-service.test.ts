@@ -73,4 +73,15 @@ describe("getAdminDashboardStats", () => {
     expect(stats.staff).toBe(30)
     expect(stats.openedCourses).toBe(0)
   })
+
+  it("keeps the course count unknown when the active semester cannot be read", async () => {
+    stubFetch((url) => {
+      if (url.pathname === "/api/catalog/admin/semesters/active")
+        return json({}, 500)
+      return json({ sessions: [], total: 0, ...paged(1) })
+    })
+    const { getAdminDashboardStats } = await loadService()
+
+    expect((await getAdminDashboardStats()).openedCourses).toBeNull()
+  })
 })

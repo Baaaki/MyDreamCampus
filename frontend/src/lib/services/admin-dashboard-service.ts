@@ -1,11 +1,12 @@
+import { HTTPError } from "ky"
 import {
   attendanceApiSafe,
+  catalogApiSafe,
   semesterApi,
   staffApi,
   studentApi,
 } from "@/lib/api-client"
-import type { AdminSessionsResponse } from "@/lib/types"
-import { getActiveSemester } from "@/lib/services/system-service"
+import type { AdminSessionsResponse, Semester } from "@/lib/types"
 import { toLocalISODate } from "@/lib/services/meal-service"
 
 // A figure that could not be read stays null so the card shows a dash
@@ -27,6 +28,20 @@ async function pagedTotal(
   return (await request).pagination.total
 }
 
+// getActiveSemester folds every failure into "no semester"; here only a 404
+// means that, anything else must stay unknown rather than become a zero.
+async function activeSemesterName(): Promise<string | null> {
+  try {
+    const semester = await catalogApiSafe
+      .get("admin/semesters/active")
+      .json<Semester>()
+    return semester.name
+  } catch (err) {
+    if (err instanceof HTTPError && err.response.status === 404) return null
+    throw err
+  }
+}
+
 function valueOf(result: PromiseSettledResult<number>): number | null {
   return result.status === "fulfilled" ? result.value : null
 }
@@ -45,12 +60,12 @@ export async function getAdminDashboardStats(
         staffApi.get("", { searchParams: { limit: 1 } }).json<PagedTotal>()
       ),
       (async () => {
-        const semester = await getActiveSemester()
+        const semester = await activeSemesterName()
         // No active semester means nothing is open, which is a real zero.
         if (!semester) return 0
         return pagedTotal(
           semesterApi
-            .get(`${encodeURIComponent(semester.name)}/courses`, {
+            .get(`${encodeURIComponent(semester)}/courses`, {
               searchParams: { limit: 1 },
             })
             .json<PagedTotal>()

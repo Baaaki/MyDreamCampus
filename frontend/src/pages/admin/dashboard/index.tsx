@@ -11,7 +11,7 @@ import {
   Calendar,
   Loader2,
 } from "lucide-react"
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
+import { Card, CardContent } from "@/components/ui/card"
 import { getAdminDashboardStats } from "@/lib/services/admin-dashboard-service"
 
 const statCards = [
@@ -177,134 +177,6 @@ export default function DashboardPage() {
             )
           })}
         </div>
-      </div>
-
-      {/* Recent Activity */}
-      <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">
-        <Card className="dark:border-gray-800 dark:bg-gray-900">
-          <CardHeader>
-            <CardTitle className="text-lg dark:text-white">
-              Son Aktiviteler
-            </CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="space-y-4">
-              {[
-                {
-                  action: "Yeni öğrenci kaydı",
-                  user: "Ahmet Yılmaz",
-                  time: "5 dk önce",
-                },
-                {
-                  action: "Ders programı güncellendi",
-                  user: "Prof. Dr. Mehmet Demir",
-                  time: "15 dk önce",
-                },
-                {
-                  action: "Yoklama alındı",
-                  user: "BIL 101",
-                  time: "30 dk önce",
-                },
-                {
-                  action: "Not girişi yapıldı",
-                  user: "FIZ 102",
-                  time: "1 saat önce",
-                },
-                {
-                  action: "Yemek rezervasyonu",
-                  user: "150 öğrenci",
-                  time: "2 saat önce",
-                },
-              ].map((activity, index) => (
-                <div
-                  key={index}
-                  className="flex items-center justify-between border-b border-gray-100 py-2 last:border-0 dark:border-gray-800"
-                >
-                  <div>
-                    <p className="text-sm font-medium text-gray-900 dark:text-white">
-                      {activity.action}
-                    </p>
-                    <p className="text-xs text-gray-500 dark:text-gray-400">
-                      {activity.user}
-                    </p>
-                  </div>
-                  <span className="text-xs text-gray-400">{activity.time}</span>
-                </div>
-              ))}
-            </div>
-          </CardContent>
-        </Card>
-
-        <Card className="dark:border-gray-800 dark:bg-gray-900">
-          <CardHeader>
-            <CardTitle className="text-lg dark:text-white">
-              Sistem Durumu
-            </CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="space-y-4">
-              {[
-                {
-                  service: "Auth Service",
-                  status: "Aktif",
-                  color: "bg-green-500",
-                },
-                {
-                  service: "Staff Service",
-                  status: "Aktif",
-                  color: "bg-green-500",
-                },
-                {
-                  service: "Student Service",
-                  status: "Aktif",
-                  color: "bg-green-500",
-                },
-                {
-                  service: "Course Catalog Service",
-                  status: "Aktif",
-                  color: "bg-green-500",
-                },
-                {
-                  service: "Enrollment Service",
-                  status: "Aktif",
-                  color: "bg-green-500",
-                },
-                {
-                  service: "Attendance Service",
-                  status: "Aktif",
-                  color: "bg-green-500",
-                },
-                {
-                  service: "Grades Service",
-                  status: "Aktif",
-                  color: "bg-green-500",
-                },
-                {
-                  service: "Meal Service",
-                  status: "Aktif",
-                  color: "bg-green-500",
-                },
-              ].map((service, index) => (
-                <div
-                  key={index}
-                  className="flex items-center justify-between border-b border-gray-100 py-2 last:border-0 dark:border-gray-800"
-                >
-                  <span className="text-sm text-gray-700 dark:text-gray-300">
-                    {service.service}
-                  </span>
-                  <div className="flex items-center gap-2">
-                    <div
-                      className={`h-2 w-2 rounded-full ${service.color}`}
-                    ></div>
-                    <span className="text-sm text-gray-500 dark:text-gray-400">
-                      {service.status}
-                    </span>
-                  </div>
-                </div>
-              ))}
-            </div>
-          </CardContent>
-        </Card>
       </div>
     </div>
   )
