@@ -38,8 +38,9 @@ import type {
   ScheduleSessionDTO,
   CourseCatalog,
   CreateSemesterCourseRequest,
-  SemesterCourse,
+  SemesterCourseDTO,
 } from "@/lib/types"
+import { normalizeSemesterCourse } from "@/lib/normalize-schedule"
 import { catalogApi, staffApi, semesterApi } from "@/lib/api-client"
 import { listSemesters } from "@/lib/services/system-service"
 import {
@@ -152,8 +153,8 @@ const fetchSemesterCourses = async (semester: string, department: string) => {
     .get(`${semester}/courses`, {
       searchParams: { department, limit: 100 },
     })
-    .json<{ data: SemesterCourse[] }>()
-  return response.data || []
+    .json<{ data: SemesterCourseDTO[] }>()
+  return (response.data || []).map(normalizeSemesterCourse)
 }
 
 // Predefined assessment types

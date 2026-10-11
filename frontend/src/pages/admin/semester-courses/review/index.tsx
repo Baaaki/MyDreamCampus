@@ -8,9 +8,11 @@ import type {
   Department,
   Faculty,
   SemesterCourse,
+  SemesterCourseDTO,
   Semester,
   SimplePeriod,
 } from "@/lib/types"
+import { normalizeSemesterCourse } from "@/lib/normalize-schedule"
 import {
   semesterApi,
   catalogApiSafe,
@@ -118,7 +120,7 @@ interface ScheduleEntry {
 }
 
 interface SemesterCoursesResponse {
-  data: SemesterCourse[]
+  data: SemesterCourseDTO[]
   pagination: {
     total: number
     page: number
@@ -145,7 +147,7 @@ const fetchSemesterCourses = async (
       searchParams: { department, limit: 100 },
     })
     .json<SemesterCoursesResponse>()
-  return response.data || []
+  return (response.data || []).map(normalizeSemesterCourse)
 }
 
 const fetchPlannedSemester = async (): Promise<Semester | null> => {

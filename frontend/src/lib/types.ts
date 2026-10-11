@@ -212,6 +212,14 @@ export interface AvailableCourse {
   instructor: string
 }
 
+// Wire shape: the API sends null for a course without sessions.
+export interface AvailableCourseDTO extends Omit<
+  AvailableCourse,
+  "schedule_sessions"
+> {
+  schedule_sessions: AvailableCourseSlot[] | null
+}
+
 export interface AvailableCourseSlot {
   day_of_week: string
   slot_numbers: number[]
@@ -624,6 +632,14 @@ export interface SemesterCourse {
   updated_at: string
 }
 
+// Wire shape: the API sends null for a course without sessions.
+export interface SemesterCourseDTO extends Omit<
+  SemesterCourse,
+  "schedule_sessions"
+> {
+  schedule_sessions: ScheduleSessionDTO[] | null
+}
+
 // Teacher types
 export interface TeacherScheduleSession {
   day: string
@@ -646,10 +662,15 @@ export interface TeacherCourse {
   schedule: TeacherScheduleSession[]
 }
 
+// Wire shape: the API sends null for a course without a weekly schedule.
+export interface TeacherCourseDTO extends Omit<TeacherCourse, "schedule"> {
+  schedule: TeacherScheduleSession[] | null
+}
+
 export interface TeacherCoursesResponse {
   instructor_id: string
   total_courses: number
-  courses: TeacherCourse[]
+  courses: TeacherCourseDTO[]
 }
 
 // Attendance Session types

@@ -1,6 +1,7 @@
 import { useState, useEffect } from "react"
 import { Calendar, Users, BookOpen, Loader2, AlertCircle } from "lucide-react"
 import { semesterApi } from "@/lib/api-client"
+import { normalizeTeacherCourse } from "@/lib/normalize-schedule"
 import type { TeacherCoursesResponse, TeacherCourse } from "@/lib/types"
 import { AssessmentSelectDialog } from "@/components/grades/assessment-select-dialog"
 
@@ -19,7 +20,7 @@ export default function GradesPage() {
         const response = await semesterApi
           .get("teacher/courses")
           .json<TeacherCoursesResponse>()
-        setCourses(response.courses || [])
+        setCourses((response.courses || []).map(normalizeTeacherCourse))
       } catch (err) {
         console.error("Failed to fetch courses:", err)
         setError("Dersler yüklenirken bir hata oluştu.")

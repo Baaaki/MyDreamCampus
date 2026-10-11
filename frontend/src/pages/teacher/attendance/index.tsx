@@ -10,6 +10,7 @@ import {
   AlertCircle,
 } from "lucide-react"
 import { semesterApi } from "@/lib/api-client"
+import { normalizeTeacherCourse } from "@/lib/normalize-schedule"
 import type { TeacherCoursesResponse, TeacherCourse } from "@/lib/types"
 
 export default function AttendancePage() {
@@ -23,7 +24,7 @@ export default function AttendancePage() {
         const response = await semesterApi
           .get("teacher/courses")
           .json<TeacherCoursesResponse>()
-        setCourses(response.courses || [])
+        setCourses((response.courses || []).map(normalizeTeacherCourse))
       } catch (err) {
         console.error("Failed to fetch courses:", err)
         setError("Dersler yüklenirken bir hata oluştu.")

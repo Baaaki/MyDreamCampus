@@ -24,6 +24,7 @@ import {
 import { Button } from "@/components/ui/button"
 import { attendanceApi, semesterApi } from "@/lib/api-client"
 import { apiErrorMessage } from "@/lib/api-error"
+import { normalizeTeacherCourse } from "@/lib/normalize-schedule"
 import type { TeacherCourse, TeacherCoursesResponse } from "@/lib/types"
 
 const WEEKS = Array.from({ length: 14 }, (_, i) => i + 1)
@@ -52,7 +53,7 @@ export default function AttendanceStartPage() {
           .json<TeacherCoursesResponse>()
         const foundCourse = response.courses?.find((c) => c.id === courseId)
         if (foundCourse) {
-          setCourse(foundCourse)
+          setCourse(normalizeTeacherCourse(foundCourse))
         } else {
           setPageError("Ders bulunamadı.")
         }
@@ -159,6 +160,12 @@ export default function AttendanceStartPage() {
             <Users className="h-4 w-4" />
             <span>{course.max_capacity} Kontenjan</span>
           </div>
+          {course.schedule.length === 0 && (
+            <div className="flex items-center gap-2">
+              <Calendar className="h-4 w-4" />
+              <span>Ders programı tanımlanmamış</span>
+            </div>
+          )}
           {course.schedule.map((s, idx) => (
             <div key={idx} className="flex items-center gap-4">
               <div className="flex items-center gap-2">

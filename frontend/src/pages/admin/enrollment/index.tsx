@@ -2,7 +2,8 @@ import { useState, useCallback } from "react"
 import { useQuery } from "@tanstack/react-query"
 import { enrollmentApi } from "@/lib/api-client"
 import { apiErrorMessage } from "@/lib/api-error"
-import type { AvailableCourse } from "@/lib/types"
+import { normalizeAvailableCourse } from "@/lib/normalize-schedule"
+import type { AvailableCourseDTO } from "@/lib/types"
 import CourseList from "@/components/enrollment/CourseList"
 import WeeklyScheduleGrid from "@/components/enrollment/WeeklyScheduleGrid"
 import Toast from "@/components/enrollment/Toast"
@@ -30,10 +31,12 @@ export default function EnrollmentPage() {
     error: coursesError,
   } = useQuery({
     queryKey: ["enrollment", "available", currentSemester],
-    queryFn: async () =>
-      (await enrollmentApi
+    queryFn: async () => {
+      const courses = await enrollmentApi
         .get(`available?semester=${currentSemester}`)
-        .json<AvailableCourse[] | null>()) ?? [],
+        .json<AvailableCourseDTO[] | null>()
+      return (courses ?? []).map(normalizeAvailableCourse)
+    },
   })
 
   // Surface a load failure through the page's toast once per error.

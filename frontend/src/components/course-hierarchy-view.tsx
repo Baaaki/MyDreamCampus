@@ -1,7 +1,13 @@
 import { useState, useMemo } from "react"
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query"
 import { useFaculties } from "@/lib/services/catalog-service"
-import type { Department, Faculty, SemesterCourse } from "@/lib/types"
+import type {
+  Department,
+  Faculty,
+  SemesterCourse,
+  SemesterCourseDTO,
+} from "@/lib/types"
+import { normalizeSemesterCourse } from "@/lib/normalize-schedule"
 import { semesterApi } from "@/lib/api-client"
 import { Badge } from "@/components/ui/badge"
 import {
@@ -29,7 +35,7 @@ import { Button } from "@/components/ui/button"
 
 // API Types
 interface SemesterCoursesResponse {
-  data: SemesterCourse[]
+  data: SemesterCourseDTO[]
   pagination: {
     total: number
     page: number
@@ -50,7 +56,7 @@ const fetchSemesterCourses = async (
   const response = await semesterApi
     .get(`${semester}/courses`, { searchParams })
     .json<SemesterCoursesResponse>()
-  return response.data || []
+  return (response.data || []).map(normalizeSemesterCourse)
 }
 
 const deleteSemesterCourse = async (semester: string, courseId: string) => {

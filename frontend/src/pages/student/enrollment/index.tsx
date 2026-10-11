@@ -1,8 +1,10 @@
 import { useState, useEffect, useCallback } from "react"
 import { enrollmentApi } from "@/lib/api-client"
 import { apiErrorMessage } from "@/lib/api-error"
+import { normalizeAvailableCourse } from "@/lib/normalize-schedule"
 import type {
   AvailableCourse,
+  AvailableCourseDTO,
   MyEnrollmentsResponse,
   EnrollmentProgramResponse,
   LatestRejectionResponse,
@@ -39,7 +41,7 @@ interface AvailableCoursesResponse {
   department: string
   class_level: number
   semester: string
-  available_courses: AvailableCourse[]
+  available_courses: AvailableCourseDTO[]
 }
 
 export default function StudentEnrollmentPage() {
@@ -93,7 +95,9 @@ export default function StudentEnrollmentPage() {
         .get(`available-courses?semester=${semesterParam}`)
         .json<AvailableCoursesResponse>()
 
-      setAvailableCourses(response.available_courses || [])
+      setAvailableCourses(
+        (response.available_courses || []).map(normalizeAvailableCourse)
+      )
       setStudentId(response.student_id)
     } catch (err: unknown) {
       setAvailableCourses([])
