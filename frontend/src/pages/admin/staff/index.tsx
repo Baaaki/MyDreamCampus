@@ -52,21 +52,8 @@ import {
 } from "@/components/ui/popover"
 import { useFaculties } from "@/lib/services/catalog-service"
 import { apiErrorMessage } from "@/lib/api-error"
-
-interface Staff {
-  id: string
-  email: string
-  first_name: string
-  last_name: string
-  role: string
-  faculty: string
-  department: string
-  phone: string
-  office_location: string
-  status: string
-  created_at: string
-  updated_at: string
-}
+import type { Staff } from "@/lib/types"
+import { StaffDeleteDialog, StaffEditDialog } from "./staff-dialogs"
 
 interface StaffListResponse {
   data: Staff[]
@@ -106,8 +93,8 @@ export default function StaffPage() {
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState("")
   const [createDialogOpen, setCreateDialogOpen] = useState(false)
-  const [editDialogOpen, setEditDialogOpen] = useState(false)
   const [editingStaff, setEditingStaff] = useState<Staff | null>(null)
+  const [deletingStaff, setDeletingStaff] = useState<Staff | null>(null)
   const [page, setPage] = useState(1)
   const [sortField, setSortField] = useState<SortField>("first_name")
   const [sortDirection, setSortDirection] = useState<SortDirection>("asc")
@@ -116,11 +103,6 @@ export default function StaffPage() {
   const [selectedFaculty, setSelectedFaculty] = useState("")
   const [facultyOpen, setFacultyOpen] = useState(false)
   const [departmentOpen, setDepartmentOpen] = useState(false)
-
-  // UI state for edit form faculty/department selection
-  const [editSelectedFaculty, setEditSelectedFaculty] = useState("")
-  const [editFacultyOpen, setEditFacultyOpen] = useState(false)
-  const [editDepartmentOpen, setEditDepartmentOpen] = useState(false)
 
   // Form states - Backend DTO'ya uygun alanlar
   const [formData, setFormData] = useState({
@@ -145,24 +127,6 @@ export default function StaffPage() {
     const faculty = faculties.find((f) => f.name === selectedFaculty)
     return faculty?.departments || []
   }, [selectedFaculty, faculties])
-
-  // Filtered departments based on selected faculty (for edit form)
-  const editFilteredDepartments = useMemo(() => {
-    if (!editSelectedFaculty) return []
-    const faculty = faculties.find((f) => f.name === editSelectedFaculty)
-    return faculty?.departments || []
-  }, [editSelectedFaculty, faculties])
-
-  // Update form for edit - tüm alanlar düzenlenebilir
-  const [updateFormData, setUpdateFormData] = useState({
-    email: "",
-    first_name: "",
-    last_name: "",
-    department: "",
-    phone: "",
-    office_location: "",
-    status: "active",
-  })
 
   // Staff list — the previous page stays on screen while the next loads
   const {
@@ -255,96 +219,6 @@ export default function StaffPage() {
     } finally {
       setLoading(false)
     }
-  }
-
-  // Update staff
-  const handleUpdate = async (e: React.FormEvent) => {
-    e.preventDefault()
-    if (!editingStaff) return
-
-    setLoading(true)
-    setError("")
-
-    try {
-      // Backend sadece bu alanları kabul ediyor
-      const payload = {
-        department: updateFormData.department,
-        phone: updateFormData.phone,
-        office_location: updateFormData.office_location,
-      }
-
-      console.log("[Staff] Updating staff with payload:", payload)
-
-      const response = await staffApi
-        .put(editingStaff.id, { json: payload })
-        .json()
-      console.log("[Staff] Update response:", response)
-
-      setEditDialogOpen(false)
-      setEditingStaff(null)
-      setUpdateFormData({
-        email: "",
-        first_name: "",
-        last_name: "",
-        department: "",
-        phone: "",
-        office_location: "",
-        status: "active",
-      })
-      setEditSelectedFaculty("")
-      refetchStaff()
-    } catch (err) {
-      console.error("[Staff] Update error:", err)
-      setError(apiErrorMessage(err, "Personel güncellenemedi"))
-    } finally {
-      setLoading(false)
-    }
-  }
-
-  // Delete staff
-  const handleDelete = async (id: string) => {
-    if (!confirm("Bu personeli silmek istediğinize emin misiniz?")) return
-
-    setLoading(true)
-    setError("")
-
-    try {
-      console.log("[Staff] Deleting staff:", id)
-      await staffApi.delete(id).json()
-      console.log("[Staff] Delete successful")
-      refetchStaff()
-    } catch (err) {
-      console.error("[Staff] Delete error:", err)
-      setError(apiErrorMessage(err, "Personel silinemedi"))
-    } finally {
-      setLoading(false)
-    }
-  }
-
-  // Open edit dialog
-  const openEditDialog = (staff: Staff) => {
-    setEditingStaff(staff)
-    setUpdateFormData({
-      email: staff.email,
-      first_name: staff.first_name,
-      last_name: staff.last_name,
-      department: staff.department || "",
-      phone: staff.phone || "",
-      office_location: staff.office_location || "",
-      status: staff.status,
-    })
-
-    // Find the faculty that contains this department
-    if (staff.department) {
-      const facultyWithDept = faculties.find((f) =>
-        f.departments.some((d) => d.name === staff.department)
-      )
-      setEditSelectedFaculty(facultyWithDept?.name || "")
-    } else {
-      setEditSelectedFaculty("")
-    }
-
-    setEditDialogOpen(true)
   }
 
   return (
@@ -745,14 +619,16 @@ export default function StaffPage() {
                       <Button
                         variant="ghost"
                         size="sm"
-                        onClick={() => openEditDialog(staff)}
+                        aria-label={`${staff.first_name} ${staff.last_name} düzenle`}
+                        onClick={() => setEditingStaff(staff)}
                       >
                         <Pencil className="h-4 w-4" />
                       </Button>
                       <Button
                         variant="ghost"
                         size="sm"
-                        onClick={() => handleDelete(staff.id)}
+                        aria-label={`${staff.first_name} ${staff.last_name} sil`}
+                        onClick={() => setDeletingStaff(staff)}
                       >
                         <Trash2 className="h-4 w-4 text-destructive" />
                       </Button>
@@ -787,242 +663,14 @@ export default function StaffPage() {
           </div>
         )}
 
-        {/* Edit Dialog */}
-        <Dialog open={editDialogOpen} onOpenChange={setEditDialogOpen}>
-          <DialogContent className="sm:max-w-[500px]">
-            <DialogHeader>
-              <DialogTitle>
-                Personeli Düzenle: {editingStaff?.first_name}{" "}
-                {editingStaff?.last_name}
-              </DialogTitle>
-            </DialogHeader>
-            <form onSubmit={handleUpdate} className="space-y-4">
-              <div className="space-y-2">
-                <Label htmlFor="edit_email">E-posta *</Label>
-                <Input
-                  id="edit_email"
-                  type="email"
-                  required
-                  value={updateFormData.email}
-                  onChange={(e) =>
-                    setUpdateFormData({
-                      ...updateFormData,
-                      email: e.target.value,
-                    })
-                  }
-                />
-              </div>
-              <div className="grid grid-cols-2 gap-4">
-                <div className="space-y-2">
-                  <Label htmlFor="edit_first_name">Ad *</Label>
-                  <Input
-                    id="edit_first_name"
-                    required
-                    value={updateFormData.first_name}
-                    onChange={(e) =>
-                      setUpdateFormData({
-                        ...updateFormData,
-                        first_name: e.target.value,
-                      })
-                    }
-                  />
-                </div>
-                <div className="space-y-2">
-                  <Label htmlFor="edit_last_name">Soyad *</Label>
-                  <Input
-                    id="edit_last_name"
-                    required
-                    value={updateFormData.last_name}
-                    onChange={(e) =>
-                      setUpdateFormData({
-                        ...updateFormData,
-                        last_name: e.target.value,
-                      })
-                    }
-                  />
-                </div>
-              </div>
-              <div className="space-y-2">
-                <Label htmlFor="edit_faculty">Fakülte (filtreleme için)</Label>
-                <Popover
-                  open={editFacultyOpen}
-                  onOpenChange={setEditFacultyOpen}
-                >
-                  <PopoverTrigger asChild>
-                    <Button
-                      variant="outline"
-                      role="combobox"
-                      aria-expanded={editFacultyOpen}
-                      className="w-full justify-between"
-                    >
-                      {editSelectedFaculty || "Fakülte seçin..."}
-                      <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
-                    </Button>
-                  </PopoverTrigger>
-                  <PopoverContent
-                    className="w-[--radix-popover-trigger-width] p-0"
-                    align="start"
-                  >
-                    <Command>
-                      <CommandInput placeholder="Fakülte ara..." />
-                      <CommandList>
-                        {isLoadingFaculties && (
-                          <div className="p-2 text-center text-sm text-muted-foreground">
-                            Fakülteler yükleniyor...
-                          </div>
-                        )}
-                        {isErrorFaculties && (
-                          <div className="p-2 text-center text-sm text-destructive">
-                            Fakülteler yüklenirken hata oluştu
-                          </div>
-                        )}
-                        <CommandEmpty>Fakülte bulunamadı.</CommandEmpty>
-                        <CommandGroup>
-                          {faculties.map((faculty) => (
-                            <CommandItem
-                              key={faculty.id}
-                              value={faculty.name}
-                              onSelect={() => {
-                                setEditSelectedFaculty(
-                                  editSelectedFaculty === faculty.name
-                                    ? ""
-                                    : faculty.name
-                                )
-                                setUpdateFormData({
-                                  ...updateFormData,
-                                  department: "",
-                                })
-                                setEditFacultyOpen(false)
-                              }}
-                            >
-                              <Check
-                                className={`mr-2 h-4 w-4 ${editSelectedFaculty === faculty.name ? "opacity-100" : "opacity-0"}`}
-                              />
-                              {faculty.name}
-                            </CommandItem>
-                          ))}
-                        </CommandGroup>
-                      </CommandList>
-                    </Command>
-                  </PopoverContent>
-                </Popover>
-              </div>
-              <div className="space-y-2">
-                <Label htmlFor="edit_department">Bölüm</Label>
-                <Popover
-                  open={editDepartmentOpen}
-                  onOpenChange={setEditDepartmentOpen}
-                >
-                  <PopoverTrigger asChild>
-                    <Button
-                      variant="outline"
-                      role="combobox"
-                      aria-expanded={editDepartmentOpen}
-                      className="w-full justify-between"
-                      disabled={!editSelectedFaculty}
-                    >
-                      {updateFormData.department ||
-                        (editSelectedFaculty
-                          ? "Bölüm seçin..."
-                          : "Önce fakülte seçin")}
-                      <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
-                    </Button>
-                  </PopoverTrigger>
-                  <PopoverContent
-                    className="w-[--radix-popover-trigger-width] p-0"
-                    align="start"
-                  >
-                    <Command>
-                      <CommandInput placeholder="Bölüm ara..." />
-                      <CommandList>
-                        <CommandEmpty>Bölüm bulunamadı.</CommandEmpty>
-                        <CommandGroup>
-                          {editFilteredDepartments.map((dept) => (
-                            <CommandItem
-                              key={dept.id}
-                              value={dept.name}
-                              onSelect={() => {
-                                setUpdateFormData({
-                                  ...updateFormData,
-                                  department:
-                                    updateFormData.department === dept.name
-                                      ? ""
-                                      : dept.name,
-                                })
-                                setEditDepartmentOpen(false)
-                              }}
-                            >
-                              <Check
-                                className={`mr-2 h-4 w-4 ${updateFormData.department === dept.name ? "opacity-100" : "opacity-0"}`}
-                              />
-                              {dept.name}
-                            </CommandItem>
-                          ))}
-                        </CommandGroup>
-                      </CommandList>
-                    </Command>
-                  </PopoverContent>
-                </Popover>
-              </div>
-              <div className="space-y-2">
-                <Label htmlFor="edit_phone">Telefon</Label>
-                <Input
-                  id="edit_phone"
-                  value={updateFormData.phone}
-                  onChange={(e) =>
-                    setUpdateFormData({
-                      ...updateFormData,
-                      phone: e.target.value,
-                    })
-                  }
-                />
-              </div>
-              <div className="space-y-2">
-                <Label htmlFor="edit_office_location">Ofis Konumu</Label>
-                <Input
-                  id="edit_office_location"
-                  value={updateFormData.office_location}
-                  onChange={(e) =>
-                    setUpdateFormData({
-                      ...updateFormData,
-                      office_location: e.target.value,
-                    })
-                  }
-                />
-              </div>
-              <div className="space-y-2">
-                <Label htmlFor="edit_status">Durum</Label>
-                <select
-                  id="edit_status"
-                  value={updateFormData.status}
-                  onChange={(e) =>
-                    setUpdateFormData({
-                      ...updateFormData,
-                      status: e.target.value,
-                    })
-                  }
-                  className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background file:border-0 file:bg-transparent file:text-sm file:font-medium placeholder:text-muted-foreground focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:outline-none disabled:cursor-not-allowed disabled:opacity-50"
-                >
-                  <option value="active">Aktif</option>
-                  <option value="inactive">Pasif</option>
-                </select>
-              </div>
-              <div className="flex gap-2 pt-4">
-                <Button type="submit" disabled={loading} className="flex-1">
-                  {loading ? "Güncelleniyor..." : "Personeli Güncelle"}
-                </Button>
-                <Button
-                  type="button"
-                  variant="outline"
-                  onClick={() => setEditDialogOpen(false)}
-                  className="flex-1"
-                >
-                  İptal
-                </Button>
-              </div>
-            </form>
-          </DialogContent>
-        </Dialog>
+        <StaffEditDialog
+          staff={editingStaff}
+          onOpenChange={(open) => !open && setEditingStaff(null)}
+        />
+        <StaffDeleteDialog
+          staff={deletingStaff}
+          onOpenChange={(open) => !open && setDeletingStaff(null)}
+        />
       </div>
     </div>
   )
