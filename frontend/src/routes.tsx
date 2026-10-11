@@ -19,21 +19,16 @@ import ResetPasswordPage from "@/pages/auth/reset-password"
 // Admin pages — lazy loaded; users only land here after auth.
 const DashboardPage = lazy(() => import("@/pages/admin/dashboard"))
 const SettingsPage = lazy(() => import("@/pages/admin/settings"))
-const AdminEnrollmentPage = lazy(() => import("@/pages/admin/enrollment"))
 const StaffPage = lazy(() => import("@/pages/admin/staff"))
 const StaffDetailsPage = lazy(
   () => import("@/pages/admin/staff/personel-details")
 )
 const StudentsPage = lazy(() => import("@/pages/admin/students"))
 const StudentPage = lazy(() => import("@/pages/admin/students/student"))
-const StudentProfilePage = lazy(
-  () => import("@/pages/admin/students/student/profile")
-)
 const AdvisorsPage = lazy(() => import("@/pages/admin/students/advisors"))
 const CatalogPage = lazy(() => import("@/pages/admin/catalog"))
 const CatalogAddPage = lazy(() => import("@/pages/admin/catalog/add"))
 const CatalogEditPage = lazy(() => import("@/pages/admin/catalog/edit"))
-const CatalogSchedulePage = lazy(() => import("@/pages/admin/catalog/schedule"))
 const SemesterCoursesPage = lazy(() => import("@/pages/admin/semester-courses"))
 const SemesterCoursesListPage = lazy(
   () => import("@/pages/admin/semester-courses/list")
@@ -44,7 +39,6 @@ const SemesterReviewPage = lazy(
 const CafeteriasPage = lazy(() => import("@/pages/admin/meal/cafeterias"))
 const MealAdminPage = lazy(() => import("@/pages/admin/meal/admin"))
 const MenusPage = lazy(() => import("@/pages/admin/meal/menus"))
-const MealStudentPage = lazy(() => import("@/pages/admin/meal/student"))
 const TimeSettingsPage = lazy(() => import("@/pages/admin/system/time"))
 const SemestersPage = lazy(() => import("@/pages/admin/system/semesters"))
 const SemesterWizardPage = lazy(
@@ -125,7 +119,6 @@ export function AppRoutes() {
             <Route element={<AdminLayout />}>
               <Route path="/dashboard" element={<DashboardPage />} />
               <Route path="/settings" element={<SettingsPage />} />
-              <Route path="/enrollment" element={<AdminEnrollmentPage />} />
               <Route path="/staff" element={<StaffPage />} />
               <Route
                 path="/staff/personel-details"
@@ -133,18 +126,10 @@ export function AppRoutes() {
               />
               <Route path="/students" element={<StudentsPage />} />
               <Route path="/students/student" element={<StudentPage />} />
-              <Route
-                path="/students/student/profile"
-                element={<StudentProfilePage />}
-              />
               <Route path="/students/advisors" element={<AdvisorsPage />} />
               <Route path="/catalog" element={<CatalogPage />} />
               <Route path="/catalog/add" element={<CatalogAddPage />} />
               <Route path="/catalog/edit" element={<CatalogEditPage />} />
-              <Route
-                path="/catalog/schedule"
-                element={<CatalogSchedulePage />}
-              />
               <Route
                 path="/semester-courses"
                 element={<SemesterCoursesPage />}
@@ -160,7 +145,6 @@ export function AppRoutes() {
               <Route path="/meal/cafeterias" element={<CafeteriasPage />} />
               <Route path="/meal/admin" element={<MealAdminPage />} />
               <Route path="/meal/menus" element={<MenusPage />} />
-              <Route path="/meal/student" element={<MealStudentPage />} />
               <Route path="/attendance" element={<AdminAttendancePage />} />
               <Route
                 path="/attendance/:sessionId"
