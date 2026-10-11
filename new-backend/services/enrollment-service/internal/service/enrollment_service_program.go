@@ -59,7 +59,7 @@ func (s *EnrollmentService) GetMyEnrollments(ctx context.Context, studentID uuid
 		}
 
 		// Create a map for quick lookup
-		catalogMap := make(map[uuid.UUID]interface{})
+		catalogMap := make(map[uuid.UUID][]contracts.ScheduleSession)
 		for _, c := range coursesFromCatalog {
 			catalogMap[c.ID] = c.ScheduleSessions
 		}
@@ -68,29 +68,12 @@ func (s *EnrollmentService) GetMyEnrollments(ctx context.Context, studentID uuid
 		for _, row := range coursesRows {
 			cID := utils.PgtypeToUUID(row.CourseID)
 
-			var scheduleSessions []dto.ScheduleSession
-			if val, ok := catalogMap[cID]; ok {
-				if catalogSessions, ok := val.([]contracts.ScheduleSession); ok {
-					for _, s := range catalogSessions {
-						var intSlots []int
-						for _, sl := range s.SlotNumbers {
-							intSlots = append(intSlots, int(sl))
-						}
-						scheduleSessions = append(scheduleSessions, dto.ScheduleSession{
-							DayOfWeek:   s.DayOfWeek,
-							SlotNumbers: intSlots,
-							SessionType: s.SessionType,
-						})
-					}
-				}
-			}
-
 			coursesDTO = append(coursesDTO, dto.CourseBasic{
 				ID:               cID.String(),
 				CourseCode:       row.CourseCode,
 				CourseName:       row.CourseName,
 				Credits:          row.Credits,
-				ScheduleSessions: scheduleSessions,
+				ScheduleSessions: toScheduleSessions(catalogMap[cID]),
 			})
 		}
 

@@ -109,20 +109,6 @@ func (s *EnrollmentService) GetAvailableCourses(ctx context.Context, studentID u
 	availableCourses := make([]dto.AvailableCourse, 0, len(courses))
 	for _, course := range courses {
 
-		// Map course catalog sessions to enrollment DTO
-		var scheduleSessions []dto.ScheduleSession
-		for _, s := range course.ScheduleSessions {
-			var intSlots []int
-			for _, sl := range s.SlotNumbers {
-				intSlots = append(intSlots, int(sl))
-			}
-			scheduleSessions = append(scheduleSessions, dto.ScheduleSession{
-				DayOfWeek:   s.DayOfWeek,
-				SlotNumbers: intSlots,
-				SessionType: s.SessionType,
-			})
-		}
-
 		// Count active enrollments via repository to check available seats
 		currentEnrollment, err := s.enrollmentRepo.CountEnrollmentForCourse(ctx, course.ID)
 		if err != nil {
@@ -135,7 +121,7 @@ func (s *EnrollmentService) GetAvailableCourses(ctx context.Context, studentID u
 			CourseCode:        course.CourseCode,
 			CourseName:        course.CourseName,
 			Credits:           course.Credits,
-			ScheduleSessions:  scheduleSessions,
+			ScheduleSessions:  toScheduleSessions(course.ScheduleSessions),
 			MaxCapacity:       course.MaxCapacity,
 			CurrentEnrollment: utils.ClampToInt16(int(currentEnrollment)),
 			AvailableSeats:    course.MaxCapacity - utils.ClampToInt16(int(currentEnrollment)),
@@ -486,11 +472,12 @@ func (s *EnrollmentService) buildProgramResponse(ctx context.Context, program db
 	coursesDTO := make([]dto.CourseBasic, 0, len(courses))
 	for _, course := range courses {
 		coursesDTO = append(coursesDTO, dto.CourseBasic{
-			ID:             course.ID.String(),
-			CourseCode:     course.CourseCode,
-			CourseName:     course.CourseName,
-			Credits:        course.Credits,
-			InstructorName: course.InstructorFullname,
+			ID:               course.ID.String(),
+			CourseCode:       course.CourseCode,
+			CourseName:       course.CourseName,
+			Credits:          course.Credits,
+			InstructorName:   course.InstructorFullname,
+			ScheduleSessions: toScheduleSessions(course.ScheduleSessions),
 		})
 	}
 
@@ -502,6 +489,24 @@ func (s *EnrollmentService) buildProgramResponse(ctx context.Context, program db
 		Courses:   coursesDTO,
 		CreatedAt: program.CreatedAt.Time,
 	}
+}
+
+// toScheduleSessions maps catalog sessions to the enrollment DTO, empty
+// rather than nil so a course without sessions marshals as [].
+func toScheduleSessions(in []contracts.ScheduleSession) []dto.ScheduleSession {
+	out := make([]dto.ScheduleSession, 0, len(in))
+	for _, s := range in {
+		slots := make([]int, 0, len(s.SlotNumbers))
+		for _, sl := range s.SlotNumbers {
+			slots = append(slots, int(sl))
+		}
+		out = append(out, dto.ScheduleSession{
+			DayOfWeek:   s.DayOfWeek,
+			SlotNumbers: slots,
+			SessionType: s.SessionType,
+		})
+	}
+	return out
 }
 
 // Helper: Check schedule conflicts

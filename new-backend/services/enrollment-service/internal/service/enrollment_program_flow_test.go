@@ -230,6 +230,7 @@ func TestApproveEnrollmentProgram_Success(t *testing.T) {
 	assert.Equal(t, "approved", resp.Status)
 	assert.Len(t, resp.Courses, 1)
 	assert.Equal(t, "CENG101", resp.Courses[0].CourseCode)
+	assertSessionsMarshalEmpty(t, resp.Courses[0].ScheduleSessions)
 	assert.NotNil(t, store.lastApproveEvt)
 }
 
@@ -455,6 +456,7 @@ func TestGetPendingProgramsByAdvisor(t *testing.T) {
 		require.Len(t, got.Courses, 1)
 		assert.Equal(t, "PHYS101", got.Courses[0].CourseCode)
 		assert.Equal(t, "Prof. Dr. Marie Curie", got.Courses[0].InstructorName)
+		assertSessionsMarshalEmpty(t, got.Courses[0].ScheduleSessions)
 
 		// The instructor is a label: a catalog outage must not hide the
 		// programs waiting for the advisor's decision.
@@ -569,5 +571,6 @@ func TestGetAvailableCourses(t *testing.T) {
 		assert.Equal(t, int16(30), c2.MaxCapacity)
 		assert.Equal(t, int16(30), c2.CurrentEnrollment)
 		assert.Equal(t, int16(0), c2.AvailableSeats)
+		assertSessionsMarshalEmpty(t, c2.ScheduleSessions)
 	})
 }
