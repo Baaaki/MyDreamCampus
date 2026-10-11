@@ -565,6 +565,55 @@ jobs:
             -H 'Content-Type: application/json' \
             -d "{\"email\":\"admin@university.edu.tr\",\"password\":\"$ADMIN_PASSWORD\"}")
           expect 200 "$code" "super admin logs in with the changed password after restore (auth)"
+          TOKEN=$(jq -r '.access_token' /tmp/body)
+
+          # ── Student CSV import ─────────────────────────────────────────
+          # Every row goes through the single-student create path, so its
+          # student.created event reaches auth: the imported student logs
+          # in with the e-mail as the initial password and is held at the
+          # password change like any new account.
+          IMPORT_TAG=$(date +%s)
+          IMPORT_EMAIL="ci.import.$IMPORT_TAG@uni.edu.tr"
+          {
+            echo "student_number,first_name,last_name,email,faculty,department,enrollment_year,class_level"
+            echo "CI$IMPORT_TAG,Deniz,Aktaş,$IMPORT_EMAIL,Mühendislik Fakültesi,Bilgisayar Mühendisliği,$(date -u +%Y),1"
+          } > /tmp/import.csv
+          code=$(api -X POST http://localhost/api/students/bulk-import \
+            -H "Authorization: Bearer $TOKEN" -F "file=@/tmp/import.csv;type=text/csv")
+          expect 202 "$code" "admin uploads a student CSV (student)"
+          JOB=$(jq -r '.job_id' /tmp/body)
+          for _ in $(seq 1 60); do
+            code=$(api "http://localhost/api/students/bulk-import/$JOB" -H "Authorization: Bearer $TOKEN")
+            job_status=$(jq -r '.status' /tmp/body)
+            [ "$code" = 200 ] && { [ "$job_status" = completed ] || [ "$job_status" = failed ]; } && break
+            sleep 1
+          done
+          [ "$job_status" = completed ] && [ "$(jq -r '.successful_records' /tmp/body)" = 1 ] \
+            || { echo "::error::import job ended $job_status: $(head -c 300 /tmp/body)"; exit 1; }
+          echo "ok  import job $JOB completed (student)"
+
+          # Polling the login itself would count every miss toward the
+          # five-try lockout, so wait on the projection row it reads.
+          for _ in $(seq 1 60); do
+            users=$(docker exec mydreamcampus-postgres psql -U postgres -d auth -tAc \
+              "SELECT count(*) FROM auth.users WHERE email = '$IMPORT_EMAIL'")
+            [ "$users" = 1 ] && break
+            sleep 1
+          done
+          [ "$users" = 1 ] || { echo "::error::auth never opened a login for the imported student"; exit 1; }
+          echo "ok  student.created reached auth for the imported student"
+
+          code=$(api -X POST http://localhost/api/auth/login \
+            -H 'Content-Type: application/json' \
+            -d "{\"email\":\"$IMPORT_EMAIL\",\"password\":\"$IMPORT_EMAIL\"}")
+          expect 200 "$code" "imported student logs in with the e-mail as password (auth)"
+          [ "$(jq -r '.force_password_change' /tmp/body)" = true ] \
+            || { echo "::error::the imported student is not asked to replace the initial password"; exit 1; }
+          IMPORTED_TOKEN=$(jq -r '.access_token' /tmp/body)
+          code=$(api http://localhost/api/grades/my/grades -H "Authorization: Bearer $IMPORTED_TOKEN")
+          expect 403 "$code" "imported student is held at the password change (grades)"
+          [ "$(jq -r '.code' /tmp/body)" = FORCE_PASSWORD_CHANGE ] \
+            || { echo "::error::the imported student was not sent to the password change"; exit 1; }
 
       - name: Collect logs on failure
         if: failure()
