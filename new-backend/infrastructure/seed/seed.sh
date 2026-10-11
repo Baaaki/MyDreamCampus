@@ -83,8 +83,15 @@ fi
 # --- 3. admin session ---
 # The bootstrap admin starts with force_password_change, and the flag rides in
 # the JWT: every call below would answer 403 FORCE_PASSWORD_CHANGE. It has to
-# be cleared before the login that mints the token.
-q auth "UPDATE auth.users SET force_password_change = false WHERE email = '$(printf '%s' "$ADMIN_EMAIL" | sed "s/'/''/g")'" >/dev/null
+# be cleared before the login that mints the token, and goes back however the
+# run ends: the admin still has to replace ADMIN_INITIAL_PASSWORD, and a run
+# that fails half-way is skipped next time, leaving nothing to put it back.
+ADMIN_EMAIL_SQL=$(printf '%s' "$ADMIN_EMAIL" | sed "s/'/''/g")
+admin_force_password_change() {
+	q auth "UPDATE auth.users SET force_password_change = $1 WHERE email = '$ADMIN_EMAIL_SQL'" >/dev/null
+}
+admin_force_password_change false
+trap 'admin_force_password_change true' EXIT
 echo ">> logging in as $ADMIN_EMAIL"
 LOGIN_BODY=$(curl -fsS -X POST "$AUTH_URL/api/auth/login" \
 	-H 'Content-Type: application/json' \
