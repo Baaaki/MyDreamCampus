@@ -32,15 +32,21 @@ jobs:
       - uses: dorny/paths-filter@v4
         id: filter
         with:
+          # A change to this workflow (a tool version, a step) runs the jobs
+          # it could break; otherwise they are skipped and report green.
           filters: |
             backend:
               - 'new-backend/**'
+              - '.github/workflows/ci.yml'
             frontend:
               - 'frontend/**'
+              - '.github/workflows/ci.yml'
             mobile:
               - 'mobile/**'
+              - '.github/workflows/ci.yml'
             infra:
               - 'new-backend/infrastructure/**'
+              - '.github/workflows/ci.yml'
 
   # One job per Go module. A failure names its own service in the job title,
   # which a single looping job cannot do — with ten services, "backend-test
