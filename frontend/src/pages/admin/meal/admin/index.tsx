@@ -7,6 +7,11 @@ import { QRCodeSVG } from "qrcode.react"
 import { format } from "date-fns"
 import { tr } from "date-fns/locale"
 
+// The payload is signed per 30 s window and the backend also accepts the
+// previous one, so a QR lives 60 s at most; refreshing at 20 s keeps the one
+// on screen valid for every scan.
+const QR_REFRESH_MS = 20_000
+
 export default function MealAdminQRPage() {
   const [selectedCafeteria, setSelectedCafeteria] = useState("")
   const [selectedDate, setSelectedDate] = useState(
@@ -46,6 +51,7 @@ export default function MealAdminQRPage() {
       return { lunch, dinner }
     },
     enabled: !!selectedCafeteria && !!selectedDate,
+    refetchInterval: QR_REFRESH_MS,
   })
   const lunchQR = qrCodes?.lunch ?? null
   const dinnerQR = qrCodes?.dinner ?? null
@@ -113,7 +119,7 @@ export default function MealAdminQRPage() {
                   Öğle Yemeği QR Kodu
                 </h3>
                 <p className="mb-4 text-sm text-gray-600">
-                  Kullanım Saati: 11:00 - 13:00
+                  Kullanım Saati: 11:00 - 13:00 (UTC+3)
                 </p>
                 {lunchQR ? (
                   <div>
@@ -139,7 +145,7 @@ export default function MealAdminQRPage() {
                   Akşam Yemeği QR Kodu
                 </h3>
                 <p className="mb-4 text-sm text-gray-600">
-                  Kullanım Saati: 16:00 - 19:00
+                  Kullanım Saati: 16:00 - 19:00 (UTC+3)
                 </p>
                 {dinnerQR ? (
                   <div>
@@ -173,9 +179,16 @@ export default function MealAdminQRPage() {
             Bilgilendirme
           </h3>
           <ul className="space-y-1 text-sm text-blue-800">
-            <li>• Öğle yemeği QR kodu 11:00-13:00 arası kullanılabilir</li>
-            <li>• Akşam yemeği QR kodu 16:00-19:00 arası kullanılabilir</li>
-            <li>• QR kodlar her gün otomatik olarak güncellenir</li>
+            <li>
+              • Öğle yemeği QR kodu 11:00-13:00 (UTC+3) arası kullanılabilir
+            </li>
+            <li>
+              • Akşam yemeği QR kodu 16:00-19:00 (UTC+3) arası kullanılabilir
+            </li>
+            <li>
+              • QR kodlar 20 saniyede bir yenilenir; her kod en fazla 60 saniye
+              geçerlidir, ekran görüntüsü alınan kod kısa sürede geçersiz olur
+            </li>
             <li>
               • Her öğrenci sadece rezervasyon yaptığı öğün için QR okutabilir
             </li>
