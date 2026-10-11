@@ -9,22 +9,33 @@
 ## Kontrol listesi
 
 ### Giriş
-- [ ] Giriş ekranında üç demo hesabı (admin, öğretmen, öğrenci) e-posta ve
-  şifresiyle görünüyor; "Bu hesapla gir" çalışıyor.
+- [ ] Giriş kartında üç rol düğmesi var ("Öğrenci / Öğretmen / Admin Olarak
+  Giriş"); düğme e-posta ve şifreyi (şifre = e-posta) doldurur, "Giriş Yap"
+  ile girilir. Kartta 1 saatlik geri dönüş uyarısı görünüyor.
 - [ ] Süper admin hesabı hiçbir listede görünmüyor.
 - [ ] Demo şeridi görünüyor.
 
 ### Demo öğrenci
-- [ ] Ders kaydı ve önkoşul senaryosu çalışıyor.
+- [ ] Ders kaydı ve önkoşul senaryosu: kayıt sayfasında Bahar dönemine
+  geçince "2. Sınıf Dersleri" altında CENG201 listeleniyor; seçilip
+  gönderilince program danışman onayına düşüyor.
 - [ ] Not sayfası ve transkript dolu.
+- [ ] Yoklama sayfası (Yoklama menüsü) aktif dönemi (Güz) gösteriyor:
+  CENG301 ve CENG350 için katılım sayıları ve haftalık oturumlar dolu.
 - [ ] Öğretmenin açtığı yoklamanın QR'ı ile yoklama alınıyor (mobil
-  uygulamadan).
-- [ ] Yemek rezervasyonu:
+  uygulamadan); aynı QR ikinci kez okutulunca "zaten alındı" deniyor.
+- [ ] Yemek rezervasyonu (web, Yemekhane → gelecek haftanın seçimi):
   - `4242 4242 4242 4242` → onaylandı;
   - `4000 0000 0000 0002` → reddedildi;
-  - iptal çalışıyor.
-- [ ] Onaylı rezervasyonun QR ile kullanımı çalışıyor; ikinci kullanım
-  reddediliyor.
+  - iptal (mobil uygulamadan; web'de ödenmiş rezervasyonu iptal eden bir
+    düğme yok) çalışıyor ve ödeme iade ediliyor. İptal, rezervasyon
+    haftasından önceki Cuma 23:59'da kapanır: hafta sonu gelecek haftanın
+    iptali reddedilir (`CANCEL_CUTOFF_PASSED`), bu bir hata değildir.
+- [ ] Yemek QR'ı (mobil): admin "Yemekhane QR Kodları" sayfasındaki öğün
+  QR'ı mobil uygulamanın tarayıcısıyla okutulunca o günün onaylı
+  rezervasyonu kullanılıyor; ikinci okutma reddediliyor. QR yalnız öğün
+  saatinde geçer (öğle 11:00–13:00, akşam 16:00–19:00); dışındaysan zaman
+  makinesiyle rezervasyonu olan bir günün öğle saatine al, sonra "Sıfırla".
 
 ### Demo öğretmen
 - [ ] Yoklama oturumu açılıyor, QR dönüyor, elle işaretleme çalışıyor.
@@ -50,14 +61,22 @@
 - [ ] Oturumlar sayfasında diğer ziyaretçilerin IP'leri maskeli.
 
 ### Süper admin ve kalıcı durum
-- [ ] "Düzenlemeye başla" → başka bir tarayıcıda demo admin kayıt yapamıyor
-  (K3) ve şerit görüyor.
-- [ ] Süper adminin eklediği kayıt "Kaydet ve yayına al" sonrası kalıcı.
-- [ ] "Bugünkü değişiklikleri şimdi geri al" → demo adminin eklediği kayıt
-  gidiyor, süper adminin kaydı duruyor.
-- [ ] "Bu sürüme dön" çalışıyor.
-- [ ] Gece geri dönüşü: `NIGHTLY_RESET_AT`'i geçici olarak 5 dakika sonraya
-  ayarla, gözlemle, eski değerine geri al.
+- [ ] Süper admin ilk girişte şifre değiştirme ekranına düşüyor; değişimden
+  sonra yeni şifreyle giriyor.
+- [ ] Kalıcı Veri → "Düzenlemeye Başla" → başka bir tarayıcıda demo admin
+  kayıt yapamıyor (K3, 503 "Sistem şu an yönetici tarafından
+  güncelleniyor") ve şerit görüyor.
+- [ ] Süper adminin eklediği kayıt "Kaydet ve Yayına Al" sonrası kalıcı;
+  sürüm geçmişine yeni sürüm ekleniyor.
+- [ ] "Ziyaretçi Değişikliklerini Şimdi Geri Al" → demo adminin eklediği
+  kayıt gidiyor, süper adminin kaydı duruyor.
+- [ ] "Bu Sürüme Dön" çalışıyor.
+- [ ] Süper admin şifresi geri dönüşte korunuyor: şifreyi değiştirdikten
+  sonra alınmış bir sürüme de, öncesine de ("Bu Sürüme Dön") dönülünce süper
+  admin güncel şifresiyle giriyor ve şifre değiştirme ekranına düşmüyor.
+- [ ] Saatlik geri dönüş: `.env`'de `REVERT_AFTER_MINUTES`'i geçici olarak
+  `2` yap ve demo-ops'u yeniden oluştur; demo adminle bir kayıt ekle, ~2
+  dakika sonra kaydın gittiğini gözlemle, değeri `60`'a geri al.
 - [ ] (K4) `.../api/catalog/admin/ops` Cloudflare Access kodu istiyor.
 
 ### Altyapı
