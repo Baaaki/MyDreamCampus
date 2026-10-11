@@ -78,15 +78,12 @@ func TestApproveEnrollmentRequest_RequiresProgramID(t *testing.T) {
 }
 
 func TestRejectEnrollmentRequest_RequiresReason(t *testing.T) {
-	code, _ := validateBinding[RejectEnrollmentRequest](t,
-		map[string]any{"program_id": uuid.NewString()})
+	code, _ := validateBinding[RejectEnrollmentRequest](t, map[string]any{})
 	assert.Equal(t, 400, code, "rejection_reason required")
 
+	// The web's body: the program id travels in the path.
 	code, _ = validateBinding[RejectEnrollmentRequest](t,
-		map[string]any{
-			"program_id":       uuid.NewString(),
-			"rejection_reason": "Schedule conflicts with mandatory course",
-		})
+		map[string]any{"rejection_reason": "Schedule conflicts with mandatory course"})
 	assert.Equal(t, 200, code)
 }
 

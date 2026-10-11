@@ -135,10 +135,11 @@ type ApproveEnrollmentRequest struct {
 	ProgramID uuid.UUID `json:"program_id" binding:"required"`
 }
 
-// RejectEnrollmentRequest represents the request to reject an enrollment
+// RejectEnrollmentRequest is the body of POST .../programs/:program_id/reject.
+// The program comes from the path only; requiring it in the body as well made
+// every reject the web sent a 400.
 type RejectEnrollmentRequest struct {
-	ProgramID       uuid.UUID `json:"program_id" binding:"required"`
-	RejectionReason string    `json:"rejection_reason" binding:"required"`
+	RejectionReason string `json:"rejection_reason" binding:"required"`
 }
 
 // AdvisorPendingProgramsResponse represents pending programs for advisor review
