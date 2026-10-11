@@ -482,6 +482,11 @@ func (s *AttendanceService) GetMyAttendance(ctx context.Context, studentID uuid.
 			continue
 		}
 
+		sessions, err := s.sessionRepo.GetSessionsByCourse(ctx, courseID, semester)
+		if err != nil {
+			return dto.GetMyAttendanceResponse{}, fmt.Errorf("list sessions of course %s: %w", courseID, err)
+		}
+
 		weeklyRecords := make([]dto.WeeklyAttendanceRecord, 0, len(records))
 		for _, record := range records {
 			weeklyRecords = append(weeklyRecords, dto.WeeklyAttendanceRecord{
@@ -501,12 +506,13 @@ func (s *AttendanceService) GetMyAttendance(ctx context.Context, studentID uuid.
 		labPresent, _ := s.attendanceRepo.GetStudentPresentCountByType(ctx, studentID, courseID, semester, db.AttendanceSessionTypeEnumLab)
 
 		detail := dto.CourseAttendanceDetail{
-			CourseID:      courseID,
-			CourseCode:    enrollment.CourseCode,
-			CourseName:    enrollment.CourseName,
-			Instructor:    utils.PgTextToString(enrollment.InstructorFullname),
-			TotalWeeks:    enrollment.TotalWeeks.Int16,
-			WeeklyRecords: weeklyRecords,
+			CourseID:       courseID,
+			CourseCode:     enrollment.CourseCode,
+			CourseName:     enrollment.CourseName,
+			Instructor:     utils.PgTextToString(enrollment.InstructorFullname),
+			TotalWeeks:     enrollment.TotalWeeks.Int16,
+			WeeklyRecords:  weeklyRecords,
+			MissedSessions: missedSessions(sessions, records),
 		}
 
 		if theoryTotal > 0 {
@@ -540,6 +546,33 @@ func (s *AttendanceService) GetMyAttendance(ctx context.Context, studentID uuid.
 		Semester:      semester,
 		Courses:       courses,
 	}, nil
+}
+
+// missedSessions lists the sessions a course held without the student on
+// the roll. A session still open is left out: its QR scans wait in Redis
+// until it closes, so the student's record may just not be written yet.
+func missedSessions(sessions []db.GetSessionsByCourseRow, attended []db.GetStudentAttendanceByCourseRow) []dto.MissedSession {
+	type slot struct {
+		week        int16
+		sessionType db.SessionTypeEnum
+	}
+	present := make(map[slot]bool, len(attended))
+	for _, r := range attended {
+		present[slot{r.WeekNumber, r.SessionType}] = true
+	}
+
+	missed := make([]dto.MissedSession, 0, len(sessions))
+	for _, session := range sessions {
+		if session.IsActive.Bool || present[slot{session.WeekNumber, session.SessionType}] {
+			continue
+		}
+		missed = append(missed, dto.MissedSession{
+			Week:        session.WeekNumber,
+			SessionType: string(session.SessionType),
+			Date:        session.SessionDate.Time.Format("2006-01-02"),
+		})
+	}
+	return missed
 }
 
 // currentSemester picks the semester whose attendance period holds now, on

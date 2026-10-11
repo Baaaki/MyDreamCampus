@@ -144,16 +144,26 @@ type WeeklyAttendanceRecord struct {
 	Note        *string `json:"note,omitempty"`
 }
 
-// CourseAttendanceDetail represents attendance detail for a course
+// MissedSession is a session the course held with no attendance record
+// for the student.
+type MissedSession struct {
+	Week        int16  `json:"week"`
+	SessionType string `json:"session_type"`
+	Date        string `json:"date"`
+}
+
+// CourseAttendanceDetail represents attendance detail for a course.
+// WeeklyRecords lists only the sessions attended; MissedSessions the rest.
 type CourseAttendanceDetail struct {
-	CourseID      uuid.UUID                `json:"course_id"`
-	CourseCode    string                   `json:"course_code"`
-	CourseName    string                   `json:"course_name"`
-	Instructor    string                   `json:"instructor"`
-	TotalWeeks    int16                    `json:"total_weeks"`
-	Theory        *SessionTypeAttendance   `json:"theory,omitempty"`
-	Lab           *SessionTypeAttendance   `json:"lab,omitempty"`
-	WeeklyRecords []WeeklyAttendanceRecord `json:"weekly_records"`
+	CourseID       uuid.UUID                `json:"course_id"`
+	CourseCode     string                   `json:"course_code"`
+	CourseName     string                   `json:"course_name"`
+	Instructor     string                   `json:"instructor"`
+	TotalWeeks     int16                    `json:"total_weeks"`
+	Theory         *SessionTypeAttendance   `json:"theory,omitempty"`
+	Lab            *SessionTypeAttendance   `json:"lab,omitempty"`
+	WeeklyRecords  []WeeklyAttendanceRecord `json:"weekly_records"`
+	MissedSessions []MissedSession          `json:"missed_sessions"`
 }
 
 // GetMyAttendanceResponse is the response for student's own attendance
