@@ -54,7 +54,9 @@ ON CONFLICT (course_id, week_number, session_type) DO NOTHING;
 
 -- Present = a record. Roughly one student in eight misses a given week.
 -- zeynep.sahin misses exactly week 2 of CENG301: her history shows an absence
--- and she is still above the attendance minimum.
+-- and she is still above the attendance minimum. CENG301 is the demo
+-- teacher's (ahmet.yilmaz), so his roster shows the same gap, and the week 5
+-- session he starts is one she can scan into.
 INSERT INTO attendance.attendance_records
   (session_id, student_id, course_id, semester, week_number, session_type,
    marked_via, scanned_at)

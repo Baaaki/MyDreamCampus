@@ -27,6 +27,10 @@ ON CONFLICT (name) DO NOTHING;
 -- ============================================================
 -- Each teacher's own department. The prerequisite snapshot is the catalog's,
 -- as an offering opened through the API would carry it.
+--
+-- CENG301 is ahmet.yilmaz's so the demo teacher and the demo student
+-- (zeynep.sahin, third year: CENG301 + CENG350) share a course: his QR is one
+-- she can scan, and the final he enters is one she sees.
 INSERT INTO course_catalog.semester_courses
   (semester, course_code, department, credits, class_level, instructor_id, instructor_fullname,
    classroom_location, max_capacity, prerequisites, assessment_schema)
@@ -42,7 +46,7 @@ JOIN (VALUES
    ('CENG102', 'ahmet.yilmaz@uni.edu.tr'),
    ('CENG201', 'elif.aydin@uni.edu.tr'),
    ('CENG202', 'elif.aydin@uni.edu.tr'),
-   ('CENG301', 'mehmet.kaya@uni.edu.tr'),
+   ('CENG301', 'ahmet.yilmaz@uni.edu.tr'),
    ('CENG350', 'mehmet.kaya@uni.edu.tr')
  ) AS m(course_code, email) ON m.course_code = c.course_code
 JOIN _staff s ON s.email = m.email

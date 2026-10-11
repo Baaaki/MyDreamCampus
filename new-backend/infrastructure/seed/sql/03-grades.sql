@@ -29,7 +29,9 @@ ON CONFLICT (id) DO NOTHING;
 -- ============================================================
 -- The teacher's gradebook opens on an empty final column; the student sees a
 -- midterm and a pending final. zeynep.sahin's two midterms are the old mock
--- report card's, everyone else's a stable hash.
+-- report card's, everyone else's a stable hash. Her CENG301 is the demo
+-- teacher's (ahmet.yilmaz): he graded the midterm, and the final he enters
+-- from his gradebook is the one her report card picks up.
 INSERT INTO grades.student_course_registrations (student_id, course_id, semester)
 SELECT p.student_id, p.course_id, :'semester'
 FROM _programs p
