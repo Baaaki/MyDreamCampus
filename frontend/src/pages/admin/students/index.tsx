@@ -32,6 +32,7 @@ import { studentApi } from "@/lib/api-client"
 import { useFaculties } from "@/lib/services/catalog-service"
 import { toCreateStudentPayload } from "@/lib/services/admin-student-service"
 import { staffApi } from "@/lib/api-client"
+import { apiErrorMessage } from "@/lib/api-error"
 import type { Department, Staff } from "@/lib/types"
 import {
   ArrowUp,
@@ -216,6 +217,7 @@ export default function StudentsPage() {
       fetchStudents()
     } catch (error) {
       console.error("[Students Page] Failed to create student:", error)
+      alert(apiErrorMessage(error, "Öğrenci oluşturulamadı"))
     }
   }
 
@@ -246,6 +248,7 @@ export default function StudentsPage() {
       fetchStudents()
     } catch (error) {
       console.error("Failed to update student:", error)
+      alert(apiErrorMessage(error, "Öğrenci güncellenemedi"))
     }
   }
 
@@ -257,6 +260,7 @@ export default function StudentsPage() {
       fetchStudents()
     } catch (error) {
       console.error("Failed to delete student:", error)
+      alert(apiErrorMessage(error, "Öğrenci silinemedi"))
     }
   }
 
@@ -309,7 +313,7 @@ export default function StudentsPage() {
       fetchStudents()
     } catch (error) {
       console.error("Failed to import students:", error)
-      alert("İçe aktarma başarısız: " + error)
+      alert(apiErrorMessage(error, "İçe aktarma başarısız"))
     } finally {
       setImporting(false)
     }
