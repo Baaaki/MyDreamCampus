@@ -7,6 +7,8 @@ import (
 
 	"github.com/baaaki/mydreamcampus/catalog/internal/db"
 	"github.com/baaaki/mydreamcampus/catalog/internal/dto"
+	"github.com/baaaki/mydreamcampus/shared/platform/utils"
+	"github.com/google/uuid"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -170,13 +172,38 @@ func TestTeacherSchedule(t *testing.T) {
 	})
 
 	t.Run("one entry per slot in the course's room", func(t *testing.T) {
-		got := teacherSchedule([]db.GetScheduleSessionsByCourseIDRow{
-			row("monday", "theory", 1),
-			row("monday", "lab", 2),
+		got := teacherSchedule([]db.GetScheduleSessionsByMultipleCourseIDsRow{
+			multiRow("monday", "theory", 1),
+			multiRow("monday", "lab", 2),
 		}, "A-101")
 		assert.Equal(t, []dto.TeacherScheduleSession{
 			{Day: "monday", Time: slotTimeRange(1), Room: "A-101", SessionType: "theory"},
 			{Day: "monday", Time: slotTimeRange(2), Room: "A-101", SessionType: "lab"},
 		}, got)
+	})
+}
+
+func TestTeacherCourseItems(t *testing.T) {
+	t.Run("no courses marshals as empty array", func(t *testing.T) {
+		raw, err := json.Marshal(teacherCourseItems(nil, nil))
+		require.NoError(t, err)
+		assert.JSONEq(t, `[]`, string(raw))
+	})
+
+	t.Run("each course gets only its own sessions", func(t *testing.T) {
+		withLessons, without := uuid.New(), uuid.New()
+		session := multiRow("tuesday", "theory", 3)
+		session.SemesterCourseID = utils.UUIDToPgtype(withLessons)
+
+		got := teacherCourseItems([]db.GetTeacherCoursesRow{
+			{ID: utils.UUIDToPgtype(withLessons), CourseCode: "BLM101", ClassroomLocation: "A-101"},
+			{ID: utils.UUIDToPgtype(without), CourseCode: "BLM102", ClassroomLocation: "B-202"},
+		}, []db.GetScheduleSessionsByMultipleCourseIDsRow{session})
+
+		require.Len(t, got, 2)
+		assert.Equal(t, []dto.TeacherScheduleSession{
+			{Day: "tuesday", Time: slotTimeRange(3), Room: "A-101", SessionType: "theory"},
+		}, got[0].Schedule)
+		assertMarshalsEmptyArray(t, got[1].Schedule)
 	})
 }

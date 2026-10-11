@@ -719,9 +719,39 @@ func groupScheduleSessionsFromMultiRows(sessions []db.GetScheduleSessionsByMulti
 	return result
 }
 
+// teacherCourseItems pairs each course with its own rows of the batch
+// schedule read.
+func teacherCourseItems(courses []db.GetTeacherCoursesRow, sessions []db.GetScheduleSessionsByMultipleCourseIDsRow) []dto.TeacherCourseItem {
+	byCourse := make(map[uuid.UUID][]db.GetScheduleSessionsByMultipleCourseIDsRow, len(courses))
+	for _, session := range sessions {
+		courseID := utils.PgUUIDToUUID(session.SemesterCourseID)
+		byCourse[courseID] = append(byCourse[courseID], session)
+	}
+
+	items := make([]dto.TeacherCourseItem, 0, len(courses))
+	for _, course := range courses {
+		courseID := utils.PgUUIDToUUID(course.ID)
+		items = append(items, dto.TeacherCourseItem{
+			ID:                courseID,
+			CourseCode:        course.CourseCode,
+			CourseName:        course.CourseName,
+			Faculty:           course.Faculty,
+			Department:        course.Department,
+			Semester:          course.Semester,
+			Credits:           course.Credits,
+			TheoreticalHours:  course.TheoreticalHours,
+			LabHours:          course.LabHours,
+			ClassroomLocation: course.ClassroomLocation,
+			MaxCapacity:       course.MaxCapacity,
+			Schedule:          teacherSchedule(byCourse[courseID], course.ClassroomLocation),
+		})
+	}
+	return items
+}
+
 // teacherSchedule lists a course's lessons one per slot, empty rather than
 // nil so a course without sessions marshals as [] for the client.
-func teacherSchedule(sessions []db.GetScheduleSessionsByCourseIDRow, room string) []dto.TeacherScheduleSession {
+func teacherSchedule(sessions []db.GetScheduleSessionsByMultipleCourseIDsRow, room string) []dto.TeacherScheduleSession {
 	out := make([]dto.TeacherScheduleSession, 0, len(sessions))
 	for _, session := range sessions {
 		out = append(out, dto.TeacherScheduleSession{
@@ -787,27 +817,19 @@ func (s *SemesterService) GetTeacherCourses(ctx context.Context, instructorID uu
 		return dto.TeacherCoursesResponse{}, sharedErrors.ErrInternal
 	}
 
-	// Build course items with schedule sessions
-	courseItems := make([]dto.TeacherCourseItem, 0, len(courses))
-	for _, course := range courses {
-		// Get schedule sessions for this course
-		sessions, _ := s.scheduleRepo.GetScheduleSessionsByCourseID(ctx, utils.PgUUIDToUUID(course.ID))
-
-		courseItems = append(courseItems, dto.TeacherCourseItem{
-			ID:                utils.PgUUIDToUUID(course.ID),
-			CourseCode:        course.CourseCode,
-			CourseName:        course.CourseName,
-			Faculty:           course.Faculty,
-			Department:        course.Department,
-			Semester:          course.Semester,
-			Credits:           course.Credits,
-			TheoreticalHours:  course.TheoreticalHours,
-			LabHours:          course.LabHours,
-			ClassroomLocation: course.ClassroomLocation,
-			MaxCapacity:       course.MaxCapacity,
-			Schedule:          teacherSchedule(sessions, course.ClassroomLocation),
-		})
+	courseIDs := make([]uuid.UUID, len(courses))
+	for i, course := range courses {
+		courseIDs[i] = utils.PgUUIDToUUID(course.ID)
 	}
+
+	// A course listed without its hours would read as having no lessons.
+	sessions, err := s.scheduleRepo.GetScheduleSessionsByMultipleCourseIDs(ctx, courseIDs)
+	if err != nil {
+		serviceLogger.Error("failed to get teacher course schedules", zap.Error(err))
+		return dto.TeacherCoursesResponse{}, sharedErrors.Wrap(sharedErrors.ErrInternal, err)
+	}
+
+	courseItems := teacherCourseItems(courses, sessions)
 
 	serviceLogger.Info("teacher courses retrieved",
 		zap.Int("count", len(courseItems)),
