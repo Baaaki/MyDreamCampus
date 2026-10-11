@@ -34,6 +34,11 @@ export interface Session {
   is_current: boolean
 }
 
+// GET /auth/sessions wraps the list; the key is null when there are none.
+export interface SessionsResponse {
+  sessions: Session[] | null
+}
+
 // Staff types
 export interface Staff {
   id: string

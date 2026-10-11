@@ -2,7 +2,7 @@ import { useQuery } from "@tanstack/react-query"
 import { useNavigate } from "react-router"
 import { authApi } from "@/lib/api-client"
 import { apiErrorMessage } from "@/lib/api-error"
-import type { Session } from "@/lib/types"
+import type { SessionsResponse } from "@/lib/types"
 import { format } from "date-fns"
 import { tr } from "date-fns/locale"
 
@@ -15,7 +15,10 @@ export default function SessionsPage() {
     refetch: refetchSessions,
   } = useQuery({
     queryKey: ["auth", "sessions"],
-    queryFn: () => authApi.get("sessions").json<Session[]>(),
+    queryFn: async () => {
+      const res = await authApi.get("sessions").json<SessionsResponse>()
+      return res.sessions ?? []
+    },
   })
   const error = queryError
     ? apiErrorMessage(queryError, "Oturumlar yüklenemedi")
