@@ -32,6 +32,21 @@ for db in $ALL_DBS; do
     fi
 done
 
+# The super admin's password, first-login flag, token version and sessions
+# are not demo data: rewound with the rest of auth, a changed password would
+# go back to the baseline's (ADMIN_INITIAL_PASSWORD on the first one) and the
+# super admin would be logged out every hour. They travel as JSON rows so the
+# argon2 hashes never pass through the shell, and are read back by column
+# name once the migrations below have run.
+KEEP_DIR=$(mktemp -d)
+trap 'rm -rf "$KEEP_DIR"' EXIT
+psql_super auth -v ON_ERROR_STOP=1 <<EOF \
+    || fail "[restore] Could not keep the super admin's credentials aside" \
+        "Süper adminin şifresi saklanamadı; geri dönüş başlamadı, veri değişmedi."
+\copy (SELECT row_to_json(u) FROM (SELECT id, password_hash, force_password_change, token_version FROM auth.users WHERE is_superadmin) u) TO '$KEEP_DIR/admins'
+\copy (SELECT row_to_json(s) FROM auth.sessions s WHERE s.user_id IN (SELECT id FROM auth.users WHERE is_superadmin)) TO '$KEEP_DIR/sessions'
+EOF
+
 echo ">> [restore] Restoring baseline $target_version (keep_lock=$keep_lock)..."
 
 # 1. Acquire write lock during restore
@@ -85,6 +100,35 @@ if [ -d "/migrations/notification" ]; then
     goose -dir /migrations/notification -table goose_db_version_notification postgres "$(svc_url notification)" up >/dev/null \
         || fail "[restore] goose up failed for notification" \
             "Geri dönüş sonrası notification migration'ları uygulanamadı."
+fi
+
+# Every database is rewound by now, so a failure here must not stop the
+# script short of the Redis reset: the transaction leaves the baseline's
+# password in place and the log says so.
+if [ -s "$KEEP_DIR/admins" ]; then
+    echo ">> [restore] Putting back the super admin's credentials and sessions..."
+    psql_super auth -v ON_ERROR_STOP=1 <<EOF \
+        || echo "!! [restore] Could not put back the super admin's credentials; the baseline's password is in effect"
+BEGIN;
+CREATE TEMP TABLE kept_admins (j jsonb);
+CREATE TEMP TABLE kept_sessions (j jsonb);
+\copy kept_admins FROM '$KEEP_DIR/admins'
+\copy kept_sessions FROM '$KEEP_DIR/sessions'
+UPDATE auth.users u
+   SET password_hash = k.password_hash,
+       force_password_change = k.force_password_change,
+       token_version = k.token_version
+  FROM kept_admins ka, jsonb_populate_record(NULL::auth.users, ka.j) k
+ WHERE u.id = k.id;
+DELETE FROM auth.sessions s
+ USING kept_admins ka, jsonb_populate_record(NULL::auth.users, ka.j) k
+ WHERE s.user_id = k.id;
+INSERT INTO auth.sessions
+SELECT k.*
+  FROM kept_sessions ks, jsonb_populate_record(NULL::auth.sessions, ks.j) k
+ WHERE k.user_id IN (SELECT id FROM auth.users);
+COMMIT;
+EOF
 fi
 
 # A migration may have altered what a service re-prepared since its
