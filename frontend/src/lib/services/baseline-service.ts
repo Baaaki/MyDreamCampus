@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react"
-import { apiClient } from "@/lib/api-client"
+import { catalogApi } from "@/lib/api-client"
 
 export interface BaselineStatus {
   mode: "normal" | "editing" | "busy"
@@ -43,30 +43,30 @@ export function useIsSystemEditing(): boolean {
 // The ops endpoints only queue the command for demo-ops; the returned id
 // shows up in the status as last_command_id once demo-ops has handled it.
 async function queueCommand(path: string): Promise<string> {
-  const res = await apiClient.post(path).json<QueuedCommand>()
+  const res = await catalogApi.post(path).json<QueuedCommand>()
   return res.command_id
 }
 
 export async function getBaselineStatus(): Promise<BaselineStatus> {
-  return apiClient.get("api/catalog/admin/ops/status").json<BaselineStatus>()
+  return catalogApi.get("admin/ops/status").json<BaselineStatus>()
 }
 
 export async function beginEdit(): Promise<string> {
-  return queueCommand("api/catalog/admin/ops/begin-edit")
+  return queueCommand("admin/ops/begin-edit")
 }
 
 export async function saveBaseline(): Promise<string> {
-  return queueCommand("api/catalog/admin/ops/save")
+  return queueCommand("admin/ops/save")
 }
 
 export async function cancelEdit(): Promise<string> {
-  return queueCommand("api/catalog/admin/ops/cancel-edit")
+  return queueCommand("admin/ops/cancel-edit")
 }
 
 export async function restoreNow(): Promise<string> {
-  return queueCommand("api/catalog/admin/ops/restore-now")
+  return queueCommand("admin/ops/restore-now")
 }
 
 export async function restoreVersion(version: string): Promise<string> {
-  return queueCommand(`api/catalog/admin/ops/restore/${version}`)
+  return queueCommand(`admin/ops/restore/${version}`)
 }
