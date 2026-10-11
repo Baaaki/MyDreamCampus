@@ -89,13 +89,18 @@ type SortDirection = "asc" | "desc"
 
 // Role options based on backend validation
 const ROLE_OPTIONS = [
-  { value: "teacher", label: "Teacher" },
-  { value: "admin", label: "Admin" },
-  { value: "department_head", label: "Department Head" },
-  { value: "dean", label: "Dean" },
-  { value: "rector", label: "Rector" },
-  { value: "advisor", label: "Advisor" },
+  { value: "teacher", label: "Öğretmen" },
+  { value: "admin", label: "Yönetici" },
+  { value: "department_head", label: "Bölüm Başkanı" },
+  { value: "dean", label: "Dekan" },
+  { value: "rector", label: "Rektör" },
+  { value: "advisor", label: "Danışman" },
 ]
+
+const STATUS_LABELS: Record<string, string> = {
+  active: "Aktif",
+  inactive: "Pasif",
+}
 
 export default function StaffPage() {
   const [loading, setLoading] = useState(false)
@@ -298,7 +303,7 @@ export default function StaffPage() {
 
   // Delete staff
   const handleDelete = async (id: string) => {
-    if (!confirm("Are you sure you want to delete this staff member?")) return
+    if (!confirm("Bu personeli silmek istediğinize emin misiniz?")) return
 
     setLoading(true)
     setError("")
@@ -348,9 +353,9 @@ export default function StaffPage() {
         {/* Header */}
         <div className="flex items-center justify-between">
           <div>
-            <h1 className="text-3xl font-bold">Staff Management</h1>
+            <h1 className="text-3xl font-bold">Personel Yönetimi</h1>
             <p className="mt-1 text-muted-foreground">
-              Manage staff members and their information
+              Personel kayıtlarını ve bilgilerini yönetin
             </p>
           </div>
 
@@ -599,7 +604,7 @@ export default function StaffPage() {
                     onClick={() => handleSort("first_name")}
                     className="h-8 px-2"
                   >
-                    Name
+                    Ad Soyad
                     {sortField === "first_name" &&
                       (sortDirection === "asc" ? (
                         <ArrowUp className="ml-2 h-4 w-4" />
@@ -618,7 +623,7 @@ export default function StaffPage() {
                     onClick={() => handleSort("email")}
                     className="h-8 px-2"
                   >
-                    Email
+                    E-posta
                     {sortField === "email" &&
                       (sortDirection === "asc" ? (
                         <ArrowUp className="ml-2 h-4 w-4" />
@@ -637,7 +642,7 @@ export default function StaffPage() {
                     onClick={() => handleSort("role")}
                     className="h-8 px-2"
                   >
-                    Role
+                    Rol
                     {sortField === "role" &&
                       (sortDirection === "asc" ? (
                         <ArrowUp className="ml-2 h-4 w-4" />
@@ -656,7 +661,7 @@ export default function StaffPage() {
                     onClick={() => handleSort("department")}
                     className="h-8 px-2"
                   >
-                    Department
+                    Bölüm
                     {sortField === "department" &&
                       (sortDirection === "asc" ? (
                         <ArrowUp className="ml-2 h-4 w-4" />
@@ -668,7 +673,7 @@ export default function StaffPage() {
                     )}
                   </Button>
                 </TableHead>
-                <TableHead>Phone</TableHead>
+                <TableHead>Telefon</TableHead>
                 <TableHead>
                   <Button
                     variant="ghost"
@@ -676,7 +681,7 @@ export default function StaffPage() {
                     onClick={() => handleSort("office_location")}
                     className="h-8 px-2"
                   >
-                    Office
+                    Ofis
                     {sortField === "office_location" &&
                       (sortDirection === "asc" ? (
                         <ArrowUp className="ml-2 h-4 w-4" />
@@ -688,8 +693,8 @@ export default function StaffPage() {
                     )}
                   </Button>
                 </TableHead>
-                <TableHead>Status</TableHead>
-                <TableHead className="text-right">Actions</TableHead>
+                <TableHead>Durum</TableHead>
+                <TableHead className="text-right">İşlemler</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
@@ -699,7 +704,7 @@ export default function StaffPage() {
                     colSpan={8}
                     className="text-center text-muted-foreground"
                   >
-                    Loading...
+                    Yükleniyor...
                   </TableCell>
                 </TableRow>
               ) : staffList.length === 0 ? (
@@ -708,7 +713,7 @@ export default function StaffPage() {
                     colSpan={8}
                     className="text-center text-muted-foreground"
                   >
-                    No staff members found
+                    Personel bulunamadı
                   </TableCell>
                 </TableRow>
               ) : (
@@ -733,7 +738,7 @@ export default function StaffPage() {
                           staff.status === "active" ? "default" : "destructive"
                         }
                       >
-                        {staff.status}
+                        {STATUS_LABELS[staff.status] ?? staff.status}
                       </Badge>
                     </TableCell>
                     <TableCell className="space-x-2 text-right">
@@ -767,17 +772,17 @@ export default function StaffPage() {
               onClick={() => setPage(page - 1)}
               disabled={page === 1}
             >
-              Previous
+              Önceki
             </Button>
             <span className="flex items-center px-4">
-              Page {page} of {totalPages}
+              Sayfa {page} / {totalPages}
             </span>
             <Button
               variant="outline"
               onClick={() => setPage(page + 1)}
               disabled={page === totalPages}
             >
-              Next
+              Sonraki
             </Button>
           </div>
         )}
@@ -787,12 +792,13 @@ export default function StaffPage() {
           <DialogContent className="sm:max-w-[500px]">
             <DialogHeader>
               <DialogTitle>
-                Edit Staff: {editingStaff?.first_name} {editingStaff?.last_name}
+                Personeli Düzenle: {editingStaff?.first_name}{" "}
+                {editingStaff?.last_name}
               </DialogTitle>
             </DialogHeader>
             <form onSubmit={handleUpdate} className="space-y-4">
               <div className="space-y-2">
-                <Label htmlFor="edit_email">Email *</Label>
+                <Label htmlFor="edit_email">E-posta *</Label>
                 <Input
                   id="edit_email"
                   type="email"
@@ -808,7 +814,7 @@ export default function StaffPage() {
               </div>
               <div className="grid grid-cols-2 gap-4">
                 <div className="space-y-2">
-                  <Label htmlFor="edit_first_name">First Name *</Label>
+                  <Label htmlFor="edit_first_name">Ad *</Label>
                   <Input
                     id="edit_first_name"
                     required
@@ -822,7 +828,7 @@ export default function StaffPage() {
                   />
                 </div>
                 <div className="space-y-2">
-                  <Label htmlFor="edit_last_name">Last Name *</Label>
+                  <Label htmlFor="edit_last_name">Soyad *</Label>
                   <Input
                     id="edit_last_name"
                     required
@@ -959,7 +965,7 @@ export default function StaffPage() {
                 </Popover>
               </div>
               <div className="space-y-2">
-                <Label htmlFor="edit_phone">Phone</Label>
+                <Label htmlFor="edit_phone">Telefon</Label>
                 <Input
                   id="edit_phone"
                   value={updateFormData.phone}
@@ -972,7 +978,7 @@ export default function StaffPage() {
                 />
               </div>
               <div className="space-y-2">
-                <Label htmlFor="edit_office_location">Office Location</Label>
+                <Label htmlFor="edit_office_location">Ofis Konumu</Label>
                 <Input
                   id="edit_office_location"
                   value={updateFormData.office_location}
@@ -985,7 +991,7 @@ export default function StaffPage() {
                 />
               </div>
               <div className="space-y-2">
-                <Label htmlFor="edit_status">Status</Label>
+                <Label htmlFor="edit_status">Durum</Label>
                 <select
                   id="edit_status"
                   value={updateFormData.status}
@@ -997,13 +1003,13 @@ export default function StaffPage() {
                   }
                   className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background file:border-0 file:bg-transparent file:text-sm file:font-medium placeholder:text-muted-foreground focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:outline-none disabled:cursor-not-allowed disabled:opacity-50"
                 >
-                  <option value="active">Active</option>
-                  <option value="inactive">Inactive</option>
+                  <option value="active">Aktif</option>
+                  <option value="inactive">Pasif</option>
                 </select>
               </div>
               <div className="flex gap-2 pt-4">
                 <Button type="submit" disabled={loading} className="flex-1">
-                  {loading ? "Updating..." : "Update Staff"}
+                  {loading ? "Güncelleniyor..." : "Personeli Güncelle"}
                 </Button>
                 <Button
                   type="button"
@@ -1011,7 +1017,7 @@ export default function StaffPage() {
                   onClick={() => setEditDialogOpen(false)}
                   className="flex-1"
                 >
-                  Cancel
+                  İptal
                 </Button>
               </div>
             </form>

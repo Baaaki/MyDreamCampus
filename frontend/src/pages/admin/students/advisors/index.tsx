@@ -104,6 +104,13 @@ type StaffListResponse = {
   }
 }
 
+const STATUS_LABELS: Record<string, string> = {
+  active: "Aktif",
+  graduated: "Mezun",
+  suspended: "Askıda",
+  withdrawn: "Kaydı Silinmiş",
+}
+
 function SortIcon({
   field,
   currentField,
@@ -631,7 +638,7 @@ export default function AdvisorManagementPage() {
                     className="cursor-pointer select-none hover:bg-muted/50"
                     onClick={() => handleOrphanedSort("email")}
                   >
-                    Email
+                    E-posta
                     <SortIcon
                       field="email"
                       currentField={orphanedSortField}
@@ -835,7 +842,8 @@ export default function AdvisorManagementPage() {
           {!orphanedLoading && orphanedStudents.length > 0 && (
             <div className="mt-4 flex items-center justify-between">
               <div className="text-sm text-muted-foreground">
-                Showing {orphanedStudents.length} of {orphanedTotal} students
+                {orphanedTotal} öğrenciden {orphanedStudents.length} tanesi
+                gösteriliyor
               </div>
               <div className="flex gap-2">
                 <Button
@@ -846,11 +854,11 @@ export default function AdvisorManagementPage() {
                   }
                   disabled={orphanedPage === 1}
                 >
-                  Previous
+                  Önceki
                 </Button>
                 <div className="flex items-center gap-2">
                   <span className="text-sm">
-                    Page {orphanedPage} of {orphanedTotalPages}
+                    Sayfa {orphanedPage} / {orphanedTotalPages}
                   </span>
                 </div>
                 <Button
@@ -863,7 +871,7 @@ export default function AdvisorManagementPage() {
                   }
                   disabled={orphanedPage === orphanedTotalPages}
                 >
-                  Next
+                  Sonraki
                 </Button>
               </div>
             </div>
@@ -942,7 +950,7 @@ export default function AdvisorManagementPage() {
                           className="cursor-pointer select-none hover:bg-muted/50"
                           onClick={() => handleAdvisorSort("email")}
                         >
-                          Email
+                          E-posta
                           <SortIcon
                             field="email"
                             currentField={advisorSortField}
@@ -1030,7 +1038,7 @@ export default function AdvisorManagementPage() {
                                     : "destructive"
                               }
                             >
-                              {student.status}
+                              {STATUS_LABELS[student.status] ?? student.status}
                             </Badge>
                           </TableCell>
                         </TableRow>
@@ -1041,8 +1049,8 @@ export default function AdvisorManagementPage() {
                   {/* Pagination for Advisor Students */}
                   <div className="mt-4 flex items-center justify-between">
                     <div className="text-sm text-muted-foreground">
-                      Showing {advisorStudents.length} of {advisorTotal}{" "}
-                      students
+                      {advisorTotal} öğrenciden {advisorStudents.length} tanesi
+                      gösteriliyor
                     </div>
                     <div className="flex gap-2">
                       <Button
@@ -1053,11 +1061,11 @@ export default function AdvisorManagementPage() {
                         }
                         disabled={advisorPage === 1}
                       >
-                        Previous
+                        Önceki
                       </Button>
                       <div className="flex items-center gap-2">
                         <span className="text-sm">
-                          Page {advisorPage} of {advisorTotalPages}
+                          Sayfa {advisorPage} / {advisorTotalPages}
                         </span>
                       </div>
                       <Button
@@ -1070,7 +1078,7 @@ export default function AdvisorManagementPage() {
                         }
                         disabled={advisorPage === advisorTotalPages}
                       >
-                        Next
+                        Sonraki
                       </Button>
                     </div>
                   </div>

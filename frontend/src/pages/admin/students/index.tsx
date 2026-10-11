@@ -85,6 +85,13 @@ type SortField =
   | "status"
 type SortDirection = "asc" | "desc"
 
+const STATUS_LABELS: Record<string, string> = {
+  active: "Aktif",
+  graduated: "Mezun",
+  suspended: "Askıda",
+  withdrawn: "Kaydı Silinmiş",
+}
+
 export default function StudentsPage() {
   const [currentPage, setCurrentPage] = useState(1)
   const [limit] = useState(10)
@@ -243,7 +250,7 @@ export default function StudentsPage() {
   }
 
   const handleDeleteStudent = async (id: string) => {
-    if (!confirm("Are you sure you want to delete this student?")) return
+    if (!confirm("Bu öğrenciyi silmek istediğinize emin misiniz?")) return
 
     try {
       await studentApi.delete(`${id}`)
@@ -296,13 +303,13 @@ export default function StudentsPage() {
         .post("bulk-import", { body: formData })
         .json<{ job_id: string }>()
 
-      alert(`Import job created successfully. Job ID: ${result.job_id}`)
+      alert(`İçe aktarma işi oluşturuldu. İş no: ${result.job_id}`)
       setIsImportOpen(false)
       setSelectedFile(null)
       fetchStudents()
     } catch (error) {
       console.error("Failed to import students:", error)
-      alert("Import failed: " + error)
+      alert("İçe aktarma başarısız: " + error)
     } finally {
       setImporting(false)
     }
@@ -353,7 +360,7 @@ export default function StudentsPage() {
   return (
     <div className="container mx-auto py-10">
       <div className="mb-6 flex items-center justify-between">
-        <h1 className="text-3xl font-bold">Student Management</h1>
+        <h1 className="text-3xl font-bold">Öğrenci Yönetimi</h1>
         <div className="flex gap-2">
           <Link to="/students/advisors">
             <Button variant="outline">
@@ -363,19 +370,20 @@ export default function StudentsPage() {
           <Dialog open={isImportOpen} onOpenChange={setIsImportOpen}>
             <DialogTrigger asChild>
               <Button variant="outline">
-                <Upload className="mr-2 h-4 w-4" /> Bulk Import
+                <Upload className="mr-2 h-4 w-4" /> Toplu İçe Aktar
               </Button>
             </DialogTrigger>
             <DialogContent>
               <DialogHeader>
-                <DialogTitle>Bulk Import Students</DialogTitle>
+                <DialogTitle>Öğrencileri Toplu İçe Aktar</DialogTitle>
                 <DialogDescription>
-                  Upload a CSV file to import multiple students at once.
+                  Birden fazla öğrenciyi tek seferde eklemek için bir CSV
+                  dosyası yükleyin.
                 </DialogDescription>
               </DialogHeader>
               <form onSubmit={handleBulkImport} className="space-y-4">
                 <div>
-                  <Label htmlFor="csv_file">CSV File</Label>
+                  <Label htmlFor="csv_file">CSV Dosyası</Label>
                   <Input
                     id="csv_file"
                     type="file"
@@ -384,8 +392,9 @@ export default function StudentsPage() {
                     required
                   />
                   <p className="mt-2 text-sm text-muted-foreground">
-                    CSV should include: student_number, first_name, last_name,
-                    email, faculty, department, enrollment_year, class_level
+                    CSV şu sütunları içermelidir: student_number, first_name,
+                    last_name, email, faculty, department, enrollment_year,
+                    class_level
                   </p>
                 </div>
                 <div className="flex justify-end space-x-2">
@@ -394,10 +403,10 @@ export default function StudentsPage() {
                     variant="outline"
                     onClick={() => setIsImportOpen(false)}
                   >
-                    Cancel
+                    İptal
                   </Button>
                   <Button type="submit" disabled={importing || !selectedFile}>
-                    {importing ? "Importing..." : "Import"}
+                    {importing ? "İçe aktarılıyor..." : "İçe Aktar"}
                   </Button>
                 </div>
               </form>
@@ -407,19 +416,19 @@ export default function StudentsPage() {
           <Dialog open={isCreateOpen} onOpenChange={setIsCreateOpen}>
             <DialogTrigger asChild>
               <Button>
-                <Plus className="mr-2 h-4 w-4" /> Add New Student
+                <Plus className="mr-2 h-4 w-4" /> Yeni Öğrenci Ekle
               </Button>
             </DialogTrigger>
             <DialogContent>
               <DialogHeader>
-                <DialogTitle>Create New Student</DialogTitle>
+                <DialogTitle>Yeni Öğrenci Oluştur</DialogTitle>
                 <DialogDescription>
-                  Add a new student to the system.
+                  Sisteme yeni bir öğrenci ekleyin.
                 </DialogDescription>
               </DialogHeader>
               <form onSubmit={handleCreateStudent} className="space-y-4">
                 <div>
-                  <Label htmlFor="student_number">Student Number</Label>
+                  <Label htmlFor="student_number">Öğrenci No</Label>
                   <Input
                     id="student_number"
                     value={createFormData.student_number}
@@ -433,7 +442,7 @@ export default function StudentsPage() {
                   />
                 </div>
                 <div>
-                  <Label htmlFor="first_name">First Name</Label>
+                  <Label htmlFor="first_name">Ad</Label>
                   <Input
                     id="first_name"
                     value={createFormData.first_name}
@@ -447,7 +456,7 @@ export default function StudentsPage() {
                   />
                 </div>
                 <div>
-                  <Label htmlFor="last_name">Last Name</Label>
+                  <Label htmlFor="last_name">Soyad</Label>
                   <Input
                     id="last_name"
                     value={createFormData.last_name}
@@ -461,7 +470,7 @@ export default function StudentsPage() {
                   />
                 </div>
                 <div>
-                  <Label htmlFor="email">Email</Label>
+                  <Label htmlFor="email">E-posta</Label>
                   <Input
                     id="email"
                     type="email"
@@ -604,7 +613,7 @@ export default function StudentsPage() {
                     )}
                 </div>
                 <div>
-                  <Label htmlFor="enrollment_year">Enrollment Year</Label>
+                  <Label htmlFor="enrollment_year">Kayıt Yılı</Label>
                   <Input
                     id="enrollment_year"
                     type="number"
@@ -619,7 +628,7 @@ export default function StudentsPage() {
                   />
                 </div>
                 <div>
-                  <Label htmlFor="class_level">Class Level</Label>
+                  <Label htmlFor="class_level">Sınıf</Label>
                   <Input
                     id="class_level"
                     type="number"
@@ -641,9 +650,9 @@ export default function StudentsPage() {
                     variant="outline"
                     onClick={() => setIsCreateOpen(false)}
                   >
-                    Cancel
+                    İptal
                   </Button>
-                  <Button type="submit">Create</Button>
+                  <Button type="submit">Oluştur</Button>
                 </div>
               </form>
             </DialogContent>
@@ -652,11 +661,11 @@ export default function StudentsPage() {
       </div>
 
       {loading ? (
-        <p>Loading...</p>
+        <p>Yükleniyor...</p>
       ) : (
         <>
           <Table>
-            <TableCaption>A list of all students in the system.</TableCaption>
+            <TableCaption>Sistemdeki tüm öğrenciler.</TableCaption>
             <TableHeader>
               <TableRow>
                 <TableHead>
@@ -665,7 +674,7 @@ export default function StudentsPage() {
                     onClick={() => handleSort("student_number")}
                     className="flex items-center"
                   >
-                    Student Number
+                    Öğrenci No
                     {getSortIcon("student_number")}
                   </Button>
                 </TableHead>
@@ -675,7 +684,7 @@ export default function StudentsPage() {
                     onClick={() => handleSort("first_name")}
                     className="flex items-center"
                   >
-                    Name
+                    Ad Soyad
                     {getSortIcon("first_name")}
                   </Button>
                 </TableHead>
@@ -685,7 +694,7 @@ export default function StudentsPage() {
                     onClick={() => handleSort("email")}
                     className="flex items-center"
                   >
-                    Email
+                    E-posta
                     {getSortIcon("email")}
                   </Button>
                 </TableHead>
@@ -695,7 +704,7 @@ export default function StudentsPage() {
                     onClick={() => handleSort("faculty")}
                     className="flex items-center"
                   >
-                    Faculty
+                    Fakülte
                     {getSortIcon("faculty")}
                   </Button>
                 </TableHead>
@@ -705,7 +714,7 @@ export default function StudentsPage() {
                     onClick={() => handleSort("department")}
                     className="flex items-center"
                   >
-                    Department
+                    Bölüm
                     {getSortIcon("department")}
                   </Button>
                 </TableHead>
@@ -715,7 +724,7 @@ export default function StudentsPage() {
                     onClick={() => handleSort("enrollment_year")}
                     className="flex items-center"
                   >
-                    Enrollment Year
+                    Kayıt Yılı
                     {getSortIcon("enrollment_year")}
                   </Button>
                 </TableHead>
@@ -725,22 +734,22 @@ export default function StudentsPage() {
                     onClick={() => handleSort("class_level")}
                     className="flex items-center"
                   >
-                    Class Level
+                    Sınıf
                     {getSortIcon("class_level")}
                   </Button>
                 </TableHead>
-                <TableHead>Advisor</TableHead>
+                <TableHead>Danışman</TableHead>
                 <TableHead>
                   <Button
                     variant="ghost"
                     onClick={() => handleSort("status")}
                     className="flex items-center"
                   >
-                    Status
+                    Durum
                     {getSortIcon("status")}
                   </Button>
                 </TableHead>
-                <TableHead>Actions</TableHead>
+                <TableHead>İşlemler</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
@@ -765,7 +774,7 @@ export default function StudentsPage() {
                       </span>
                     ) : (
                       <span className="text-sm text-muted-foreground">
-                        No Advisor
+                        Danışman Yok
                       </span>
                     )}
                   </TableCell>
@@ -779,7 +788,7 @@ export default function StudentsPage() {
                             : "destructive"
                       }
                     >
-                      {student.status}
+                      {STATUS_LABELS[student.status] ?? student.status}
                     </Badge>
                   </TableCell>
                   <TableCell>
@@ -789,14 +798,14 @@ export default function StudentsPage() {
                         size="sm"
                         onClick={() => openEditModal(student)}
                       >
-                        Edit
+                        Düzenle
                       </Button>
                       <Button
                         variant="destructive"
                         size="sm"
                         onClick={() => handleDeleteStudent(student.id)}
                       >
-                        Delete
+                        Sil
                       </Button>
                     </div>
                   </TableCell>
@@ -811,10 +820,10 @@ export default function StudentsPage() {
               onClick={() => setCurrentPage((prev) => Math.max(prev - 1, 1))}
               disabled={currentPage === 1}
             >
-              Previous
+              Önceki
             </Button>
             <span>
-              Page {currentPage} of {totalPages}
+              Sayfa {currentPage} / {totalPages}
             </span>
             <Button
               variant="outline"
@@ -823,7 +832,7 @@ export default function StudentsPage() {
               }
               disabled={currentPage === totalPages}
             >
-              Next
+              Sonraki
             </Button>
           </div>
         </>
@@ -833,15 +842,15 @@ export default function StudentsPage() {
       <Dialog open={isEditOpen} onOpenChange={setIsEditOpen}>
         <DialogContent>
           <DialogHeader>
-            <DialogTitle>Edit Student</DialogTitle>
+            <DialogTitle>Öğrenciyi Düzenle</DialogTitle>
             <DialogDescription>
-              Update student information. Note: Only class level and status can
-              be changed.
+              Öğrenci bilgilerini güncelleyin. Not: Yalnızca sınıf, durum ve
+              danışman değiştirilebilir.
             </DialogDescription>
           </DialogHeader>
           <form onSubmit={handleUpdateStudent} className="space-y-4">
             <div>
-              <Label htmlFor="edit_student_number">Student Number</Label>
+              <Label htmlFor="edit_student_number">Öğrenci No</Label>
               <Input
                 id="edit_student_number"
                 value={updateFormData.student_number}
@@ -849,7 +858,7 @@ export default function StudentsPage() {
               />
             </div>
             <div>
-              <Label htmlFor="edit_first_name">First Name</Label>
+              <Label htmlFor="edit_first_name">Ad</Label>
               <Input
                 id="edit_first_name"
                 value={updateFormData.first_name}
@@ -857,7 +866,7 @@ export default function StudentsPage() {
               />
             </div>
             <div>
-              <Label htmlFor="edit_last_name">Last Name</Label>
+              <Label htmlFor="edit_last_name">Soyad</Label>
               <Input
                 id="edit_last_name"
                 value={updateFormData.last_name}
@@ -865,7 +874,7 @@ export default function StudentsPage() {
               />
             </div>
             <div>
-              <Label htmlFor="edit_email">Email</Label>
+              <Label htmlFor="edit_email">E-posta</Label>
               <Input
                 id="edit_email"
                 type="email"
@@ -874,7 +883,7 @@ export default function StudentsPage() {
               />
             </div>
             <div>
-              <Label htmlFor="edit_faculty">Faculty</Label>
+              <Label htmlFor="edit_faculty">Fakülte</Label>
               <Input
                 id="edit_faculty"
                 value={updateFormData.faculty}
@@ -882,7 +891,7 @@ export default function StudentsPage() {
               />
             </div>
             <div>
-              <Label htmlFor="edit_department">Department</Label>
+              <Label htmlFor="edit_department">Bölüm</Label>
               <Input
                 id="edit_department"
                 value={updateFormData.department}
@@ -890,7 +899,7 @@ export default function StudentsPage() {
               />
             </div>
             <div>
-              <Label htmlFor="edit_enrollment_year">Enrollment Year</Label>
+              <Label htmlFor="edit_enrollment_year">Kayıt Yılı</Label>
               <Input
                 id="edit_enrollment_year"
                 type="number"
@@ -899,7 +908,7 @@ export default function StudentsPage() {
               />
             </div>
             <div>
-              <Label htmlFor="edit_class_level">Class Level</Label>
+              <Label htmlFor="edit_class_level">Sınıf</Label>
               <Input
                 id="edit_class_level"
                 type="number"
@@ -916,7 +925,7 @@ export default function StudentsPage() {
               />
             </div>
             <div>
-              <Label htmlFor="edit_status">Status</Label>
+              <Label htmlFor="edit_status">Durum</Label>
               <select
                 id="edit_status"
                 value={updateFormData.status}
@@ -929,10 +938,10 @@ export default function StudentsPage() {
                 className="w-full rounded-md border p-2"
                 required
               >
-                <option value="active">Active</option>
-                <option value="graduated">Graduated</option>
-                <option value="suspended">Suspended</option>
-                <option value="withdrawn">Withdrawn</option>
+                <option value="active">Aktif</option>
+                <option value="graduated">Mezun</option>
+                <option value="suspended">Askıda</option>
+                <option value="withdrawn">Kaydı Silinmiş</option>
               </select>
             </div>
             <div>
@@ -984,9 +993,9 @@ export default function StudentsPage() {
                 variant="outline"
                 onClick={() => setIsEditOpen(false)}
               >
-                Cancel
+                İptal
               </Button>
-              <Button type="submit">Update</Button>
+              <Button type="submit">Güncelle</Button>
             </div>
           </form>
         </DialogContent>

@@ -96,11 +96,11 @@ export default function AuditLogPage() {
     <div className="space-y-6">
       <div>
         <h1 className="text-2xl font-bold text-gray-900 dark:text-white">
-          Audit Log
+          Denetim Kaydı
         </h1>
         <p className="text-gray-600 dark:text-gray-400">
-          Tum kritik islemlerin degistirilemez kayitlari (DB trigger ile
-          korunur)
+          Tüm kritik işlemlerin değiştirilemez kayıtları (veritabanı
+          tetikleyicisiyle korunur)
         </p>
       </div>
 
@@ -108,8 +108,8 @@ export default function AuditLogPage() {
         <CardHeader>
           <div className="flex items-center gap-2">
             <ScrollText className="h-5 w-5 text-indigo-600" />
-            <CardTitle>Islem Kayitlari</CardTitle>
-            <span className="ml-auto text-sm text-gray-500">{total} kayit</span>
+            <CardTitle>İşlem Kayıtları</CardTitle>
+            <span className="ml-auto text-sm text-gray-500">{total} kayıt</span>
           </div>
         </CardHeader>
         <CardContent className="space-y-4">
@@ -122,20 +122,20 @@ export default function AuditLogPage() {
                 onChange={(e) => setFilterService(e.target.value)}
                 className="mt-1 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background focus:ring-2 focus:ring-ring focus:ring-offset-2 focus:outline-none"
               >
-                <option value="">Tumu</option>
-                <option value="catalog">Catalog</option>
-                <option value="enrollment">Enrollment</option>
-                <option value="grades">Grades</option>
-                <option value="meal">Meal</option>
-                <option value="attendance">Attendance</option>
-                <option value="auth">Auth</option>
-                <option value="students">Students</option>
-                <option value="staff">Staff</option>
-                <option value="payment">Payment</option>
+                <option value="">Tümü</option>
+                <option value="catalog">Katalog</option>
+                <option value="enrollment">Ders Kaydı</option>
+                <option value="grades">Notlar</option>
+                <option value="meal">Yemekhane</option>
+                <option value="attendance">Yoklama</option>
+                <option value="auth">Kimlik Doğrulama</option>
+                <option value="students">Öğrenciler</option>
+                <option value="staff">Personel</option>
+                <option value="payment">Ödeme</option>
               </select>
             </div>
             <div className="max-w-xs flex-1">
-              <Label>Islem (action)</Label>
+              <Label>İşlem</Label>
               <Input
                 placeholder="semester.activated, period.created..."
                 value={filterAction}
@@ -166,9 +166,9 @@ export default function AuditLogPage() {
                 <TableRow>
                   <TableHead className="w-[160px]">Zaman</TableHead>
                   <TableHead className="w-[100px]">Servis</TableHead>
-                  <TableHead>Islem</TableHead>
+                  <TableHead>İşlem</TableHead>
                   <TableHead>Kaynak</TableHead>
-                  <TableHead>Aktor</TableHead>
+                  <TableHead>Aktör</TableHead>
                   <TableHead className="w-[80px] text-right">Detay</TableHead>
                 </TableRow>
               </TableHeader>
@@ -185,7 +185,7 @@ export default function AuditLogPage() {
                       colSpan={6}
                       className="py-6 text-center text-destructive"
                     >
-                      Audit log yuklenemedi
+                      Denetim kaydı yüklenemedi
                     </TableCell>
                   </TableRow>
                 ) : entries.length === 0 ? (
@@ -194,7 +194,7 @@ export default function AuditLogPage() {
                       colSpan={6}
                       className="py-6 text-center text-gray-500"
                     >
-                      Kayit bulunamadi
+                      Kayıt bulunamadı
                     </TableCell>
                   </TableRow>
                 ) : (
@@ -241,7 +241,7 @@ export default function AuditLogPage() {
                             {entry.actor_id.slice(0, 8)}...
                           </span>
                         ) : (
-                          <span className="text-gray-400">system</span>
+                          <span className="text-gray-400">sistem</span>
                         )}
                       </TableCell>
                       <TableCell className="text-right">
@@ -303,7 +303,7 @@ export default function AuditLogPage() {
       >
         <DialogContent className="max-w-lg">
           <DialogHeader>
-            <DialogTitle>Audit Log Detayi</DialogTitle>
+            <DialogTitle>Denetim Kaydı Detayı</DialogTitle>
           </DialogHeader>
           {selectedEntry && (
             <div className="space-y-3">
@@ -323,23 +323,23 @@ export default function AuditLogPage() {
                   <p className="font-medium">{selectedEntry.service}</p>
                 </div>
                 <div>
-                  <span className="text-gray-500">Islem:</span>
+                  <span className="text-gray-500">İşlem:</span>
                   <p className="font-medium">{selectedEntry.action}</p>
                 </div>
                 <div>
-                  <span className="text-gray-500">Aktor Rolu:</span>
+                  <span className="text-gray-500">Aktör Rolü:</span>
                   <p className="font-medium">
                     {selectedEntry.actor_role || "-"}
                   </p>
                 </div>
                 <div>
-                  <span className="text-gray-500">Aktor ID:</span>
+                  <span className="text-gray-500">Aktör ID:</span>
                   <p className="font-mono text-xs break-all">
                     {selectedEntry.actor_id || "-"}
                   </p>
                 </div>
                 <div>
-                  <span className="text-gray-500">Kaynak Tipi:</span>
+                  <span className="text-gray-500">Kaynak Türü:</span>
                   <p className="font-medium">
                     {selectedEntry.resource_type || "-"}
                   </p>
@@ -352,7 +352,9 @@ export default function AuditLogPage() {
                 </div>
               </div>
               <div>
-                <span className="text-sm text-gray-500">Detaylar (JSON):</span>
+                <span className="text-sm text-gray-500">
+                  Ayrıntılar (JSON):
+                </span>
                 <pre className="mt-1 max-h-64 overflow-auto rounded-lg bg-gray-100 p-3 font-mono text-xs dark:bg-gray-800">
                   {JSON.stringify(selectedEntry.details, null, 2)}
                 </pre>
