@@ -509,14 +509,15 @@ Bu ozellikler **henuz kurulu degil**. Eklenmesi yeni dependency + native config 
 | Push notifications | `expo-notifications` | Devamsizlik bildirimi, not aciklanmasi vs. |
 | Deep linking | `expo-router` (zaten var) + `app.json` `scheme` | Universal links, email'den uygulama acma |
 | Image optimization | `expo-image` | `<Image>` yerine cache + placeholder |
-| EAS Build | `eas-cli` (npx ile) | Production .ipa/.apk. Expo Go yetmez ise |
 | OTA update | `expo-updates` | Native build atmadan JS bundle deploy |
 
-EAS build hizli rehber:
-```bash
-npx eas-cli build --profile preview --platform android
-# eas.json'da profile tanimli olmali; ilk seferde npx eas-cli build:configure
-```
+**Release APK** EAS ile degil, yerelde derlenir (Expo/EAS hesabi YOK, iOS
+dagitimi YOK — iPhone kullanicilari web'i kullanir): `./scripts/build-apk.sh`.
+Imzalama `plugins/withReleaseSigning.js` config plugin'inde; anahtar ve sifreler
+repo disinda `~/.gradle/gradle.properties` (`MDC_UPLOAD_*`). Proje acik kaynak —
+keystore, sifre, `.env` asla commit'lenmez. `android/` uretilen klasordur, elle
+duzenleme; native degisiklik config plugin ile yapilir. Yeni surumde
+`app.json` `expo.android.versionCode` artirilir. Detay: `DEPLOY.md` "Mobil Yayın".
 
 ---
 
@@ -548,7 +549,7 @@ npm run test:coverage # kapsam raporu
 |---|---|---|
 | Type error | Tipi duzelt | `as any`, `@ts-ignore` |
 | Metro cache bozuk | `npx expo start -c` (cache temizle) | `node_modules` sil |
-| Build fail | Expo Go yeterli mi kontrol (native modul varsa Dev Client gerekir) | EAS build calistirilirken log'lar olmadan hata ayiklamaya kalkma |
+| Build fail | Expo Go yeterli mi kontrol (native modul varsa Dev Client gerekir) | `android/build.gradle`'i elle yamamak (sonraki prebuild siler) — Gradle log'unu oku, gerekiyorsa config plugin'i duzelt |
 | 401 sonsuz dongu | `services/api.ts` _retried flag kontrol | Interceptor'i bypass et |
 | iOS simulator API'ye ulasamiyor | Mac IP'sini `EXPO_PUBLIC_API_URL`'e yaz | `localhost` Android'de calismaz |
 | Android emulator API'ye ulasamiyor | `http://10.0.2.2/api` kullan | `localhost` direkt |

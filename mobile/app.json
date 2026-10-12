@@ -13,6 +13,7 @@
     },
     "android": {
       "package": "com.mydreamcampus.mobile",
+      "versionCode": 1,
       "adaptiveIcon": {
         "foregroundImage": "./assets/images/adaptive-icon.png",
         "backgroundColor": "#ffffff"
@@ -44,7 +45,8 @@
       "expo-secure-store",
       "expo-splash-screen",
       "expo-status-bar",
-      "expo-web-browser"
+      "expo-web-browser",
+      "./plugins/withReleaseSigning"
     ],
     "experiments": {
       "typedRoutes": true
