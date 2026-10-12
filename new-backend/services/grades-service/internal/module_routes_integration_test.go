@@ -109,3 +109,69 @@ func TestTranscriptRoutes_WhoGetsWhichTranscript(t *testing.T) {
 		})
 	}
 }
+
+// The teacher's assessment lock through the real routes: the slug comes from
+// the path, so a route without :slug answered 400 for every request.
+func TestLockAssessmentRoute_InstructorLocksAScoredAssessment(t *testing.T) {
+	require.NoError(t, logger.Init("test"))
+	gin.SetMode(gin.TestMode)
+	utils.InitJWTSecret("test-secret-key-minimum-32-characters-long-aaa")
+	platformMiddleware.SetBlacklistChecker(nil)
+	ctx := context.Background()
+	pool := pgtest.New(t, "grades", "sql/migrations")
+
+	course, instructor, student := uuid.New(), uuid.New(), uuid.New()
+	cache := repository.NewCacheRepository(pool)
+	_, err := cache.UpsertCourseCache(ctx, db.UpsertCourseCacheParams{
+		ID: course, CourseCode: "BLM101", CourseName: "Programlamaya Giriş", Credits: 4, Semester: "2026-2027-Fall",
+		InstructorID: instructor, AssessmentSchema: []byte(`[{"slug":"vize","weight":40},{"slug":"final","weight":60}]`),
+	})
+	require.NoError(t, err)
+	_, err = cache.UpsertStudentCache(ctx, db.UpsertStudentCacheParams{ID: student, StudentNumber: "2026001", IsActive: pgtype.Bool{Bool: true, Valid: true}})
+	require.NoError(t, err)
+	reg, err := repository.NewRegistrationRepository(pool).CreateRegistration(ctx, db.CreateRegistrationParams{
+		StudentID: student, CourseID: course, Semester: "2026-2027-Fall", IsAttendanceFailed: pgtype.Bool{Valid: true},
+	})
+	require.NoError(t, err)
+	scores := repository.NewScoreRepository(pool)
+	_, err = scores.UpsertAssessmentScoreWithEvent(ctx, db.UpsertAssessmentScoreParams{
+		RegistrationID: reg.ID, Slug: "vize", Score: utils.Float64ToPgNumeric(70), GradedBy: instructor,
+	}, nil)
+	require.NoError(t, err)
+
+	m := New(pool, nil, sharedRepo.NewSimplePeriodRepository(pool, "grades"), nil, advisorsByStudent{})
+	router := gin.New()
+	m.RegisterRoutes(router.Group("/api/grades"))
+
+	lockOf := func(slug string) string {
+		return "/api/grades/courses/" + course.String() + "/assessments/" + slug + "/lock"
+	}
+	cases := []struct {
+		name, path, auth string
+		want             int
+		code             string
+	}{
+		{"another teacher is refused", lockOf("vize"), bearer(t, uuid.New(), "teacher"), http.StatusForbidden, gradeErrors.ErrNotCourseInstructor.Code},
+		{"a student cannot lock", lockOf("vize"), bearer(t, student, "student"), http.StatusForbidden, ""},
+		{"slug outside the schema", lockOf("quiz"), bearer(t, instructor, "teacher"), http.StatusBadRequest, gradeErrors.ErrInvalidSlug.Code},
+		{"assessment nobody graded yet", lockOf("final"), bearer(t, instructor, "teacher"), http.StatusBadRequest, gradeErrors.ErrIncompleteAssessment.Code},
+		{"instructor locks the graded assessment", lockOf("vize"), bearer(t, instructor, "teacher"), http.StatusOK, `"locked_count":1`},
+	}
+	for _, c := range cases {
+		t.Run(c.name, func(t *testing.T) {
+			req := httptest.NewRequest(http.MethodPost, c.path, nil)
+			req.Header.Set("Authorization", c.auth)
+			w := httptest.NewRecorder()
+			router.ServeHTTP(w, req)
+
+			assert.Equal(t, c.want, w.Code, w.Body.String())
+			if c.code != "" {
+				assert.Contains(t, w.Body.String(), c.code)
+			}
+		})
+	}
+
+	score, err := scores.GetScoreByRegistrationAndSlug(ctx, reg.ID, "vize")
+	require.NoError(t, err)
+	assert.True(t, score.IsLocked.Bool, "the score is final once the assessment is locked")
+}

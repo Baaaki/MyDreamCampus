@@ -133,7 +133,7 @@ func (m *Module) RegisterRoutes(rg *gin.RouterGroup) {
 			// the student has already been shown.
 			teacher.POST("/courses/:course_id/scores", platformMiddleware.Idempotency(), m.gradeHandler.SubmitScore)
 			teacher.POST("/courses/:course_id/scores/bulk", platformMiddleware.Idempotency(), m.gradeHandler.BulkSubmitScores)
-			teacher.POST("/courses/:course_id/scores/lock", m.gradeHandler.LockAssessment)
+			teacher.POST("/courses/:course_id/assessments/:slug/lock", m.gradeHandler.LockAssessment)
 			// A teacher sees only their advisees' transcripts; the service
 			// asks the student service who the advisor is.
 			teacher.GET("/students/:student_id/transcript", m.gradeHandler.GetStudentTranscript)

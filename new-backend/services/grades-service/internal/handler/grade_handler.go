@@ -312,7 +312,7 @@ func (h *GradeHandler) BulkSubmitScores(c *gin.Context) {
 	c.JSON(http.StatusCreated, result)
 }
 
-// LockAssessment - POST /course/:course_id/assessments/:slug/lock
+// LockAssessment - POST /api/grades/courses/:course_id/assessments/:slug/lock
 // Instructor-only: marks every student's score for this assessment as final.
 // Once all assessments are locked, the course auto-finalizes.
 func (h *GradeHandler) LockAssessment(c *gin.Context) {
