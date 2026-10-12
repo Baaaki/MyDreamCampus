@@ -31,13 +31,6 @@ import {
   ChevronsUpDown,
 } from "lucide-react"
 import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select"
-import {
   Command,
   CommandEmpty,
   CommandGroup,
@@ -74,15 +67,12 @@ type SortField =
   | "office_location"
 type SortDirection = "asc" | "desc"
 
-// Role options based on backend validation
-const ROLE_OPTIONS = [
-  { value: "teacher", label: "Öğretmen" },
-  { value: "admin", label: "Yönetici" },
-  { value: "department_head", label: "Bölüm Başkanı" },
-  { value: "dean", label: "Dekan" },
-  { value: "rector", label: "Rektör" },
-  { value: "advisor", label: "Danışman" },
-]
+// The staff API creates teacher accounts only (CreateStaffRequest is
+// oneof=teacher): every new staff row becomes a teacher login in auth.
+const STAFF_ROLE = "teacher"
+const ROLE_LABELS: Record<string, string> = {
+  teacher: "Öğretmen",
+}
 
 const STATUS_LABELS: Record<string, string> = {
   active: "Aktif",
@@ -109,7 +99,6 @@ export default function StaffPage() {
     email: "",
     first_name: "",
     last_name: "",
-    role: "teacher",
     department: "",
     phone: "",
     office_location: "",
@@ -190,7 +179,7 @@ export default function StaffPage() {
         email: formData.email,
         first_name: formData.first_name,
         last_name: formData.last_name,
-        role: formData.role,
+        role: STAFF_ROLE,
         department: formData.department,
         phone: formData.phone,
         office_location: formData.office_location,
@@ -206,7 +195,6 @@ export default function StaffPage() {
         email: "",
         first_name: "",
         last_name: "",
-        role: "teacher",
         department: "",
         phone: "",
         office_location: "",
@@ -283,24 +271,8 @@ export default function StaffPage() {
                   </div>
                 </div>
                 <div className="space-y-2">
-                  <Label htmlFor="role">Rol *</Label>
-                  <Select
-                    value={formData.role}
-                    onValueChange={(value) =>
-                      setFormData({ ...formData, role: value })
-                    }
-                  >
-                    <SelectTrigger>
-                      <SelectValue placeholder="Rol seçin" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {ROLE_OPTIONS.map((role) => (
-                        <SelectItem key={role.value} value={role.value}>
-                          {role.label}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
+                  <Label htmlFor="role">Rol</Label>
+                  <Input id="role" value={ROLE_LABELS[STAFF_ROLE]} disabled />
                 </div>
                 <div className="space-y-2">
                   <Label htmlFor="faculty">Fakülte (filtreleme için)</Label>
@@ -599,8 +571,7 @@ export default function StaffPage() {
                     <TableCell>{staff.email}</TableCell>
                     <TableCell>
                       <Badge variant="outline">
-                        {ROLE_OPTIONS.find((r) => r.value === staff.role)
-                          ?.label || staff.role}
+                        {ROLE_LABELS[staff.role] ?? staff.role}
                       </Badge>
                     </TableCell>
                     <TableCell>{staff.department || "-"}</TableCell>
