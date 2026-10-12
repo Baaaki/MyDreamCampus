@@ -32,7 +32,6 @@ const SESSION = {
 const RECORDS = {
   session_id: "sess-123",
   week_number: 5,
-  total_count: 1,
   present_count: 1,
   records: [
     {
@@ -40,8 +39,7 @@ const RECORDS = {
       student_id: "stu-1",
       student_number: "2024001",
       student_name: "Ali Yılmaz",
-      is_present: true,
-      marked_via: "qr",
+      marked_via: "qr_scan",
       marked_at: "2026-09-28T10:05:00Z",
     },
   ],
@@ -73,7 +71,6 @@ const MANUAL_OK = () =>
     student_id: "stu-2",
     student_number: "2024002",
     student_name: "Ayşe Kaya",
-    is_present: true,
     marked_via: "manual",
     marked_at: "2026-09-28T10:15:00Z",
   })
@@ -82,13 +79,13 @@ const MANUAL_OK = () =>
 function stubBackend({
   session = json(SESSION),
   students = STUDENTS,
-  records = RECORDS,
+  records = () => RECORDS,
   manual = MANUAL_OK,
   close = () => json({ message: "Yoklama kapatıldı" }),
 }: {
   session?: Response
   students?: typeof STUDENTS
-  records?: typeof RECORDS
+  records?: () => typeof RECORDS
   manual?: () => Response
   close?: () => Response
 } = {}) {
@@ -114,7 +111,7 @@ function stubBackend({
             rotation_interval: 15,
           })
         case `GET ${base}/records`:
-          return json(records)
+          return json(records())
         case `GET ${base}/students`:
           return json({
             session_id: "sess-123",
@@ -156,6 +153,7 @@ function renderPage() {
 }
 
 afterEach(() => {
+  vi.useRealTimers()
   vi.unstubAllGlobals()
 })
 
@@ -177,6 +175,10 @@ describe("AttendanceSessionPage", () => {
     expect(screen.getByText("Katıldı")).toBeInTheDocument()
     expect(screen.getByText("Ayşe Kaya")).toBeInTheDocument()
     expect(screen.getByRole("button", { name: /Ekle/ })).toBeInTheDocument()
+    expect(
+      screen.getAllByText("1 / 2"),
+      "header and roster both count the QR scan"
+    ).toHaveLength(2)
     expect(
       screen.getByRole("link", { name: /Ders Sayfasına Dön/ })
     ).toHaveAttribute("href", "/teacher/attendance/course-123")
@@ -207,7 +209,7 @@ describe("AttendanceSessionPage", () => {
 
     await waitFor(() => expect(screen.getAllByText("Katıldı")).toHaveLength(2))
     expect(sent.manual).toEqual([
-      { student_id: "stu-2", is_present: true, note: "Manuel olarak eklendi" },
+      { student_id: "stu-2", note: "Manuel olarak eklendi" },
     ])
     expect(
       screen.queryByRole("button", { name: /Ekle/ })
@@ -240,6 +242,40 @@ describe("AttendanceSessionPage", () => {
     expect(sent.manual).toHaveLength(2)
   })
 
+  it("marks a student who scans the QR while the page is open", async () => {
+    vi.useFakeTimers({ shouldAdvanceTime: true })
+    let records = RECORDS
+    stubBackend({ records: () => records })
+    renderPage()
+
+    expect(
+      await screen.findByRole("button", { name: /Ekle/ })
+    ).toBeInTheDocument()
+    records = {
+      ...RECORDS,
+      present_count: 2,
+      records: [
+        ...RECORDS.records,
+        {
+          id: "rec-2",
+          student_id: "stu-2",
+          student_number: "2024002",
+          student_name: "Ayşe Kaya",
+          marked_via: "qr_scan",
+          marked_at: "2026-09-28T10:06:00Z",
+        },
+      ],
+    }
+    await vi.advanceTimersByTimeAsync(5000)
+
+    await waitFor(() => expect(screen.getAllByText("Katıldı")).toHaveLength(2))
+    expect(
+      screen.queryByRole("button", { name: /Ekle/ }),
+      "no manual add that would relabel the QR record"
+    ).not.toBeInTheDocument()
+    expect(screen.getAllByText("2 / 2")).toHaveLength(2)
+  })
+
   it("fetches a fresh QR code on demand", async () => {
     const sent = stubBackend()
     const user = userEvent.setup()
@@ -264,6 +300,9 @@ describe("AttendanceSessionPage", () => {
     expect(
       within(dialog).getByText(/katılmayan öğrenciler otomatik olarak devamsız/)
     ).toBeInTheDocument()
+    expect(
+      within(dialog).getByText("Katılan öğrenci:").nextSibling
+    ).toHaveTextContent("1")
     expect(
       within(dialog).getByText("Devamsız sayılacak:").nextSibling
     ).toHaveTextContent("1")
@@ -349,7 +388,7 @@ describe("AttendanceSessionPage", () => {
     stubBackend({
       session: json({ ...SESSION, enrolled_student_count: 0 }),
       students: [],
-      records: { ...RECORDS, records: [] },
+      records: () => ({ ...RECORDS, records: [] }),
     })
     renderPage()
 

@@ -754,13 +754,14 @@ export interface QRCodeResponse {
   rotation_interval: number
 }
 
+// A record exists only for a student who attended; absentees have none, so
+// the absent side comes from the enrolled list (SessionStudentsResponse).
 export interface AttendanceRecordItem {
   id: string
   student_id: string
   student_number: string
   student_name: string
-  is_present: boolean
-  marked_via: string
+  marked_via: "qr_scan" | "manual" | "admin"
   marked_at?: string
   note?: string
 }
@@ -768,7 +769,6 @@ export interface AttendanceRecordItem {
 export interface SessionRecordsResponse {
   session_id: string
   week_number: number
-  total_count: number
   present_count: number
   records: AttendanceRecordItem[]
 }
@@ -792,7 +792,6 @@ export interface SessionStudentsResponse {
 
 export interface ManualAttendanceRequest {
   student_id: string
-  is_present: boolean
   note?: string
 }
 
@@ -802,8 +801,7 @@ export interface ManualAttendanceResponse {
   student_id: string
   student_number: string
   student_name: string
-  is_present: boolean
-  marked_via: string
+  marked_via: "qr_scan" | "manual" | "admin"
   note?: string
   marked_at?: string
 }

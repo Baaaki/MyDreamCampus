@@ -188,7 +188,6 @@ export default function AttendanceSessionPage() {
         .post(`sessions/${sessionId}/manual`, {
           json: {
             student_id: student.student_id,
-            is_present: true,
             note: "Manuel olarak eklendi",
           },
         })
@@ -201,7 +200,6 @@ export default function AttendanceSessionPage() {
           student_id: response.student_id,
           student_number: response.student_number,
           student_name: response.student_name,
-          is_present: response.is_present,
           marked_via: response.marked_via,
           marked_at: response.marked_at,
         },
@@ -230,6 +228,8 @@ export default function AttendanceSessionPage() {
   const openCloseDialog = (open: boolean) => {
     setCloseError("")
     setCloseDialogOpen(open)
+    // The summary would otherwise lag the last poll by up to 5 seconds.
+    if (open) fetchRecords()
   }
 
   // Close session
@@ -249,6 +249,14 @@ export default function AttendanceSessionPage() {
       setClosing(false)
     }
   }
+
+  // The roster is fetched once; QR scans reach the page only through the
+  // polled records, so marks are derived from them. is_marked still covers a
+  // manual add that an in-flight older poll would otherwise overwrite.
+  const recordedIds = new Set(attendanceRecords.map((r) => r.student_id))
+  const isMarked = (s: EnrolledStudentItem) =>
+    s.is_marked || recordedIds.has(s.student_id)
+  const presentCount = attendanceRecords.length
 
   if (loading) {
     return (
@@ -326,8 +334,7 @@ export default function AttendanceSessionPage() {
             <div className="flex items-center gap-2 text-gray-600 dark:text-gray-400">
               <Users className="h-4 w-4" />
               <span>
-                {attendanceRecords.filter((r) => r.is_present).length} /{" "}
-                {sessionInfo?.enrolled_student_count}
+                {presentCount} / {sessionInfo?.enrolled_student_count}
               </span>
             </div>
             <div className="flex items-center gap-2 text-orange-600 dark:text-orange-400">
@@ -408,7 +415,7 @@ export default function AttendanceSessionPage() {
               </h2>
             </div>
             <span className="text-sm text-gray-500 dark:text-gray-400">
-              {enrolledStudents.filter((s) => s.is_marked).length} /{" "}
+              {enrolledStudents.filter(isMarked).length} /{" "}
               {enrolledStudents.length}
             </span>
           </div>
@@ -443,13 +450,13 @@ export default function AttendanceSessionPage() {
                   <div
                     key={student.student_id}
                     className={`flex items-center justify-between rounded-lg border p-3 ${
-                      student.is_marked
+                      isMarked(student)
                         ? "border-green-200 bg-green-50 dark:border-green-800 dark:bg-green-900/20"
                         : "border-gray-200 dark:border-gray-700"
                     }`}
                   >
                     <div className="flex items-center gap-3">
-                      {student.is_marked ? (
+                      {isMarked(student) ? (
                         <CheckCircle2 className="h-5 w-5 text-green-500" />
                       ) : (
                         <div className="h-5 w-5 rounded-full border-2 border-gray-300 dark:border-gray-600" />
@@ -463,7 +470,7 @@ export default function AttendanceSessionPage() {
                         </p>
                       </div>
                     </div>
-                    {student.is_marked ? (
+                    {isMarked(student) ? (
                       <span className="text-xs text-green-600 dark:text-green-400">
                         Katıldı
                       </span>
@@ -515,7 +522,7 @@ export default function AttendanceSessionPage() {
                   Katılan öğrenci:
                 </span>
                 <span className="font-medium text-green-600">
-                  {attendanceRecords.filter((r) => r.is_present).length}
+                  {presentCount}
                 </span>
               </div>
               <div className="mt-2 flex justify-between text-sm">
@@ -523,8 +530,7 @@ export default function AttendanceSessionPage() {
                   Devamsız sayılacak:
                 </span>
                 <span className="font-medium text-red-600">
-                  {(sessionInfo?.enrolled_student_count || 0) -
-                    attendanceRecords.filter((r) => r.is_present).length}
+                  {(sessionInfo?.enrolled_student_count || 0) - presentCount}
                 </span>
               </div>
             </div>

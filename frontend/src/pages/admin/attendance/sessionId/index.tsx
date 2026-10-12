@@ -6,6 +6,7 @@ import { apiErrorMessage } from "@/lib/api-error"
 import { catalogService } from "@/lib/services/catalog-service"
 import type {
   SessionRecordsResponse,
+  SessionStudentsResponse,
   AdminSessionItem,
   SessionDetailsResponse,
 } from "@/lib/types"
@@ -68,8 +69,18 @@ export default function AdminAttendanceSessionPage() {
     enabled: !!sessionId,
   })
 
-  const presentStudents = records?.records.filter((r) => r.is_present) || []
-  const absentStudents = records?.records.filter((r) => !r.is_present) || []
+  // Absentees have no record, so they come from the enrolled list.
+  const { data: students, isLoading: studentsLoading } = useQuery({
+    queryKey: ["admin-session-students", sessionId],
+    queryFn: () =>
+      attendanceApiSafe
+        .get(`sessions/${sessionId}/students`)
+        .json<SessionStudentsResponse>(),
+    enabled: !!sessionId,
+  })
+
+  const presentStudents = records?.records ?? []
+  const absentStudents = students?.students.filter((s) => !s.is_marked) ?? []
 
   const [studentToMark, setStudentToMark] = useState<string | null>(null)
   const [isMarking, setIsMarking] = useState(false)
@@ -83,13 +94,17 @@ export default function AdminAttendanceSessionPage() {
       await attendanceApiSafe.post(`sessions/${sessionId}/manual`, {
         json: {
           student_id: studentToMark,
-          is_present: true,
           note: "Admin tarafından manuel eklendi",
         },
       })
-      await queryClient.invalidateQueries({
-        queryKey: ["admin-session-records", sessionId],
-      })
+      await Promise.all([
+        queryClient.invalidateQueries({
+          queryKey: ["admin-session-records", sessionId],
+        }),
+        queryClient.invalidateQueries({
+          queryKey: ["admin-session-students", sessionId],
+        }),
+      ])
     } catch (err) {
       setMarkError(apiErrorMessage(err, "Öğrenci yoklamaya eklenemedi."))
     } finally {
@@ -214,11 +229,11 @@ export default function AdminAttendanceSessionPage() {
           <h2 className="mb-4 text-lg font-semibold text-gray-900 dark:text-white">
             Katılım Kayıtları
           </h2>
-          {recordsLoading ? (
+          {recordsLoading || studentsLoading ? (
             <div className="py-12 text-center text-sm text-gray-500">
               Kayıtlar yükleniyor...
             </div>
-          ) : records ? (
+          ) : records && students ? (
             <div className="space-y-6">
               <div className="grid grid-cols-2 gap-4 text-sm sm:grid-cols-4">
                 <div className="rounded-lg border bg-gray-50 p-4 dark:border-gray-800 dark:bg-gray-950">
@@ -242,7 +257,7 @@ export default function AdminAttendanceSessionPage() {
                     Toplam Kayıtlı
                   </p>
                   <p className="mt-1 text-lg font-medium text-gray-900 dark:text-white">
-                    {records.total_count} Öğrenci
+                    {students.total_enrolled} Öğrenci
                   </p>
                 </div>
                 <div className="rounded-lg border bg-emerald-50 p-4 dark:border-emerald-900/20 dark:bg-emerald-950/20">
@@ -250,7 +265,7 @@ export default function AdminAttendanceSessionPage() {
                     Katılım
                   </p>
                   <p className="mt-1 text-xl font-bold text-emerald-700 dark:text-emerald-300">
-                    {records.present_count} / {records.total_count}
+                    {records.present_count} / {students.total_enrolled}
                   </p>
                 </div>
               </div>
@@ -302,7 +317,7 @@ export default function AdminAttendanceSessionPage() {
                                 </Badge>
                               </TableCell>
                               <TableCell>
-                                {r.marked_via === "qr"
+                                {r.marked_via === "qr_scan"
                                   ? "QR Okutma"
                                   : r.marked_via === "manual"
                                     ? "Manuel (Elle)"
@@ -365,12 +380,14 @@ export default function AdminAttendanceSessionPage() {
                             </TableCell>
                           </TableRow>
                         ) : (
-                          absentStudents.map((r) => (
-                            <TableRow key={r.id}>
+                          absentStudents.map((s) => (
+                            <TableRow key={s.student_id}>
                               <TableCell className="font-medium">
-                                {r.student_number}
+                                {s.student_number}
                               </TableCell>
-                              <TableCell>{r.student_name}</TableCell>
+                              <TableCell>
+                                {s.first_name} {s.last_name}
+                              </TableCell>
                               <TableCell>
                                 <Badge variant="destructive">
                                   Katılmadı (Yok)
@@ -380,7 +397,7 @@ export default function AdminAttendanceSessionPage() {
                                 <Button
                                   variant="outline"
                                   size="sm"
-                                  onClick={() => setStudentToMark(r.student_id)}
+                                  onClick={() => setStudentToMark(s.student_id)}
                                 >
                                   Yoklamaya Ekle
                                 </Button>
