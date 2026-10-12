@@ -53,6 +53,58 @@ edge host'un `:80/:443`'ünü tutuyorsa Caddy'nin `:443`'ü publish etmesi port
 
 ---
 
+## 0. Başlamadan önce: sunucuyu kontrol et
+
+Sunucu boş değilse (başka projeler, eski bir kurulum, zaten çalışan bir
+cloudflared) kurulum ortasında port ya da ağ çakışmasına düşmemek için önce
+şu bloğu sunucuda **olduğu gibi** yapıştır. Yalnız okur, hiçbir şeyi
+değiştirmez, sudo istemez:
+
+```bash
+{
+echo "== OS =="; . /etc/os-release; echo "$PRETTY_NAME"
+echo "== CPU / RAM / DISK =="; echo "cpu: $(nproc)"; free -h | head -2; df -h / | tail -1
+echo "== Araclar =="
+for c in git make curl openssl docker cloudflared; do
+  printf '%-12s ' "$c"; command -v "$c" >/dev/null && ("$c" --version 2>&1 | head -1) || echo "YOK"
+done
+docker compose version 2>&1 | head -1
+echo "== Docker erisimi =="
+echo "gruplar: $(id -nG)  DOCKER_HOST=${DOCKER_HOST:-<bos>}"
+docker info --format 'guvenlik={{.SecurityOptions}}' 2>&1 | head -1
+echo "== Konteynerler =="; docker ps -a --format '{{.Names}}\t{{.Status}}\t{{.Ports}}' 2>&1
+echo "== Eski mydreamcampus volume'lari =="; docker volume ls --format '{{.Name}}' 2>/dev/null | grep -i mydream || echo "yok"
+echo "== Docker aglari =="; docker network ls -q 2>/dev/null | xargs -r docker network inspect --format '{{.Name}} {{range .IPAM.Config}}{{.Subnet}} {{end}}'
+echo "== Dinlenen TCP portlari =="; ss -ltn | awk 'NR>1{print $4}' | sort -u | tr '\n' ' '; echo
+echo "== Host cloudflared =="
+echo "servis: $(systemctl is-active cloudflared 2>/dev/null || echo yok)"
+systemctl cat cloudflared 2>/dev/null | grep ExecStart | sed -E 's/(token[= ])[A-Za-z0-9._-]+/\1***/g'
+echo "== Cloudflare'e cikis (7844) =="; timeout 5 bash -c '</dev/tcp/region1.v2.argotunnel.com/7844' 2>/dev/null && echo "acik" || echo "KAPALI"
+echo "== Saat senkronu =="; timedatectl 2>/dev/null | grep -i synchronized
+} 2>&1
+```
+
+Çıktıyı şu tabloyla oku:
+
+| Çıktıda bunu görürsen | Anlamı | Ne yap |
+|---|---|---|
+| RAM 4 GB'tan az | İlk build ~2.5 GB kullanır | Swap ekle (B → 4b) |
+| `docker` veya `docker compose` → `YOK` | Docker kurulu değil | A1 |
+| `docker info` → `permission denied` | Kullanıcın daemon'a erişemiyor | A1 (rootless) ya da `docker` grubu |
+| `guvenlik=[... name=rootless ...]` | Rootless daemon: 1024 altı port açılamaz | `HTTP_PORT` yüksek port olsun (A1) |
+| Konteynerlerde / volume'larda `mydreamcampus-*` | Eski kurulum duruyor | Eski repo dizininde `make deploy-down` (veriyi korur) ya da sıfırdan başlamak için `make clean` (**veriyi siler**) |
+| Dinlenen portlarda seçtiğin `HTTP_PORT` | Port başka bir projede | Boş bir port seç (ör. `8090`) |
+| Dinlenen portlarda `5432`, `5672`, `15672`, `6379`, `1025` veya `8025` | Standalone katmanı bu infra portlarını `127.0.0.1`'e açar, çakışır | `.env`'de `POSTGRES_HOST_PORT`, `RABBITMQ_HOST_PORT`, `RABBITMQ_UI_HOST_PORT`, `REDIS_HOST_PORT`, `MAILHOG_SMTP_HOST_PORT`, `MAILHOG_UI_HOST_PORT` ile kaydır. `EDGE=tunnel`'da bunlar hiç publish edilmez |
+| Docker ağlarından biri `172.16.238.0/24` ile çakışıyor | Compose ağı kurulamaz | `.env`'de `STACK_SUBNET` (Sorun giderme) |
+| Host cloudflared `servis: active` | Sunucuda zaten bir tunnel çalışıyor | C bölümünde **Yol 2** |
+| Host cloudflared `servis: yok` | Tunnel yok | C bölümünde **Yol 1** (ya da A8) |
+| `ExecStart` satırında `--token` / `--token-file` | Tunnel **panelden yönetiliyor**: hostname → hedef eşlemesi Cloudflare panelinde | Hedefi panelden değiştireceksin (C → Yol 2) |
+| `ExecStart` satırında `--config` | Yönlendirme sunucudaki `config.yml`'de | A8 → 3 |
+| Cloudflare'e çıkış `KAPALI` | Tunnel bağlanamaz | Ağ/firewall'da 7844 (TCP+UDP) çıkışına izin ver |
+| `System clock synchronized: no` | JWT ve 15 sn'lik QR süreleri kayar | `sudo timedatectl set-ntp true` |
+
+---
+
 ## A. Ev sunucusu — tek komut
 
 ### A1. Sunucuda Docker — root yetkisi vermeden
@@ -137,7 +189,18 @@ nano new-backend/infrastructure/.env
 
 Her `CHANGE_ME` için ayrı ayrı `openssl rand -hex 32` çalıştırıp yapıştır. Base64 kullanma:
 `RABBITMQ_PASSWORD` ve `SERVICE_DB_PASSWORD` bağlantı URL'lerine gömülüyor, base64'ün `/`
-karakteri URL'i bozar ve servisler bağlanamaz.
+karakteri URL'i bozar ve servisler bağlanamaz. Elle uğraşmak yerine hepsini tek seferde
+doldurabilirsin (repo kökünden):
+
+```bash
+for k in POSTGRES_PASSWORD SERVICE_DB_PASSWORD REDIS_PASSWORD RABBITMQ_PASSWORD \
+         JWT_SECRET INTERNAL_SERVICE_SECRET QR_SECRET ADMIN_INITIAL_PASSWORD; do
+  sed -i "s|^$k=.*|$k=$(openssl rand -hex 32)|" new-backend/infrastructure/.env
+done
+```
+
+`ADMIN_EMAIL`'i de kendi adresinle değiştirmeyi unutma: süper admin hesabı ilk açılışta
+bu adresle oluşturulur, sonradan `.env`'i değiştirmek hesabı değiştirmez.
 Adres satırları A1'de seçtiğin kuruluma göre — IP'yi kendi LAN IP'nle değiştir:
 
 **Rootless, yüksek port (varsayılan öneri):**
@@ -208,6 +271,16 @@ Ev ağındaki **herhangi bir cihazdan** tarayıcı: `PUBLIC_ORIGIN`'e yazdığı
 `http://192.168.1.50`.
 
 Giriş bilgileri için aşağıdaki [demo hesaplar](#demo-giriş-bilgileri) tablosuna bak.
+
+> **Bilinen kısıt — düz HTTP'de web girişi:** Compose servisleri
+> `ENVIRONMENT=production` ile başlatır ve oturum çerezleri `Secure` bayrağıyla
+> yazılır. Tarayıcılar `Secure` çerezi yalnız HTTPS'te ya da `localhost`'ta
+> saklar. Bu yüzden `http://192.168.1.50` gibi bir LAN adresinden web'e girişte
+> giriş başarılı olur ama sayfa hemen giriş ekranına geri döner (auth logunda
+> `refresh token not found in body or cookie`). Mobil uygulama çerez değil token
+> kullandığı için etkilenmez. Web için ya A8 / C ile HTTPS üzerinden eriş ya da
+> sunucunun kendisinde `http://localhost` kullan (`PUBLIC_HOST=:80`,
+> `PUBLIC_ORIGIN=http://localhost`).
 
 ### A7. Sunucu yeniden başlarsa
 
@@ -652,9 +725,10 @@ periyotlar kapandıktan sonra ~6 ay pay kalır. O pay içinde iki yoldan biri:
 Bu senaryoda proje, kullanıcının ev sunucusunda çalışır ve Cloudflare Tunnel
 aracılığıyla dış dünyaya (`https://mydreamcampus.madebybaki.com`) açılır.
 
-- **Dışarıya açık port yok:** Caddy'nin host portları iptal edilir (`docker-compose.tunnel.yml`).
+- **Dışarıya açık port yok:** Yol 1'de Caddy'nin host portları iptal edilir (`docker-compose.tunnel.yml`).
   İstekler Cloudflare'in sunucuya kurduğu tünel konteyneri (`cloudflared`) üzerinden
-  dahili Docker ağıyla Caddy'ye (`http://caddy:80`) ulaşır.
+  dahili Docker ağıyla Caddy'ye (`http://caddy:80`) ulaşır. Yol 2'de host'taki cloudflared
+  Caddy'ye yalnız `127.0.0.1` üzerinden bağlanır; LAN'a da port açılmaz.
 - **Güvenli ve İzole:** Statik varlıklar Cloudflare tarafından önbelleğe alınır,
   yönetim uçları Cloudflare Access ile korunur. Ziyaretçilerin değişiklikleri en
   fazla 1 saat yaşar: son geri dönüşten sonraki ilk değişiklik 1 saatlik olunca
@@ -664,70 +738,166 @@ aracılığıyla dış dünyaya (`https://mydreamcampus.madebybaki.com`) açıl�
 
 ---
 
+### Hangi yol?
+
+Önce [0. bölümdeki](#0-başlamadan-önce-sunucuyu-kontrol-et) kontrolü çalıştır;
+"Host cloudflared" satırı yolunu belirler:
+
+| | **Yol 1 — cloudflared konteyneri** | **Yol 2 — host'taki cloudflared** |
+|---|---|---|
+| Ne zaman | Sunucuda cloudflared yok | Sunucuda zaten systemd servisi olarak çalışan bir cloudflared var (başka projeler de aynı tunnel'ı kullanıyor olabilir) |
+| `.env` | `EDGE=tunnel` + `TUNNEL_TOKEN` | `EDGE=` (boş) + `HTTP_PORT=127.0.0.1:<boş port>` |
+| Panel hedefi | `HTTP` → `caddy:80` | `HTTP` → `127.0.0.1:<HTTP_PORT>` |
+| Host'a açılan port | Hiç | Yalnız `127.0.0.1` üzerinde Caddy + infra portları |
+
+Yol 2'de token zaten host'ta (`/etc/cloudflared/...`) durur; `.env`'e token
+yazılmaz. İki yolu karıştırma: host'ta cloudflared varken `EDGE=tunnel` yazmak
+aynı tunnel'a ikinci bir bağlayıcı ekler ve hostname'in nereye gittiğini
+belirsizleştirir.
+
 ### Adım Adım Kurulum
+
+Aşağıdaki komutlarda `campus.example.com` yerine kendi alan adını yaz.
 
 #### 1. Repoyu al
 ```bash
-git clone <REPO_URL> mydreamcampus
-cd mydreamcampus
+git clone https://github.com/Baaaki/MyDreamCampus.git ~/mydreamcampus
+cd ~/mydreamcampus
 ```
 
 #### 2. Ortam Değişkenlerini (`.env`) Doldur
-```bash
-cp new-backend/infrastructure/.env.example new-backend/infrastructure/.env
-nano new-backend/infrastructure/.env
-```
-Gereken temel değerler:
-- Tüm secret'ları `openssl rand -hex 32` ile üret (base64 değil: `/` karakteri RabbitMQ ve Postgres URL'lerini bozar).
-- `ADMIN_EMAIL`: Tahmin edilemez gerçek süper admin e-postası.
-- `ADMIN_INITIAL_PASSWORD`: Güçlü geçici ilk şifre. Yalnız ilk açılışta, süper admin oluşturulurken kullanılır; ilk girişte değiştirilmesi zorunludur.
-- `DEMO_MODE=true`
-- `SEED_DEMO=true`
-- `DEMO_ADMIN_EMAIL=demo.admin@mydreamcampus.com`
-- `DEMO_TEACHER_EMAIL=ahmet.yilmaz@uni.edu.tr`
-- `DEMO_STUDENT_EMAIL=zeynep.sahin@uni.edu.tr`
-- `REVERT_AFTER_MINUTES=60`
-- `BASELINE_KEEP=7`
-- `EDGE=tunnel`: Her `make` hedefi ve otomatik deploy bunu `.env`'den okur. Yazmazsan elle
-  çalıştırılan bir `make deploy` standalone katmanına döner ve `cloudflared`'ı kaldırır.
-- `TUNNEL_TOKEN`: Cloudflare Zero Trust panelinden alınan tünel token'ı (aşağıdaki Cloudflare adımlarına bak).
-- `PUBLIC_HOST=:80`
-- `PUBLIC_ORIGIN=https://mydreamcampus.madebybaki.com`
 
-> **Alternatif (Host Seviyesinde Cloudflared):** Eğer sunucuda zaten Docker dışında
-> bağımsız çalışan bir `cloudflared` varsa, `EDGE`'i boş bırak ve normal `make deploy`
-> kullan. `.env`'de `HTTP_PORT=127.0.0.1:8080` ve `HTTPS_PORT=127.0.0.1:8443` yaz —
-> `127.0.0.1:` öneki olmadan port tüm arayüzlere açılır ve Cloudflare'i atlayan bir kapı
-> kalır. Host'taki `~/.cloudflared/config.yml` ingress kuralına
-> `service: http://127.0.0.1:8080` yazılır (ayrıntı: A8).
+Ortak kısım — secret'lar ve süper admin (her iki yol):
+
+```bash
+cd ~/mydreamcampus
+cp new-backend/infrastructure/.env.example new-backend/infrastructure/.env
+
+# Her secret'a ayrı rastgele değer. hex, base64 değil: '/' Postgres/RabbitMQ URL'lerini bozar.
+for k in POSTGRES_PASSWORD SERVICE_DB_PASSWORD REDIS_PASSWORD RABBITMQ_PASSWORD \
+         JWT_SECRET INTERNAL_SERVICE_SECRET QR_SECRET ADMIN_INITIAL_PASSWORD; do
+  sed -i "s|^$k=.*|$k=$(openssl rand -hex 32)|" new-backend/infrastructure/.env
+done
+
+# Süper admin: tahmin edilmesi zor bir adres seç (giriş ekranı herkese açık).
+# Hesap ilk açılışta bu adresle oluşturulur; sonra değiştirmek hesabı değiştirmez.
+sed -i 's|^ADMIN_EMAIL=.*|ADMIN_EMAIL=sen@example.com|' new-backend/infrastructure/.env
+```
+
+Demo ayarları (`DEMO_MODE=true`, `SEED_DEMO=true`, demo e-postaları,
+`REVERT_AFTER_MINUTES=60`, `BASELINE_KEEP=7`) `.env.example`'da zaten canlı
+demoya uygun; dokunmana gerek yok.
+
+**Yol 1 — cloudflared konteyneri:**
+
+```bash
+ENV=new-backend/infrastructure/.env
+sed -i 's|^EDGE=.*|EDGE=tunnel|; s|^PUBLIC_HOST=.*|PUBLIC_HOST=:80|; s|^PUBLIC_ORIGIN=.*|PUBLIC_ORIGIN=https://campus.example.com|' $ENV
+echo 'TUNNEL_TOKEN=<panelden aldığın token>' >> $ENV
+```
+
+`EDGE=tunnel` önemli: her `make` hedefi ve otomatik deploy bunu `.env`'den
+okur. Yazmazsan elle çalıştırılan bir `make deploy` standalone katmanına döner
+ve `cloudflared`'ı kaldırır.
+
+**Yol 2 — host'taki cloudflared:**
+
+```bash
+ENV=new-backend/infrastructure/.env
+sed -i 's|^EDGE=.*|EDGE=|; s|^PUBLIC_HOST=.*|PUBLIC_HOST=:80|; s|^PUBLIC_ORIGIN=.*|PUBLIC_ORIGIN=https://campus.example.com|' $ENV
+cat >> $ENV <<'EOF'
+
+# Host cloudflared reaches caddy here. Loopback only: nothing on the LAN bypasses Cloudflare.
+HTTP_PORT=127.0.0.1:8090
+HTTPS_PORT=127.0.0.1:8443
+EOF
+```
+
+`8090` 0. bölümde boş gördüğün herhangi bir port olabilir — aynı sunucudaki
+başka bir proje sık sık `8080`'i tutar. `127.0.0.1:` önekini atma: öneksiz port
+tüm arayüzlere açılır ve Cloudflare'i (Access, WAF, rate limit) atlayan bir
+kapı kalır.
+
+**Kontrol (her iki yol):**
+
+```bash
+make check-env && echo CHECK_ENV_OK
+grep -E '^(EDGE|HTTP_PORT|PUBLIC_HOST|PUBLIC_ORIGIN|ADMIN_EMAIL|DEMO_MODE|SEED_DEMO)=' new-backend/infrastructure/.env
+```
+
+`ADMIN_EMAIL` hâlâ `sen@example.com` ya da `admin@university.edu.tr` ise
+**deploy'dan önce** düzelt.
 
 #### 3. Stack'i Başlat
 ```bash
 make deploy
 ```
-`.env`'deki `EDGE=tunnel` sayesinde bu komut `docker-compose.yml` ve `docker-compose.tunnel.yml`
-katmanlarını birlikte yükler.
-Caddy'nin host portları kalkar, `cloudflared` konteyneri ayağa kalkıp tüneli kurar.
-`make` hedefleri katmanı kendisi seçer. Compose'u doğrudan çağıracaksan ("Günlük komutlar"daki
-`COMPOSE_FILE` örneği) `docker-compose.standalone.yml` yerine `docker-compose.tunnel.yml` yaz.
+İlk sefer 5-10 dakika sürer (4 CPU'da ölçülen ~5 dk); sonrakiler önbellekten gelir.
 
-#### 4. Seed ve İlk Kalıcı Durumu Doğrula
+- **Yol 1:** `EDGE=tunnel` sayesinde `docker-compose.yml` + `docker-compose.tunnel.yml`
+  yüklenir. Caddy'nin host portları kalkar, `cloudflared` konteyneri tüneli kurar.
+- **Yol 2:** `docker-compose.yml` + `docker-compose.standalone.yml` yüklenir. Caddy
+  `127.0.0.1:<HTTP_PORT>`'u dinler; host'taki cloudflared oraya bağlanır.
+
+`make` hedefleri katmanı kendisi seçer. Compose'u doğrudan çağıracaksan ("Günlük
+komutlar"daki `COMPOSE_FILE` örneği) Yol 1'de `docker-compose.standalone.yml`
+yerine `docker-compose.tunnel.yml` yaz.
+
+#### 4. Panel hedefini ayarla, sonra doğrula
+
+Cloudflare Zero Trust → Networks → Tunnels → tunnel'ın → **Public Hostname**
+(yeni arayüzde "Published application routes") → hostname'in → **Edit**:
+
+| | Yol 1 | Yol 2 |
+|---|---|---|
+| Service Type | `HTTP` | `HTTP` |
+| URL | `caddy:80` | `127.0.0.1:8090` (seçtiğin `HTTP_PORT`) |
+
+Yol 2'de `localhost` değil `127.0.0.1` yaz: `localhost` önce `::1`'e çözülebilir
+ve orada dinleyen yoktur. **Yeniden kurulumda** bu kaydı mutlaka kontrol et:
+eski kurulumun hedefi (ör. `localhost:80`) panelde kalır ve yeni stack'e
+ulaşamadığı için 502 döner.
+
+`make deploy` bittikten ~1 dakika sonra (seed'in bitmesi için):
+
 ```bash
-# Seed işlemini kontrol et
-docker logs mydreamcampus-seed | grep "seed complete"
-
-# demo-ops konteynerinin ilk kalıcı durumu kaydettiğini kontrol et
-docker logs mydreamcampus-demo-ops | grep "Snapshot completed"
+make deploy-ps
+docker logs mydreamcampus-seed 2>&1 | tail -1                              # "seed complete"
+docker logs mydreamcampus-demo-ops 2>&1 | grep -i "snapshot completed" | tail -1
+curl -s -o /dev/null -w 'yerel:    %{http_code}\n' http://127.0.0.1:8090/health   # yalnız Yol 2
+curl -s -o /dev/null -w 'internet: %{http_code}\n' https://campus.example.com/health
 ```
 
+| Sonuç | Anlamı |
+|---|---|
+| `deploy-ps`'te `migrate` ve `seed` `Exited (0)` | Normal: tek seferlik işler |
+| yerel `200`, internet `200` | Yayındasın |
+| yerel `200`, internet `502` | Stack sağlam, panel hedefi yanlış. Host'ta: `journalctl -u cloudflared --since "15 min ago" --no-pager \| grep -i originService \| tail -1` — `originService=` cloudflared'ın gerçekte gittiği adresi gösterir |
+| yerel ≠ `200` | Kurulum sorunu: `make deploy-logs`, `make logs-auth` |
+
 #### 5. Süper Admin İlk Girişi ve Doğrulama
-1. Tarayıcıda `https://mydreamcampus.madebybaki.com` adresini aç.
-2. `ADMIN_EMAIL` ve `ADMIN_INITIAL_PASSWORD` ile giriş yap.
-3. Sunucu seni otomatik olarak `/change-password` ekranına yönlendirecektir; güçlü yeni şifreni belirle.
-   Bu adım zorunludur: şifre değişmeden başka admin işlemi çalışmaz. Yeni şifren ve açık oturumların saatlik
-   geri dönüşte ve düzenleme oturumlarında korunur; kalıcı durum ilk şifreyi taşısa da geri dönüş onu geri getirmez.
+
+Giriş ekranındaki Öğrenci / Öğretmen / Admin düğmeleri **herkese açık demo
+hesaplarıdır**; değişiklikleri saatlik geri dönüşle silinir. Süper admin
+(`ADMIN_EMAIL`) yalnız sana aittir ve demo admininden farklı olarak **Kalıcı
+Veri** sayfasını (`/system/baseline`) görür: sitenin geri döndüğü durumu
+belirler, "Düzenlemeye Başla" ile kalıcı değişiklik yapar, eski sürüme döner.
+Girmezsen demo yine çalışır (ilk snapshot'a döner), ama ilk şifre `.env`'de düz
+metin durur.
+
+1. İlk şifreni sunucuda gör: `grep ADMIN_INITIAL_PASSWORD ~/mydreamcampus/new-backend/infrastructure/.env`
+2. Tarayıcıda `https://campus.example.com`'u aç. Demo düğmelerine **basma**;
+   `ADMIN_EMAIL` ve bu şifreyi elle yaz.
+3. Sunucu seni otomatik olarak `/change-password` ekranına yönlendirecektir; güçlü yeni şifreni belirle
+   (en az 8 karakter; büyük harf, küçük harf ve rakam). Bu adım zorunludur: şifre değişmeden başka
+   admin işlemi çalışmaz. Yeni şifren ve açık oturumların saatlik geri dönüşte ve düzenleme
+   oturumlarında korunur; kalıcı durum ilk şifreyi taşısa da geri dönüş onu geri getirmez.
 4. `/system/baseline` ("Kalıcı Veri") sayfasına git ve ilk kalıcı durumun (`YYYYMMDD-HHMMSS` adlı sürüm)
    listelendiğini gör. Cloudflare Access'i (aşağıda 4. adım) kurduysan sayfa önce Access doğrulaması ister.
+
+`ADMIN_INITIAL_PASSWORD` satırını şifreyi değiştirdikten sonra da `.env`'de
+bırak: değeri artık kullanılmaz ama compose değişkeni zorunlu tutar, silersen
+`make deploy` hata verir.
 
 #### 6. Otomatik Deploy'u Kur
 ```bash
@@ -743,7 +913,8 @@ notlarında.
 
 ### Cloudflare ve Yayın Adımları
 
-1. **Cloudflare Tunnel (Zero Trust):**
+1. **Cloudflare Tunnel (Zero Trust) — Yol 1.** Yol 2'de tunnel zaten var: yeni tunnel
+   oluşturma, yalnız hostname kaydının hedefini `HTTP` → `127.0.0.1:<HTTP_PORT>` yap (adım 4).
    - Cloudflare One (Zero Trust) -> Networks -> Tunnels -> **Create a tunnel**.
    - Connector tipi olarak **Cloudflared / Docker** seç.
    - Verilen komuttaki `--token <TOKEN>` değerini kopyalayıp sunucudaki `.env` dosyasındaki `TUNNEL_TOKEN` alanına yapıştır.
@@ -875,6 +1046,8 @@ Kalıcı olsun istersen `~/.bashrc`'ye ekle.
 | Build OOM (2GB) | Adım 4b swap ekle veya droplet'i 4GB'a resize et. |
 | `rabbitmq` açılmıyor, logda `feature flag` / `incompatible` | Broker yeni bir sürüm serisine, eski sürümde kapalı kalmış feature flag'lerle geçmiş. Aşağıdaki "RabbitMQ sürüm yükseltmesi" bölümüne bak. |
 | Tunnel bağlanmıyor | `docker compose logs cloudflared`. `TUNNEL_TOKEN` değerinin `.env`'de doğru olduğunu kontrol et. Cloudflare Zero Trust'ta Public Hostname hedefinin `caddy:80` (HTTP) olarak yazıldığından emin ol (localhost:80 container içinden host'a değil container'ın kendisine bakar). |
+| Site 502, ama sunucuda `curl http://127.0.0.1:<HTTP_PORT>/health` → 200 | Stack sağlam, tunnel yanlış yere gidiyor. Host cloudflared'da (C → Yol 2): `journalctl -u cloudflared --since "15 min ago" --no-pager \| grep -i originService \| tail -1`. `originService=` paneldeki hedeftir; yeniden kurulumda eski hedef (ör. `http://localhost:80`) kalmış olur. Panelde `HTTP` → `127.0.0.1:<HTTP_PORT>` yap. |
+| Giriş "başarılı" ama sayfa hemen giriş ekranına dönüyor | Tarayıcı oturum çerezini saklamıyor: servisler production'da `Secure` çerez yazar, düz HTTP'de (`localhost` hariç) tarayıcı bunu atar. Auth logunda `refresh token not found in body or cookie`. HTTPS (tunnel) üzerinden ya da sunucuda `http://localhost` ile eriş (A6'daki not). |
 | Loglarda gerçek IP görünmüyor | `frontend/Caddyfile`'daki `trusted_proxies` bloğunun Docker ağını (`172.16.0.0/12`) kapsadığından emin ol. Compose ağı `172.16.238.0/24` olarak sabitlenmiştir; `STACK_SUBNET` ile değiştirirsen `172.16.0.0/12` içinde kalmalı. |
 | Geri dönüş (restore) hatası | `docker compose logs demo-ops`. Veritabanı şifrelerinin `.env` ile uyumunu doğrula. `docker exec mydreamcampus-demo-ops ls -la /baselines` ile geçerli dump dosyalarını kontrol et. |
 | Kilit takılı kaldı (503 SYSTEM_EDITING) | Kalıcı Veri sayfasına bak. Mod "Düzenleme" ise süper admin "Kaydet ve Yayına Al" ya da "Vazgeç ve Sıfırla" ile bitirir; bitirmezse demo-ops `EDIT_TIMEOUT_MINUTES` (varsayılan 120) dolunca kendisi kapatır. demo-ops çöktüyse `docker restart mydreamcampus-demo-ops`: yarıda kalan bir işlemin kilidini kaldırır, süren bir düzenlemeyi son tarihine kadar korur. Kilit Redis'teki süreli `ops:write_lock` anahtarıdır; son çare: `docker exec mydreamcampus-redis sh -c 'redis-cli -a "$REDIS_PASSWORD" --no-auth-warning DEL ops:write_lock'`. |
