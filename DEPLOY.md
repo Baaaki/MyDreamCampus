@@ -959,17 +959,52 @@ notlarında.
    - Yeni monitor ekle: Type `HTTP(s)`, URL `https://mydreamcampus.madebybaki.com/health`, Interval `5 minutes`.
    - Caddy `/health` isteğini `auth-service`'e iletir; auth-service Postgres, Redis ve RabbitMQ sağlığını doğrulayarak yanıt verir.
 
-7. **Mobil Yayın (EAS Build Preview):**
+7. **Mobil Yayın (Android APK, yerel build):**
+   APK geliştirme makinesinde, Expo/EAS hesabı olmadan derlenir. Gereken: JDK 17+
+   ve Android SDK (`ANDROID_HOME`). İlk build Gradle ve NDK indirdiği için uzun
+   sürer. iOS sürümü yok; iPhone kullanıcıları web sürümünü kullanır.
+
+   **İmzalama anahtarı (bir kez).** Anahtar ve şifreleri repoya **asla** girmez.
+   Sertifikadaki `-dname` APK'yı indiren herkes tarafından okunabilir, bu yüzden
+   oraya kişisel bilgi yazma:
+   ```bash
+   mkdir -p ~/keystores
+   keytool -genkeypair -v -storetype PKCS12 -keyalg RSA -keysize 4096 -validity 10000 \
+     -keystore ~/keystores/mydreamcampus-release.jks -alias mydreamcampus \
+     -dname "CN=MyDreamCampus"
+   ```
+   Sonra `~/.gradle/gradle.properties` dosyasına ekle (PKCS12'de iki şifre aynıdır;
+   yol mutlak olmalı, `~` açılmaz) ve `chmod 600 ~/.gradle/gradle.properties`:
+   ```properties
+   MDC_UPLOAD_STORE_FILE=/home/<kullanici>/keystores/mydreamcampus-release.jks
+   MDC_UPLOAD_STORE_PASSWORD=<sifre>
+   MDC_UPLOAD_KEY_ALIAS=mydreamcampus
+   MDC_UPLOAD_KEY_PASSWORD=<sifre>
+   ```
+   `.jks` dosyasını ve şifreyi repo dışında bir yere yedekle. Kaybolursa sonraki
+   sürümler eskisinin üzerine kurulamaz; kullanıcılar uygulamayı silip yeniden kurmak
+   zorunda kalır.
+
+   **Build:**
    ```bash
    cd mobile
-   npx eas-cli login
-   npx eas-cli init    # Expo projesini oluşturur, app.json'a extra.eas.projectId yazar
-   npx eas-cli build -p android --profile preview
+   ./scripts/build-apk.sh                                     # API: https://mydreamcampus.madebybaki.com/api
+   API_URL=https://campus.example.com/api ./scripts/build-apk.sh   # kendi domain'in
    ```
-   `app.json`'da yer tutucu bir `projectId` bırakma: `eas init` var olan bir ID'yi
-   "zaten bağlı" sayıp yenisini yazmaz, build de olmayan projeyi arar.
-   `eas init`'in yazdığı `extra.eas` bloğunu commit'le.
-   EAS tarafından üretilen APK indirme bağlantısını projenin dokümantasyonuna veya README'sine ekleyebilirsin.
+   Çıktı `mobile/dist/mydreamcampus.apk`. Script anahtar yoksa durur, API adresinin
+   bundle'a girdiğini kontrol eder ve SHA-256'yı yazar. `android/` her build'de
+   yeniden üretilir; imzalama ayarı `mobile/plugins/withReleaseSigning.js` içindedir.
+
+   **Yeni sürüm:** `mobile/app.json`'da `expo.android.versionCode`'u **1 artır**
+   (ve `expo.version`'ı güncelle). Aynı ya da daha küçük `versionCode` eski kurulumun
+   üzerine yüklenmez.
+
+   **Yayınlama:** GitHub'da `mobile-vX.Y.Z` etiketiyle bir Release aç ve APK'yı
+   **her zaman `mydreamcampus.apk` adıyla** yükle (SHA-256'yı notlara ekle). Bu
+   bağlantı hep son sürümü indirir, landing page'de bir kez yazılması yeter:
+   `https://github.com/Baaaki/MyDreamCampus/releases/latest/download/mydreamcampus.apk`.
+   İndirenler Android'de "bilinmeyen kaynaklardan yükleme" iznini vermeli;
+   Play Protect "tanınmayan geliştirici" uyarısı gösterebilir.
 
 8. **(İsteğe bağlı) Sunucu Dışı Yedek:**
    `BASELINE_OFFSITE_CMD` her kalıcı durumdan sonra **demo-ops konteynerinin içinde** çalışır.

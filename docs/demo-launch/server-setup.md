@@ -327,18 +327,20 @@ bildirim için e-postanı seç.
 
 ## 13. [Geliştirme] Mobil APK
 
+Expo/EAS hesabı gerekmez; APK bu bilgisayarda derlenir. Anahtar üretimi,
+`~/.gradle/gradle.properties` ayarı ve yayınlama: [DEPLOY.md](../../DEPLOY.md)
+"Mobil Yayın (Android APK, yerel build)".
+
 ```bash
 cd mobile
-npx eas-cli login
-npx eas-cli init                                   # app.json'a projectId yazar
-npx eas-cli build -p android --profile preview     # bulutta derler, ~15 dk
+./scripts/build-apk.sh        # çıktı: dist/mydreamcampus.apk, ilk build uzun sürer
 ```
 
-- `eas init`'in `app.json`'da yaptığı değişikliği commit'le (ya da bana
-  söyle, ben commit'lerim).
-- Build bitince verilen APK bağlantısını telefona kur. Giriş panelini,
-  rezervasyonu ve `4242 4242 4242 4242` ile ödemeyi dene. Bağlantıyı README'ye
-  ekleyelim.
+- APK'yı telefona kur. Giriş panelini, rezervasyonu ve `4242 4242 4242 4242`
+  ile ödemeyi dene.
+- GitHub'da Release aç, APK'yı `mydreamcampus.apk` adıyla yükle. Landing page'e
+  `https://github.com/Baaaki/MyDreamCampus/releases/latest/download/mydreamcampus.apk`
+  bağlantısını ekle.
 - Bu bilgisayarda Expo ile geliştirirken `mobile/.env` içindeki
   `EXPO_PUBLIC_API_URL`'i `https://mydreamcampus.madebybaki.com/api` yap.
   LAN adresi artık cevap vermiyor.

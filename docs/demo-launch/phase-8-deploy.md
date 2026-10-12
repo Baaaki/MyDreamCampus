@@ -121,8 +121,10 @@
     Ardından `EDGE=tunnel make deploy` ve `make autodeploy-install`.
   - [ ] Süper admin ilk giriş: şifre değişimi, sonra "Kalıcı Veri" sayfasında
     ilk kalıcı durumun göründüğünü kontrol et.
-  - [ ] Expo hesabı: `eas init` (projectId), ardından
-    `eas build -p android --profile preview`. APK linkini README'ye ekle.
+  - [ ] Android APK (yerel build, Expo/EAS hesabı yok — karar 12.10): imzalama
+    anahtarını üret, `mobile/scripts/build-apk.sh`, APK'yı GitHub Release'e
+    `mydreamcampus.apk` adıyla yükle; `releases/latest/download` bağlantısını
+    landing page'e ekle. iOS yok, iPhone kullanıcıları web'i kullanır.
   - [ ] (İsteğe bağlı) Sunucu dışı yedek: rclone'u host'a kur ve DEPLOY.md
     C/8'deki cron satırını ekle. (`BASELINE_OFFSITE_CMD` demo-ops
     konteynerinde çalışır; orada rclone yok.)
