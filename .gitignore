@@ -100,3 +100,4 @@ docker-compose.override.yml
 # PROJECT OUT-OF-SCOPE
 ############################
 landingpage/
+.gstack/
