@@ -8,7 +8,7 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu"
-import { Moon, Sun, LogOut, User, Settings, Bell } from "lucide-react"
+import { Moon, Sun, LogOut, User, Settings, Bell, Menu } from "lucide-react"
 import { useNavigate } from "react-router"
 import { authApi } from "@/lib/api-client"
 import { cn } from "@/lib/utils"
@@ -34,7 +34,11 @@ const profilePaths: Record<string, string> = {
   student: "/student/dashboard",
 }
 
-export function Header() {
+interface HeaderProps {
+  onMenuClick: () => void
+}
+
+export function Header({ onMenuClick }: HeaderProps) {
   const { theme, toggleTheme } = useTheme()
   const navigate = useNavigate()
   const [user] = useState<{ email: string; role: string } | null>(() => {
@@ -70,20 +74,29 @@ export function Header() {
   return (
     <header
       className={cn(
-        "fixed right-0 left-52 z-30 h-16 border-b border-gray-200 bg-white transition-colors dark:border-gray-800 dark:bg-gray-900",
-        isDemo ? "top-8" : "top-0"
+        "fixed right-0 left-0 z-30 h-16 border-b border-gray-200 bg-white transition-colors dark:border-gray-800 dark:bg-gray-900",
+        isDemo ? "top-8" : "top-0",
+        "lg:left-16"
       )}
     >
-      <div className="flex h-full items-center justify-between px-6">
-        {/* Left side - Page title or breadcrumb can go here */}
-        <div className="flex items-center gap-4">
-          <h2 className="text-lg font-semibold text-gray-900 dark:text-white">
+      <div className="flex h-full items-center justify-between gap-2 px-4 md:px-6">
+        <div className="flex min-w-0 items-center gap-2">
+          <Button
+            variant="ghost"
+            size="icon"
+            onClick={onMenuClick}
+            aria-label="Menüyü aç"
+            className="-ml-2 shrink-0 text-gray-600 lg:hidden dark:text-gray-400"
+          >
+            <Menu className="h-5 w-5" />
+          </Button>
+          <h2 className="truncate text-base font-semibold text-gray-900 sm:text-lg dark:text-white">
             {panelTitle}
           </h2>
         </div>
 
         {/* Right side - Actions */}
-        <div className="flex items-center gap-3">
+        <div className="flex shrink-0 items-center gap-1 sm:gap-3">
           {/* Notifications */}
           <Button variant="ghost" size="icon">
             <Bell className="h-5 w-5 text-gray-600 dark:text-gray-400" />
