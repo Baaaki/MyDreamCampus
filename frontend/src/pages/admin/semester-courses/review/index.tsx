@@ -351,7 +351,7 @@ export default function SemesterReviewPage() {
     <div className="min-h-screen bg-gray-50 py-8 dark:bg-gray-900">
       <div className="mx-auto max-w-[1600px] space-y-6 px-4">
         {/* Header */}
-        <div className="flex items-center justify-between">
+        <div className="flex flex-wrap items-center justify-between gap-4">
           <div className="flex items-center gap-4">
             <Button
               variant="ghost"
@@ -600,7 +600,7 @@ export default function SemesterReviewPage() {
                             {classLevel}. Sınıf Haftalık Ders Programı
                           </h4>
                         </div>
-                        <div className="overflow-x-auto">
+                        <div className="relative overflow-x-auto">
                           <table className="w-full border-collapse">
                             <thead>
                               <tr className="bg-gray-50 dark:bg-gray-700">

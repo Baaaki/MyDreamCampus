@@ -2435,7 +2435,7 @@ export default function StaffProfilePage() {
                             </Button>
                           )}
                         </div>
-                        <div className="overflow-x-auto">
+                        <div className="relative overflow-x-auto">
                           <table className="w-full">
                             <thead>
                               <tr className="border-b">
@@ -2638,7 +2638,7 @@ export default function StaffProfilePage() {
                                     }
                                   />
                                 </div>
-                                <div className="grid grid-cols-3 gap-3">
+                                <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
                                   <Input
                                     placeholder="Yayın Ayı/Yılı"
                                     value={article.publishingMonth || ""}
@@ -3027,7 +3027,7 @@ export default function StaffProfilePage() {
                                       }
                                     />
                                   </div>
-                                  <div className="grid grid-cols-3 gap-3">
+                                  <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
                                     <Input
                                       type="number"
                                       placeholder="Başlangıç Yılı"
@@ -3121,7 +3121,7 @@ export default function StaffProfilePage() {
                             </Button>
                           )}
                         </div>
-                        <div className="overflow-x-auto">
+                        <div className="relative overflow-x-auto">
                           <table className="w-full">
                             <thead>
                               <tr className="border-b">
@@ -3233,7 +3233,7 @@ export default function StaffProfilePage() {
                             </Button>
                           )}
                         </div>
-                        <div className="overflow-x-auto">
+                        <div className="relative overflow-x-auto">
                           <table className="w-full">
                             <thead>
                               <tr className="border-b">
@@ -3349,7 +3349,7 @@ export default function StaffProfilePage() {
                             </Button>
                           )}
                         </div>
-                        <div className="overflow-x-auto">
+                        <div className="relative overflow-x-auto">
                           <table className="w-full">
                             <thead>
                               <tr className="border-b">

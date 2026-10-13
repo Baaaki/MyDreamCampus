@@ -1557,7 +1557,7 @@ export default function MenusPage() {
                       key={weekIndex}
                       className="border-b last:border-b-0 dark:border-gray-700"
                     >
-                      <div className="overflow-x-auto">
+                      <div className="relative overflow-x-auto">
                         <table className="w-full border-collapse">
                           <thead>
                             <tr className="bg-yellow-100 dark:bg-yellow-900/30">
@@ -1663,7 +1663,7 @@ export default function MenusPage() {
                       key={weekIndex}
                       className="border-b last:border-b-0 dark:border-gray-700"
                     >
-                      <div className="overflow-x-auto">
+                      <div className="relative overflow-x-auto">
                         <table className="w-full border-collapse">
                           <thead>
                             <tr className="bg-green-100 dark:bg-green-900/30">

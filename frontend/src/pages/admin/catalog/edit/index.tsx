@@ -485,8 +485,8 @@ export default function EditCourseCatalogPage() {
     return (
       <div className="min-h-screen bg-gray-50 py-8">
         <div className="mx-auto max-w-4xl px-4">
-          <div className="rounded-lg bg-white p-6 shadow-md">
-            <div className="mb-8 flex items-center gap-4">
+          <div className="rounded-lg bg-white p-4 shadow-md sm:p-6">
+            <div className="mb-8 flex flex-wrap items-center gap-4">
               <Button
                 variant="ghost"
                 size="sm"
@@ -495,7 +495,7 @@ export default function EditCourseCatalogPage() {
                 <ArrowLeft className="mr-2 h-4 w-4" />
                 Geri
               </Button>
-              <div className="flex-1">
+              <div className="min-w-48 flex-1">
                 <h1 className="text-2xl font-bold text-gray-900">
                   Ders Düzenle
                 </h1>
@@ -606,7 +606,7 @@ export default function EditCourseCatalogPage() {
     return (
       <div className="min-h-screen bg-gray-50 py-8">
         <div className="mx-auto max-w-7xl px-4">
-          <div className="rounded-lg bg-white p-6 shadow-md">
+          <div className="rounded-lg bg-white p-4 shadow-md sm:p-6">
             <button
               onClick={() => setSelectedDepartment(null)}
               className="mb-4 flex items-center gap-2 text-indigo-600 hover:text-indigo-800"
@@ -628,7 +628,7 @@ export default function EditCourseCatalogPage() {
     return (
       <div className="min-h-screen bg-gray-50 py-8">
         <div className="mx-auto max-w-7xl px-4">
-          <div className="rounded-lg bg-white p-6 shadow-md">
+          <div className="rounded-lg bg-white p-4 shadow-md sm:p-6">
             <button
               onClick={() => setSelectedDepartment(null)}
               className="mb-4 flex items-center gap-2 text-indigo-600 hover:text-indigo-800"
@@ -659,7 +659,7 @@ export default function EditCourseCatalogPage() {
     <div className="min-h-screen bg-gray-50 py-8">
       <div className="mx-auto max-w-7xl px-4">
         {/* Header */}
-        <div className="mb-6 rounded-lg bg-white p-6 shadow-md">
+        <div className="mb-6 rounded-lg bg-white p-4 shadow-md sm:p-6">
           <button
             onClick={() => setSelectedDepartment(null)}
             className="mb-4 flex items-center gap-2 text-indigo-600 transition-colors hover:text-indigo-800"
@@ -668,7 +668,7 @@ export default function EditCourseCatalogPage() {
             <span>Tüm Fakülteler</span>
           </button>
 
-          <div className="flex items-center justify-between">
+          <div className="flex flex-wrap items-center justify-between gap-4">
             <div className="flex items-center gap-4">
               <div className="flex h-16 w-16 items-center justify-center rounded-xl bg-indigo-100">
                 <Edit3 className="h-8 w-8 text-indigo-600" />
@@ -744,7 +744,7 @@ export default function EditCourseCatalogPage() {
                               <div className="h-2 w-2 rounded-full bg-red-500"></div>
                               ZORUNLU DERSLER
                             </h4>
-                            <div className="overflow-x-auto">
+                            <div className="relative overflow-x-auto">
                               <table className="w-full text-sm">
                                 <thead>
                                   <tr className="bg-red-50 text-left">
@@ -810,7 +810,7 @@ export default function EditCourseCatalogPage() {
                               <div className="h-2 w-2 rounded-full bg-green-500"></div>
                               SEÇMELİ DERSLER
                             </h4>
-                            <div className="overflow-x-auto">
+                            <div className="relative overflow-x-auto">
                               <table className="w-full text-sm">
                                 <thead>
                                   <tr className="bg-green-50 text-left">
@@ -959,7 +959,7 @@ export default function EditCourseCatalogPage() {
 
                   <Separator />
 
-                  <div className="grid grid-cols-4 gap-4">
+                  <div className="grid grid-cols-2 gap-4 md:grid-cols-4">
                     <div className="space-y-2">
                       <Label>Dönem</Label>
                       <Select
@@ -1036,7 +1036,7 @@ export default function EditCourseCatalogPage() {
 
                   <Separator />
 
-                  <div className="grid grid-cols-4 gap-4">
+                  <div className="grid grid-cols-2 gap-4 md:grid-cols-4">
                     <div className="space-y-2">
                       <Label>Teorik</Label>
                       <Input
@@ -1138,7 +1138,7 @@ export default function EditCourseCatalogPage() {
                       />
                     </div>
                   </div>
-                  <div className="grid grid-cols-3 gap-4">
+                  <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
                     <div className="space-y-2">
                       <Label>E-posta</Label>
                       <Input

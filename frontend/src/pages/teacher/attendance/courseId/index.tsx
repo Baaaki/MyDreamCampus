@@ -207,7 +207,7 @@ export default function AttendanceStartPage() {
               <label className="mb-2 block text-sm font-medium text-gray-700 dark:text-gray-300">
                 Hafta Seçin
               </label>
-              <div className="grid grid-cols-7 gap-2">
+              <div className="grid grid-cols-5 gap-2 sm:grid-cols-7">
                 {WEEKS.map((week) => (
                   <button
                     key={week}

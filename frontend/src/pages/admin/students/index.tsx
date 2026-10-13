@@ -327,9 +327,9 @@ export default function StudentsPage() {
 
   return (
     <div className="container mx-auto py-10">
-      <div className="mb-6 flex items-center justify-between">
-        <h1 className="text-3xl font-bold">Öğrenci Yönetimi</h1>
-        <div className="flex gap-2">
+      <div className="mb-6 flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+        <h1 className="text-2xl font-bold sm:text-3xl">Öğrenci Yönetimi</h1>
+        <div className="flex flex-wrap gap-2">
           <Link to="/students/advisors">
             <Button variant="outline">
               <Users className="mr-2 h-4 w-4" /> Danışman İşleri

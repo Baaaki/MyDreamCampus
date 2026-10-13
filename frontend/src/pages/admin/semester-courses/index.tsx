@@ -1136,7 +1136,7 @@ export default function SemesterCoursesPage() {
                 </p>
               </div>
             )}
-            <div className="overflow-x-auto">
+            <div className="relative overflow-x-auto">
               <table className="w-full border-collapse">
                 <thead>
                   <tr>
@@ -1451,7 +1451,7 @@ export default function SemesterCoursesPage() {
                         {classLevel}. Sınıf
                       </h3>
                     </div>
-                    <div className="overflow-x-auto">
+                    <div className="relative overflow-x-auto">
                       <table className="w-full table-fixed border-collapse text-xs">
                         <thead>
                           <tr className="bg-gray-50 dark:bg-gray-700">

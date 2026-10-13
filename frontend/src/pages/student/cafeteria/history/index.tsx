@@ -236,7 +236,7 @@ export default function CafeteriaHistoryPage() {
         </CardHeader>
         <CardContent>
           {currentReservations.length > 0 ? (
-            <div className="overflow-x-auto">
+            <div className="relative overflow-x-auto">
               <table className="w-full">
                 <thead>
                   <tr className="border-b dark:border-gray-700">

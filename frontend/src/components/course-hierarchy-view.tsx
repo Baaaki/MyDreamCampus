@@ -479,7 +479,7 @@ export default function CourseHierarchyView({
               </div>
 
               {/* Schedule Table */}
-              <div className="overflow-x-auto">
+              <div className="relative overflow-x-auto">
                 <table className="w-full border-collapse">
                   <thead>
                     <tr className="bg-gray-50 dark:bg-gray-700">

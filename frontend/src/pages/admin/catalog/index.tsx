@@ -137,10 +137,10 @@ export default function CourseCatalogPage() {
     return (
       <div className="min-h-screen bg-gray-50 py-8">
         <div className="mx-auto max-w-4xl px-4">
-          <div className="rounded-lg bg-white p-6 shadow-md">
-            <div className="mb-8 flex items-center justify-between">
+          <div className="rounded-lg bg-white p-4 shadow-md sm:p-6">
+            <div className="mb-8 flex flex-col items-center gap-4 sm:flex-row sm:justify-between">
               <div className="flex-1 text-center">
-                <h1 className="mb-2 text-3xl font-bold text-gray-900">
+                <h1 className="mb-2 text-2xl font-bold text-gray-900 sm:text-3xl">
                   Ders Kataloğu
                 </h1>
                 <p className="text-gray-600">
@@ -272,7 +272,7 @@ export default function CourseCatalogPage() {
     return (
       <div className="min-h-screen bg-gray-50 py-8">
         <div className="mx-auto max-w-7xl px-4">
-          <div className="mb-6 rounded-lg bg-white p-6 shadow-md">
+          <div className="mb-6 rounded-lg bg-white p-4 shadow-md sm:p-6">
             <button
               onClick={() => setSelectedDepartment(null)}
               className="mb-4 flex items-center gap-2 text-indigo-600 transition-colors hover:text-indigo-800"
@@ -295,7 +295,7 @@ export default function CourseCatalogPage() {
     return (
       <div className="min-h-screen bg-gray-50 py-8">
         <div className="mx-auto max-w-7xl px-4">
-          <div className="mb-6 rounded-lg bg-white p-6 shadow-md">
+          <div className="mb-6 rounded-lg bg-white p-4 shadow-md sm:p-6">
             <button
               onClick={() => setSelectedDepartment(null)}
               className="mb-4 flex items-center gap-2 text-indigo-600 transition-colors hover:text-indigo-800"
@@ -328,7 +328,7 @@ export default function CourseCatalogPage() {
     <div className="min-h-screen bg-gray-50 py-8">
       <div className="mx-auto max-w-7xl px-4">
         {/* Header */}
-        <div className="mb-6 rounded-lg bg-white p-6 shadow-md">
+        <div className="mb-6 rounded-lg bg-white p-4 shadow-md sm:p-6">
           <button
             onClick={() => setSelectedDepartment(null)}
             className="mb-4 flex items-center gap-2 text-indigo-600 transition-colors hover:text-indigo-800"
@@ -403,7 +403,7 @@ export default function CourseCatalogPage() {
                               <div className="h-2 w-2 rounded-full bg-red-500"></div>
                               ZORUNLU DERSLER
                             </h4>
-                            <div className="overflow-x-auto">
+                            <div className="relative overflow-x-auto">
                               <table className="w-full text-sm">
                                 <thead>
                                   <tr className="bg-red-50 text-left">
@@ -455,7 +455,7 @@ export default function CourseCatalogPage() {
                               <div className="h-2 w-2 rounded-full bg-green-500"></div>
                               SEÇMELİ DERSLER
                             </h4>
-                            <div className="overflow-x-auto">
+                            <div className="relative overflow-x-auto">
                               <table className="w-full text-sm">
                                 <thead>
                                   <tr className="bg-green-50 text-left">
@@ -607,7 +607,7 @@ export default function CourseCatalogPage() {
                   <Clock className="h-5 w-5 text-indigo-600" />
                   Kredi ve Saat Bilgileri
                 </h4>
-                <div className="grid grid-cols-5 gap-3">
+                <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 md:grid-cols-5">
                   <div className="rounded-lg border border-indigo-100 bg-white p-3 text-center">
                     <div className="text-2xl font-bold text-indigo-600">
                       {selectedCourse.theoretical_hours}
@@ -721,7 +721,7 @@ export default function CourseCatalogPage() {
                       <Calendar className="h-5 w-5 text-cyan-500" />
                       Ders İçeriği (Haftalık)
                     </h4>
-                    <div className="overflow-x-auto">
+                    <div className="relative overflow-x-auto">
                       <table className="w-full text-sm">
                         <thead>
                           <tr className="bg-gray-50">

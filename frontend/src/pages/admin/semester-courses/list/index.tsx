@@ -8,7 +8,7 @@ export default function OpenedCoursesPage() {
   return (
     <div className="min-h-screen bg-gray-50 py-8 dark:bg-gray-900">
       <div className="mx-auto max-w-[1600px] px-4">
-        <div className="rounded-lg bg-white p-6 shadow-md dark:bg-gray-800">
+        <div className="rounded-lg bg-white p-4 shadow-md sm:p-6 dark:bg-gray-800">
           <div className="mb-8 flex items-center gap-4">
             <div className="flex h-12 w-12 items-center justify-center rounded-lg bg-indigo-600 text-white">
               <CalendarPlus className="h-6 w-6" />

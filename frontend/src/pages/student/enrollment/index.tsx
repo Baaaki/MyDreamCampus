@@ -362,7 +362,7 @@ function EnrollmentWorkspace({
         (!enrollmentStatus && rejectionInfo)) &&
         rejectionInfo && (
           <div className="mb-4 rounded-lg border border-red-200 bg-red-50 p-4 dark:border-red-700 dark:bg-red-900/30">
-            <div className="flex items-start justify-between gap-4">
+            <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
               <div className="flex flex-1 items-start gap-3">
                 <svg
                   className="mt-0.5 h-6 w-6 flex-shrink-0 text-red-600 dark:text-red-400"
@@ -400,7 +400,7 @@ function EnrollmentWorkspace({
               {enrollmentOpen && (
                 <button
                   onClick={handleCancelEnrollment}
-                  className="flex-shrink-0 rounded-lg bg-red-600 px-4 py-2 font-medium text-white transition-colors hover:bg-red-700"
+                  className="flex-shrink-0 self-start rounded-lg bg-red-600 px-4 py-2 font-medium text-white transition-colors hover:bg-red-700"
                 >
                   Yeniden Ders Kaydı Yap
                 </button>
@@ -422,7 +422,7 @@ function EnrollmentWorkspace({
           Ders kaydı yükleniyor...
         </div>
       ) : (
-        <div className="flex flex-1 overflow-hidden rounded-lg bg-gray-100 dark:bg-gray-900">
+        <div className="flex flex-1 flex-col overflow-hidden rounded-lg bg-gray-100 lg:flex-row dark:bg-gray-900">
           {/* Toast Notification */}
           <Toast
             message={toast.message}
@@ -434,7 +434,7 @@ function EnrollmentWorkspace({
 
           {/* Left Panel - Course List (hidden when enrolled) */}
           {!isReadOnly && (
-            <div className="w-80 flex-shrink-0 shadow-lg transition-all duration-300">
+            <div className="h-[50vh] w-full flex-shrink-0 shadow-lg transition-all duration-300 lg:h-auto lg:w-80">
               <CourseList
                 courses={availableCourses}
                 selectedCourseIds={selectedCourseIds}
@@ -444,7 +444,7 @@ function EnrollmentWorkspace({
           )}
 
           {/* Right Panel - Weekly Schedule Grid */}
-          <div className="relative flex-1 shadow-lg">
+          <div className="relative min-w-0 flex-1 shadow-lg">
             <WeeklyScheduleGrid
               sessions={selectedCourses}
               selectedCourseIds={selectedCourseIds}

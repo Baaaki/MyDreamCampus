@@ -65,7 +65,7 @@ export default function MealAdminQRPage() {
   return (
     <div className="min-h-screen bg-gray-50 py-8">
       <div className="mx-auto max-w-6xl px-4">
-        <div className="rounded-lg bg-white p-6 shadow-md">
+        <div className="rounded-lg bg-white p-4 shadow-md sm:p-6">
           <h1 className="mb-6 text-2xl font-bold text-gray-900">
             Yemekhane QR Kodları
           </h1>

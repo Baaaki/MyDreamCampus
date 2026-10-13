@@ -210,12 +210,14 @@ export default function StaffPage() {
   }
 
   return (
-    <div className="min-h-screen bg-background p-8">
+    <div className="min-h-screen bg-background lg:p-8">
       <div className="mx-auto max-w-7xl space-y-6">
         {/* Header */}
-        <div className="flex items-center justify-between">
+        <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
           <div>
-            <h1 className="text-3xl font-bold">Personel Yönetimi</h1>
+            <h1 className="text-2xl font-bold sm:text-3xl">
+              Personel Yönetimi
+            </h1>
             <p className="mt-1 text-muted-foreground">
               Personel kayıtlarını ve bilgilerini yönetin
             </p>

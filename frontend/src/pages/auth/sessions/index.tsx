@@ -95,7 +95,7 @@ export default function SessionsPage() {
   return (
     <div className="min-h-screen bg-gray-50 py-8">
       <div className="mx-auto max-w-4xl px-4">
-        <div className="rounded-lg bg-white p-6 shadow-md">
+        <div className="rounded-lg bg-white p-4 shadow-md sm:p-6">
           <div className="mb-6 flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
             <h1 className="text-2xl font-bold text-gray-900">
               Aktif Oturumlar
@@ -147,8 +147,8 @@ export default function SessionsPage() {
                       : "border-gray-200"
                   }`}
                 >
-                  <div className="flex items-start justify-between">
-                    <div className="flex-1">
+                  <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+                    <div className="min-w-0 flex-1">
                       <div className="mb-2 flex items-center gap-2">
                         <h3 className="font-semibold text-gray-900">
                           {session.device_info || "Bilinmeyen Cihaz"}
@@ -185,7 +185,7 @@ export default function SessionsPage() {
                     </div>
                     <button
                       onClick={() => handleRevokeSession(session.id)}
-                      className="ml-4 rounded-md bg-red-100 px-4 py-2 text-sm font-medium text-red-700 hover:bg-red-200 focus:ring-2 focus:ring-red-500 focus:ring-offset-2 focus:outline-none"
+                      className="self-start rounded-md bg-red-100 px-4 py-2 text-sm font-medium text-red-700 hover:bg-red-200 focus:ring-2 focus:ring-red-500 focus:ring-offset-2 focus:outline-none"
                     >
                       Sonlandır
                     </button>
