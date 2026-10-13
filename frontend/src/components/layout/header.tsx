@@ -8,7 +8,7 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu"
-import { Moon, Sun, LogOut, User, Settings, Bell, Menu } from "lucide-react"
+import { Moon, Sun, LogOut, User, Settings, Bell, Menu, X } from "lucide-react"
 import { useNavigate } from "react-router"
 import { authApi } from "@/lib/api-client"
 import { cn } from "@/lib/utils"
@@ -35,10 +35,11 @@ const profilePaths: Record<string, string> = {
 }
 
 interface HeaderProps {
+  menuOpen: boolean
   onMenuClick: () => void
 }
 
-export function Header({ onMenuClick }: HeaderProps) {
+export function Header({ menuOpen, onMenuClick }: HeaderProps) {
   const { theme, toggleTheme } = useTheme()
   const navigate = useNavigate()
   const [user] = useState<{ email: string; role: string } | null>(() => {
@@ -75,8 +76,7 @@ export function Header({ onMenuClick }: HeaderProps) {
     <header
       className={cn(
         "fixed right-0 left-0 z-30 h-16 border-b border-gray-200 bg-white transition-colors dark:border-gray-800 dark:bg-gray-900",
-        isDemo ? "top-8" : "top-0",
-        "lg:left-16"
+        isDemo ? "top-8" : "top-0"
       )}
     >
       <div className="flex h-full items-center justify-between gap-2 px-4 md:px-6">
@@ -85,10 +85,15 @@ export function Header({ onMenuClick }: HeaderProps) {
             variant="ghost"
             size="icon"
             onClick={onMenuClick}
-            aria-label="Menüyü aç"
+            aria-label={menuOpen ? "Menüyü kapat" : "Menüyü aç"}
+            aria-expanded={menuOpen}
             className="-ml-2 shrink-0 text-gray-600 lg:hidden dark:text-gray-400"
           >
-            <Menu className="h-5 w-5" />
+            {menuOpen ? (
+              <X className="h-5 w-5" />
+            ) : (
+              <Menu className="h-5 w-5" />
+            )}
           </Button>
           <h2 className="truncate text-base font-semibold text-gray-900 sm:text-lg dark:text-white">
             {panelTitle}

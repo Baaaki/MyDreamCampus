@@ -19,7 +19,10 @@ export function AppShell({ sidebar: Sidebar }: AppShellProps) {
         mobileOpen={drawerOpen}
         onMobileClose={() => setDrawerOpen(false)}
       />
-      <Header onMenuClick={() => setDrawerOpen(true)} />
+      <Header
+        menuOpen={drawerOpen}
+        onMenuClick={() => setDrawerOpen((open) => !open)}
+      />
       {/* The rail reserves only its collapsed width; when it widens on hover
           it overlays the page instead of pushing it. */}
       <main className={cn("min-h-screen lg:ml-16", isDemo ? "pt-24" : "pt-16")}>

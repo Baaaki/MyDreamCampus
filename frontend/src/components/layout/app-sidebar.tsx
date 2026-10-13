@@ -1,6 +1,6 @@
 import { useRef, useState } from "react"
 import { Link, useLocation } from "react-router"
-import { ChevronDown, ChevronRight, X } from "lucide-react"
+import { ChevronDown, ChevronRight } from "lucide-react"
 import { cn } from "@/lib/utils"
 import { useIsDemoMode } from "@/lib/services/demo-service"
 
@@ -107,13 +107,20 @@ export function AppSidebar({
   // the drawer (which is always wide) still get them.
   const hiddenOnRail = !railExpanded && "lg:pointer-events-none lg:opacity-0"
 
+  // The header spans the full width, so the sidebar and its backdrop start
+  // below it (and below the demo strip when that is shown).
+  const belowHeader = isDemo
+    ? "top-24 h-[calc(100dvh-6rem)]"
+    : "top-16 h-[calc(100dvh-4rem)]"
+
   return (
     <>
       <div
         aria-hidden="true"
         onClick={onMobileClose}
         className={cn(
-          "fixed inset-0 z-[35] bg-black/40 transition-opacity lg:hidden",
+          "fixed inset-x-0 z-[35] bg-black/40 transition-opacity lg:hidden",
+          belowHeader,
           mobileOpen ? "opacity-100" : "pointer-events-none opacity-0"
         )}
       />
@@ -144,7 +151,7 @@ export function AppSidebar({
         }}
         className={cn(
           "fixed left-0 z-40 flex w-72 flex-col overflow-hidden border-r border-gray-200 bg-white transition-[width,translate,box-shadow] duration-200 ease-out dark:border-gray-800 dark:bg-gray-900",
-          isDemo ? "top-8 h-[calc(100dvh-2rem)]" : "top-0 h-dvh",
+          belowHeader,
           mobileOpen ? "translate-x-0 shadow-xl" : "-translate-x-full",
           "lg:translate-x-0",
           railExpanded ? "lg:w-64 lg:shadow-xl" : "lg:w-16 lg:shadow-none"
@@ -168,14 +175,6 @@ export function AppSidebar({
           >
             {brandTitle}
           </span>
-          <button
-            type="button"
-            onClick={onMobileClose}
-            aria-label="Menüyü kapat"
-            className="rounded-md p-1 text-gray-500 hover:bg-gray-100 lg:hidden dark:text-gray-400 dark:hover:bg-gray-800"
-          >
-            <X className="h-5 w-5" />
-          </button>
         </div>
 
         {/* Navigation */}
