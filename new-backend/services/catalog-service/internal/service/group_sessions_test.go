@@ -2,7 +2,8 @@ package service
 
 import (
 	"encoding/json"
-	"sort"
+	"math/rand/v2"
+	"slices"
 	"testing"
 
 	"github.com/baaaki/mydreamcampus/catalog/internal/db"
@@ -20,28 +21,6 @@ func assertMarshalsEmptyArray(t *testing.T, v any) {
 	raw, err := json.Marshal(v)
 	require.NoError(t, err)
 	assert.JSONEq(t, `[]`, string(raw))
-}
-
-// sortGrouped returns a deterministic copy of result by sorting the outer
-// slice on (day, type) and the inner SlotNumbers slice. The grouping
-// functions iterate a map, so production output order is intentionally
-// non-deterministic — tests stabilise it before comparing.
-func sortGrouped(in []dto.ScheduleSession) []dto.ScheduleSession {
-	out := make([]dto.ScheduleSession, len(in))
-	copy(out, in)
-	for i := range out {
-		slots := make([]int16, len(out[i].SlotNumbers))
-		copy(slots, out[i].SlotNumbers)
-		sort.Slice(slots, func(a, b int) bool { return slots[a] < slots[b] })
-		out[i].SlotNumbers = slots
-	}
-	sort.Slice(out, func(a, b int) bool {
-		if out[a].DayOfWeek != out[b].DayOfWeek {
-			return out[a].DayOfWeek < out[b].DayOfWeek
-		}
-		return out[a].SessionType < out[b].SessionType
-	})
-	return out
 }
 
 func row(day, sessionType string, slot int16) db.GetScheduleSessionsByCourseIDRow {
@@ -72,7 +51,7 @@ func TestGroupScheduleSessionsFromRows(t *testing.T) {
 		want := []dto.ScheduleSession{
 			{DayOfWeek: "monday", SlotNumbers: []int16{1}, SessionType: "theory"},
 		}
-		assert.Equal(t, want, sortGrouped(got))
+		assert.Equal(t, want, got)
 	})
 
 	t.Run("rows with same day and type collapse into one session", func(t *testing.T) {
@@ -84,7 +63,7 @@ func TestGroupScheduleSessionsFromRows(t *testing.T) {
 		want := []dto.ScheduleSession{
 			{DayOfWeek: "monday", SlotNumbers: []int16{1, 2, 3}, SessionType: "theory"},
 		}
-		assert.Equal(t, want, sortGrouped(got))
+		assert.Equal(t, want, got)
 	})
 
 	t.Run("same day with different session types stays separate", func(t *testing.T) {
@@ -95,10 +74,10 @@ func TestGroupScheduleSessionsFromRows(t *testing.T) {
 			row("monday", "lab", 4),
 		})
 		want := []dto.ScheduleSession{
-			{DayOfWeek: "monday", SlotNumbers: []int16{3, 4}, SessionType: "lab"},
 			{DayOfWeek: "monday", SlotNumbers: []int16{1, 2}, SessionType: "theory"},
+			{DayOfWeek: "monday", SlotNumbers: []int16{3, 4}, SessionType: "lab"},
 		}
-		assert.Equal(t, want, sortGrouped(got))
+		assert.Equal(t, want, got)
 	})
 
 	t.Run("different days stay separate", func(t *testing.T) {
@@ -110,12 +89,39 @@ func TestGroupScheduleSessionsFromRows(t *testing.T) {
 		assert.Len(t, got, 3)
 		assert.Equal(t,
 			[]dto.ScheduleSession{
-				{DayOfWeek: "friday", SlotNumbers: []int16{5}, SessionType: "theory"},
 				{DayOfWeek: "monday", SlotNumbers: []int16{1}, SessionType: "theory"},
 				{DayOfWeek: "wednesday", SlotNumbers: []int16{2}, SessionType: "theory"},
+				{DayOfWeek: "friday", SlotNumbers: []int16{5}, SessionType: "theory"},
 			},
-			sortGrouped(got),
+			got,
 		)
+	})
+
+	t.Run("week order, theory before lab, slots ascending, on every call", func(t *testing.T) {
+		rows := []db.GetScheduleSessionsByCourseIDRow{
+			row("sunday", "theory", 2),
+			row("friday", "lab", 6),
+			row("monday", "lab", 4),
+			row("friday", "lab", 5),
+			row("monday", "theory", 2),
+			row("thursday", "theory", 1),
+			row("monday", "theory", 1),
+			row("tuesday", "theory", 3),
+		}
+		want := []dto.ScheduleSession{
+			{DayOfWeek: "monday", SlotNumbers: []int16{1, 2}, SessionType: "theory"},
+			{DayOfWeek: "monday", SlotNumbers: []int16{4}, SessionType: "lab"},
+			{DayOfWeek: "tuesday", SlotNumbers: []int16{3}, SessionType: "theory"},
+			{DayOfWeek: "thursday", SlotNumbers: []int16{1}, SessionType: "theory"},
+			{DayOfWeek: "friday", SlotNumbers: []int16{5, 6}, SessionType: "lab"},
+			{DayOfWeek: "sunday", SlotNumbers: []int16{2}, SessionType: "theory"},
+		}
+		// The groups come out of a map; one lucky run proves nothing.
+		for range 20 {
+			shuffled := slices.Clone(rows)
+			rand.Shuffle(len(shuffled), func(i, j int) { shuffled[i], shuffled[j] = shuffled[j], shuffled[i] })
+			require.Equal(t, want, groupScheduleSessionsFromRows(shuffled))
+		}
 	})
 
 	t.Run("preserves duplicate slot numbers (no dedup)", func(t *testing.T) {
@@ -130,7 +136,7 @@ func TestGroupScheduleSessionsFromRows(t *testing.T) {
 			[]dto.ScheduleSession{
 				{DayOfWeek: "monday", SlotNumbers: []int16{1, 1}, SessionType: "theory"},
 			},
-			sortGrouped(got),
+			got,
 		)
 	})
 }
@@ -154,7 +160,7 @@ func TestGroupScheduleSessionsFromMultiRows(t *testing.T) {
 			{DayOfWeek: "monday", SlotNumbers: []int16{1, 2}, SessionType: "theory"},
 			{DayOfWeek: "tuesday", SlotNumbers: []int16{4}, SessionType: "lab"},
 		}
-		assert.Equal(t, want, sortGrouped(got))
+		assert.Equal(t, want, got)
 	})
 
 	t.Run("same day, different types stay separate", func(t *testing.T) {
@@ -163,6 +169,25 @@ func TestGroupScheduleSessionsFromMultiRows(t *testing.T) {
 			multiRow("friday", "lab", 2),
 		})
 		assert.Len(t, got, 2)
+	})
+
+	t.Run("sorted like the by-id variant, on every call", func(t *testing.T) {
+		rows := []db.GetScheduleSessionsByMultipleCourseIDsRow{
+			multiRow("wednesday", "theory", 4),
+			multiRow("monday", "lab", 7),
+			multiRow("wednesday", "theory", 3),
+			multiRow("monday", "theory", 1),
+		}
+		want := []dto.ScheduleSession{
+			{DayOfWeek: "monday", SlotNumbers: []int16{1}, SessionType: "theory"},
+			{DayOfWeek: "monday", SlotNumbers: []int16{7}, SessionType: "lab"},
+			{DayOfWeek: "wednesday", SlotNumbers: []int16{3, 4}, SessionType: "theory"},
+		}
+		for range 20 {
+			shuffled := slices.Clone(rows)
+			rand.Shuffle(len(shuffled), func(i, j int) { shuffled[i], shuffled[j] = shuffled[j], shuffled[i] })
+			require.Equal(t, want, groupScheduleSessionsFromMultiRows(shuffled))
+		}
 	})
 }
 

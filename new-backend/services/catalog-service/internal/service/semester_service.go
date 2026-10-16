@@ -1,10 +1,13 @@
 package service
 
 import (
+	"cmp"
 	"context"
 	"fmt"
 	"regexp"
+	"slices"
 	"strconv"
+	"strings"
 
 	"github.com/baaaki/mydreamcampus/catalog/internal/db"
 	"github.com/baaaki/mydreamcampus/catalog/internal/dto"
@@ -665,6 +668,55 @@ func (s *SemesterService) checkInstructorConflict(ctx context.Context, semester 
 	return nil
 }
 
+// dayOfWeekRank and sessionTypeRank follow the enums' declared order, so a
+// week reads Monday to Sunday rather than alphabetically.
+var dayOfWeekRank = map[string]int{
+	string(db.CourseCatalogDayOfWeekEnumMonday):    1,
+	string(db.CourseCatalogDayOfWeekEnumTuesday):   2,
+	string(db.CourseCatalogDayOfWeekEnumWednesday): 3,
+	string(db.CourseCatalogDayOfWeekEnumThursday):  4,
+	string(db.CourseCatalogDayOfWeekEnumFriday):    5,
+	string(db.CourseCatalogDayOfWeekEnumSaturday):  6,
+	string(db.CourseCatalogDayOfWeekEnumSunday):    7,
+}
+
+var sessionTypeRank = map[string]int{
+	string(db.CourseCatalogScheduleSessionTypeEnumTheory): 1,
+	string(db.CourseCatalogScheduleSessionTypeEnumLab):    2,
+}
+
+// compareRanked orders by rank; values missing from the table go last, by
+// string order.
+func compareRanked(rank map[string]int, a, b string) int {
+	ra, okA := rank[a]
+	rb, okB := rank[b]
+	if !okA {
+		ra = len(rank) + 1
+	}
+	if !okB {
+		rb = len(rank) + 1
+	}
+	if c := cmp.Compare(ra, rb); c != 0 {
+		return c
+	}
+	return strings.Compare(a, b)
+}
+
+// sortScheduleSessions gives grouped sessions a stable order. They are built
+// from a map, so without it the same course came back in a different order
+// on every request.
+func sortScheduleSessions(sessions []dto.ScheduleSession) {
+	for i := range sessions {
+		slices.Sort(sessions[i].SlotNumbers)
+	}
+	slices.SortFunc(sessions, func(a, b dto.ScheduleSession) int {
+		if c := compareRanked(dayOfWeekRank, a.DayOfWeek, b.DayOfWeek); c != 0 {
+			return c
+		}
+		return compareRanked(sessionTypeRank, a.SessionType, b.SessionType)
+	})
+}
+
 // scheduleGroupKey is used as map key for grouping sessions by day + session_type
 type scheduleGroupKey struct {
 	DayOfWeek   string
@@ -691,6 +743,7 @@ func groupScheduleSessionsFromRows(sessions []db.GetScheduleSessionsByCourseIDRo
 			SessionType: key.SessionType,
 		})
 	}
+	sortScheduleSessions(result)
 
 	return result
 }
@@ -715,6 +768,7 @@ func groupScheduleSessionsFromMultiRows(sessions []db.GetScheduleSessionsByMulti
 			SessionType: key.SessionType,
 		})
 	}
+	sortScheduleSessions(result)
 
 	return result
 }
