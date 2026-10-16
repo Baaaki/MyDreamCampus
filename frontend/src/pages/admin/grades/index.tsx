@@ -7,7 +7,6 @@ import {
   ArrowLeft,
   Lock,
   Unlock,
-  Calendar,
   GraduationCap,
 } from "lucide-react"
 import { Input } from "@/components/ui/input"
@@ -76,7 +75,6 @@ export default function AdminGradesPage() {
 
   // Students View State
   const [students, setStudents] = useState<StudentGrades[]>([])
-  const [lockDate, setLockDate] = useState<string>("")
   const [actionLoading, setActionLoading] = useState<string | null>(null)
 
   type LockActionState = {
@@ -382,31 +380,6 @@ export default function AdminGradesPage() {
                 {selectedCourse?.course_code} - Tüm Notlar
               </h2>
             </div>
-          </div>
-
-          <div className="flex items-center gap-2 rounded-lg border bg-white p-2 shadow-sm dark:border-gray-800 dark:bg-gray-900">
-            <Calendar className="h-5 w-5 text-gray-500" />
-            <div className="flex flex-col">
-              <span className="text-xs font-semibold text-gray-500 uppercase">
-                Kilitlenme Tarihi Belirle
-              </span>
-              <Input
-                type="datetime-local"
-                className="h-8 border-none p-0 text-sm shadow-none focus-visible:ring-0"
-                value={lockDate}
-                onChange={(e) => setLockDate(e.target.value)}
-              />
-            </div>
-            {lockDate && (
-              <Button
-                size="sm"
-                onClick={() =>
-                  alert("Frontend kilit tarihi kaydedildi: " + lockDate)
-                }
-              >
-                Kaydet
-              </Button>
-            )}
           </div>
         </div>
 
