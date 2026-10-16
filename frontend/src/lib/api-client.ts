@@ -110,6 +110,102 @@ async function isForcedPasswordChange(response: Response): Promise<boolean> {
   }
 }
 
+/**
+ * Drops a trailing slash from the URL: Gin does not route /api/students/
+ * like /api/students. Returns the replacement request, or undefined when the
+ * URL is fine as it is.
+ */
+async function stripTrailingSlash(
+  request: Request
+): Promise<Request | undefined> {
+  const url = new URL(request.url)
+  if (!url.pathname.endsWith("/") || url.pathname === "/") return undefined
+
+  url.pathname = url.pathname.slice(0, -1)
+  // Clone the request to preserve the body (body streams can only be read once)
+  const body = await request.clone().text()
+  return new Request(url.toString(), {
+    method: request.method,
+    headers: request.headers,
+    body: body || undefined,
+    credentials: "include",
+  })
+}
+
+/** Follows the super admin's edit mode from any service's response. */
+async function trackSystemEditing(response: Response): Promise<void> {
+  // Every service sends the header while the super admin edits, so a
+  // response without it means the edit is over.
+  setSystemEditing(response.headers.get("X-System-Editing") === "1")
+
+  if (response.status !== 503) return
+  try {
+    const body: unknown = await response.clone().json()
+    if (
+      typeof body === "object" &&
+      body !== null &&
+      "code" in body &&
+      body.code === "SYSTEM_EDITING"
+    ) {
+      setSystemEditing(true)
+    }
+  } catch {
+    // Ignore non-json 503
+  }
+}
+
+interface RefreshResult {
+  /** What the caller should see: the replay's answer, or the original. */
+  response: Response
+  /** The backend no longer accepts this session. */
+  sessionEnded: boolean
+}
+
+/**
+ * Answers a 401 by refreshing the access token once (shared with every
+ * other request that hit 401 at the same moment) and replaying the request.
+ * What to do about a session that has ended is the caller's call.
+ */
+async function refreshOn401(
+  request: Request,
+  response: Response
+): Promise<RefreshResult> {
+  if (response.status !== 401) return { response, sessionEnded: false }
+
+  // Don't try to refresh on the auth endpoints themselves —
+  // 401 there means the credentials/refresh token are bad.
+  const url = new URL(request.url)
+  if (
+    url.pathname.includes("/auth/login") ||
+    url.pathname.includes("/auth/refresh")
+  ) {
+    return { response, sessionEnded: false }
+  }
+
+  // Avoid infinite retry loops: if we already retried this request, give up.
+  if (request.headers.get("X-Refresh-Retry") === "1") {
+    return { response, sessionEnded: true }
+  }
+
+  const outcome = await refreshAccessToken()
+  // The refresh endpoint is unreachable, not refusing: keep the session
+  // and let the caller see the original error.
+  if (outcome === "unavailable") return { response, sessionEnded: false }
+
+  // Replay the original request with a marker so afterResponse won't
+  // loop. Replayed even when this tab's refresh lost: another tab
+  // refreshing at the same moment may already hold the new cookies,
+  // and the browser sends them with the replay.
+  const retryRequest = request.clone()
+  retryRequest.headers.set("X-Refresh-Retry", "1")
+  attachCSRFToken(retryRequest)
+  const retried = await fetch(retryRequest)
+  return {
+    response: retried,
+    sessionEnded: outcome === "ended" && retried.status === 401,
+  }
+}
+
 // Create ky instance with default configuration
 const apiClient = ky.create({
   prefix: API_BASE_URL,
@@ -129,47 +225,12 @@ const apiClient = ky.create({
         // Attach CSRF token for state-changing requests
         attachCSRFToken(request)
         attachIdempotencyKey(request)
-
-        // Remove trailing slash from URL (Gin doesn't handle /api/students/ the same as /api/students)
-        const url = new URL(request.url)
-
-        if (url.pathname.endsWith("/") && url.pathname !== "/") {
-          url.pathname = url.pathname.slice(0, -1)
-
-          // Clone the request to preserve the body (body streams can only be read once)
-          const clonedRequest = request.clone()
-          const body = await clonedRequest.text()
-
-          return new Request(url.toString(), {
-            method: request.method,
-            headers: request.headers,
-            body: body || undefined,
-            credentials: "include",
-          })
-        }
+        return stripTrailingSlash(request)
       },
     ],
     afterResponse: [
       async ({ request, response }) => {
-        // Every service sends the header while the super admin edits, so a
-        // response without it means the edit is over.
-        setSystemEditing(response.headers.get("X-System-Editing") === "1")
-
-        if (response.status === 503) {
-          try {
-            const body: unknown = await response.clone().json()
-            if (
-              typeof body === "object" &&
-              body !== null &&
-              "code" in body &&
-              body.code === "SYSTEM_EDITING"
-            ) {
-              setSystemEditing(true)
-            }
-          } catch {
-            // Ignore non-json 503
-          }
-        }
+        await trackSystemEditing(response)
 
         if (await isForcedPasswordChange(response)) {
           if (
@@ -181,41 +242,9 @@ const apiClient = ky.create({
           return response
         }
 
-        if (response.status !== 401) return response
-
-        // Don't try to refresh on the auth endpoints themselves —
-        // 401 there means the credentials/refresh token are bad.
-        const url = new URL(request.url)
-        if (
-          url.pathname.includes("/auth/login") ||
-          url.pathname.includes("/auth/refresh")
-        ) {
-          return response
-        }
-
-        // Avoid infinite retry loops: if we already retried this request, give up.
-        if (request.headers.get("X-Refresh-Retry") === "1") {
-          redirectToLogin()
-          return response
-        }
-
-        const outcome = await refreshAccessToken()
-        // The refresh endpoint is unreachable, not refusing: keep the session
-        // and let the caller see the original error.
-        if (outcome === "unavailable") return response
-
-        // Replay the original request with a marker so afterResponse won't
-        // loop. Replayed even when this tab's refresh lost: another tab
-        // refreshing at the same moment may already hold the new cookies,
-        // and the browser sends them with the replay.
-        const retryRequest = request.clone()
-        retryRequest.headers.set("X-Refresh-Retry", "1")
-        attachCSRFToken(retryRequest)
-        const retried = await fetch(retryRequest)
-        if (outcome === "ended" && retried.status === 401) {
-          redirectToLogin()
-        }
-        return retried
+        const result = await refreshOn401(request, response)
+        if (result.sessionEnded) redirectToLogin()
+        return result.response
       },
     ],
   },
@@ -256,9 +285,12 @@ export const paymentApi = apiClient.extend({
   prefix: `${API_BASE_URL}/api/payments`,
 })
 
-// API clients without 401 auto-redirect — for admin pages that call
+// API clients that never navigate away — for admin pages that call
 // multiple services in parallel (e.g. system page). The global 401 hook
 // would redirect before Promise.allSettled can catch individual failures.
+// An expired access token is still refreshed and the request replayed; a
+// session that has ended, or a forced password change, is handed back to
+// the caller as the response instead of a page change.
 const noRedirectClient = ky.create({
   prefix: API_BASE_URL,
   timeout: 30000,
@@ -266,9 +298,16 @@ const noRedirectClient = ky.create({
   retry: { limit: 0 },
   hooks: {
     beforeRequest: [
-      ({ request }) => {
+      async ({ request }) => {
         attachCSRFToken(request)
         attachIdempotencyKey(request)
+        return stripTrailingSlash(request)
+      },
+    ],
+    afterResponse: [
+      async ({ request, response }) => {
+        await trackSystemEditing(response)
+        return (await refreshOn401(request, response)).response
       },
     ],
   },

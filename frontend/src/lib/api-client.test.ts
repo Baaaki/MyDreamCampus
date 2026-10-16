@@ -372,3 +372,102 @@ describe("api-client - system editing notice", () => {
     expect(result.current).toBe(false)
   })
 })
+
+describe("api-client - safe clients", () => {
+  beforeEach(() => {
+    localStorage.setItem("user", JSON.stringify({ role: "admin" }))
+    Object.defineProperty(window, "location", {
+      writable: true,
+      value: {
+        ...window.location,
+        pathname: "/dashboard",
+        href: "http://localhost/dashboard",
+      },
+    })
+  })
+
+  afterEach(() => {
+    vi.unstubAllGlobals()
+    vi.resetAllMocks()
+    localStorage.clear()
+  })
+
+  it("refreshes an expired access token once and replays the request", async () => {
+    let refreshCalls = 0
+    let originalCall = 0
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(async (input: Request | string) => {
+        const url = typeof input === "string" ? input : input.url
+        if (url.includes("/auth/refresh")) {
+          refreshCalls++
+          return new Response("{}", { status: 200 })
+        }
+        originalCall++
+        if (originalCall === 1) return new Response("{}", { status: 401 })
+        return new Response('{"data":"ok"}', { status: 200 })
+      })
+    )
+
+    const { gradesApiSafe } = await loadClient()
+    const res = await gradesApiSafe.get("admin/stats")
+
+    expect(res.status).toBe(200)
+    expect(refreshCalls).toBe(1)
+    expect(originalCall).toBe(2)
+  })
+
+  it("hands an ended session back as a 401 without leaving the page", async () => {
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(async (input: Request | string) => {
+        const url = typeof input === "string" ? input : input.url
+        if (url.includes("/auth/refresh")) {
+          return new Response("{}", { status: 401 })
+        }
+        return new Response("{}", { status: 401 })
+      })
+    )
+
+    const { gradesApiSafe } = await loadClient()
+    const err = await gradesApiSafe.get("admin/stats").catch((e: unknown) => e)
+
+    expect(err).toBeInstanceOf(HTTPError)
+    expect((err as HTTPError).response.status).toBe(401)
+    expect(window.location.href).toBe("http://localhost/dashboard")
+    expect(localStorage.getItem("user")).not.toBeNull()
+  })
+
+  it("leaves a forced password change to the caller", async () => {
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(
+        async () =>
+          new Response('{"code":"FORCE_PASSWORD_CHANGE"}', {
+            status: 403,
+            headers: { "Content-Type": "application/json" },
+          })
+      )
+    )
+
+    const { gradesApiSafe } = await loadClient()
+    const err = await gradesApiSafe.get("admin/stats").catch((e: unknown) => e)
+
+    expect((err as HTTPError).response.status).toBe(403)
+    expect(window.location.href).toBe("http://localhost/dashboard")
+  })
+
+  it("drops a trailing slash like the main client", async () => {
+    const fetchSpy = vi.fn(
+      async (_input: RequestInfo | URL, _init?: RequestInit) =>
+        new Response("{}", { status: 200 })
+    )
+    vi.stubGlobal("fetch", fetchSpy)
+
+    const { gradesApiSafe } = await loadClient()
+    await gradesApiSafe.get("admin/stats/")
+
+    const req = fetchSpy.mock.calls[0]![0] as Request
+    expect(new URL(req.url).pathname).toBe("/api/grades/admin/stats")
+  })
+})
