@@ -38,6 +38,7 @@ import {
 import { studentApi } from "@/lib/api-client"
 import { useFaculties } from "@/lib/services/catalog-service"
 import type { Student } from "@/lib/types"
+import { GpaCard } from "./gpa-card"
 
 export default function StudentPage() {
   // View state
@@ -475,6 +476,7 @@ export default function StudentPage() {
                   <Button
                     variant="outline"
                     size="sm"
+                    onClick={() => window.print()}
                     className="border-white/20 bg-white/10 text-white hover:bg-white/20"
                   >
                     <Printer className="mr-2 h-4 w-4" />
@@ -636,22 +638,7 @@ export default function StudentPage() {
 
               {/* Right Column: Quick Stats / Timeline */}
               <div className="space-y-6">
-                <Card>
-                  <CardHeader>
-                    <CardTitle className="text-sm font-medium text-gray-500">
-                      Genel Ortalaması (GNO)
-                    </CardTitle>
-                  </CardHeader>
-                  <CardContent>
-                    <div className="text-3xl font-bold text-[#005a87]">
-                      3.42
-                    </div>
-                    <p className="mt-1 flex items-center text-xs text-green-600">
-                      <span className="mr-1 h-2 w-2 rounded-full bg-green-500"></span>
-                      Başarılı
-                    </p>
-                  </CardContent>
-                </Card>
+                <GpaCard studentId={profile.id} />
               </div>
             </div>
           </div>

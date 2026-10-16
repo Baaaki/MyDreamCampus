@@ -11,6 +11,7 @@ import type {
   GradeAppealRequest,
   GradeAppealResponse,
   MyGradesResponse,
+  TranscriptResponse,
 } from "@/lib/types"
 
 /** The backend's minimum, so a short reason is caught before the request. */
@@ -69,6 +70,13 @@ export const gradesService = {
       active_courses: res.active_courses ?? [],
       completed_courses: res.completed_courses ?? [],
     }
+  },
+
+  /** A student's transcript, for an admin or the student's advisor. */
+  async getStudentTranscript(studentId: string): Promise<TranscriptResponse> {
+    return gradesApi
+      .get(`students/${studentId}/transcript`)
+      .json<TranscriptResponse>()
   },
 
   async getCourseStatus(courseId: string): Promise<CourseStatusResponse> {
