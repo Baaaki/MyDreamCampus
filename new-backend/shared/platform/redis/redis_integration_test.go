@@ -112,6 +112,42 @@ func TestConsumeResetToken_SingleUseUnderARace(t *testing.T) {
 	assert.Empty(t, email)
 }
 
+func TestPeekResetToken_LeavesTokenInPlace(t *testing.T) {
+	c := newTestClient(t)
+	ctx := context.Background()
+	token := uuid.NewString()
+	require.NoError(t, c.StoreResetToken(ctx, token, "zeynep@uni.edu.tr", time.Minute))
+
+	email, ttl, err := c.PeekResetToken(ctx, token)
+	require.NoError(t, err)
+	assert.Equal(t, "zeynep@uni.edu.tr", email)
+	assert.Positive(t, ttl)
+	assert.LessOrEqual(t, ttl, time.Minute)
+
+	consumed, err := c.ConsumeResetToken(ctx, token)
+	require.NoError(t, err)
+	assert.Equal(t, "zeynep@uni.edu.tr", consumed, "a peek must not spend the token")
+
+	email, ttl, err = c.PeekResetToken(ctx, token)
+	require.NoError(t, err)
+	assert.Empty(t, email)
+	assert.Zero(t, ttl)
+}
+
+func TestRestoreResetToken_DoesNotOverwrite(t *testing.T) {
+	c := newTestClient(t)
+	ctx := context.Background()
+	token := uuid.NewString()
+
+	require.NoError(t, c.RestoreResetToken(ctx, token, "zeynep@uni.edu.tr", time.Minute))
+	require.NoError(t, c.RestoreResetToken(ctx, token, "baska@uni.edu.tr", time.Hour))
+
+	email, ttl, err := c.PeekResetToken(ctx, token)
+	require.NoError(t, err)
+	assert.Equal(t, "zeynep@uni.edu.tr", email)
+	assert.LessOrEqual(t, ttl, time.Minute)
+}
+
 func TestClaimIdempotencyKey_OneClaimUntilReleased(t *testing.T) {
 	c := newTestClient(t)
 	ctx := context.Background()

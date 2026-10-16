@@ -11,20 +11,27 @@ import (
 	"go.uber.org/zap"
 )
 
-// fakeAuthCache keeps login failures in a map; the other authCache methods
-// are not exercised by the lockout path.
+// fakeAuthCache keeps login failures and reset tokens in maps.
 type fakeAuthCache struct {
 	failures   map[string]int64
 	windows    map[string]time.Duration
 	countErr   error
 	minVersion map[string]int
+
+	resetTokens map[string]string
+	resetTTLs   map[string]time.Duration
+	// beforeConsume runs inside ConsumeResetToken, before the token is
+	// taken: the window in which a concurrent reset can get there first.
+	beforeConsume func()
 }
 
 func newFakeAuthCache() *fakeAuthCache {
 	return &fakeAuthCache{
-		failures:   map[string]int64{},
-		windows:    map[string]time.Duration{},
-		minVersion: map[string]int{},
+		failures:    map[string]int64{},
+		windows:     map[string]time.Duration{},
+		minVersion:  map[string]int{},
+		resetTokens: map[string]string{},
+		resetTTLs:   map[string]time.Duration{},
 	}
 }
 
@@ -52,12 +59,32 @@ func (f *fakeAuthCache) ClearLoginFailures(_ context.Context, key string) error 
 	return nil
 }
 
-func (f *fakeAuthCache) StoreResetToken(context.Context, string, string, time.Duration) error {
+func (f *fakeAuthCache) StoreResetToken(_ context.Context, token, email string, expiry time.Duration) error {
+	f.resetTokens[token] = email
+	f.resetTTLs[token] = expiry
 	return nil
 }
 
-func (f *fakeAuthCache) ConsumeResetToken(context.Context, string) (string, error) {
-	return "", nil
+func (f *fakeAuthCache) PeekResetToken(_ context.Context, token string) (string, time.Duration, error) {
+	return f.resetTokens[token], f.resetTTLs[token], nil
+}
+
+func (f *fakeAuthCache) ConsumeResetToken(_ context.Context, token string) (string, error) {
+	if f.beforeConsume != nil {
+		f.beforeConsume()
+	}
+	email := f.resetTokens[token]
+	delete(f.resetTokens, token)
+	delete(f.resetTTLs, token)
+	return email, nil
+}
+
+func (f *fakeAuthCache) RestoreResetToken(_ context.Context, token, email string, ttl time.Duration) error {
+	if _, exists := f.resetTokens[token]; !exists {
+		f.resetTokens[token] = email
+		f.resetTTLs[token] = ttl
+	}
+	return nil
 }
 
 func newLockoutService(cache *fakeAuthCache, lockMinutes int) *AuthService {

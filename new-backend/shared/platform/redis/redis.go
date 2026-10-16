@@ -148,22 +148,57 @@ func (c *ClientWrapper) ClearLoginFailures(ctx context.Context, key string) erro
 // Auth Service - Password Reset Token
 // ============================================
 
+func resetTokenKey(token string) string {
+	return fmt.Sprintf("reset_token:%s", token)
+}
+
 // StoreResetToken stores a password reset token with email
 func (c *ClientWrapper) StoreResetToken(ctx context.Context, token, email string, expiry time.Duration) error {
-	key := fmt.Sprintf("reset_token:%s", token)
-	return c.client.Set(ctx, key, email, expiry).Err()
+	return c.client.Set(ctx, resetTokenKey(token), email, expiry).Err()
+}
+
+// PeekResetToken returns the e-mail a reset token was issued for and how
+// long it has left, without spending it; "" when the token is unknown or
+// expired. A reset looks first and consumes only once the new password is
+// ready to be written, so a failure in between leaves the link usable.
+func (c *ClientWrapper) PeekResetToken(ctx context.Context, token string) (string, time.Duration, error) {
+	key := resetTokenKey(token)
+	pipe := c.client.Pipeline()
+	get := pipe.Get(ctx, key)
+	pttl := pipe.PTTL(ctx, key)
+	// Exec reports GET's redis.Nil for an unknown token; that is an answer.
+	if _, err := pipe.Exec(ctx); err != nil && !errors.Is(err, redis.Nil) {
+		return "", 0, err
+	}
+	email, err := get.Result()
+	if errors.Is(err, redis.Nil) {
+		return "", 0, nil
+	}
+	if err != nil {
+		return "", 0, err
+	}
+	ttl, err := pttl.Result()
+	if err != nil {
+		return "", 0, err
+	}
+	return email, ttl, nil
 }
 
 // ConsumeResetToken returns the e-mail a reset token was issued for and
 // deletes it in the same step, "" when the token is unknown or expired.
 // GETDEL keeps the token single-use even when two resets race.
 func (c *ClientWrapper) ConsumeResetToken(ctx context.Context, token string) (string, error) {
-	key := fmt.Sprintf("reset_token:%s", token)
-	val, err := c.client.GetDel(ctx, key).Result()
+	val, err := c.client.GetDel(ctx, resetTokenKey(token)).Result()
 	if err == redis.Nil {
 		return "", nil
 	}
 	return val, err
+}
+
+// RestoreResetToken puts back a token that was consumed for a reset that
+// then failed. NX: if the key exists again, whatever is there wins.
+func (c *ClientWrapper) RestoreResetToken(ctx context.Context, token, email string, ttl time.Duration) error {
+	return c.client.SetNX(ctx, resetTokenKey(token), email, ttl).Err()
 }
 
 // ============================================

@@ -35,7 +35,9 @@ type authCache interface {
 	RecordLoginFailure(ctx context.Context, key string, window time.Duration) (int64, error)
 	ClearLoginFailures(ctx context.Context, key string) error
 	StoreResetToken(ctx context.Context, token, email string, expiry time.Duration) error
+	PeekResetToken(ctx context.Context, token string) (string, time.Duration, error)
 	ConsumeResetToken(ctx context.Context, token string) (string, error)
+	RestoreResetToken(ctx context.Context, token, email string, ttl time.Duration) error
 }
 
 var _ authCache = (*redis.ClientWrapper)(nil)
@@ -737,13 +739,19 @@ func (s *AuthService) ResetPassword(ctx context.Context, token, newPassword stri
 		return serviceErrors.ErrWeakPassword
 	}
 
-	email, err := s.redisClient.ConsumeResetToken(ctx, token)
+	// Look, don't spend: the token is consumed only once the new hash is
+	// ready, so a busy hasher or a failed write leaves the link usable. The
+	// lookup still comes before the hash — this endpoint is unauthenticated,
+	// and hashing for any random token would let anyone fill the few
+	// Argon2id slots and stall every login.
+	email, ttl, err := s.redisClient.PeekResetToken(ctx, token)
 	if err != nil {
-		return sharedErrors.Wrap(sharedErrors.ErrInternal, fmt.Errorf("failed to consume reset token: %w", err))
+		return sharedErrors.Wrap(sharedErrors.ErrInternal, fmt.Errorf("failed to read reset token: %w", err))
 	}
 	if email == "" {
 		return serviceErrors.ErrInvalidResetToken
 	}
+	peekedAt := time.Now()
 
 	user, err := s.authRepo.GetUserByEmail(ctx, email)
 	if err != nil {
@@ -761,9 +769,21 @@ func (s *AuthService) ResetPassword(ctx context.Context, token, newPassword stri
 	if err != nil {
 		return passwordWorkError(err)
 	}
+
+	// GETDEL keeps the token single-use: of two resets racing on the same
+	// link, only the first gets the e-mail back.
+	consumed, err := s.redisClient.ConsumeResetToken(ctx, token)
+	if err != nil {
+		return sharedErrors.Wrap(sharedErrors.ErrInternal, fmt.Errorf("failed to consume reset token: %w", err))
+	}
+	if consumed == "" || consumed != email {
+		return serviceErrors.ErrInvalidResetToken
+	}
+
 	userID := utils.PgtypeToUUID(user.ID)
 	// UpdatePassword bumps token_version, which retires every refresh token.
 	if err := s.authRepo.UpdatePassword(ctx, userID, hash, false); err != nil {
+		s.restoreResetToken(ctx, token, email, ttl-time.Since(peekedAt))
 		return sharedErrors.Wrap(sharedErrors.ErrInternal, err)
 	}
 
@@ -778,6 +798,21 @@ func (s *AuthService) ResetPassword(ctx context.Context, token, newPassword stri
 
 	logger.Info("password reset completed", zap.String("user_id", userID.String()))
 	return nil
+}
+
+// restoreResetToken gives a consumed token back after the password write
+// failed, for the time it had left, so the user can retry the same link.
+// It runs on a context of its own: a write that failed because the request
+// was cancelled must still get its token back.
+func (s *AuthService) restoreResetToken(ctx context.Context, token, email string, ttl time.Duration) {
+	if ttl <= 0 {
+		return
+	}
+	restoreCtx, cancel := context.WithTimeout(context.WithoutCancel(ctx), 3*time.Second)
+	defer cancel()
+	if err := s.redisClient.RestoreResetToken(restoreCtx, token, email, ttl); err != nil {
+		logger.Error("failed to restore reset token after failed password update", zap.Error(err))
+	}
 }
 
 // GetUserSessions returns all active sessions for a user. currentSessionJTI
