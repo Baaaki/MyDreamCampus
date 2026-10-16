@@ -41,6 +41,7 @@
     "testMatch": [
       "<rootDir>/lib/**/*.(test|spec).[jt]s?(x)",
       "<rootDir>/services/**/*.(test|spec).[jt]s?(x)",
+      "<rootDir>/hooks/**/*.(test|spec).[jt]s?(x)",
       "<rootDir>/__tests__/**/*.[jt]s?(x)"
     ],
     "moduleNameMapper": {
@@ -50,6 +51,7 @@
     "collectCoverageFrom": [
       "services/**/*.{ts,tsx}",
       "lib/**/*.{ts,tsx}",
+      "hooks/**/*.{ts,tsx}",
       "!**/node_modules/**"
     ]
   },
