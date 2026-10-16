@@ -11,6 +11,7 @@ import (
 	"github.com/baaaki/mydreamcampus/shared/platform/logger"
 	"github.com/baaaki/mydreamcampus/shared/platform/rabbitmq"
 	"github.com/baaaki/mydreamcampus/shared/platform/utils"
+	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5"
 	"go.uber.org/zap"
 )
@@ -37,14 +38,33 @@ type outboxEnvelope struct {
 // after a nack cannot corrupt state.
 type EventConsumer struct {
 	consumer  *rabbitmq.Consumer
-	cacheRepo *repository.CacheRepository
-	regRepo   *repository.RegistrationRepository
+	cacheRepo cacheWriter
+	regRepo   registrationWriter
 }
+
+// cacheWriter and registrationWriter are the parts of the repositories the
+// consumer uses, so handlers can be tested without Postgres.
+type cacheWriter interface {
+	UpsertStudentCache(ctx context.Context, arg db.UpsertStudentCacheParams) (db.GradesStudentsView, error)
+	DeactivateStudentCache(ctx context.Context, id uuid.UUID) error
+	UpsertCourseCache(ctx context.Context, arg db.UpsertCourseCacheParams) (db.GradesCoursesView, error)
+	UpsertPrerequisiteCourse(ctx context.Context, arg db.UpsertPrerequisiteCourseParams) error
+}
+
+type registrationWriter interface {
+	CreateRegistration(ctx context.Context, arg db.CreateRegistrationParams) (db.GradesStudentCourseRegistration, error)
+	MarkAttendanceFailed(ctx context.Context, arg db.MarkAttendanceFailedParams) error
+}
+
+var (
+	_ cacheWriter        = (*repository.CacheRepository)(nil)
+	_ registrationWriter = (*repository.RegistrationRepository)(nil)
+)
 
 func NewEventConsumer(
 	consumer *rabbitmq.Consumer,
-	cacheRepo *repository.CacheRepository,
-	regRepo *repository.RegistrationRepository,
+	cacheRepo cacheWriter,
+	regRepo registrationWriter,
 ) *EventConsumer {
 	return &EventConsumer{
 		consumer:  consumer,
@@ -222,7 +242,7 @@ func (w *EventConsumer) handleEnrollmentApproved(ctx context.Context, env outbox
 		return nil
 	}
 
-	successCount := 0
+	failedCount := 0
 	var lastErr error
 	for _, courseID := range event.Data.CourseIDs {
 		_, err := w.regRepo.CreateRegistration(ctx, db.CreateRegistrationParams{
@@ -235,24 +255,28 @@ func (w *EventConsumer) handleEnrollmentApproved(ctx context.Context, env outbox
 			// ON CONFLICT DO NOTHING + :one → pgx.ErrNoRows on redelivery
 			// of an already-registered pair; that is success, not failure.
 			if errors.Is(err, pgx.ErrNoRows) {
-				successCount++
 				continue
 			}
 			log.Error("failed to create registration", zap.Error(err),
 				zap.String("student_id", event.Data.StudentID.String()),
 				zap.String("course_id", courseID.String()),
 			)
+			failedCount++
 			lastErr = err
-			continue
 		}
-		successCount++
 	}
 
-	// All failed usually means the student/course rows haven't landed in
-	// the local caches yet (FK) — requeue and let the sync events win the race.
-	if successCount == 0 && lastErr != nil {
-		log.Warn("all registrations failed, requeueing",
+	// One failed course is enough to requeue the whole event: acking it
+	// would leave that course without a registration, so no grade could ever
+	// be entered for it. The courses that already landed come back as
+	// ErrNoRows on redelivery (handled above), and the consumer dead-letters
+	// the message once its retries run out. The usual cause is the
+	// student/course rows not having reached the local caches yet (FK);
+	// the retry lets the sync events win that race.
+	if lastErr != nil {
+		log.Warn("registrations failed, requeueing",
 			zap.String("student_id", event.Data.StudentID.String()),
+			zap.Int("failed_courses", failedCount),
 			zap.Int("total_courses", len(event.Data.CourseIDs)),
 			zap.Error(lastErr),
 		)
@@ -261,7 +285,7 @@ func (w *EventConsumer) handleEnrollmentApproved(ctx context.Context, env outbox
 
 	log.Info("registrations created",
 		zap.String("student_id", event.Data.StudentID.String()),
-		zap.Int("count", successCount),
+		zap.Int("count", len(event.Data.CourseIDs)),
 	)
 	return nil
 }
