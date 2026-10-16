@@ -3,6 +3,8 @@ package service
 import (
 	"context"
 	"fmt"
+	"math/rand/v2"
+	"slices"
 	"testing"
 
 	"github.com/baaaki/mydreamcampus/grades/internal/db"
@@ -87,5 +89,47 @@ func TestGetTranscript_WhoMaySeeWhom(t *testing.T) {
 			}
 			assert.Equal(t, c.asksStudent, calls > 0, "only a teacher's access needs the student service")
 		})
+	}
+}
+
+func TestCompareSemesters_MixedFormats_SortsChronologically(t *testing.T) {
+	want := []string{
+		"2024_fall",   // 2024-2025 Güz
+		"2025_spring", // 2024-2025 Bahar
+		"2025-2026-Fall",
+		"2025-2026-Spring",
+		"2025-2026-Summer",
+		"2026-2027-Fall",
+		"bilinmeyen",
+		"zzz",
+	}
+	for range 20 {
+		got := slices.Clone(want)
+		rand.Shuffle(len(got), func(i, j int) { got[i], got[j] = got[j], got[i] })
+		slices.SortFunc(got, compareSemesters)
+		require.Equal(t, want, got)
+	}
+}
+
+func TestGetTranscript_Semesters_ReturnedInChronologicalOrder(t *testing.T) {
+	w, courseID := newGradesWorld(t)
+	reg := w.enroll(courseID, "1", 90, 90, false)
+	svc := &StudentGradesService{cacheRepo: cacheView{w}, registrationRepo: regView{w: w}, scoreRepo: scoreView{w: w}, completedRepo: completedView{w: w}}
+	for _, sem := range []string{"2026-2027-Fall", "2025-2026-Spring", "2025-2026-Fall", "2026-2027-Spring"} {
+		w.completed = append(w.completed, db.GradesStudentCompletedCourse{
+			StudentID: reg.StudentID, Semester: sem, CourseCode: "C-" + sem, Credits: 3, GradePoint: db.GradesGradePointEnum300,
+		})
+	}
+
+	// The semesters are grouped through a map, so one lucky run proves nothing.
+	for range 20 {
+		tr, err := svc.GetTranscript(context.Background(), uuid.New(), "admin", reg.StudentID)
+		require.NoError(t, err)
+
+		var got []string
+		for _, sem := range tr.Semesters {
+			got = append(got, sem.SemesterDisplay)
+		}
+		require.Equal(t, []string{"2025-2026 Güz", "2025-2026 Bahar", "2026-2027 Güz", "2026-2027 Bahar"}, got)
 	}
 }

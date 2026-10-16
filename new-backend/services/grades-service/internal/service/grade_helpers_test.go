@@ -116,6 +116,13 @@ func TestFormatSemesterDisplay(t *testing.T) {
 		{"2024_spring", "2024 Bahar"},
 		{"2024_summer", "2024 Yaz"},
 
+		// Current format: "<start>-<end>-<Term>".
+		{"2025-2026-Spring", "2025-2026 Bahar"},
+		{"2026-2027-Fall", "2026-2027 Güz"},
+		{"2025-2026-Summer", "2025-2026 Yaz"},
+		{"2025-2026-Winter", "2025-2026-Winter"},
+		{"2025-2027-Fall", "2025-2027-Fall"},
+
 		// Unknown season passes through verbatim (no Turkish translation).
 		{"2024_winter", "2024 winter"},
 

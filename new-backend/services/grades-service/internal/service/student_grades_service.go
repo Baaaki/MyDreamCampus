@@ -1,10 +1,12 @@
 package service
 
 import (
+	"cmp"
 	"context"
 	"encoding/json"
 	goerrors "errors"
 	"fmt"
+	"slices"
 	"strconv"
 	"strings"
 
@@ -214,6 +216,10 @@ func (s *StudentGradesService) GetTranscript(ctx context.Context, requesterID uu
 
 		semesters = append(semesters, *sem)
 	}
+	// Map iteration order is random; a transcript reads oldest term first.
+	slices.SortFunc(semesters, func(a, b dto.SemesterGrades) int {
+		return compareSemesters(a.Semester, b.Semester)
+	})
 
 	// 6. Calculate overall GPA
 	gpaResult, err := s.completedRepo.CalculateStudentGPA(ctx, studentID)
@@ -269,8 +275,83 @@ func (s *StudentGradesService) requireAdvisor(ctx context.Context, teacherID, st
 
 // Helper functions
 
+var semesterTermOrder = map[string]int{"fall": 1, "spring": 2, "summer": 3}
+
+var semesterTermTR = map[string]string{"fall": "Güz", "spring": "Bahar", "summer": "Yaz"}
+
+// parseAcademicSemester reads the current semester name, "2025-2026-Spring".
+func parseAcademicSemester(semester string) (startYear, endYear int, term string, ok bool) {
+	parts := strings.Split(semester, "-")
+	if len(parts) != 3 {
+		return 0, 0, "", false
+	}
+	start, err := strconv.Atoi(parts[0])
+	if err != nil {
+		return 0, 0, "", false
+	}
+	end, err := strconv.Atoi(parts[1])
+	if err != nil || end != start+1 {
+		return 0, 0, "", false
+	}
+	term = strings.ToLower(parts[2])
+	if semesterTermOrder[term] == 0 {
+		return 0, 0, "", false
+	}
+	return start, end, term, true
+}
+
+// semesterSortKey places a semester on the timeline as (year the academic
+// year starts, term order). It reads both the current "2025-2026-Spring" and
+// the legacy "2024_fall"; the legacy name carries the calendar year, so its
+// spring and summer belong to the academic year that began the year before.
+func semesterSortKey(semester string) (startYear, termOrder int, ok bool) {
+	if start, _, term, ok := parseAcademicSemester(semester); ok {
+		return start, semesterTermOrder[term], true
+	}
+	yearStr, term, found := strings.Cut(semester, "_")
+	if !found {
+		return 0, 0, false
+	}
+	year, err := strconv.Atoi(yearStr)
+	term = strings.ToLower(term)
+	if err != nil || semesterTermOrder[term] == 0 {
+		return 0, 0, false
+	}
+	if term != "fall" {
+		year--
+	}
+	return year, semesterTermOrder[term], true
+}
+
+// compareSemesters orders semesters chronologically. Names it cannot read
+// go after the readable ones, by plain string order, so the result is still
+// the same on every call.
+func compareSemesters(a, b string) int {
+	aYear, aTerm, aOK := semesterSortKey(a)
+	bYear, bTerm, bOK := semesterSortKey(b)
+	switch {
+	case aOK && !bOK:
+		return -1
+	case !aOK && bOK:
+		return 1
+	case aOK && bOK:
+		if c := cmp.Compare(aYear, bYear); c != 0 {
+			return c
+		}
+		if c := cmp.Compare(aTerm, bTerm); c != 0 {
+			return c
+		}
+	}
+	return strings.Compare(a, b)
+}
+
 func formatSemesterDisplay(semester string) string {
-	// Convert "2024_fall" to "2024-2025 Güz"
+	// "2025-2026-Spring" -> "2025-2026 Bahar"
+	if start, end, term, ok := parseAcademicSemester(semester); ok {
+		return strconv.Itoa(start) + "-" + strconv.Itoa(end) + " " + semesterTermTR[term]
+	}
+
+	// Legacy: "2024_fall" -> "2024-2025 Güz"
 	parts := strings.Split(semester, "_")
 	if len(parts) != 2 {
 		return semester
@@ -282,13 +363,7 @@ func formatSemesterDisplay(semester string) string {
 	}
 
 	season := parts[1]
-	seasonTR := map[string]string{
-		"fall":   "Güz",
-		"spring": "Bahar",
-		"summer": "Yaz",
-	}
-
-	seasonName := seasonTR[season]
+	seasonName := semesterTermTR[season]
 	if seasonName == "" {
 		seasonName = season
 	}
