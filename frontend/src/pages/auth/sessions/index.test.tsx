@@ -71,10 +71,11 @@ function signIn(user: Record<string, unknown>) {
   )
 }
 
-function renderPage() {
-  const queryClient = new QueryClient({
+function renderPage(
+  queryClient = new QueryClient({
     defaultOptions: { queries: { retry: false } },
   })
+) {
   return render(
     <QueryClientProvider client={queryClient}>
       <MemoryRouter initialEntries={["/auth/sessions"]}>
@@ -124,7 +125,11 @@ describe("SessionsPage", () => {
       json({ message: "Tüm cihazlardan çıkış yapıldı" })
     )
     const user = userEvent.setup()
-    renderPage()
+    const queryClient = new QueryClient({
+      defaultOptions: { queries: { retry: false } },
+    })
+    queryClient.setQueryData(["grades", "my"], { cumulative_gpa: 3.9 })
+    renderPage(queryClient)
 
     await user.click(
       await screen.findByRole("button", { name: "Tüm Cihazlardan Çık" })
@@ -135,6 +140,7 @@ describe("SessionsPage", () => {
     expect(await screen.findByText("Giriş sayfası")).toBeInTheDocument()
     expect(calls).toHaveLength(1)
     expect(localStorage.getItem("user")).toBeNull()
+    expect(queryClient.getQueryCache().getAll()).toHaveLength(0)
   })
 
   it("keeps the user on the page when they back out", async () => {

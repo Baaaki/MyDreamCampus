@@ -5,15 +5,16 @@ import { MemoryRouter, Route, Routes } from "react-router"
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query"
 import LoginPage from "./index"
 
-function renderAt(initial = "/auth/login") {
-  const queryClient = new QueryClient({
+function renderAt(
+  initial = "/auth/login",
+  queryClient = new QueryClient({
     defaultOptions: {
       queries: {
         retry: false,
       },
     },
   })
-
+) {
   return render(
     <QueryClientProvider client={queryClient}>
       <MemoryRouter initialEntries={[initial]}>
@@ -78,6 +79,33 @@ describe("LoginPage - happy paths", () => {
       id: "u-1",
       role: "admin",
     })
+  })
+
+  // Logout and login stay inside the SPA: the previous account's cached
+  // data must not reach the next one signing in on the same tab.
+  it("drops the previous account's cached data before redirecting", async () => {
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(async () =>
+        jsonResponse({
+          access_token: "at",
+          user: { id: "u-2", role: "student" },
+        })
+      )
+    )
+    const queryClient = new QueryClient()
+    queryClient.setQueryData(["grades", "my"], { cumulative_gpa: 3.9 })
+
+    renderAt("/auth/login", queryClient)
+    await userEvent.type(
+      screen.getByPlaceholderText("E-posta adresi"),
+      "s@x.tr"
+    )
+    await userEvent.type(screen.getByPlaceholderText("Şifre"), "Password1")
+    await userEvent.click(screen.getByRole("button", { name: /giriş yap/i }))
+
+    expect(await screen.findByText("student-home")).toBeInTheDocument()
+    expect(queryClient.getQueryData(["grades", "my"])).toBeUndefined()
   })
 
   it("redirects teacher to /teacher/attendance", async () => {

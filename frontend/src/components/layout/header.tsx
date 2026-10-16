@@ -10,7 +10,9 @@ import {
 } from "@/components/ui/dropdown-menu"
 import { Moon, Sun, LogOut, User, Settings, Bell, Menu, X } from "lucide-react"
 import { useNavigate } from "react-router"
+import { useQueryClient } from "@tanstack/react-query"
 import { authApi } from "@/lib/api-client"
+import { clearUserSession } from "@/lib/session"
 import { cn } from "@/lib/utils"
 import { useIsDemoMode } from "@/lib/services/demo-service"
 
@@ -42,6 +44,7 @@ interface HeaderProps {
 export function Header({ menuOpen, onMenuClick }: HeaderProps) {
   const { theme, toggleTheme } = useTheme()
   const navigate = useNavigate()
+  const queryClient = useQueryClient()
   const [user] = useState<{ email: string; role: string } | null>(() => {
     const stored = localStorage.getItem("user")
     if (!stored) return null
@@ -60,8 +63,7 @@ export function Header({ menuOpen, onMenuClick }: HeaderProps) {
       // Even if the API call fails, clear local state
     }
 
-    // Clear UI-only localStorage data
-    localStorage.removeItem("user")
+    clearUserSession(queryClient)
 
     // Redirect to login
     navigate("/auth/login")

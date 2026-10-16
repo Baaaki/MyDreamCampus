@@ -1,11 +1,14 @@
 import { useState } from "react"
 import { useNavigate } from "react-router"
+import { useQueryClient } from "@tanstack/react-query"
 import { authApi } from "@/lib/api-client"
 import { apiErrorMessage } from "@/lib/api-error"
 import { validatePasswordPolicy } from "@/lib/password-policy"
+import { clearUserSession } from "@/lib/session"
 
 export default function ChangePasswordPage() {
   const navigate = useNavigate()
+  const queryClient = useQueryClient()
   const [currentPassword, setCurrentPassword] = useState("")
   const [newPassword, setNewPassword] = useState("")
   const [confirmPassword, setConfirmPassword] = useState("")
@@ -38,7 +41,7 @@ export default function ChangePasswordPage() {
 
       // Clear UI state and redirect to login
       // httpOnly cookies are managed by the backend
-      localStorage.removeItem("user")
+      clearUserSession(queryClient)
       navigate("/auth/login")
     } catch (err) {
       setError(apiErrorMessage(err, "Şifre değiştirme başarısız"))

@@ -2,16 +2,22 @@ import { describe, it, expect, beforeEach, afterEach, vi } from "vitest"
 import { render, screen } from "@testing-library/react"
 import userEvent from "@testing-library/user-event"
 import { MemoryRouter, Route, Routes } from "react-router"
+import { QueryClient, QueryClientProvider } from "@tanstack/react-query"
 import ChangePasswordPage from "./index"
 
 function renderPage() {
   return render(
-    <MemoryRouter initialEntries={["/auth/change-password"]}>
-      <Routes>
-        <Route path="/auth/change-password" element={<ChangePasswordPage />} />
-        <Route path="/auth/login" element={<div>login-page</div>} />
-      </Routes>
-    </MemoryRouter>
+    <QueryClientProvider client={new QueryClient()}>
+      <MemoryRouter initialEntries={["/auth/change-password"]}>
+        <Routes>
+          <Route
+            path="/auth/change-password"
+            element={<ChangePasswordPage />}
+          />
+          <Route path="/auth/login" element={<div>login-page</div>} />
+        </Routes>
+      </MemoryRouter>
+    </QueryClientProvider>
   )
 }
 

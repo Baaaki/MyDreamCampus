@@ -1,9 +1,11 @@
 import { useRef, useState } from "react"
 import { Link, useNavigate, useSearchParams } from "react-router"
+import { useQueryClient } from "@tanstack/react-query"
 import { authApi } from "@/lib/api-client"
 import { apiErrorMessage } from "@/lib/api-error"
 import type { AuthResponse, DemoAccount } from "@/lib/types"
 import { useDemoAccounts } from "@/lib/services/demo-service"
+import { clearUserSession } from "@/lib/session"
 import { cn } from "@/lib/utils"
 import {
   AlertTriangle,
@@ -23,6 +25,7 @@ const demoRoleButtons: { role: string; label: string; icon: LucideIcon }[] = [
 
 export default function LoginPage() {
   const navigate = useNavigate()
+  const queryClient = useQueryClient()
   const [searchParams] = useSearchParams()
   const [email, setEmail] = useState("")
   const [password, setPassword] = useState("")
@@ -48,6 +51,9 @@ export default function LoginPage() {
         })
         .json()
 
+      // Whatever another account left in this tab's cache must not be
+      // served to this one.
+      clearUserSession(queryClient)
       // Store user info in localStorage for UI display only
       // Access token is stored as httpOnly cookie by the backend
       localStorage.setItem("user", JSON.stringify(response.user))

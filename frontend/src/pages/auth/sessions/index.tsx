@@ -1,5 +1,5 @@
 import { useState } from "react"
-import { useMutation, useQuery } from "@tanstack/react-query"
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query"
 import { useNavigate } from "react-router"
 import { LogOut } from "lucide-react"
 import {
@@ -15,6 +15,7 @@ import {
 import { Button } from "@/components/ui/button"
 import { authApi } from "@/lib/api-client"
 import { apiErrorMessage } from "@/lib/api-error"
+import { clearUserSession } from "@/lib/session"
 import type { SessionsResponse, User } from "@/lib/types"
 import { format } from "date-fns"
 import { tr } from "date-fns/locale"
@@ -35,6 +36,7 @@ function isDemoAccount(): boolean {
 
 export default function SessionsPage() {
   const navigate = useNavigate()
+  const queryClient = useQueryClient()
   const [isDemo] = useState(isDemoAccount)
   const [confirmLogoutAll, setConfirmLogoutAll] = useState(false)
   const {
@@ -56,7 +58,7 @@ export default function SessionsPage() {
   const logoutAll = useMutation({
     mutationFn: () => authApi.post("logout-all").json(),
     onSuccess: () => {
-      localStorage.removeItem("user")
+      clearUserSession(queryClient)
       navigate("/auth/login", { replace: true })
     },
   })
@@ -73,7 +75,7 @@ export default function SessionsPage() {
       const revokedSession = sessions.find((s) => s.id === sessionId)
       if (revokedSession?.is_current) {
         // Current session revoked, logout
-        localStorage.removeItem("user")
+        clearUserSession(queryClient)
         navigate("/auth/login")
       } else {
         // Refresh sessions list
