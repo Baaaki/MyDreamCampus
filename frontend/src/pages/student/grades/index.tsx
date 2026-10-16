@@ -19,6 +19,7 @@ import {
 } from "@/components/ui/table"
 import { gradesService } from "@/lib/services/grades-service"
 import { apiErrorMessage } from "@/lib/api-error"
+import { parseSemester, type SemesterMeta } from "@/lib/semester"
 import type { ActiveCourse, CompletedCourse } from "@/lib/types"
 import {
   GraduationCap,
@@ -36,36 +37,33 @@ import {
 } from "lucide-react"
 
 // ============================================
-// Notlandırma Sistemi (Yönetmelik)
-// 12 harf notu — sayısal grade point ↔ harf notu eşleşmesi
+// Notlandırma Sistemi
+// Backend harf notu tutmaz: not, 15 kademeli bir katsayıdır (4.00-0.00).
+// minScore, mutlak değerlendirmedeki eşiktir (grades-service
+// calculateAbsoluteGradePoint); bağıl değerlendirmede katsayı z-skorundan
+// gelir.
 // ============================================
-const LETTER_GRADE_TABLE: Array<{
-  letter: string
-  point: number
-  minScore: number
-  status: "pass" | "conditional" | "fail"
-}> = [
-  { letter: "AA", point: 4.0, minScore: 90, status: "pass" },
-  { letter: "AB", point: 3.75, minScore: 85, status: "pass" },
-  { letter: "BA", point: 3.5, minScore: 80, status: "pass" },
-  { letter: "BB", point: 3.0, minScore: 75, status: "pass" },
-  { letter: "BC", point: 2.75, minScore: 70, status: "pass" },
-  { letter: "CB", point: 2.5, minScore: 65, status: "pass" },
-  { letter: "CC", point: 2.0, minScore: 60, status: "pass" },
-  { letter: "CD", point: 1.75, minScore: 55, status: "conditional" },
-  { letter: "DC", point: 1.5, minScore: 50, status: "conditional" },
-  { letter: "DD", point: 1.0, minScore: 45, status: "conditional" },
-  { letter: "FD", point: 0.5, minScore: 35, status: "fail" },
-  { letter: "FF", point: 0.0, minScore: 0, status: "fail" },
+const GRADE_POINT_TABLE: Array<{ point: number; minScore: number }> = [
+  { point: 4.0, minScore: 90 },
+  { point: 3.75, minScore: 87.5 },
+  { point: 3.5, minScore: 85 },
+  { point: 3.25, minScore: 82.5 },
+  { point: 3.0, minScore: 80 },
+  { point: 2.75, minScore: 77.5 },
+  { point: 2.5, minScore: 75 },
+  { point: 2.25, minScore: 72.5 },
+  { point: 2.0, minScore: 70 },
+  { point: 1.75, minScore: 67.5 },
+  { point: 1.5, minScore: 65 },
+  { point: 1.25, minScore: 62.5 },
+  { point: 1.0, minScore: 60 },
+  { point: 0.5, minScore: 50 },
+  { point: 0.0, minScore: 0 },
 ]
 
-function gradePointToLetter(gp: string): string {
+function formatGradePoint(gp: string): string {
   const value = parseFloat(gp)
-  if (Number.isNaN(value)) return gp
-  const match = LETTER_GRADE_TABLE.find(
-    (g) => Math.abs(g.point - value) < 0.001
-  )
-  return match ? match.letter : gp
+  return Number.isNaN(value) ? gp : value.toFixed(2)
 }
 
 function getGradeStatus(gp: string): "pass" | "conditional" | "fail" {
@@ -76,22 +74,17 @@ function getGradeStatus(gp: string): "pass" | "conditional" | "fail" {
   return "fail"
 }
 
-function getLetterClasses(letter: string): string {
-  const map: Record<string, string> = {
-    AA: "bg-emerald-600 text-white",
-    AB: "bg-emerald-500 text-white",
-    BA: "bg-green-600 text-white",
-    BB: "bg-green-500 text-white",
-    BC: "bg-lime-600 text-white",
-    CB: "bg-yellow-600 text-white",
-    CC: "bg-yellow-700 text-white",
-    CD: "bg-orange-500 text-white",
-    DC: "bg-orange-600 text-white",
-    DD: "bg-amber-700 text-white",
-    FD: "bg-red-500 text-white",
-    FF: "bg-red-600 text-white",
-  }
-  return map[letter] || "bg-gray-500 text-white"
+function getGradePointClasses(gp: number): string {
+  if (Number.isNaN(gp)) return "bg-gray-500 text-white"
+  if (gp >= 3.75) return "bg-emerald-600 text-white"
+  if (gp >= 3.25) return "bg-emerald-500 text-white"
+  if (gp >= 2.75) return "bg-green-600 text-white"
+  if (gp >= 2.25) return "bg-lime-600 text-white"
+  if (gp >= 2.0) return "bg-yellow-600 text-white"
+  if (gp >= 1.5) return "bg-orange-500 text-white"
+  if (gp >= 1.0) return "bg-amber-700 text-white"
+  if (gp >= 0.5) return "bg-red-500 text-white"
+  return "bg-red-600 text-white"
 }
 
 function getAssessmentName(slug: string): string {
@@ -105,36 +98,6 @@ function getAssessmentName(slug: string): string {
     attendance: "Devam",
   }
   return names[slug] || slug.charAt(0).toUpperCase() + slug.slice(1)
-}
-
-// "2024_fall" → { year: 2024, season: 'fall', label: '2024-2025 Güz', sortKey: 20243 }
-interface SemesterMeta {
-  key: string
-  year: number
-  season: "fall" | "spring" | "summer" | string
-  label: string
-  sortKey: number
-}
-
-function parseSemester(key: string): SemesterMeta {
-  const parts = key.split("_")
-  const year = parseInt(parts[0], 10) || 0
-  const season = parts[1] || "fall"
-  const seasonLabel: Record<string, string> = {
-    fall: "Güz",
-    spring: "Bahar",
-    summer: "Yaz",
-  }
-  const seasonOrder: Record<string, number> = { fall: 1, spring: 2, summer: 3 }
-  const academicYearLabel =
-    season === "fall" ? `${year}-${year + 1}` : `${year - 1}-${year}`
-  return {
-    key,
-    year,
-    season,
-    label: `${academicYearLabel} ${seasonLabel[season] || season}`,
-    sortKey: year * 10 + (seasonOrder[season] || 9),
-  }
 }
 
 // Bir grade point string'inin sayısal değerini güvenle döner
@@ -430,37 +393,43 @@ export default function StudentGradesPage() {
             {showLegend && (
               <div className="border-t border-gray-200 px-6 py-4 dark:border-gray-700">
                 <p className="mb-3 text-xs text-gray-500 dark:text-gray-400">
-                  Harf notu — sayısal değer karşılığı (4.00 üzerinden) ve durum:
+                  Katsayı (4.00 üzerinden) ve mutlak değerlendirmede gereken en
+                  düşük ortalama:
                 </p>
-                <div className="grid grid-cols-3 gap-2 text-xs sm:grid-cols-4 md:grid-cols-6">
-                  {LETTER_GRADE_TABLE.map((g) => (
+                <div className="grid grid-cols-3 gap-2 text-xs sm:grid-cols-4 md:grid-cols-5">
+                  {GRADE_POINT_TABLE.map((g) => (
                     <div
-                      key={g.letter}
+                      key={g.point}
                       className="flex items-center justify-between rounded-md border border-gray-200 bg-gray-50 px-2.5 py-1.5 dark:border-gray-700 dark:bg-gray-800"
                     >
                       <span
-                        className={`rounded px-1.5 py-0.5 text-[10px] font-bold ${getLetterClasses(g.letter)}`}
+                        className={`rounded px-1.5 py-0.5 font-mono text-[10px] font-bold ${getGradePointClasses(g.point)}`}
                       >
-                        {g.letter}
+                        {g.point.toFixed(2)}
                       </span>
                       <span className="font-mono text-gray-700 dark:text-gray-300">
-                        {g.point.toFixed(2)}
+                        {g.minScore > 0 ? `≥ ${g.minScore}` : `< 50`}
                       </span>
                     </div>
                   ))}
                 </div>
+                <p className="mt-3 text-xs text-gray-500 dark:text-gray-400">
+                  Sınıf ortalaması 60&apos;ın altındaysa bağıl değerlendirme
+                  yapılır: katsayı, notunuzun sınıf ortalamasından sapmasına
+                  (z-skoru) göre belirlenir ve yukarıdaki eşikler uygulanmaz.
+                </p>
                 <div className="mt-3 flex flex-wrap gap-3 text-xs text-gray-500 dark:text-gray-400">
                   <span className="flex items-center gap-1.5">
                     <span className="h-2 w-2 rounded-full bg-emerald-500" />{" "}
-                    Geçti (≥ CC)
+                    Geçti (≥ 2.00)
                   </span>
                   <span className="flex items-center gap-1.5">
                     <span className="h-2 w-2 rounded-full bg-orange-500" />{" "}
-                    Şartlı (DD-CD)
+                    Şartlı (1.00 - 1.75)
                   </span>
                   <span className="flex items-center gap-1.5">
                     <span className="h-2 w-2 rounded-full bg-red-500" /> Kaldı
-                    (FD-FF)
+                    (0.50 - 0.00)
                   </span>
                 </div>
               </div>
@@ -559,19 +528,19 @@ function SemesterView({
             <StatBlock
               label="Geçilen Ders"
               value={String(stats.passing)}
-              hint="CC ve üzeri"
+              hint="2.00 ve üzeri"
               accent="good"
             />
             <StatBlock
               label="Şartlı Geçilen"
               value={String(stats.conditional)}
-              hint="DD - CD arası"
+              hint="1.00 - 1.75 arası"
               accent="warn"
             />
             <StatBlock
               label="Kalan Ders"
               value={String(stats.failing)}
-              hint="FD / FF"
+              hint="0.50 / 0.00"
               accent="bad"
             />
           </div>
@@ -683,12 +652,11 @@ function SemesterView({
                   <TableHead className="text-center">Kredi</TableHead>
                   <TableHead>Değerlendirme Notları</TableHead>
                   <TableHead className="text-right">Ortalama</TableHead>
-                  <TableHead className="pr-6 text-right">Harf Notu</TableHead>
+                  <TableHead className="pr-6 text-right">Katsayı</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
                 {completedCourses.map((c, idx) => {
-                  const letter = gradePointToLetter(c.grade_point)
                   const status = getGradeStatus(c.grade_point)
                   const scoreEntries = c.assessment_scores
                     ? Object.entries(c.assessment_scores)
@@ -751,10 +719,10 @@ function SemesterView({
                       </TableCell>
                       <TableCell className="pr-6 text-right">
                         <span
-                          className={`inline-flex min-w-[2.5rem] items-center justify-center rounded px-2 py-0.5 text-xs font-bold ${getLetterClasses(letter)}`}
-                          title={`${gpFloat(c.grade_point).toFixed(2)} / 4.00`}
+                          className={`inline-flex min-w-[2.5rem] items-center justify-center rounded px-2 py-0.5 font-mono text-xs font-bold ${getGradePointClasses(parseFloat(c.grade_point))}`}
+                          title="4.00 üzerinden"
                         >
-                          {letter}
+                          {formatGradePoint(c.grade_point)}
                         </span>
                       </TableCell>
                     </TableRow>
