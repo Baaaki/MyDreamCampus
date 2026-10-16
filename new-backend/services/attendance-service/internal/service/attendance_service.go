@@ -419,6 +419,17 @@ func (s *AttendanceService) CloseSession(ctx context.Context, sessionID, instruc
 		return dto.CloseSessionResponse{}, err
 	}
 
+	// Write the buffered scans now instead of on the flusher's next tick: a
+	// finalize right after the last close must find them in the database.
+	// A failure leaves them in the buffer for the flusher to retry, so the
+	// close itself still succeeds.
+	if err := FlushSessionBuffer(ctx, s.attendanceRepo, s.redisService, sessionID.String()); err != nil {
+		logger.Warn("failed to flush scan buffer at close, flusher will retry",
+			zap.String("session_id", sessionID.String()),
+			zap.Error(err),
+		)
+	}
+
 	// Clear Redis keys
 	if err := s.redisService.ClearSessionKeys(ctx, sessionID.String()); err != nil {
 		logger.Warn("failed to clear session redis keys", zap.Error(err))
@@ -432,18 +443,26 @@ func (s *AttendanceService) CloseSession(ctx context.Context, sessionID, instruc
 		return dto.CloseSessionResponse{}, err
 	}
 
-	presentCount, err := s.attendanceRepo.GetSessionAttendanceCount(ctx, sessionID)
+	marked, err := s.attendanceRepo.GetMarkedStudentsBySession(ctx, sessionID)
 	if err != nil {
-		logger.Error("failed to get attendance count", zap.Error(err))
+		logger.Error("failed to get marked students", zap.Error(err))
 		return dto.CloseSessionResponse{}, err
 	}
-
-	// Scans still sitting in the Redis buffer haven't reached the DB yet
-	// (BufferFlusher drains it on its own tick); count them so the summary
-	// the instructor sees at close time is complete.
-	if pending, bufErr := s.redisService.GetBuffer(ctx, sessionID.String()); bufErr == nil {
-		presentCount += int64(len(pending))
+	present := make(map[string]bool, len(marked))
+	for _, id := range marked {
+		present[id.String()] = true
 	}
+
+	// Scans the flush above could not write are still in the buffer; count
+	// them so the summary the instructor sees at close time is complete. A
+	// set rather than a sum: a scan already in the database (its HDEL
+	// failed) or a student also marked by hand must count once.
+	if pending, bufErr := s.redisService.GetBuffer(ctx, sessionID.String()); bufErr == nil {
+		for studentID := range pending {
+			present[studentID] = true
+		}
+	}
+	presentCount := len(present)
 
 	totalEnrolled := len(enrolledStudents)
 
@@ -452,8 +471,8 @@ func (s *AttendanceService) CloseSession(ctx context.Context, sessionID, instruc
 		ClosedAt:  clock.Now(),
 		Summary: dto.SessionSummary{
 			TotalEnrolled: totalEnrolled,
-			PresentCount:  int(presentCount),
-			AbsentCount:   totalEnrolled - int(presentCount),
+			PresentCount:  presentCount,
+			AbsentCount:   totalEnrolled - presentCount,
 		},
 	}, nil
 }
@@ -656,6 +675,9 @@ func (s *AttendanceService) FinalizeAttendance(ctx context.Context, courseID, in
 			return dto.FinalizeAttendanceResponse{}, errors.ErrOpenSessionExists
 		}
 	}
+	if err := s.drainScanBuffers(ctx, sessions); err != nil {
+		return dto.FinalizeAttendanceResponse{}, err
+	}
 
 	// Get total sessions by type. Thresholds scale with the sessions
 	// actually held (10/14 and 11/14 ratios) instead of flat constants.
@@ -820,6 +842,31 @@ func (s *AttendanceService) FinalizeAttendance(ctx context.Context, courseID, in
 		return dto.FinalizeAttendanceResponse{}, errors.ErrAttendanceFinalized
 	}
 	return resp, nil
+}
+
+// drainScanBuffers makes sure no closed session of the course still has
+// scans in Redis. Closing a session flushes its buffer, but a flush that
+// failed there is left to the BufferFlusher; finalizing before it catches up
+// would mark those students absent, and a finalization cannot be undone.
+// Anything still buffered after one more flush refuses the finalize.
+func (s *AttendanceService) drainScanBuffers(ctx context.Context, sessions []db.GetSessionsByCourseRow) error {
+	for _, session := range sessions {
+		sessionID := utils.PgUUIDToUUID(session.ID).String()
+		if err := FlushSessionBuffer(ctx, s.attendanceRepo, s.redisService, sessionID); err != nil {
+			logger.Warn("failed to flush scan buffer before finalization",
+				zap.String("session_id", sessionID),
+				zap.Error(err),
+			)
+		}
+		pending, err := s.redisService.GetBuffer(ctx, sessionID)
+		if err != nil {
+			return fmt.Errorf("read scan buffer of session %s: %w", sessionID, err)
+		}
+		if len(pending) > 0 {
+			return errors.ErrScansPending
+		}
+	}
+	return nil
 }
 
 // GetFinalization tells the course's teacher, or an admin, whether its

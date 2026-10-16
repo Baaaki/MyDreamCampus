@@ -43,12 +43,14 @@ type attWorld struct {
 	enrollmentSemester     string
 	myEnrollments          []db.GetStudentEnrollmentsBySemesterRow
 
-	redisDown   bool
-	enrolledSet map[string]map[string]bool
-	scanned     map[string]map[string]bool
-	buffer      map[string]map[string]string
-	cache       map[string]map[string]any
-	invalidated []uuid.UUID
+	redisDown        bool
+	failBatchInsert  bool
+	failBufferDelete bool
+	enrolledSet      map[string]map[string]bool
+	scanned          map[string]map[string]bool
+	buffer           map[string]map[string]string
+	cache            map[string]map[string]any
+	invalidated      []uuid.UUID
 }
 
 type attOutboxEvent struct {
@@ -200,8 +202,26 @@ func (v attRecordView) GetAttendanceRecordsBySession(context.Context, uuid.UUID)
 	return nil, nil
 }
 
-func (v attRecordView) GetMarkedStudentsBySession(context.Context, uuid.UUID) ([]uuid.UUID, error) {
-	return nil, nil
+func (v attRecordView) BatchCreateAttendanceRecordsQR(ctx context.Context, records []db.CreateAttendanceRecordQRParams) error {
+	if v.w.failBatchInsert {
+		return errors.New("batch insert: connection reset")
+	}
+	for _, r := range records {
+		if _, err := v.CreateAttendanceRecordQR(ctx, r); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+func (v attRecordView) GetMarkedStudentsBySession(_ context.Context, sessionID uuid.UUID) ([]uuid.UUID, error) {
+	var out []uuid.UUID
+	for _, r := range v.w.records {
+		if utils.PgUUIDToUUID(r.SessionID) == sessionID {
+			out = append(out, utils.PgUUIDToUUID(r.StudentID))
+		}
+	}
+	return out, nil
 }
 
 func (v attRecordView) GetSessionAttendanceCount(_ context.Context, sessionID uuid.UUID) (int64, error) {
@@ -333,6 +353,16 @@ func (v attRedisView) GetBuffer(_ context.Context, id string) (map[string]string
 		return nil, errRedisDown
 	}
 	return v.w.buffer[id], nil
+}
+
+func (v attRedisView) HDelBufferFields(_ context.Context, id string, studentIDs []string) error {
+	if v.w.redisDown || v.w.failBufferDelete {
+		return errRedisDown
+	}
+	for _, studentID := range studentIDs {
+		delete(v.w.buffer[id], studentID)
+	}
+	return nil
 }
 
 func (v attRedisView) ClearSessionKeys(_ context.Context, id string) error {
@@ -647,7 +677,7 @@ func TestCreateManualAttendance_OwnerOrAdmin(t *testing.T) {
 
 // --------------------------------------------------------------- CloseSession
 
-func TestCloseSession_CountsBufferedScansAndKeepsTheBuffer(t *testing.T) {
+func TestCloseSession_WritesBufferedScansToDatabase(t *testing.T) {
 	w, courseID, students := newAttWorld(t)
 	sessionID := openTheory(t, w, courseID, 1)
 	svc := w.service(nil)
@@ -656,21 +686,61 @@ func TestCloseSession_CountsBufferedScansAndKeepsTheBuffer(t *testing.T) {
 	require.NoError(t, err)
 	_, err = svc.CreateManualAttendance(ctx, sessionID, teacherID, false, dto.ManualAttendanceRequest{StudentID: students[1]})
 	require.NoError(t, err)
+	require.Len(t, w.buffer[sessionID.String()], 1)
 
 	resp, err := svc.CloseSession(ctx, sessionID, teacherID, false)
 
 	require.NoError(t, err)
 	assert.Equal(t, 3, resp.Summary.TotalEnrolled)
-	assert.Equal(t, 2, resp.Summary.PresentCount, "one in the database, one still in the buffer")
+	assert.Equal(t, 2, resp.Summary.PresentCount, "the scan and the manual mark, each once")
 	assert.Equal(t, 1, resp.Summary.AbsentCount)
 	assert.False(t, w.sessions[sessionID].IsActive.Bool)
-	assert.Len(t, w.buffer[sessionID.String()], 1, "an unflushed scan must survive the close")
+	assert.Empty(t, w.buffer[sessionID.String()], "the close drains the buffer instead of waiting for the flusher")
+	assert.Len(t, w.records, 2, "the scan is in the database the moment the session is closed")
 	assert.Nil(t, w.enrolledSet[sessionID.String()])
 
 	_, err = svc.CloseSession(ctx, sessionID, teacherID, false)
 	assert.ErrorIs(t, err, attErrors.ErrSessionNotActive)
 	_, err = svc.CloseSession(ctx, openTheory(t, w, courseID, 2), uuid.New(), false)
 	assert.ErrorIs(t, err, attErrors.ErrForbidden)
+}
+
+func TestCloseSession_FlushFails_ClosesAndKeepsTheBuffer(t *testing.T) {
+	w, courseID, students := newAttWorld(t)
+	sessionID := openTheory(t, w, courseID, 1)
+	svc := w.service(nil)
+	ctx := context.Background()
+	_, err := svc.ScanQR(ctx, students[0], scanRequest(w, sessionID, time.Now()))
+	require.NoError(t, err)
+	_, err = svc.CreateManualAttendance(ctx, sessionID, teacherID, false, dto.ManualAttendanceRequest{StudentID: students[1]})
+	require.NoError(t, err)
+	w.failBatchInsert = true
+
+	resp, err := svc.CloseSession(ctx, sessionID, teacherID, false)
+
+	require.NoError(t, err, "the flusher retries; the close must not fail over it")
+	assert.False(t, w.sessions[sessionID].IsActive.Bool)
+	assert.Len(t, w.buffer[sessionID.String()], 1, "an unwritten scan must survive the close")
+	assert.Equal(t, 2, resp.Summary.PresentCount, "one in the database, one still in the buffer")
+}
+
+// The rows went in but the HDEL failed: the same scan is in the database
+// and in the buffer, and must still count once.
+func TestCloseSession_ScanInDatabaseAndBuffer_CountedOnce(t *testing.T) {
+	w, courseID, students := newAttWorld(t)
+	sessionID := openTheory(t, w, courseID, 1)
+	svc := w.service(nil)
+	ctx := context.Background()
+	_, err := svc.ScanQR(ctx, students[0], scanRequest(w, sessionID, time.Now()))
+	require.NoError(t, err)
+	w.failBufferDelete = true
+
+	resp, err := svc.CloseSession(ctx, sessionID, teacherID, false)
+
+	require.NoError(t, err)
+	require.Len(t, w.records, 1)
+	require.Len(t, w.buffer[sessionID.String()], 1)
+	assert.Equal(t, 1, resp.Summary.PresentCount)
 }
 
 // --------------------------------------------------------- FinalizeAttendance
@@ -821,6 +891,76 @@ func TestFinalizeAttendance_OpenSession_Refused(t *testing.T) {
 
 	assert.ErrorIs(t, err, attErrors.ErrOpenSessionExists)
 	assert.Empty(t, w.finalizations)
+}
+
+// bufferScan leaves a QR scan of studentID in the Redis buffer of the
+// course's closed session for week, as if the flusher had not reached it.
+func bufferScan(t *testing.T, w *attWorld, courseID uuid.UUID, week int16, studentID uuid.UUID) {
+	t.Helper()
+	for id, session := range w.sessions {
+		if utils.PgUUIDToUUID(session.CourseID) != courseID || session.WeekNumber != week {
+			continue
+		}
+		data, err := json.Marshal(db.CreateAttendanceRecordQRParams{
+			SessionID: session.ID, StudentID: utils.UUIDToPgUUID(studentID), CourseID: session.CourseID,
+			Semester: session.Semester, WeekNumber: week, SessionType: session.SessionType,
+		})
+		require.NoError(t, err)
+		if w.buffer[id.String()] == nil {
+			w.buffer[id.String()] = map[string]string{}
+		}
+		w.buffer[id.String()][studentID.String()] = string(data)
+		return
+	}
+	t.Fatalf("no session for week %d", week)
+}
+
+// The last scan of a student one short of the threshold is still in Redis.
+// Finalizing without it would fail them for good.
+func TestFinalizeAttendance_BufferedScan_FlushedAndCounted(t *testing.T) {
+	w, courseID, s := newAttWorld(t)
+	holdSessions(w, courseID, db.AttendanceSessionTypeEnumTheory, 14, s, []int{14, 9, 14})
+	bufferScan(t, w, courseID, 14, s[1])
+
+	resp, err := w.service(nil).FinalizeAttendance(context.Background(), courseID, teacherID, semester)
+
+	require.NoError(t, err)
+	assert.Equal(t, 0, resp.FinalizationSummary.FailingCount, "10 of 14 with the buffered scan")
+	assert.Empty(t, resp.FailedStudents)
+	assert.Empty(t, w.outbox)
+	for id := range w.sessions {
+		assert.Empty(t, w.buffer[id.String()])
+	}
+}
+
+func TestFinalizeAttendance_BufferCannotBeFlushed_RefusedAndNothingRecorded(t *testing.T) {
+	w, courseID, s := newAttWorld(t)
+	holdSessions(w, courseID, db.AttendanceSessionTypeEnumTheory, 14, s, []int{14, 9, 14})
+	bufferScan(t, w, courseID, 14, s[1])
+	w.failBatchInsert = true
+
+	_, err := w.service(nil).FinalizeAttendance(context.Background(), courseID, teacherID, semester)
+
+	assert.ErrorIs(t, err, attErrors.ErrScansPending)
+	assert.Empty(t, w.finalizations, "a finalization cannot be undone; it must wait for the scans")
+	assert.Empty(t, w.outbox)
+
+	w.failBatchInsert = false
+	_, err = w.service(nil).FinalizeAttendance(context.Background(), courseID, teacherID, semester)
+	require.NoError(t, err, "once the scans are written the finalize goes through")
+	assert.Empty(t, w.outbox)
+}
+
+func TestFinalizeAttendance_BufferUnreadable_Refused(t *testing.T) {
+	w, courseID, s := newAttWorld(t)
+	holdSessions(w, courseID, db.AttendanceSessionTypeEnumTheory, 14, s, []int{14, 9, 14})
+	w.redisDown = true
+
+	_, err := w.service(nil).FinalizeAttendance(context.Background(), courseID, teacherID, semester)
+
+	assert.Error(t, err, "with Redis unreadable nobody can tell whether scans are pending")
+	assert.Empty(t, w.finalizations)
+	assert.Empty(t, w.outbox)
 }
 
 // Under another semester name the course has no sessions and nobody would

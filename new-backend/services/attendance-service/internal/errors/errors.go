@@ -37,6 +37,7 @@ var (
 	// Finalization errors (AppError for HTTP responses)
 	ErrAttendanceFinalized = sharedErrors.New("ATTENDANCE_FINALIZED", "Bu dersin yoklaması zaten kesinleştirildi", http.StatusConflict)
 	ErrOpenSessionExists   = sharedErrors.New("OPEN_SESSION_EXISTS", "Açık yoklama oturumu var; kesinleştirmeden önce oturumu kapatın", http.StatusConflict)
+	ErrScansPending        = sharedErrors.New("ATTENDANCE_SCANS_PENDING", "Yoklama kayıtları henüz işleniyor, birkaç saniye sonra tekrar deneyin", http.StatusConflict)
 	ErrSemesterMismatch    = sharedErrors.New("SEMESTER_MISMATCH", "Ders bu döneme ait değil", http.StatusBadRequest)
 
 	// Authorization errors (AppError for HTTP responses)

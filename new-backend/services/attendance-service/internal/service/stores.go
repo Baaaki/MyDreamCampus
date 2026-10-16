@@ -33,6 +33,7 @@ type sessionStore interface {
 }
 
 type attendanceStore interface {
+	ScanRecordWriter
 	CreateAttendanceRecordQR(ctx context.Context, params db.CreateAttendanceRecordQRParams) (bool, error)
 	CreateAttendanceRecordManual(ctx context.Context, params db.CreateAttendanceRecordManualParams) (db.AttendanceRecord, error)
 	GetAttendanceRecordsBySession(ctx context.Context, sessionID uuid.UUID) ([]db.GetAttendanceRecordsBySessionRow, error)
@@ -50,11 +51,11 @@ type finalizationStore interface {
 }
 
 type attendanceRedis interface {
+	ScanBuffer
 	SetSessionCache(ctx context.Context, sessionID string, data map[string]any, ttl time.Duration) error
 	AddEnrolledStudents(ctx context.Context, sessionID string, studentIDs []uuid.UUID, ttl time.Duration) error
 	IsStudentEnrolled(ctx context.Context, sessionID, studentID string) (bool, error)
 	AddToBuffer(ctx context.Context, sessionID, studentID, data string, scannedTTL time.Duration) (bool, error)
-	GetBuffer(ctx context.Context, sessionID string) (map[string]string, error)
 	ClearSessionKeys(ctx context.Context, sessionID string) error
 	InvalidateStudentSummary(ctx context.Context, studentID uuid.UUID, semester string) error
 }
