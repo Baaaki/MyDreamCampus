@@ -62,7 +62,7 @@ export default function RootLayout() {
 }
 
 function AuthGuard({ children }: { children: React.ReactNode }) {
-  const { isAuthenticated, isLoading } = useAuthContext();
+  const { isAuthenticated, isLoading, setUser } = useAuthContext();
   const segments = useSegments();
   const router = useRouter();
 
@@ -80,11 +80,12 @@ function AuthGuard({ children }: { children: React.ReactNode }) {
 
   useEffect(() => {
     setOnForcePasswordChange(() => {
+      setUser((current) => (current ? { ...current, force_password_change: true } : current));
       if (segments[0] !== 'change-password') {
         router.replace('/change-password');
       }
     });
-  }, [segments, router]);
+  }, [segments, router, setUser]);
 
   return <>{children}</>;
 }

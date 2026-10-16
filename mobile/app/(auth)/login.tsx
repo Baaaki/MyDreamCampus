@@ -43,7 +43,7 @@ export default function LoginScreen() {
       {
         onSuccess: (data) => {
           haptic.success();
-          setUser(data.user);
+          setUser({ ...data.user, force_password_change: data.force_password_change });
 
           if (data.force_password_change) {
             router.replace('/change-password');

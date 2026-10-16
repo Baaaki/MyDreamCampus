@@ -1,11 +1,12 @@
 import Ionicons from '@expo/vector-icons/Ionicons';
 import { useRouter } from 'expo-router';
-import React, { useState } from 'react';
-import { KeyboardAvoidingView, Platform, ScrollView, View } from 'react-native';
+import React, { useEffect, useState } from 'react';
+import { BackHandler, KeyboardAvoidingView, Platform, ScrollView, View } from 'react-native';
 import Animated, { FadeInDown } from 'react-native-reanimated';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { Button, Input, Text } from '@/components/ui';
+import { useAuthContext } from '@/contexts/AuthContext';
 import { useTheme } from '@/contexts/ThemeContext';
 import { useChangePassword } from '@/hooks/useAuth';
 import { useHaptic } from '@/hooks/useHaptic';
@@ -17,6 +18,18 @@ export default function ChangePasswordScreen() {
   const haptic = useHaptic();
   const { isDark } = useTheme();
   const colors = COLORS[isDark ? 'dark' : 'light'];
+  const { user, setUser, logout } = useAuthContext();
+  // Forced after login or by a service's FORCE_PASSWORD_CHANGE; otherwise
+  // the student came here from Profile and may change their mind.
+  const forced = user?.force_password_change === true;
+
+  // gestureEnabled: false does not stop Android's back button, and the app
+  // ships on Android only: a forced change must not be skipped that way.
+  useEffect(() => {
+    if (!forced) return;
+    const subscription = BackHandler.addEventListener('hardwareBackPress', () => true);
+    return () => subscription.remove();
+  }, [forced]);
 
   const [oldPassword, setOldPassword] = useState('');
   const [newPassword, setNewPassword] = useState('');
@@ -50,6 +63,9 @@ export default function ChangePasswordScreen() {
       {
         onSuccess: () => {
           haptic.success();
+          setUser((current) =>
+            current ? { ...current, force_password_change: false } : current
+          );
           router.replace('/(tabs)');
         },
         onError: (error: any) => {
@@ -75,9 +91,13 @@ export default function ChangePasswordScreen() {
             <View className="mb-6 h-14 w-14 items-center justify-center rounded-2xl bg-warning">
               <Ionicons name="key" size={26} color="#fff" />
             </View>
-            <Text className="text-3xl font-extrabold text-foreground">Sifreni yenile</Text>
+            <Text className="text-3xl font-extrabold text-foreground">
+              {forced ? 'Sifreni yenile' : 'Sifre degistir'}
+            </Text>
             <Text className="mt-2 text-base text-muted-foreground">
-              Guvenligin icin ilk giriste sifreni degistirmen gerekiyor.
+              {forced
+                ? 'Guvenligin icin ilk giriste sifreni degistirmen gerekiyor.'
+                : 'Mevcut sifreni gir ve yeni bir sifre belirle.'}
             </Text>
           </Animated.View>
 
@@ -145,6 +165,37 @@ export default function ChangePasswordScreen() {
                 {changePasswordMutation.isPending ? 'Kaydediliyor...' : 'Sifreyi Degistir'}
               </Text>
             </Button>
+
+            {forced ? (
+              <Button
+                variant="ghost"
+                onPress={() => {
+                  haptic.light();
+                  // AuthGuard takes a signed-out user to the login screen.
+                  void logout();
+                }}
+                disabled={changePasswordMutation.isPending}
+                accessibilityLabel="Cikis yap"
+              >
+                <Text>Cikis Yap</Text>
+              </Button>
+            ) : (
+              <Button
+                variant="ghost"
+                onPress={() => {
+                  haptic.light();
+                  if (router.canGoBack()) {
+                    router.back();
+                  } else {
+                    router.replace('/(tabs)');
+                  }
+                }}
+                disabled={changePasswordMutation.isPending}
+                accessibilityLabel="Vazgec"
+              >
+                <Text>Vazgec</Text>
+              </Button>
+            )}
           </Animated.View>
         </ScrollView>
       </KeyboardAvoidingView>

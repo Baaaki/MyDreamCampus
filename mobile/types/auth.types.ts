@@ -5,6 +5,10 @@ export interface User {
   email: string;
   role: 'student' | 'teacher' | 'admin';
   department?: string;
+  // Not part of the backend's user object: copied from the login response,
+  // or set when a service answers FORCE_PASSWORD_CHANGE, so the
+  // change-password screen knows the change cannot be skipped.
+  force_password_change?: boolean;
 }
 
 export interface LoginRequest {
