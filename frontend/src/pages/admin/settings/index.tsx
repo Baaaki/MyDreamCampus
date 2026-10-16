@@ -110,27 +110,6 @@ export default function SettingsPage() {
             </p>
           </CardContent>
         </Card>
-
-        {/* Profil */}
-        <Card className="dark:border-gray-800 dark:bg-gray-900">
-          <CardHeader>
-            <CardTitle className="flex items-center gap-2 dark:text-white">
-              <User className="h-5 w-5" />
-              Profil
-            </CardTitle>
-            <CardDescription>Profil bilgilerinizi düzenleyin</CardDescription>
-          </CardHeader>
-          <CardContent>
-            <Button
-              variant="outline"
-              className="w-full justify-start"
-              onClick={() => navigate("/staff/profile")}
-            >
-              <User className="mr-2 h-4 w-4" />
-              Profili Görüntüle
-            </Button>
-          </CardContent>
-        </Card>
       </div>
     </div>
   )
