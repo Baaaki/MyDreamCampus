@@ -86,10 +86,12 @@ function stubBackend(outcome: "completed" | "failed") {
   return { fetchSpy, confirmBodies }
 }
 
-function renderDialog(onPaid = vi.fn()) {
-  const client = new QueryClient({
+function renderDialog(
+  onPaid = vi.fn(),
+  client = new QueryClient({
     defaultOptions: { queries: { retry: false } },
   })
+) {
   render(
     <QueryClientProvider client={client}>
       <CheckoutDialog
@@ -127,7 +129,11 @@ describe("CheckoutDialog", () => {
 
   it("reserves, pays with a test card and reports the confirmed reservation", async () => {
     const { confirmBodies } = stubBackend("completed")
-    const onPaid = renderDialog()
+    const client = new QueryClient({
+      defaultOptions: { queries: { retry: false } },
+    })
+    const invalidate = vi.spyOn(client, "invalidateQueries")
+    const onPaid = renderDialog(vi.fn(), client)
 
     await reachCardForm()
     await userEvent.click(screen.getAllByRole("button", { name: "Kullan" })[0])
@@ -148,6 +154,17 @@ describe("CheckoutDialog", () => {
 
     await userEvent.click(screen.getByRole("button", { name: "Tamam" }))
     expect(onPaid).toHaveBeenCalledOnce()
+    // The lists that show the reservation must refetch it.
+    const invalidated = invalidate.mock.calls.map(
+      ([filters]) => filters?.queryKey
+    )
+    expect(invalidated).toEqual(
+      expect.arrayContaining([
+        ["current-reservations"],
+        ["past-reservations"],
+        ["meals", "reservations", "my"],
+      ])
+    )
   })
 
   it("shows the decline reason once the reservation is cancelled", async () => {

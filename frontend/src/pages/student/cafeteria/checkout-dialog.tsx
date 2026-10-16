@@ -198,7 +198,10 @@ export function CheckoutDialog({
     setFormErrors({})
     setError(null)
     setPayment(null)
-    queryClient.invalidateQueries({ queryKey: ["my-reservations"] })
+    // The cafeteria history and the dashboard list the reservations just paid.
+    queryClient.invalidateQueries({ queryKey: ["current-reservations"] })
+    queryClient.invalidateQueries({ queryKey: ["past-reservations"] })
+    queryClient.invalidateQueries({ queryKey: ["meals", "reservations", "my"] })
   }
 
   const handleOpenChange = (next: boolean) => {

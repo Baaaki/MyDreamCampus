@@ -74,7 +74,6 @@ export default function CafeteriaHistoryPage() {
       })
       // The cafeteria page and the dashboard list the same reservations.
       queryClient.invalidateQueries({ queryKey: ["current-reservations"] })
-      queryClient.invalidateQueries({ queryKey: ["my-reservations"] })
       queryClient.invalidateQueries({ queryKey: ["meals", "reservations"] })
     },
     onError: (err) => {
