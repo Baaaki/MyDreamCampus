@@ -19,16 +19,35 @@ import (
 // so attendance can keep its local cache tables in sync.
 const QueueSyncEvents = "attendance.sync_events"
 
+// cacheWriter and processedEvents are the parts of the cache and event
+// repositories the consumer uses, so handlers can be tested without Postgres.
+type cacheWriter interface {
+	UpsertStudentCache(ctx context.Context, student db.UpsertStudentCacheParams) error
+	DeactivateStudentCache(ctx context.Context, studentID uuid.UUID) error
+	UpsertCourseCache(ctx context.Context, course db.UpsertCourseCacheParams) error
+	CreateEnrollmentCache(ctx context.Context, studentID, courseID uuid.UUID, semester string) error
+}
+
+type processedEvents interface {
+	IsEventProcessed(ctx context.Context, eventID uuid.UUID) (bool, error)
+	MarkEventProcessed(ctx context.Context, eventID uuid.UUID, eventType string) error
+}
+
+var (
+	_ cacheWriter     = (*repository.CacheRepository)(nil)
+	_ processedEvents = (*repository.EventRepository)(nil)
+)
+
 type EventConsumer struct {
 	consumer  *rabbitmq.Consumer
-	cacheRepo *repository.CacheRepository
-	eventRepo *repository.EventRepository
+	cacheRepo cacheWriter
+	eventRepo processedEvents
 }
 
 func NewEventConsumer(
 	consumer *rabbitmq.Consumer,
-	cacheRepo *repository.CacheRepository,
-	eventRepo *repository.EventRepository,
+	cacheRepo cacheWriter,
+	eventRepo processedEvents,
 ) *EventConsumer {
 	return &EventConsumer{
 		consumer:  consumer,
@@ -285,8 +304,7 @@ func (w *EventConsumer) handleEnrollmentProgramApproved(ctx context.Context, bod
 	}
 	eventData := inner.Data
 
-	// Create enrollment cache entries for each course
-	successCount := 0
+	failedCount := 0
 	var lastErr error
 	for _, courseID := range eventData.CourseIDs {
 		err := w.cacheRepo.CreateEnrollmentCache(
@@ -301,11 +319,11 @@ func (w *EventConsumer) handleEnrollmentProgramApproved(ctx context.Context, bod
 				zap.String("course_id", courseID.String()),
 				zap.Error(err),
 			)
+			failedCount++
 			lastErr = err
 			continue
 		}
 
-		successCount++
 		log.Info("enrollment cache created",
 			zap.String("student_id", eventData.StudentID.String()),
 			zap.String("course_id", courseID.String()),
@@ -313,10 +331,16 @@ func (w *EventConsumer) handleEnrollmentProgramApproved(ctx context.Context, bod
 		)
 	}
 
-	// If all enrollments failed (e.g. FK constraint: student not in cache yet), requeue for retry
-	if successCount == 0 && lastErr != nil {
-		log.Warn("all enrollment cache entries failed, will retry",
+	// One failed course is enough to retry the whole event and leave it
+	// unprocessed: marking it processed would drop that course from the
+	// roster for good. Re-running the courses that already landed is a no-op
+	// (ON CONFLICT DO NOTHING), and the consumer dead-letters the message once
+	// its retries run out, so a failure that never clears (e.g. the student
+	// is still missing from the cache) ends up in the DLQ instead of looping.
+	if lastErr != nil {
+		log.Warn("enrollment cache entries failed, will retry",
 			zap.String("student_id", eventData.StudentID.String()),
+			zap.Int("failed_courses", failedCount),
 			zap.Int("total_courses", len(eventData.CourseIDs)),
 			zap.Error(lastErr),
 		)
