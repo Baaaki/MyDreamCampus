@@ -183,7 +183,8 @@ Servis sinirini gecen her sync cagri `shared/client` uzerinden gider.
 - **Idempotency**: `platformMiddleware.Idempotency()` **sunucu** tarafinda,
   Redis'te. Para, kota veya tekrar edilemez side-effect ureten POST'lara takilir
   (rezervasyon, ders programi gonderme, danisman onayi/reddi). Ayni
-  `Idempotency-Key` + ayni govde → ilk yanit; ayni key + farkli govde → 422.
+  `Idempotency-Key` + ayni istek (metot + somut path + govde) → ilk yanit;
+  ayni key + farkli istek → 422.
   Client basligi gondermezse middleware seffaf gecer.
 - **Hata map'lemesi**: HTTP client, hedefin 404'unu cagiran servisin kendi
   sentinel hatasina cevirir (staff 404 → catalog'un `ErrInstructorNotFound`'u).

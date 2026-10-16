@@ -125,7 +125,7 @@ func TestIdempotency_InFlightKey_Returns409(t *testing.T) {
 	// Simulate the first attempt still running: the claim exists, the
 	// response does not.
 	claimed, err := store.ClaimIdempotencyKey(t.Context(), "idem:meal:anonymous:key-1",
-		`{"body_sha256":"`+sha256Hex([]byte(body))+`","in_flight":true}`, time.Minute)
+		`{"body_sha256":"`+requestFingerprint(http.MethodPost, "/reservations", []byte(body))+`","in_flight":true}`, time.Minute)
 	require.NoError(t, err)
 	require.True(t, claimed)
 
@@ -232,6 +232,56 @@ func TestIdempotency_DeleteSameKey_ReplaysStoredResponse(t *testing.T) {
 	assert.Equal(t, http.StatusOK, second.Code)
 	assert.JSONEq(t, first.Body.String(), second.Body.String())
 	assert.Equal(t, 1, calls, "a retried cancel must not refund twice")
+}
+
+// newCancelRouter mounts a body-less DELETE whose handler records which
+// reservation it actually cancelled.
+func newCancelRouter(t *testing.T) (*gin.Engine, *[]string) {
+	t.Helper()
+	require.NoError(t, logger.Init("test"))
+	gin.SetMode(gin.TestMode)
+	SetIdempotencyStore(newFakeIdempotencyStore(), "meal")
+	t.Cleanup(func() { globalIdempotency = nil })
+
+	var cancelled []string
+	r := gin.New()
+	r.DELETE("/reservations/:id", Idempotency(), func(c *gin.Context) {
+		cancelled = append(cancelled, c.Param("id"))
+		c.JSON(http.StatusOK, gin.H{"id": c.Param("id")})
+	})
+	return r, &cancelled
+}
+
+func cancel(r *gin.Engine, key, id string) *httptest.ResponseRecorder {
+	req := httptest.NewRequest(http.MethodDelete, "/reservations/"+id, nil)
+	req.Header.Set(IdempotencyHeader, key)
+	w := httptest.NewRecorder()
+	r.ServeHTTP(w, req)
+	return w
+}
+
+func TestIdempotency_SameKeyEmptyBodyDifferentPath_Returns422(t *testing.T) {
+	r, cancelled := newCancelRouter(t)
+
+	first := cancel(r, "key-1", "res_1")
+	second := cancel(r, "key-1", "res_2")
+
+	assert.Equal(t, http.StatusOK, first.Code)
+	assert.Equal(t, http.StatusUnprocessableEntity, second.Code,
+		"replaying res_1's answer would report res_2 cancelled while it is still booked")
+	assert.Contains(t, second.Body.String(), "IDEMPOTENCY_KEY_REUSED")
+	assert.Equal(t, []string{"res_1"}, *cancelled)
+}
+
+func TestIdempotency_SameKeyEmptyBodySamePath_ReplaysStoredResponse(t *testing.T) {
+	r, cancelled := newCancelRouter(t)
+
+	first := cancel(r, "key-1", "res_1")
+	second := cancel(r, "key-1", "res_1")
+
+	assert.Equal(t, http.StatusOK, second.Code)
+	assert.JSONEq(t, first.Body.String(), second.Body.String())
+	assert.Equal(t, []string{"res_1"}, *cancelled)
 }
 
 // ctxAwareStore fails writes whose context is already cancelled, the way a

@@ -46,7 +46,9 @@ type IdempotencyStore interface {
 }
 
 // idempotencyRecord is what a key maps to. An in-flight claim carries the
-// body hash only; StatusCode is filled in once the handler has answered.
+// request fingerprint only; StatusCode is filled in once the handler has
+// answered. BodySHA256 holds that fingerprint; the name is left over from
+// when only the body was hashed.
 type idempotencyRecord struct {
 	BodySHA256   string `json:"body_sha256"`
 	StatusCode   int    `json:"status_code,omitempty"`
@@ -107,7 +109,7 @@ func Idempotency() gin.HandlerFunc {
 		}
 
 		key := idempotencyKey(cfg.serviceName, userIDForIdempotency(c), clientKey)
-		bodyHash := sha256Hex(body)
+		fingerprint := requestFingerprint(c.Request.Method, c.Request.URL.Path, body)
 		ctx := c.Request.Context()
 		log := logger.WithContextAndFields(ctx,
 			zap.String("middleware", "Idempotency"),
@@ -121,11 +123,11 @@ func Idempotency() gin.HandlerFunc {
 			return
 		}
 		if existing != "" {
-			replayIdempotentResponse(c, log, existing, bodyHash)
+			replayIdempotentResponse(c, log, existing, fingerprint)
 			return
 		}
 
-		claim, err := json.Marshal(idempotencyRecord{BodySHA256: bodyHash, InFlight: true})
+		claim, err := json.Marshal(idempotencyRecord{BodySHA256: fingerprint, InFlight: true})
 		if err != nil {
 			log.Warn("idempotency claim could not be encoded", zap.Error(err))
 			c.Next()
@@ -168,7 +170,7 @@ func Idempotency() gin.HandlerFunc {
 		}
 
 		record, err := json.Marshal(idempotencyRecord{
-			BodySHA256:   bodyHash,
+			BodySHA256:   fingerprint,
 			StatusCode:   status,
 			ResponseBody: recorder.body.String(),
 		})
@@ -184,8 +186,8 @@ func Idempotency() gin.HandlerFunc {
 
 // replayIdempotentResponse answers from the stored record: the same body
 // for a repeat of the same request, 409 while the first one is still
-// running, 422 when the key was reused for different content.
-func replayIdempotentResponse(c *gin.Context, log *zap.Logger, stored, bodyHash string) {
+// running, 422 when the key was reused for a different request.
+func replayIdempotentResponse(c *gin.Context, log *zap.Logger, stored, fingerprint string) {
 	var record idempotencyRecord
 	if err := json.Unmarshal([]byte(stored), &record); err != nil {
 		log.Warn("stored idempotency record is unreadable, passing request through", zap.Error(err))
@@ -193,7 +195,7 @@ func replayIdempotentResponse(c *gin.Context, log *zap.Logger, stored, bodyHash 
 		return
 	}
 
-	if record.BodySHA256 != bodyHash {
+	if record.BodySHA256 != fingerprint {
 		c.AbortWithStatusJSON(http.StatusUnprocessableEntity, gin.H{
 			"error": "Bu anahtar farklı bir istekle kullanıldı",
 			"code":  "IDEMPOTENCY_KEY_REUSED",
@@ -243,9 +245,15 @@ func idempotencyKey(service, userID, clientKey string) string {
 	return "idem:" + service + ":" + userID + ":" + clientKey
 }
 
-func sha256Hex(body []byte) string {
-	sum := sha256.Sum256(body)
-	return hex.EncodeToString(sum[:])
+// requestFingerprint identifies the request a key was first used for. The
+// concrete path is part of it, not the route template: two body-less DELETEs
+// on different reservations would otherwise share a fingerprint, and the
+// second cancel would replay the first instead of running.
+func requestFingerprint(method, path string, body []byte) string {
+	h := sha256.New()
+	h.Write([]byte(method + "\n" + path + "\n"))
+	h.Write(body)
+	return hex.EncodeToString(h.Sum(nil))
 }
 
 // idempotencyRecorder captures the response so it can be replayed later.
