@@ -39,7 +39,7 @@ interface GradeAppealDialogProps {
 
 /**
  * Processes a grade appeal on a finalized course: one assessment score is
- * corrected and the letter grade recomputed against the frozen class
+ * corrected and the grade point recomputed against the frozen class
  * statistics. Open while `student` is set.
  */
 export function GradeAppealDialog({
@@ -91,8 +91,8 @@ export function GradeAppealDialog({
           <DialogDescription>
             {student?.first_name} {student?.last_name} (
             {student?.student_number}) için bir değerlendirme notunu düzeltin.
-            Harf notu, ders kesinleştirilirken dondurulan sınıf
-            istatistikleriyle yeniden hesaplanır.
+            Katsayı, ders kesinleştirilirken dondurulan sınıf istatistikleriyle
+            yeniden hesaplanır.
           </DialogDescription>
         </DialogHeader>
 
@@ -200,7 +200,7 @@ function AppealResult({
           to={result.new_weighted_average.toFixed(2)}
         />
         <Change
-          label="Harf notu"
+          label="Katsayı"
           from={result.old_grade_point}
           to={result.new_grade_point}
         />

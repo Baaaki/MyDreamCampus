@@ -32,7 +32,7 @@ const results: CourseResult[] = [
     last_name: "Veli",
     scores: { midterm: 40, final: 55 },
     weighted_average: 49,
-    grade_point: "DD",
+    grade_point: "1.00",
     is_attendance_failed: false,
   },
   {
@@ -42,7 +42,7 @@ const results: CourseResult[] = [
     last_name: "Kaya",
     scores: { midterm: 10 },
     weighted_average: 4,
-    grade_point: "FF",
+    grade_point: "0.00",
     is_attendance_failed: true,
   },
 ]
@@ -93,7 +93,7 @@ describe("CourseResultsTable", () => {
     expect(within(ali).getByText("40")).toBeInTheDocument()
     expect(within(ali).getByText("55")).toBeInTheDocument()
     expect(within(ali).getByText("49.00")).toBeInTheDocument()
-    expect(within(ali).getByText("DD")).toBeInTheDocument()
+    expect(within(ali).getByText("1.00")).toBeInTheDocument()
 
     const ayse = screen.getByText("2024002").closest("tr")!
     expect(within(ayse).getByText("-")).toBeInTheDocument()

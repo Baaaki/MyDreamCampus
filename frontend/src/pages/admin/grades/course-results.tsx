@@ -53,7 +53,7 @@ export function CourseResultsTable({
               Ortalama
             </TableHead>
             <TableHead className="text-center whitespace-nowrap">
-              Harf Notu
+              Katsayı
             </TableHead>
             <TableHead className="text-right whitespace-nowrap">
               İtiraz

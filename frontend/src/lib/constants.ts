@@ -51,16 +51,3 @@ export const MENU_TYPES = {
   NORMAL: "normal",
   VEGAN: "vegan",
 } as const
-
-// Letter grades
-export const LETTER_GRADES = [
-  "AA",
-  "BA",
-  "BB",
-  "CB",
-  "CC",
-  "DC",
-  "DD",
-  "FD",
-  "FF",
-] as const

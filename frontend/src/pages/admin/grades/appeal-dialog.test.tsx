@@ -19,7 +19,7 @@ const student: CourseResult = {
   last_name: "Veli",
   scores: { midterm: 40, final: 55 },
   weighted_average: 49,
-  grade_point: "DD",
+  grade_point: "1.00",
   is_attendance_failed: false,
 }
 
@@ -114,8 +114,8 @@ describe("GradeAppealDialog", () => {
         new_score: 60,
         old_weighted_average: 49,
         new_weighted_average: 57,
-        old_grade_point: "DD",
-        new_grade_point: "CC",
+        old_grade_point: "1.00",
+        new_grade_point: "2.00",
         grading_type: "relative",
         frozen_class_mean: 55,
       })
@@ -138,8 +138,8 @@ describe("GradeAppealDialog", () => {
     expect(screen.getByText("Vize")).toBeInTheDocument()
     expect(screen.getByText("49.00")).toBeInTheDocument()
     expect(screen.getByText("57.00")).toBeInTheDocument()
-    expect(screen.getByText("DD")).toBeInTheDocument()
-    expect(screen.getByText("CC")).toBeInTheDocument()
+    expect(screen.getByText("1.00")).toBeInTheDocument()
+    expect(screen.getByText("2.00")).toBeInTheDocument()
   })
 
   it("shows the current score of the picked assessment", async () => {

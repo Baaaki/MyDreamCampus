@@ -6,7 +6,6 @@ import {
   MEAL_RESERVATION_WINDOW,
   MEAL_TIMES,
   MENU_TYPES,
-  LETTER_GRADES,
 } from "./constants"
 
 describe("TIME_SLOTS", () => {
@@ -62,17 +61,5 @@ describe("MEAL_TIMES + MENU_TYPES", () => {
     expect(MEAL_TIMES.DINNER).toBe("dinner")
     expect(MENU_TYPES.NORMAL).toBe("normal")
     expect(MENU_TYPES.VEGAN).toBe("vegan")
-  })
-})
-
-describe("LETTER_GRADES", () => {
-  it("ordered from highest to lowest", () => {
-    expect(LETTER_GRADES[0]).toBe("AA")
-    expect(LETTER_GRADES[LETTER_GRADES.length - 1]).toBe("FF")
-    expect(LETTER_GRADES.length).toBe(9)
-  })
-
-  it("has no duplicates", () => {
-    expect(new Set(LETTER_GRADES).size).toBe(LETTER_GRADES.length)
   })
 })
