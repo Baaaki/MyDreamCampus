@@ -2,7 +2,8 @@ import { useState } from "react"
 import { useQuery } from "@tanstack/react-query"
 import { mealApi } from "@/lib/api-client"
 import { apiErrorMessage } from "@/lib/api-error"
-import type { QRResponse, Cafeteria } from "@/lib/types"
+import { getCafeterias } from "@/lib/services/meal-service"
+import type { QRResponse } from "@/lib/types"
 import { QRCodeSVG } from "qrcode.react"
 import { format } from "date-fns"
 import { tr } from "date-fns/locale"
@@ -21,9 +22,7 @@ export default function MealAdminQRPage() {
   const { data: cafeterias = [], error: cafeteriasError } = useQuery({
     queryKey: ["meal", "cafeterias", "active"],
     queryFn: async () =>
-      (await mealApi.get("cafeterias").json<Cafeteria[]>()).filter(
-        (c) => c.is_active
-      ),
+      (await getCafeterias()).cafeterias.filter((c) => c.is_active),
   })
 
   const {
