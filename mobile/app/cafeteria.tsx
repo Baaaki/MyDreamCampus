@@ -20,8 +20,9 @@ import {
   useMyReservations,
 } from '@/hooks/useMeals';
 import { apiErrorCode, apiErrorMessage } from '@/lib/api-error';
+import { menuForDate } from '@/lib/menu';
 import { COLORS } from '@/lib/theme';
-import type { Cafeteria, DailyMenu, MealTime, MenuType, Reservation } from '@/types/meal.types';
+import type { Cafeteria, MealTime, MenuData, MenuType, Reservation } from '@/types/meal.types';
 
 // ---------------------------------------------------------------------------
 // Yardimci parcalar
@@ -155,8 +156,20 @@ function StepDots({ step }: { step: number }) {
   );
 }
 
-function DayMenuRow({ menu, mealTimes }: { menu?: DailyMenu; mealTimes: MealTime[] }) {
-  const dishes = mealTimes.flatMap((mt) => menu?.[mt] ?? []);
+function DayMenuRow({
+  menu,
+  date,
+  menuType,
+  mealTimes,
+}: {
+  menu: MenuData | null | undefined;
+  date: Date;
+  menuType: MenuType;
+  mealTimes: MealTime[];
+}) {
+  const day = menuForDate(menu, date, menuType);
+  // The week format serves one menu for lunch and dinner; list it once.
+  const dishes = [...new Set(mealTimes.flatMap((mt) => day[mt] ?? []))];
   if (dishes.length === 0) {
     return <Text className="text-xs text-muted-foreground">Bu gün için menü henüz girilmedi.</Text>;
   }
@@ -198,13 +211,12 @@ function ReservationWizard({
   const canDinner = cafeteria?.serves_dinner ?? false;
   const canVegan = cafeteria?.has_vegan_menu ?? false;
 
-  // Gelecek hafta iki aya yayilabilir (ay sonu); iki ay menusunu birlestir.
+  // Gelecek hafta iki aya yayilabilir (ay sonu). Iki ayin menusu birlestirilmez
+  // (web bicimindeki hafta dizileri cakisir); her gun kendi ayinin menusunden okunur.
   const menuA = useMonthlyMenu(days[0].getFullYear(), days[0].getMonth() + 1);
   const menuB = useMonthlyMenu(days[4].getFullYear(), days[4].getMonth() + 1);
-  const menuByDate: Record<string, DailyMenu> = {
-    ...(menuA.data?.menu_data ?? {}),
-    ...(menuB.data?.menu_data ?? {}),
-  };
+  const monthMenuOf = (d: Date) =>
+    (d.getMonth() === days[0].getMonth() ? menuA.data : menuB.data)?.menu_data;
   const menuLoading = menuA.isLoading || menuB.isLoading;
 
   const effectiveMenuType: MenuType = canVegan ? menuType : 'normal';
@@ -456,7 +468,12 @@ function ReservationWizard({
                                   {formatDateLongTR(iso)}
                                 </Text>
                                 <View className="mt-1">
-                                  <DayMenuRow menu={menuByDate[iso]} mealTimes={effectiveMeals} />
+                                  <DayMenuRow
+                                    menu={monthMenuOf(d)}
+                                    date={d}
+                                    menuType={effectiveMenuType}
+                                    mealTimes={effectiveMeals}
+                                  />
                                 </View>
                               </View>
                             </View>

@@ -18,13 +18,36 @@ export interface CafeteriaListData {
   currency: string;
 }
 
-// menu_data: { "2026-07-06": { lunch: string[], dinner: string[] }, ... }
+// Bir ayin menusu iki bicimde gelebilir (seed ikisini birden yazar):
+// - web: { normalMenus: [hafta...], veganMenus: [hafta...] }; i'inci hafta ayi
+//   kesen i'inci Pazartesi-Pazar haftasi, her gun { items: [5 kalem], calories }.
+//   Ogun ayrimi yok. Web admin menuyu yalnizca bu bicimde kaydeder.
+// - eski: { "2026-07-06": { lunch: string[], dinner: string[] }, ... };
+//   yalnizca normal menu.
 export type DailyMenu = { lunch?: string[]; dinner?: string[] };
+
+export interface MenuDay {
+  items: string[];
+  calories: number;
+}
+
+export type MenuWeekday = 'monday' | 'tuesday' | 'wednesday' | 'thursday' | 'friday';
+
+export type MenuWeek = Partial<Record<MenuWeekday, MenuDay>>;
+
+export interface WebMenuData {
+  normalMenus: MenuWeek[];
+  veganMenus: MenuWeek[];
+}
+
+export type DatedMenuData = Record<string, DailyMenu>;
+
+export type MenuData = WebMenuData | DatedMenuData;
 
 export interface MonthlyMenuData {
   year: number;
   month: number;
-  menu_data: Record<string, DailyMenu> | null;
+  menu_data: MenuData | null;
 }
 
 export interface CafeteriaInfo {
