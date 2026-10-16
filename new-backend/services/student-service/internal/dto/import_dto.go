@@ -70,10 +70,12 @@ type CSVStudentRecord struct {
 	ClassLevel     int16  `csv:"class_level"`
 }
 
-// ImportJobFilterQuery represents query parameters for filtering import jobs
+// ImportJobFilterQuery is the paging of the import job list. It does not
+// embed PaginationQuery: that type also binds the student list's status
+// filter, whose oneof rejects every import job status with a 400.
 type ImportJobFilterQuery struct {
-	PaginationQuery
-	Status string `form:"status" binding:"omitempty,oneof=pending processing completed failed"`
+	Page  int `form:"page,default=1" binding:"min=1"`
+	Limit int `form:"limit,default=20" binding:"min=1,max=100"`
 }
 
 // StaffAdvisor represents advisor from staff service (for caching)

@@ -333,17 +333,16 @@ func (s *ImportService) ListImportJobs(ctx context.Context, userID uuid.UUID, qu
 		zap.String("method", "ListImportJobs"),
 	)
 
-	limit := int32(20)
-	offset := int32(0)
-
-	if query.Limit > 0 {
-		limit = utils.ClampToInt32(query.Limit)
-	}
-	if query.Page > 0 {
-		offset = utils.ClampToInt32((query.Page - 1) * query.Limit)
+	// The handler's binding already guarantees both are >= 1; a direct
+	// caller with a zero query must not divide by zero below.
+	page := max(query.Page, 1)
+	limit := query.Limit
+	if limit < 1 {
+		limit = 20
 	}
 
-	jobs, total, err := s.importRepo.ListImportJobsByUser(ctx, userID, limit, offset)
+	jobs, total, err := s.importRepo.ListImportJobsByUser(ctx, userID,
+		utils.ClampToInt32(limit), utils.ClampToInt32((page-1)*limit))
 	if err != nil {
 		log.Error("failed to list import jobs",
 			zap.Error(err),
@@ -359,10 +358,10 @@ func (s *ImportService) ListImportJobs(ctx context.Context, userID uuid.UUID, qu
 	return dto.ImportJobListResponse{
 		Data: jobSummaries,
 		Pagination: dto.PaginationResponse{
-			Page:       query.Page,
-			Limit:      query.Limit,
+			Page:       page,
+			Limit:      limit,
 			Total:      int(total),
-			TotalPages: (int(total) + query.Limit - 1) / query.Limit,
+			TotalPages: (int(total) + limit - 1) / limit,
 		},
 	}, nil
 }

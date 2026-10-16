@@ -2,10 +2,13 @@ package dto
 
 import (
 	"encoding/json"
+	"net/http"
+	"net/http/httptest"
 	"strings"
 	"testing"
 	"time"
 
+	"github.com/gin-gonic/gin/binding"
 	"github.com/google/uuid"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -53,13 +56,22 @@ func TestCSVStudentRecord_FieldsAreTaggedForCSV(t *testing.T) {
 	assert.Equal(t, int16(1), r.ClassLevel)
 }
 
-func TestImportJobFilterQuery_ValidStatuses(t *testing.T) {
-	// We can't easily run gin form binding on this, but we can document
-	// the expected values via a sentinel test.
-	valid := []string{"pending", "processing", "completed", "failed"}
-	for _, s := range valid {
-		assert.NotEmpty(t, s, "status %s must be a non-empty constant", s)
-	}
+// The list used to embed PaginationQuery, whose student-status oneof turned
+// ?status=pending into a 400. Unknown params must now be ignored.
+func TestImportJobFilterQuery_StatusParam_BindsWithDefaults(t *testing.T) {
+	req := httptest.NewRequest(http.MethodGet, "/imports?status=pending", nil)
+
+	var q ImportJobFilterQuery
+	require.NoError(t, binding.Query.Bind(req, &q))
+	assert.Equal(t, 1, q.Page)
+	assert.Equal(t, 20, q.Limit)
+}
+
+func TestImportJobFilterQuery_LimitAboveMax_Rejected(t *testing.T) {
+	req := httptest.NewRequest(http.MethodGet, "/imports?limit=101", nil)
+
+	var q ImportJobFilterQuery
+	require.Error(t, binding.Query.Bind(req, &q))
 }
 
 func TestStaffAdvisor_RoundTrip(t *testing.T) {

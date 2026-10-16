@@ -27,6 +27,15 @@ type fakeImportStore struct {
 	started   bool
 	completed bool
 	failed    bool
+
+	listTotal  int64
+	listLimit  int32
+	listOffset int32
+}
+
+func (f *fakeImportStore) ListImportJobsByUser(_ context.Context, _ uuid.UUID, limit, offset int32) ([]db.ImportJob, int64, error) {
+	f.listLimit, f.listOffset = limit, offset
+	return nil, f.listTotal, nil
 }
 
 func (f *fakeImportStore) CreateImportJob(_ context.Context, params db.CreateImportJobParams) (db.ImportJob, error) {
@@ -275,4 +284,37 @@ func TestImportService_ToImportJobResponse_ReadsRowErrorsBack(t *testing.T) {
 	// Jobs from before the structured format hold plain strings.
 	legacy := svc.toImportJobResponse(db.ImportJob{Errors: []byte(`["Line 2: bad"]`)})
 	assert.Empty(t, legacy.Errors)
+}
+
+func TestImportService_ListImportJobs_ZeroQuery_UsesDefaultPaging(t *testing.T) {
+	require.NoError(t, logger.Init("test"))
+	store := &fakeImportStore{listTotal: 45}
+	svc := NewImportService(store, newFakeCreator(), &fakeImportStaff{})
+
+	var resp dto.ImportJobListResponse
+	require.NotPanics(t, func() {
+		var err error
+		resp, err = svc.ListImportJobs(context.Background(), uuid.New(), dto.ImportJobFilterQuery{})
+		require.NoError(t, err)
+	})
+
+	assert.Equal(t, 1, resp.Pagination.Page)
+	assert.Equal(t, 20, resp.Pagination.Limit)
+	assert.Equal(t, 45, resp.Pagination.Total)
+	assert.Equal(t, 3, resp.Pagination.TotalPages)
+	assert.Equal(t, int32(20), store.listLimit)
+	assert.Equal(t, int32(0), store.listOffset)
+}
+
+func TestImportService_ListImportJobs_SecondPage_OffsetsByLimit(t *testing.T) {
+	require.NoError(t, logger.Init("test"))
+	store := &fakeImportStore{listTotal: 45}
+	svc := NewImportService(store, newFakeCreator(), &fakeImportStaff{})
+
+	resp, err := svc.ListImportJobs(context.Background(), uuid.New(), dto.ImportJobFilterQuery{Page: 2, Limit: 10})
+
+	require.NoError(t, err)
+	assert.Equal(t, int32(10), store.listOffset)
+	assert.Equal(t, 2, resp.Pagination.Page)
+	assert.Equal(t, 5, resp.Pagination.TotalPages)
 }
