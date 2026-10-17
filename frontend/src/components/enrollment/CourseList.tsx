@@ -96,10 +96,10 @@ export default function CourseList({
   }
 
   return (
-    <div className="flex h-full flex-col border-r border-gray-200 bg-white">
-      <div className="border-b border-gray-200 bg-gray-50 px-3 py-2">
-        <h2 className="text-lg font-bold text-gray-800">Açılan Dersler</h2>
-        <p className="text-xs text-gray-600">
+    <div className="flex h-full flex-col border-r border-border bg-card">
+      <div className="border-b border-border bg-muted/50 px-3 py-2">
+        <h2 className="text-lg font-bold text-foreground">Açılan Dersler</h2>
+        <p className="text-xs text-muted-foreground">
           {courses.length} ders • {selectedCourseIds.length} seçili
         </p>
       </div>
@@ -110,15 +110,15 @@ export default function CourseList({
           const selectedCount = getSelectedCount(section.courses)
 
           return (
-            <div key={section.key} className="border-b border-gray-200">
+            <div key={section.key} className="border-b border-border">
               {/* Accordion Header */}
               <button
                 onClick={() => toggleSection(section.key)}
-                className="flex w-full items-center justify-between bg-gray-100 px-3 py-2 transition-colors hover:bg-gray-200"
+                className="flex w-full items-center justify-between bg-muted px-3 py-2 transition-colors hover:bg-muted/70"
               >
                 <div className="flex items-center gap-2">
                   <svg
-                    className={`h-4 w-4 text-gray-600 transition-transform duration-200 ${isExpanded ? "rotate-90" : ""}`}
+                    className={`h-4 w-4 text-muted-foreground transition-transform duration-200 ${isExpanded ? "rotate-90" : ""}`}
                     fill="none"
                     stroke="currentColor"
                     viewBox="0 0 24 24"
@@ -130,7 +130,7 @@ export default function CourseList({
                       d="M9 5l7 7-7 7"
                     />
                   </svg>
-                  <span className="text-sm font-semibold text-gray-800">
+                  <span className="text-sm font-semibold text-foreground">
                     {section.title}
                   </span>
                 </div>
@@ -140,7 +140,7 @@ export default function CourseList({
                       {selectedCount}
                     </span>
                   )}
-                  <span className="text-xs text-gray-500">
+                  <span className="text-xs text-muted-foreground">
                     {section.courses.length}
                   </span>
                 </div>
@@ -159,23 +159,23 @@ export default function CourseList({
                     <div
                       key={course.id}
                       onClick={() => onSelectCourse(course.id)}
-                      className={`cursor-pointer border-b border-gray-100 px-3 py-2 transition-all duration-200 hover:bg-blue-50 ${
+                      className={`cursor-pointer border-b border-border/50 px-3 py-2 transition-all duration-200 hover:bg-blue-50 dark:hover:bg-blue-950/40 ${
                         isSelected
-                          ? "border-l-4 border-l-blue-600 bg-blue-100"
+                          ? "border-l-4 border-l-blue-600 bg-blue-100 dark:bg-blue-900/40"
                           : "hover:border-l-4 hover:border-l-blue-300"
                       }`}
                     >
                       <div className="flex items-center justify-between gap-2">
-                        <h3 className="text-sm font-bold text-gray-900">
+                        <h3 className="text-sm font-bold text-foreground">
                           {course.course_code}
                         </h3>
                         {branch && (
-                          <span className="rounded-full bg-purple-100 px-1.5 py-0.5 text-xs text-purple-700">
+                          <span className="rounded-full bg-purple-100 px-1.5 py-0.5 text-xs text-purple-700 dark:bg-purple-900/40 dark:text-purple-300">
                             {branch}. Şube
                           </span>
                         )}
                       </div>
-                      <div className="mt-1 flex items-center gap-1 text-xs text-gray-600">
+                      <div className="mt-1 flex items-center gap-1 text-xs text-muted-foreground">
                         <svg
                           className="h-3 w-3 flex-shrink-0"
                           fill="none"
@@ -191,7 +191,7 @@ export default function CourseList({
                         </svg>
                         <span className="truncate">{course.instructor}</span>
                       </div>
-                      <div className="flex items-center gap-1 text-xs text-gray-500">
+                      <div className="flex items-center gap-1 text-xs text-muted-foreground">
                         <span className="truncate">
                           Kontenjan: {course.current_enrollment}/
                           {course.max_capacity} • Boş: {course.available_seats}

@@ -118,11 +118,11 @@ export default function WeeklyScheduleGrid({
   )
 
   return (
-    <div className="flex h-full flex-col bg-white">
+    <div className="flex h-full flex-col bg-card">
       {/* Header */}
-      <div className="border-b border-gray-200 bg-gray-50 p-4">
-        <h2 className="text-xl font-bold text-gray-800">Haftalık Program</h2>
-        <p className="mt-1 text-sm text-gray-600">
+      <div className="border-b border-border bg-muted/50 p-4">
+        <h2 className="text-xl font-bold text-foreground">Haftalık Program</h2>
+        <p className="mt-1 text-sm text-muted-foreground">
           {selectedCourseIds.length > 0
             ? `${selectedCourseIds.length} ders seçildi • ${totalSessions} oturum`
             : "Sol taraftan ders seçin"}
@@ -131,10 +131,10 @@ export default function WeeklyScheduleGrid({
 
       {/* Conflict Warning Box */}
       {conflicts.length > 0 && (
-        <div className="mx-4 mt-4 rounded-lg border border-red-300 bg-red-50 p-4">
+        <div className="mx-4 mt-4 rounded-lg border border-red-300 bg-red-50 p-4 dark:border-red-700 dark:bg-red-900/30">
           <div className="flex items-start gap-3">
             <svg
-              className="mt-0.5 h-6 w-6 flex-shrink-0 text-red-600"
+              className="mt-0.5 h-6 w-6 flex-shrink-0 text-red-600 dark:text-red-400"
               fill="none"
               stroke="currentColor"
               viewBox="0 0 24 24"
@@ -147,30 +147,30 @@ export default function WeeklyScheduleGrid({
               />
             </svg>
             <div className="flex-1">
-              <h3 className="text-lg font-bold text-red-800">
+              <h3 className="text-lg font-bold text-red-800 dark:text-red-200">
                 Ders Çakışması Tespit Edildi!
               </h3>
-              <p className="mt-1 mb-3 text-sm text-red-700">
+              <p className="mt-1 mb-3 text-sm text-red-700 dark:text-red-300">
                 Aşağıdaki zaman dilimlerinde birden fazla ders çakışıyor:
               </p>
               <div className="space-y-2">
                 {conflicts.map((conflict, index) => (
                   <div
                     key={index}
-                    className="flex items-center gap-2 rounded-md bg-red-100 px-3 py-2"
+                    className="flex items-center gap-2 rounded-md bg-red-100 px-3 py-2 dark:bg-red-900/50"
                   >
-                    <span className="font-semibold text-red-900">
+                    <span className="font-semibold text-red-900 dark:text-red-100">
                       {conflict.dayLabel}
                     </span>
-                    <span className="text-red-700">{conflict.timeRange}</span>
-                    <span className="text-red-600">→</span>
-                    <span className="font-bold text-red-900">
+                    <span className="text-red-700 dark:text-red-300">{conflict.timeRange}</span>
+                    <span className="text-red-600 dark:text-red-400">→</span>
+                    <span className="font-bold text-red-900 dark:text-red-100">
                       {conflict.courses.join(" & ")}
                     </span>
                   </div>
                 ))}
               </div>
-              <p className="mt-3 text-xs text-red-600">
+              <p className="mt-3 text-xs text-red-600 dark:text-red-400">
                 Çakışan derslerden birini kaldırmak için tablodaki hücreye veya
                 soldaki listeden derse tıklayın.
               </p>
@@ -184,13 +184,13 @@ export default function WeeklyScheduleGrid({
           <table className="w-full border-collapse">
             <thead>
               <tr>
-                <th className="sticky top-0 left-0 z-20 min-w-[120px] border border-gray-300 bg-gray-100 p-3 text-sm font-semibold text-gray-700">
+                <th className="sticky top-0 left-0 z-20 min-w-[120px] border border-border bg-muted p-3 text-sm font-semibold text-foreground">
                   Saat
                 </th>
                 {DAYS_OF_WEEK.map((day) => (
                   <th
                     key={day.key}
-                    className="sticky top-0 z-10 min-w-[140px] border border-gray-300 bg-gray-100 p-3 text-sm font-semibold text-gray-700"
+                    className="sticky top-0 z-10 min-w-[140px] border border-border bg-muted p-3 text-sm font-semibold text-foreground"
                   >
                     {day.label}
                   </th>
@@ -200,12 +200,12 @@ export default function WeeklyScheduleGrid({
             <tbody>
               {Object.entries(TIME_SLOTS).map(([slotNum, slotInfo]) => (
                 <tr key={slotNum}>
-                  <td className="sticky left-0 z-10 border border-gray-300 bg-gray-50 p-3 text-center text-sm font-medium text-gray-700">
+                  <td className="sticky left-0 z-10 border border-border bg-muted p-3 text-center text-sm font-medium text-foreground">
                     <div className="flex flex-col">
-                      <span className="text-sm font-semibold text-gray-700">
+                      <span className="text-sm font-semibold text-foreground">
                         {slotInfo.label}
                       </span>
-                      <span className="font-mono text-xs text-gray-600">
+                      <span className="font-mono text-xs text-muted-foreground">
                         {slotInfo.time}
                       </span>
                     </div>
@@ -221,11 +221,11 @@ export default function WeeklyScheduleGrid({
                         return (
                           <td
                             key={key}
-                            className="border-2 border-red-500 bg-red-100 p-2 transition-all duration-200"
+                            className="border-2 border-red-500 bg-red-100 p-2 dark:bg-red-900/40 transition-all duration-200"
                           >
                             <div className="flex h-12 flex-col items-center justify-center gap-1">
                               <svg
-                                className="h-5 w-5 text-red-600"
+                                className="h-5 w-5 text-red-600 dark:text-red-400"
                                 fill="none"
                                 stroke="currentColor"
                                 viewBox="0 0 24 24"
@@ -238,12 +238,12 @@ export default function WeeklyScheduleGrid({
                                 />
                               </svg>
                               <div className="text-center">
-                                <div className="text-xs font-bold text-red-800">
+                                <div className="text-xs font-bold text-red-800 dark:text-red-200">
                                   {coursesInSlot
                                     .map((c) => c.course_code)
                                     .join(" & ")}
                                 </div>
-                                <div className="text-xs font-semibold text-red-600">
+                                <div className="text-xs font-semibold text-red-600 dark:text-red-400">
                                   ÇAKIŞMA!
                                 </div>
                               </div>
@@ -261,7 +261,7 @@ export default function WeeklyScheduleGrid({
                             onClick={() =>
                               !readOnly && onRemoveCourse(course.id)
                             }
-                            className={`border border-gray-300 p-2 transition-all duration-200 ${
+                            className={`border border-border p-2 transition-all duration-200 ${
                               readOnly
                                 ? "cursor-default"
                                 : "cursor-pointer hover:opacity-90"
@@ -292,7 +292,7 @@ export default function WeeklyScheduleGrid({
                     return (
                       <td
                         key={key}
-                        className="border border-gray-300 bg-white p-3 transition-all duration-200 hover:bg-gray-50"
+                        className="border border-border bg-card p-3 transition-all duration-200 hover:bg-muted/50"
                       />
                     )
                   })}
@@ -305,10 +305,10 @@ export default function WeeklyScheduleGrid({
 
       {/* Empty state overlay */}
       {sessions.length === 0 && (
-        <div className="bg-opacity-75 pointer-events-none absolute inset-0 flex items-center justify-center bg-gray-50">
+        <div className="pointer-events-none absolute inset-0 flex items-center justify-center bg-muted">
           <div className="text-center">
             <svg
-              className="mx-auto mb-4 h-16 w-16 text-gray-400"
+              className="mx-auto mb-4 h-16 w-16 text-muted-foreground/60"
               fill="none"
               stroke="currentColor"
               viewBox="0 0 24 24"
@@ -320,13 +320,13 @@ export default function WeeklyScheduleGrid({
                 d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z"
               />
             </svg>
-            <p className="font-medium text-gray-600">
+            <p className="font-medium text-muted-foreground">
               Sol taraftan bir veya birden fazla ders seçin
             </p>
-            <p className="mt-1 text-sm text-gray-500">
+            <p className="mt-1 text-sm text-muted-foreground">
               Haftalık program burada görünecek
             </p>
-            <p className="mt-1 text-sm text-gray-500">
+            <p className="mt-1 text-sm text-muted-foreground">
               Her ders farklı renkle gösterilecek
             </p>
           </div>
@@ -335,13 +335,13 @@ export default function WeeklyScheduleGrid({
 
       {/* Enrollment button - always visible unless explicitly hidden or readOnly without override */}
       {showSubmitButton && (!readOnly || showSubmitButton) && (
-        <div className="mt-auto border-t border-gray-200 bg-white p-4">
+        <div className="mt-auto border-t border-border bg-card p-4">
           <button
             onClick={onEnroll}
             disabled={conflicts.length > 0}
             className={`w-full rounded-lg px-6 py-4 text-lg font-bold transition-all duration-200 ${
               conflicts.length > 0
-                ? "cursor-not-allowed bg-gray-300 text-gray-500"
+                ? "cursor-not-allowed bg-muted text-muted-foreground"
                 : "bg-indigo-600 text-white shadow-lg hover:bg-indigo-700 hover:shadow-xl active:bg-indigo-800"
             }`}
           >
