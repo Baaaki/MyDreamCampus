@@ -196,6 +196,17 @@ describe("StudentEnrollmentPage", () => {
     expect(submitButton(0)).toBeEnabled()
   })
 
+  it("shows the dates the enrollment window is open between", async () => {
+    stubBackend()
+    renderPage()
+
+    expect(
+      await screen.findByText(
+        /^Ders kayıt tarihleri: \d+ \S+ 2026 \d{2}:\d{2} – \d+ \S+ 2026 \d{2}:\d{2}$/
+      )
+    ).toBeInTheDocument()
+  })
+
   it("submits the chosen courses and shows the program as awaiting approval", async () => {
     const sent = stubBackend()
     const user = userEvent.setup()

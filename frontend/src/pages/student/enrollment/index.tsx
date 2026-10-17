@@ -1,6 +1,8 @@
 import { useState } from "react"
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query"
-import { AlertCircle, Loader2 } from "lucide-react"
+import { format } from "date-fns"
+import { tr } from "date-fns/locale"
+import { AlertCircle, CalendarClock, Loader2 } from "lucide-react"
 import { apiErrorMessage } from "@/lib/api-error"
 import {
   defaultSemester,
@@ -51,6 +53,7 @@ export default function StudentEnrollmentPage() {
             value={current.semester}
             onChange={setChosenSemester}
           />
+          <EnrollmentWindow semester={current} />
           {/* Keyed so a switch starts the next semester from a clean slate
               and a late reply for the previous one has nowhere to land. */}
           <EnrollmentWorkspace
@@ -93,6 +96,21 @@ function SemesterPicker({
         </Button>
       ))}
     </div>
+  )
+}
+
+function formatWindowDate(iso: string): string {
+  return format(new Date(iso), "d MMMM yyyy HH:mm", { locale: tr })
+}
+
+function EnrollmentWindow({ semester }: { semester: OpenSemester }) {
+  return (
+    <p className="mb-4 flex items-center gap-2 text-sm text-muted-foreground">
+      <CalendarClock className="h-4 w-4 flex-shrink-0" />
+      {semester.enrollment_open
+        ? `Ders kayıt tarihleri: ${formatWindowDate(semester.period_start)} – ${formatWindowDate(semester.period_end)}`
+        : `Ders kaydı ${formatWindowDate(semester.period_end)} tarihinde sona erdi`}
+    </p>
   )
 }
 
