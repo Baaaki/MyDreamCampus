@@ -122,5 +122,13 @@ export function Sidebar(props: SidebarDrawerProps) {
     return item
   })
 
-  return <AppSidebar items={currentNavItems} {...props} />
+  return (
+    <AppSidebar
+      brandInitial="M"
+      brandTitle="MyDreamCampus"
+      accent="indigo"
+      items={currentNavItems}
+      {...props}
+    />
+  )
 }

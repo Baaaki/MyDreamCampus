@@ -47,5 +47,13 @@ const navItems: SidebarNavItem[] = [
 ]
 
 export function StudentSidebar(props: SidebarDrawerProps) {
-  return <AppSidebar items={navItems} {...props} />
+  return (
+    <AppSidebar
+      brandInitial="Ö"
+      brandTitle="Öğrenci Portalı"
+      accent="emerald"
+      items={navItems}
+      {...props}
+    />
+  )
 }
