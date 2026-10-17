@@ -7,6 +7,7 @@ import type { AuthResponse, DemoAccount } from "@/lib/types"
 import { useDemoAccounts } from "@/lib/services/demo-service"
 import { clearUserSession } from "@/lib/session"
 import { cn } from "@/lib/utils"
+import { LoginVideoBackground } from "@/components/auth/login-video-background"
 import {
   AlertTriangle,
   GraduationCap,
@@ -112,13 +113,14 @@ export default function LoginPage() {
   }
 
   return (
-    <div className="flex min-h-screen items-center justify-center bg-gray-50 px-4 py-12">
-      <div className="w-full max-w-md space-y-8 rounded-lg bg-white p-8 shadow-md">
+    <div className="relative flex min-h-screen items-center justify-center px-4 py-12">
+      <LoginVideoBackground />
+      <div className="relative z-10 w-full max-w-md space-y-8 rounded-2xl border border-white/20 bg-background/55 p-8 shadow-2xl backdrop-blur-xl dark:border-white/10 dark:bg-background/45">
         <div>
-          <h2 className="mt-6 text-center text-3xl font-extrabold text-gray-900">
+          <h2 className="mt-6 text-center text-3xl font-extrabold text-foreground">
             MyDreamCampus
           </h2>
-          <p className="mt-2 text-center text-sm text-gray-600">
+          <p className="mt-2 text-center text-sm text-muted-foreground">
             Hesabınıza giriş yapın
           </p>
         </div>
@@ -127,7 +129,7 @@ export default function LoginPage() {
           <section aria-label="Demo hesapları" className="space-y-3">
             <div
               role="note"
-              className="flex items-start gap-2 rounded-md border border-amber-200 bg-amber-50 p-3 text-sm font-medium text-amber-900"
+              className="flex items-start gap-2 rounded-md border border-amber-200 bg-amber-50/85 p-3 text-sm font-medium text-amber-900 dark:border-amber-900 dark:bg-amber-950/50 dark:text-amber-200"
             >
               <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0" />
               <p>
@@ -146,10 +148,10 @@ export default function LoginPage() {
                     onClick={() => fillDemoAccount(account)}
                     disabled={loading}
                     className={cn(
-                      "flex w-full items-center justify-center gap-2 rounded-md border px-4 py-2 text-sm font-semibold tracking-wide uppercase transition-colors focus:ring-2 focus:ring-indigo-500 focus:ring-offset-2 focus:outline-none disabled:cursor-not-allowed disabled:opacity-50",
+                      "flex w-full items-center justify-center gap-2 rounded-md border px-4 py-2 text-sm font-semibold tracking-wide uppercase transition-colors focus:ring-2 focus:ring-indigo-500 focus:ring-offset-2 focus:ring-offset-background focus:outline-none disabled:cursor-not-allowed disabled:opacity-50",
                       selected
-                        ? "border-indigo-600 bg-indigo-50 text-indigo-700"
-                        : "border-gray-300 bg-white text-gray-700 hover:border-indigo-400 hover:bg-gray-50"
+                        ? "border-indigo-600 bg-indigo-50/90 text-indigo-700 dark:border-indigo-400 dark:bg-indigo-950/60 dark:text-indigo-300"
+                        : "border-border bg-background/60 text-foreground/80 hover:border-indigo-400 hover:bg-background/80"
                     )}
                   >
                     <Icon className="h-4 w-4 shrink-0" />
@@ -158,7 +160,7 @@ export default function LoginPage() {
                 )
               })}
             </div>
-            <p className="text-center text-xs text-gray-500">
+            <p className="text-center text-xs text-muted-foreground">
               Bir hesap seçin, bilgileri doldurulunca Giriş Yap&apos;a basın.
             </p>
           </section>
@@ -166,8 +168,8 @@ export default function LoginPage() {
 
         <form className="space-y-6" onSubmit={handleLogin}>
           {error && (
-            <div className="rounded-md bg-red-50 p-4">
-              <p className="text-sm text-red-800">{error}</p>
+            <div className="rounded-md bg-red-50/90 p-4 dark:bg-red-950/50">
+              <p className="text-sm text-red-800 dark:text-red-300">{error}</p>
             </div>
           )}
           <div className="-space-y-px rounded-md shadow-sm">
@@ -181,7 +183,7 @@ export default function LoginPage() {
                 type="email"
                 autoComplete="email"
                 required
-                className="relative block w-full appearance-none rounded-none rounded-t-md border border-gray-300 px-3 py-2 text-gray-900 placeholder-gray-500 focus:z-10 focus:border-indigo-500 focus:ring-indigo-500 focus:outline-none sm:text-sm"
+                className="relative block w-full appearance-none rounded-none rounded-t-md border border-input bg-background/70 px-3 py-2 text-foreground placeholder:text-muted-foreground focus:z-10 focus:border-indigo-500 focus:ring-indigo-500 focus:outline-none sm:text-sm"
                 placeholder="E-posta adresi"
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
@@ -198,7 +200,7 @@ export default function LoginPage() {
                 type="password"
                 autoComplete="current-password"
                 required
-                className="relative block w-full appearance-none rounded-none rounded-b-md border border-gray-300 px-3 py-2 text-gray-900 placeholder-gray-500 focus:z-10 focus:border-indigo-500 focus:ring-indigo-500 focus:outline-none sm:text-sm"
+                className="relative block w-full appearance-none rounded-none rounded-b-md border border-input bg-background/70 px-3 py-2 text-foreground placeholder:text-muted-foreground focus:z-10 focus:border-indigo-500 focus:ring-indigo-500 focus:outline-none sm:text-sm"
                 placeholder="Şifre"
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
@@ -212,7 +214,7 @@ export default function LoginPage() {
               ref={submitRef}
               type="submit"
               disabled={loading}
-              className="group relative flex w-full justify-center rounded-md border border-transparent bg-indigo-600 px-4 py-2 text-sm font-medium text-white hover:bg-indigo-700 focus:ring-2 focus:ring-indigo-500 focus:ring-offset-2 focus:outline-none disabled:cursor-not-allowed disabled:opacity-50"
+              className="group relative flex w-full justify-center rounded-md border border-transparent bg-indigo-600 px-4 py-2 text-sm font-medium text-white hover:bg-indigo-700 focus:ring-2 focus:ring-indigo-500 focus:ring-offset-2 focus:ring-offset-background focus:outline-none disabled:cursor-not-allowed disabled:opacity-50"
             >
               {loading ? "Giriş yapılıyor..." : "Giriş Yap"}
             </button>
@@ -220,7 +222,7 @@ export default function LoginPage() {
           <p className="text-center text-sm">
             <Link
               to="/auth/forgot-password"
-              className="font-medium text-indigo-600 hover:text-indigo-500"
+              className="font-medium text-indigo-600 hover:text-indigo-500 dark:text-indigo-400 dark:hover:text-indigo-300"
             >
               Şifremi unuttum
             </Link>
