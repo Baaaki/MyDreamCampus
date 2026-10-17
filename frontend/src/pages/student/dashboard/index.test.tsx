@@ -194,12 +194,8 @@ function renderPage() {
   )
 }
 
-const section = (title: string) =>
-  within(
-    screen
-      .getByRole("heading", { name: title })
-      .closest("section") as HTMLElement
-  )
+const card = (title: string) =>
+  within(screen.getByText(title).closest("[data-slot=card]") as HTMLElement)
 
 beforeEach(() => {
   // Only Date is faked: react-query and findBy* still need real timers.
@@ -215,27 +211,23 @@ afterEach(() => {
 })
 
 describe("StudentDashboardPage", () => {
-  it("leads with the class in progress and what comes next", async () => {
+  it("leads with the student and the class in progress", async () => {
     const asked = stubBackend()
     renderPage()
 
+    expect(await screen.findByText("Sayın Zeynep Arslan")).toBeInTheDocument()
     expect(
-      await screen.findByRole("heading", { name: "Zeynep Arslan" })
-    ).toBeInTheDocument()
-    expect(
-      screen.getByText(
-        "20230001 · Bilgisayar Mühendisliği, 2. sınıf · Çarşamba, 21 Ekim"
-      )
+      screen.getByText("Bilgisayar Mühendisliği, 2. sınıf")
     ).toBeInTheDocument()
 
     const now = within(
       await screen.findByRole("region", { name: "Şu an ve sıradaki ders" })
     )
-    expect(now.getByText("Şu an derstesiniz")).toBeInTheDocument()
+    expect(await now.findByText("Şu an derstesiniz")).toBeInTheDocument()
     expect(now.getByText("Veritabanı Sistemleri")).toBeInTheDocument()
     expect(now.getByText("Bitiş 15:35")).toBeInTheDocument()
     expect(now.getByText("Dağıtık Sistemler")).toBeInTheDocument()
-    expect(now.getByText("Yarın 08:30")).toBeInTheDocument()
+    expect(now.getByText(/Yarın 08:30/)).toBeInTheDocument()
     expect(asked["/api/enrollment/my-enrollments"]).toBe("?status=approved")
   })
 
@@ -243,49 +235,49 @@ describe("StudentDashboardPage", () => {
     stubBackend()
     renderPage()
 
-    const todo = await screen.findByRole("heading", {
-      name: "Yapmanız gerekenler",
-    })
-    const list = within(todo.closest("section") as HTMLElement)
     expect(
-      await list.findByText("2026-2027 Bahar ders kaydı açık.")
+      await screen.findByText("2026-2027 Bahar ders kaydı açık.")
     ).toBeInTheDocument()
-    expect(list.getByText("Dağıtık Sistemler · Teori")).toBeInTheDocument()
-    expect(list.getByText(/Devamsızlık hakkınız bitti/)).toBeInTheDocument()
-    expect(list.getByText("Veritabanı Sistemleri · Teori")).toBeInTheDocument()
-    expect(list.queryByText(/Bilgisayar Ağları/)).not.toBeInTheDocument()
+    const todo = card("Yapmanız Gerekenler")
+    expect(todo.getByText("Dağıtık Sistemler · Teori")).toBeInTheDocument()
+    expect(todo.getByText(/Devamsızlık hakkınız bitti/)).toBeInTheDocument()
+    expect(todo.getByText("Veritabanı Sistemleri · Teori")).toBeInTheDocument()
+    expect(todo.queryByText(/Bilgisayar Ağları/)).not.toBeInTheDocument()
   })
 
   it("shows today's classes and meals, the record and upcoming meals", async () => {
     const asked = stubBackend()
     renderPage()
 
-    const today = section("Bugün")
-    expect(
-      await today.findByText("Yoklamaya katıldınız", { exact: false })
-    ).toBeInTheDocument()
+    expect(await screen.findByText("Yoklamaya katıldınız")).toBeInTheDocument()
+    const today = card("Bugün")
     expect(today.getByText("Öğle yemeği")).toBeInTheDocument()
-    expect(
-      today.getByText("Devam ediyor", { exact: false })
-    ).toBeInTheDocument()
+    expect(today.getByText("Devam ediyor")).toBeInTheDocument()
 
     expect(await screen.findByText("3.26")).toBeInTheDocument()
-    expect(section("Notlar").getByText("34")).toBeInTheDocument()
+    expect(card("Akademik Durum").getByText("34")).toBeInTheDocument()
 
-    const absences = section("Devamsızlık")
-    expect(absences.getByText("Hak kalmadı")).toBeInTheDocument()
-    expect(absences.getByText("1 hak")).toBeInTheDocument()
-    expect(absences.getByText("4 hak")).toBeInTheDocument()
-
-    const meals = section("Yemek")
+    const absences = card("Devamsızlık")
     expect(
-      (await meals.findAllByRole("listitem")).map((li) => li.textContent),
+      absences.getByText("Devamsızlık hakkınız kalmadı")
+    ).toBeInTheDocument()
+    expect(
+      absences.getByText("1 devamsızlık hakkınız kaldı")
+    ).toBeInTheDocument()
+    expect(
+      absences.getByText("4 devamsızlık hakkınız kaldı")
+    ).toBeInTheDocument()
+
+    expect(await screen.findByText("Yarın · Öğle")).toBeInTheDocument()
+    expect(
+      card("Yaklaşan Yemekler")
+        .getAllByRole("listitem")
+        .map((li) => li.textContent),
       "confirmed meals after today only"
     ).toEqual([expect.stringContaining("Yemekhane tomorrow")])
-    expect(meals.getByText("Yarın öğle")).toBeInTheDocument()
     expect(asked["/api/meals/reservations/my"]).toBe("?from_date=2026-10-21")
 
-    expect(section("Bu hafta").getAllByText("CENG304")).toHaveLength(1)
+    expect(card("Bu Hafta").getAllByText("CENG304")).toHaveLength(3)
     expect(screen.queryByText("Günün Sözü")).not.toBeInTheDocument()
   })
 
@@ -320,11 +312,11 @@ describe("StudentDashboardPage", () => {
       await screen.findByText("Yaklaşan yemek rezervasyonunuz yok.")
     ).toBeInTheDocument()
     expect(screen.getByText("Bugün dersiniz yok.")).toBeInTheDocument()
-    expect(screen.queryByText("Yapmanız gerekenler")).not.toBeInTheDocument()
-    expect(screen.queryByText("Bu hafta")).not.toBeInTheDocument()
+    expect(screen.queryByText("Yapmanız Gerekenler")).not.toBeInTheDocument()
+    expect(screen.queryByText("Bu Hafta")).not.toBeInTheDocument()
   })
 
-  it("keeps the other sections when one source fails", async () => {
+  it("keeps the other cards when one source fails", async () => {
     stubBackend({
       "/api/meals/reservations/my": json(
         { error: "Yemek servisi şu anda yanıt vermiyor", code: "INTERNAL" },

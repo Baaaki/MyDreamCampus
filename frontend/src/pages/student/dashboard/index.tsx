@@ -1,9 +1,22 @@
-import { useEffect, useState, type ReactNode } from "react"
+import { useEffect, useState, type ComponentType, type ReactNode } from "react"
 import { Link } from "react-router"
 import { useQuery, type UseQueryResult } from "@tanstack/react-query"
 import { addDays, format } from "date-fns"
 import { tr } from "date-fns/locale"
-import { AlertCircle, Loader2 } from "lucide-react"
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
+import {
+  AlertCircle,
+  AlertTriangle,
+  ArrowRight,
+  BookOpen,
+  CalendarDays,
+  Clock,
+  GraduationCap,
+  ListChecks,
+  Loader2,
+  User,
+  UtensilsCrossed,
+} from "lucide-react"
 import { studentApi } from "@/lib/api-client"
 import { apiErrorMessage } from "@/lib/api-error"
 import { TIME_SLOTS } from "@/lib/constants"
@@ -46,8 +59,8 @@ const SESSION_LABELS: Record<SessionType, string> = {
 }
 
 const MEAL_TIME_LABELS: Record<Reservation["meal_time"], string> = {
-  lunch: "öğle",
-  dinner: "akşam",
+  lunch: "Öğle",
+  dinner: "Akşam",
 }
 
 // Where a meal sits among the day's classes; reservations carry no time.
@@ -56,28 +69,28 @@ const MEAL_SORT_MINUTES: Record<Reservation["meal_time"], number> = {
   dinner: toMinutes("17:00"),
 }
 
-const UPCOMING_MEALS_SHOWN = 3
+const UPCOMING_MEALS_SHOWN = 4
 
-// Tailwind only ships classes it finds verbatim, so each course colour is
-// spelled out instead of interpolated.
+// Same palette as the enrollment page's weekly grid. Tailwind only ships
+// classes it finds verbatim, so each colour is spelled out.
 const COURSE_BORDER = [
-  "border-course-1",
-  "border-course-2",
-  "border-course-3",
-  "border-course-4",
-  "border-course-5",
+  "border-blue-500",
+  "border-green-500",
+  "border-purple-500",
+  "border-orange-500",
+  "border-pink-500",
 ]
 const COURSE_CELL = [
-  "bg-course-1/15 text-course-1",
-  "bg-course-2/15 text-course-2",
-  "bg-course-3/15 text-course-3",
-  "bg-course-4/15 text-course-4",
-  "bg-course-5/15 text-course-5",
+  "bg-blue-500 text-white",
+  "bg-green-500 text-white",
+  "bg-purple-500 text-white",
+  "bg-orange-500 text-white",
+  "bg-pink-500 text-white",
 ]
 
-const WEEK_DAYS = ["Pzt", "Sal", "Çar", "Per", "Cum"]
+const WEEK_DAYS = ["Pazartesi", "Salı", "Çarşamba", "Perşembe", "Cuma"]
 
-// The "now" card and the timeline follow the clock without a reload.
+// The class cards and the timeline follow the clock without a reload.
 function useNow(intervalMs = 30_000): Date {
   const [now, setNow] = useState(() => new Date())
   useEffect(() => {
@@ -127,6 +140,11 @@ function cafeteriaName(r: Reservation): string {
   return r.cafeteria_name || r.cafeteria?.name || ""
 }
 
+function greeting(now: Date): string {
+  const hour = now.getHours()
+  return hour < 12 ? "Günaydın" : hour < 18 ? "İyi Günler" : "İyi Akşamlar"
+}
+
 export default function StudentDashboardPage() {
   const now = useNow()
   const today = toLocalISODate(now)
@@ -159,165 +177,198 @@ export default function StudentDashboardPage() {
   })
 
   const program = currentProgram(programs.data ?? [], attendance.data?.semester)
-  const confirmedMeals = (meals.data?.reservations ?? [])
-    .filter((r) => r.status === "confirmed" && !r.is_used)
+  const todaysMeals = (meals.data?.reservations ?? []).filter(
+    (r) => r.date.slice(0, 10) === today && r.status === "confirmed"
+  )
+  const upcomingMeals = (meals.data?.reservations ?? [])
+    .filter(
+      (r) =>
+        r.status === "confirmed" && !r.is_used && r.date.slice(0, 10) > today
+    )
     .sort(
       (a, b) =>
         a.date.localeCompare(b.date) ||
         MEAL_SORT_MINUTES[a.meal_time] - MEAL_SORT_MINUTES[b.meal_time]
     )
-  const todaysMeals = (meals.data?.reservations ?? []).filter(
-    (r) => r.date.slice(0, 10) === today && r.status === "confirmed"
-  )
-  const upcomingMeals = confirmedMeals
-    .filter((r) => r.date.slice(0, 10) > today)
     .slice(0, UPCOMING_MEALS_SHOWN)
 
   return (
-    <div className="flex max-w-6xl flex-col gap-8">
-      <Header student={student.data} now={now} />
-
-      <NowSection programs={programs} program={program} now={now} />
-
-      <TodoSection
-        attendance={attendance.data?.courses ?? []}
-        openSemesters={openSemesters.data ?? []}
-      />
-
-      <div className="grid items-start gap-8 lg:grid-cols-[minmax(0,1.2fr)_minmax(0,1fr)]">
-        <Section title="Bugün">
-          <QueryState query={programs} errorMessage="Ders programı yüklenemedi">
-            <Timeline
-              blocks={program ? dayBlocks(program.courses, now) : []}
-              meals={todaysMeals}
-              attendance={attendance.data?.courses ?? []}
-              now={now}
-            />
-          </QueryState>
-        </Section>
-
-        <div className="flex min-w-0 flex-col gap-8">
-          <Section
-            title="Devamsızlık"
-            link={{ to: "/student/attendance", label: "Tümü" }}
-          >
-            <QueryState
-              query={attendance}
-              errorMessage="Yoklama bilgileri yüklenemedi"
-            >
-              <AbsenceList courses={attendance.data?.courses ?? []} />
-            </QueryState>
-          </Section>
-
-          <Section
-            title="Notlar"
-            link={{ to: "/student/grades", label: "Notlarım" }}
-          >
-            <QueryState query={grades} errorMessage="Not bilgileri yüklenemedi">
-              {grades.data && grades.data.completed_courses?.length ? (
-                <div className="flex flex-wrap items-end gap-7 rounded-xl bg-card p-5">
-                  <div>
-                    <p className="text-5xl leading-none font-extrabold tracking-tighter">
-                      {grades.data.cumulative_gpa.toFixed(2)}
-                    </p>
-                    <p className="mt-1.5 text-sm text-muted-foreground">
-                      Genel not ortalaması
-                    </p>
-                  </div>
-                  <div className="flex gap-6">
-                    <Figure
-                      value={grades.data.total_credits}
-                      label="Toplam kredi"
-                    />
-                    <Figure
-                      value={grades.data.active_courses?.length ?? 0}
-                      label="Bu dönem ders"
-                    />
-                  </div>
-                </div>
-              ) : (
-                <Empty>Henüz not ortalamanız oluşmadı.</Empty>
-              )}
-            </QueryState>
-          </Section>
-
-          <Section
-            title="Yemek"
-            link={{ to: "/student/cafeteria", label: "Rezervasyon yap" }}
-          >
-            <QueryState
-              query={meals}
-              errorMessage="Yemek rezervasyonları yüklenemedi"
-            >
-              {upcomingMeals.length > 0 ? (
-                <ul className="divide-y rounded-xl bg-card py-1.5">
-                  {upcomingMeals.map((r) => {
-                    const day = parseDay(r.date)
-                    return (
-                      <li
-                        key={r.id}
-                        className="grid grid-cols-[9rem_minmax(0,1fr)] gap-3.5 px-4.5 py-2.5 text-sm"
-                      >
-                        <span className="font-bold">
-                          {day ? mealDay(day, now) : r.date}{" "}
-                          {MEAL_TIME_LABELS[r.meal_time]}
-                        </span>
-                        <span>
-                          {cafeteriaName(r)}
-                          {r.menu_type === "vegan" && (
-                            <span className="text-muted-foreground">
-                              {" "}
-                              · Vegan
-                            </span>
-                          )}
-                        </span>
-                      </li>
-                    )
-                  })}
-                </ul>
-              ) : (
-                <Empty>Yaklaşan yemek rezervasyonunuz yok.</Empty>
-              )}
-            </QueryState>
-          </Section>
+    <div className="space-y-6">
+      {/* Header */}
+      <div className="flex items-center justify-between">
+        <div>
+          <h1 className="text-2xl font-bold text-gray-900 dark:text-white">
+            Öğrenci Portalı
+          </h1>
+          <p className="text-gray-600 dark:text-gray-400">
+            {now.toLocaleDateString("tr-TR", {
+              weekday: "long",
+              year: "numeric",
+              month: "long",
+              day: "numeric",
+            })}
+          </p>
         </div>
       </div>
 
-      {program && program.courses.some((c) => c.schedule_sessions?.length) && (
-        <Section
-          title="Bu hafta"
-          link={{ to: "/student/enrollment", label: "Ders kaydı" }}
+      <div className="grid grid-cols-1 gap-6 md:grid-cols-2">
+        <WelcomeCard query={student} now={now} />
+        <ClassCard programs={programs} program={program} now={now} />
+
+        <TodoCard
+          attendance={attendance.data?.courses ?? []}
+          openSemesters={openSemesters.data ?? []}
+        />
+
+        <SummaryCard
+          title="Bugün"
+          icon={CalendarDays}
+          to="/student/attendance"
+          linkLabel="Yoklama durumum"
+          query={programs}
+          errorMessage="Ders programı yüklenemedi"
         >
-          <WeekGrid program={program} now={now} />
-        </Section>
+          <Timeline
+            blocks={program ? dayBlocks(program.courses, now) : []}
+            meals={todaysMeals}
+            attendance={attendance.data?.courses ?? []}
+            now={now}
+          />
+        </SummaryCard>
+
+        <SummaryCard
+          title="Devamsızlık"
+          icon={AlertTriangle}
+          to="/student/attendance"
+          linkLabel="Yoklama durumum"
+          query={attendance}
+          errorMessage="Yoklama bilgileri yüklenemedi"
+        >
+          <AbsenceList courses={attendance.data?.courses ?? []} />
+        </SummaryCard>
+
+        <SummaryCard
+          title="Akademik Durum"
+          icon={GraduationCap}
+          to="/student/grades"
+          linkLabel="Notlarım"
+          query={grades}
+          errorMessage="Not bilgileri yüklenemedi"
+        >
+          {grades.data && grades.data.completed_courses?.length ? (
+            <div className="flex gap-8">
+              <Figure
+                label="GNO"
+                value={grades.data.cumulative_gpa.toFixed(2)}
+              />
+              <Figure label="Toplam kredi" value={grades.data.total_credits} />
+              <Figure
+                label="Bu dönem ders"
+                value={grades.data.active_courses?.length ?? 0}
+              />
+            </div>
+          ) : (
+            <EmptyText>Henüz not ortalamanız oluşmadı.</EmptyText>
+          )}
+        </SummaryCard>
+
+        <SummaryCard
+          title="Yaklaşan Yemekler"
+          icon={UtensilsCrossed}
+          to="/student/cafeteria"
+          linkLabel="Yemekhane"
+          query={meals}
+          errorMessage="Yemek rezervasyonları yüklenemedi"
+        >
+          {upcomingMeals.length > 0 ? (
+            <ul className="space-y-2">
+              {upcomingMeals.map((r) => {
+                const day = parseDay(r.date)
+                return (
+                  <li
+                    key={r.id}
+                    className="flex items-center justify-between gap-3 rounded-lg bg-gray-50 p-3 text-sm dark:bg-gray-800"
+                  >
+                    <span className="font-medium text-gray-900 dark:text-white">
+                      {day ? mealDay(day, now) : r.date} ·{" "}
+                      {MEAL_TIME_LABELS[r.meal_time]}
+                    </span>
+                    <span className="text-gray-500 dark:text-gray-400">
+                      {cafeteriaName(r)}
+                      {r.menu_type === "vegan" && " · Vegan"}
+                    </span>
+                  </li>
+                )
+              })}
+            </ul>
+          ) : (
+            <EmptyText>Yaklaşan yemek rezervasyonunuz yok.</EmptyText>
+          )}
+        </SummaryCard>
+      </div>
+
+      {program && program.courses.some((c) => c.schedule_sessions?.length) && (
+        <Card>
+          <CardHeader className="pb-3">
+            <CardTitle className="flex items-center gap-2 text-gray-900 dark:text-white">
+              <BookOpen className="h-5 w-5 text-emerald-600" />
+              Bu Hafta
+            </CardTitle>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            <p className="text-sm text-gray-500 dark:text-gray-400">
+              {semesterLabel(program.semester)} onaylı programınız ·{" "}
+              {program.courses.length} ders
+            </p>
+            <WeekGrid program={program} now={now} />
+            <CardLink to="/student/enrollment" label="Ders kaydı" />
+          </CardContent>
+        </Card>
       )}
     </div>
   )
 }
 
-function Header({ student, now }: { student?: Student; now: Date }) {
-  const details = student
-    ? [
-        student.student_number,
-        `${student.department}, ${student.class_level}. sınıf`,
-      ]
-    : []
+function WelcomeCard({
+  query,
+  now,
+}: {
+  query: UseQueryResult<Student>
+  now: Date
+}) {
+  const s = query.data
   return (
-    <header className="flex flex-wrap items-baseline justify-between gap-x-6 gap-y-1">
-      <h1 className="text-2xl font-bold tracking-tight">
-        {student ? `${student.first_name} ${student.last_name}` : "Özet"}
-      </h1>
-      <p className="text-sm text-muted-foreground">
-        {[
-          ...details,
-          capitalize(format(now, "EEEE, d MMMM", { locale: tr })),
-        ].join(" · ")}
-      </p>
-    </header>
+    <Card className="border-0 bg-gradient-to-br from-emerald-500 to-emerald-600 text-white">
+      <CardHeader className="pb-2">
+        <CardTitle className="flex items-center gap-2 text-white">
+          <User className="h-5 w-5" />
+          {greeting(now)}
+        </CardTitle>
+      </CardHeader>
+      <CardContent>
+        <p className="mb-2 text-2xl font-bold">
+          {query.isLoading
+            ? "Yükleniyor..."
+            : s
+              ? `Sayın ${s.first_name} ${s.last_name}`
+              : "Öğrenci"}
+        </p>
+        {s && (
+          <div className="space-y-1 text-sm text-emerald-100">
+            <p>Öğrenci No: {s.student_number}</p>
+            <p>
+              {s.department}, {s.class_level}. sınıf
+            </p>
+            <p>{s.faculty}</p>
+            {s.advisor_name && <p>Danışman: {s.advisor_name}</p>}
+          </div>
+        )}
+      </CardContent>
+    </Card>
   )
 }
 
-function NowSection({
+function ClassCard({
   programs,
   program,
   now,
@@ -326,56 +377,73 @@ function NowSection({
   program: EnrollmentProgramResponse | null
   now: Date
 }) {
-  if (programs.isLoading || programs.isError) return null
-  if (!program) {
-    return (
-      <div className="flex flex-wrap items-center justify-between gap-3 rounded-2xl bg-card p-6">
-        <p className="font-semibold">Onaylı bir ders programınız yok.</p>
-        <Link
-          to="/student/enrollment"
-          className="text-sm font-semibold text-primary hover:underline"
-        >
-          Ders kaydına git
-        </Link>
-      </div>
-    )
-  }
-
-  const { current, next } = currentAndNext(program.courses, now)
-  if (!current && !next) return null
+  const { current, next } = program
+    ? currentAndNext(program.courses, now)
+    : { current: null, next: null }
 
   return (
-    <section
+    <Card
+      role="region"
       aria-label="Şu an ve sıradaki ders"
-      className={cn(
-        "grid gap-3.5",
-        current && next && "md:grid-cols-[minmax(0,1.6fr)_minmax(0,1fr)]"
-      )}
+      className="border-0 bg-gradient-to-br from-blue-500 to-blue-600 text-white"
     >
-      {current ? (
-        <CurrentClass block={current} now={now} />
-      ) : (
-        next && <NextClass next={next} now={now} filled />
-      )}
-      {current && next && <NextClass next={next} now={now} />}
-    </section>
+      <CardHeader className="pb-2">
+        <CardTitle className="flex items-center gap-2 text-white">
+          <Clock className="h-5 w-5" />
+          {current ? "Şu an derstesiniz" : "Sıradaki ders"}
+        </CardTitle>
+      </CardHeader>
+      <CardContent className="space-y-3">
+        {programs.isLoading ? (
+          <p className="text-blue-100">Yükleniyor...</p>
+        ) : programs.isError ? (
+          <p className="text-blue-100">
+            {apiErrorMessage(programs.error, "Ders programı yüklenemedi")}
+          </p>
+        ) : !program ? (
+          <>
+            <p className="text-lg font-medium">
+              Onaylı bir ders programınız yok.
+            </p>
+            <Link
+              to="/student/enrollment"
+              className="inline-flex items-center gap-1 text-sm font-medium text-white hover:underline"
+            >
+              Ders kaydına git
+              <ArrowRight className="h-4 w-4" />
+            </Link>
+          </>
+        ) : current ? (
+          <CurrentClass block={current} next={next} now={now} />
+        ) : next ? (
+          <NextClass next={next} now={now} />
+        ) : (
+          <p className="text-blue-100">Programınızda haftalık ders yok.</p>
+        )}
+      </CardContent>
+    </Card>
   )
 }
 
-function CurrentClass({ block, now }: { block: ClassBlock; now: Date }) {
+function CurrentClass({
+  block,
+  next,
+  now,
+}: {
+  block: ClassBlock
+  next: UpcomingClass | null
+  now: Date
+}) {
   const start = toMinutes(block.start)
   const end = toMinutes(block.end)
   const nowMin = now.getHours() * 60 + now.getMinutes()
   const progress = Math.round(((nowMin - start) / (end - start)) * 100)
   return (
-    <div className="flex flex-col gap-3.5 rounded-2xl bg-primary p-6 text-primary-foreground">
-      <p className="text-sm font-semibold opacity-80">Şu an derstesiniz</p>
-      <h2 className="text-3xl leading-tight font-extrabold tracking-tight text-balance md:text-4xl">
-        {block.courseName}
-      </h2>
-      <ClassMeta block={block} className="opacity-90" />
+    <>
+      <p className="text-2xl font-bold">{block.courseName}</p>
+      <ClassMeta block={block} />
       <div
-        className="h-1.5 overflow-hidden rounded-full bg-primary-foreground/25"
+        className="h-2 overflow-hidden rounded-full bg-white/25"
         role="progressbar"
         aria-label="Dersin geçen kısmı"
         aria-valuenow={progress}
@@ -383,87 +451,58 @@ function CurrentClass({ block, now }: { block: ClassBlock; now: Date }) {
         aria-valuemax={100}
       >
         <div
-          className="h-full rounded-full bg-primary-foreground"
+          className="h-full rounded-full bg-white"
           style={{ width: `${progress}%` }}
         />
       </div>
-      <div className="flex justify-between text-sm opacity-85">
+      <div className="flex justify-between text-sm text-blue-100">
         <span>Başlangıç {block.start}</span>
         <span>Bitiş {block.end}</span>
       </div>
-    </div>
-  )
-}
-
-function NextClass({
-  next,
-  now,
-  filled = false,
-}: {
-  next: UpcomingClass
-  now: Date
-  filled?: boolean
-}) {
-  const day = relativeDay(addDays(now, next.daysAhead), now)
-  return (
-    <div
-      className={cn(
-        "flex flex-col gap-1.5 rounded-2xl p-6",
-        filled ? "bg-primary text-primary-foreground" : "bg-card"
+      {next && (
+        <p className="border-t border-white/20 pt-3 text-sm text-blue-100">
+          Sonraki:{" "}
+          <span className="font-medium text-white">
+            {next.block.courseName}
+          </span>{" "}
+          · {relativeDay(addDays(now, next.daysAhead), now)} {next.block.start}
+        </p>
       )}
-    >
-      <p
-        className={cn(
-          "text-sm font-semibold",
-          filled ? "opacity-80" : "text-muted-foreground"
-        )}
-      >
-        Sıradaki ders
-      </p>
-      <h2
-        className={cn(
-          "leading-tight font-bold tracking-tight text-balance",
-          filled ? "text-3xl font-extrabold md:text-4xl" : "text-xl"
-        )}
-      >
-        {next.block.courseName}
-      </h2>
-      <ClassMeta
-        block={next.block}
-        className={filled ? "opacity-90" : "text-muted-foreground"}
-      />
-      <p className="mt-auto pt-3 font-bold">
-        {day} {next.block.start}
-      </p>
-    </div>
+    </>
   )
 }
 
-function ClassMeta({
-  block,
-  className,
-}: {
-  block: ClassBlock
-  className?: string
-}) {
+function NextClass({ next, now }: { next: UpcomingClass; now: Date }) {
   return (
-    <p className={cn("flex flex-wrap gap-x-4 gap-y-1 text-sm", className)}>
-      <span>{block.courseCode}</span>
-      <span>{SESSION_LABELS[block.sessionType]}</span>
-      {block.instructor && <span>{block.instructor}</span>}
+    <>
+      <p className="text-2xl font-bold">{next.block.courseName}</p>
+      <ClassMeta block={next.block} />
+      <p className="text-lg font-medium">
+        {relativeDay(addDays(now, next.daysAhead), now)} {next.block.start}
+      </p>
+    </>
+  )
+}
+
+function ClassMeta({ block }: { block: ClassBlock }) {
+  return (
+    <p className="text-sm text-blue-100">
+      {[block.courseCode, SESSION_LABELS[block.sessionType], block.instructor]
+        .filter(Boolean)
+        .join(" · ")}
     </p>
   )
 }
 
 interface Todo {
   key: string
-  tone: "critical" | "info"
+  tone: "critical" | "warning" | "info"
   title: string
   detail?: string
   link: { to: string; label: string }
 }
 
-function TodoSection({
+function TodoCard({
   attendance,
   openSemesters,
 }: {
@@ -473,7 +512,7 @@ function TodoSection({
   const names = new Map(attendance.map((c) => [c.course_id, c.course_name]))
   const todos: Todo[] = absenceWarnings(attendance).map((w) => ({
     key: `${w.course_id}-${w.session_type}`,
-    tone: w.absences_left <= 0 ? "critical" : "info",
+    tone: w.absences_left <= 0 ? "critical" : "warning",
     title: `${names.get(w.course_id) ?? w.course_code} · ${SESSION_LABELS[w.session_type]}`,
     detail:
       w.absences_left < 0
@@ -497,36 +536,48 @@ function TodoSection({
 
   if (todos.length === 0) return null
   return (
-    <Section title="Yapmanız gerekenler">
-      <ul className="flex flex-col gap-2">
-        {todos.map((t) => (
-          <li
-            key={t.key}
-            className="grid grid-cols-[0.625rem_minmax(0,1fr)] items-center gap-x-3.5 gap-y-1 rounded-xl bg-card px-4.5 py-3.5 sm:grid-cols-[0.625rem_minmax(0,1fr)_auto]"
-          >
-            <span
-              aria-hidden
+    <Card className="md:col-span-2">
+      <CardHeader className="pb-3">
+        <CardTitle className="flex items-center gap-2 text-gray-900 dark:text-white">
+          <ListChecks className="h-5 w-5 text-emerald-600" />
+          Yapmanız Gerekenler
+        </CardTitle>
+      </CardHeader>
+      <CardContent>
+        <ul className="space-y-2">
+          {todos.map((t) => (
+            <li
+              key={t.key}
               className={cn(
-                "size-2.5 rounded-full",
-                t.tone === "critical" ? "bg-destructive" : "bg-primary"
+                "flex flex-wrap items-center justify-between gap-x-4 gap-y-1 rounded-lg p-3 text-sm",
+                t.tone === "critical" && "bg-red-50 dark:bg-red-900/30",
+                t.tone === "warning" && "bg-amber-50 dark:bg-amber-900/30",
+                t.tone === "info" && "bg-emerald-50 dark:bg-emerald-900/30"
               )}
-            />
-            <p className="text-sm">
-              <strong className="font-bold">{t.title}</strong>{" "}
-              {t.detail && (
-                <span className="text-muted-foreground">{t.detail}</span>
-              )}
-            </p>
-            <Link
-              to={t.link.to}
-              className="col-start-2 text-sm font-semibold text-primary hover:underline sm:col-start-3"
             >
-              {t.link.label}
-            </Link>
-          </li>
-        ))}
-      </ul>
-    </Section>
+              <span className="min-w-0">
+                <span className="font-medium text-gray-900 dark:text-white">
+                  {t.title}
+                </span>{" "}
+                {t.detail && (
+                  <span
+                    className={cn(
+                      t.tone === "critical" && "text-red-700 dark:text-red-300",
+                      t.tone === "warning" &&
+                        "text-amber-700 dark:text-amber-300",
+                      t.tone === "info" && "text-gray-600 dark:text-gray-300"
+                    )}
+                  >
+                    {t.detail}
+                  </span>
+                )}
+              </span>
+              <CardLink to={t.link.to} label={t.link.label} />
+            </li>
+          ))}
+        </ul>
+      </CardContent>
+    </Card>
   )
 }
 
@@ -546,7 +597,7 @@ function Timeline({
   now: Date
 }) {
   if (blocks.length === 0 && meals.length === 0) {
-    return <Empty>Bugün dersiniz yok.</Empty>
+    return <EmptyText>Bugün dersiniz yok.</EmptyText>
   }
 
   const today = toLocalISODate(now)
@@ -566,7 +617,7 @@ function Timeline({
   ].sort((a, b) => a.sortKey - b.sortKey)
 
   return (
-    <ol className="rounded-xl bg-card py-2">
+    <ul className="space-y-2">
       {items.map((item) => {
         if (item.kind === "meal") {
           const { meal } = item
@@ -574,21 +625,16 @@ function Timeline({
             <li
               key={meal.id}
               className={cn(
-                "grid grid-cols-[4rem_minmax(0,1fr)] gap-3.5 px-4.5 py-2",
+                "flex items-center justify-between gap-3 rounded-lg border-l-4 border-gray-300 bg-gray-50 p-3 text-sm dark:border-gray-600 dark:bg-gray-800",
                 meal.is_used && "opacity-60"
               )}
             >
-              <span className="pt-0.5 text-sm font-semibold">
-                {capitalize(MEAL_TIME_LABELS[meal.meal_time])}
+              <span className="font-medium text-gray-900 dark:text-white">
+                {MEAL_TIME_LABELS[meal.meal_time]} yemeği
               </span>
-              <span className="flex flex-col border-l-[3px] border-border pl-3.5 text-sm">
-                <strong className="font-bold">
-                  {meal.meal_time === "lunch" ? "Öğle yemeği" : "Akşam yemeği"}
-                </strong>
-                <span className="text-muted-foreground">
-                  {cafeteriaName(meal)}
-                  {meal.is_used && " · Kullanıldı"}
-                </span>
+              <span className="text-gray-500 dark:text-gray-400">
+                {cafeteriaName(meal)}
+                {meal.is_used && " · Kullanıldı"}
               </span>
             </li>
           )
@@ -610,52 +656,40 @@ function Timeline({
           <li
             key={`${block.courseCode}-${block.start}`}
             className={cn(
-              "grid grid-cols-[4rem_minmax(0,1fr)] gap-3.5 px-4.5 py-2",
-              live && "bg-primary/10"
+              "flex items-center justify-between gap-3 rounded-lg border-l-4 p-3 text-sm",
+              COURSE_BORDER[block.colorIndex],
+              live
+                ? "bg-emerald-50 dark:bg-emerald-900/30"
+                : "bg-gray-50 dark:bg-gray-800",
+              past && "opacity-60"
             )}
           >
-            <span className="pt-0.5 text-sm text-muted-foreground">
-              <b className="block font-semibold text-foreground">
-                {block.start}
-              </b>
-              {block.end}
-            </span>
-            <span
-              className={cn(
-                "flex flex-col border-l-[3px] pl-3.5 text-sm",
-                COURSE_BORDER[block.colorIndex],
-                past && "opacity-60"
-              )}
-            >
-              <strong className="text-[0.95rem] font-bold">
+            <span className="min-w-0">
+              <span className="block font-medium text-gray-900 dark:text-white">
                 {block.courseName}
-              </strong>
-              <span className="text-muted-foreground">
-                {block.courseCode} · {SESSION_LABELS[block.sessionType]}
-                {attended && (
-                  <span className="font-semibold text-primary">
-                    {" "}
-                    · Yoklamaya katıldınız
-                  </span>
-                )}
-                {missed && (
-                  <span className="font-semibold text-destructive">
-                    {" "}
-                    · Yoklamada yoktunuz
-                  </span>
-                )}
-                {live && !attended && (
-                  <span className="font-semibold text-primary">
-                    {" "}
-                    · Devam ediyor
-                  </span>
-                )}
+              </span>
+              <span className="text-gray-500 dark:text-gray-400">
+                {block.start}–{block.end} · {block.courseCode} ·{" "}
+                {SESSION_LABELS[block.sessionType]}
               </span>
             </span>
+            {attended ? (
+              <span className="shrink-0 font-medium text-emerald-600">
+                Yoklamaya katıldınız
+              </span>
+            ) : missed ? (
+              <span className="shrink-0 font-medium text-destructive">
+                Yoklamada yoktunuz
+              </span>
+            ) : live ? (
+              <span className="shrink-0 font-medium text-emerald-600">
+                Devam ediyor
+              </span>
+            ) : null}
           </li>
         )
       })}
-    </ol>
+    </ul>
   )
 }
 
@@ -674,62 +708,58 @@ function AbsenceList({ courses }: { courses: CourseAttendanceDetail[] }) {
     })
   )
   if (rows.length === 0) {
-    return <Empty>Henüz yoklama alınmadı.</Empty>
+    return <EmptyText>Henüz yoklama alınmadı.</EmptyText>
   }
   rows.sort((a, b) => a.left - b.left)
 
   return (
-    <ul className="divide-y rounded-xl bg-card py-1.5">
+    <ul className="space-y-3">
       {rows.map(({ course, type, used, left, allowed }) => {
         const tone = left <= 0 ? "critical" : left === 1 ? "warning" : "normal"
         return (
-          <li
-            key={`${course.course_id}-${type}`}
-            className="grid grid-cols-[minmax(0,1fr)_auto] gap-x-3.5 gap-y-1.5 px-4.5 py-3"
-          >
-            <span className="min-w-0 text-sm font-semibold">
-              {course.course_name}{" "}
-              <span className="font-normal text-muted-foreground">
-                {SESSION_LABELS[type].toLocaleLowerCase("tr-TR")}
+          <li key={`${course.course_id}-${type}`} className="space-y-1.5">
+            <div className="flex items-center justify-between gap-3 text-sm">
+              <span className="font-medium text-gray-900 dark:text-white">
+                {course.course_code} · {SESSION_LABELS[type]}
               </span>
-            </span>
-            <span
-              className={cn(
-                "text-sm font-bold",
-                tone === "critical" && "text-destructive",
-                tone === "warning" && "text-warning",
-                tone === "normal" && "text-muted-foreground"
-              )}
-            >
-              {left < 0
-                ? "Sınır aşıldı"
-                : left === 0
-                  ? "Hak kalmadı"
-                  : `${left} hak`}
-            </span>
-            {allowed > 0 && (
               <span
-                className="col-span-2 grid gap-0.5"
+                className={cn(
+                  tone === "critical" && "font-medium text-destructive",
+                  tone === "warning" &&
+                    "font-medium text-amber-700 dark:text-amber-300",
+                  tone === "normal" && "text-gray-500 dark:text-gray-400"
+                )}
+              >
+                {left < 0
+                  ? "Devamsızlık sınırı aşıldı"
+                  : left === 0
+                    ? "Devamsızlık hakkınız kalmadı"
+                    : `${left} devamsızlık hakkınız kaldı`}
+              </span>
+            </div>
+            {allowed > 0 && (
+              <div
+                className="grid gap-1"
                 style={{ gridTemplateColumns: `repeat(${allowed}, 1fr)` }}
                 role="img"
                 aria-label={`${allowed} devamsızlık hakkından ${Math.min(used, allowed)} kullanıldı`}
               >
                 {Array.from({ length: allowed }, (_, i) => (
-                  <i
+                  <span
                     key={i}
                     className={cn(
-                      "h-1.5 rounded-full",
+                      "h-2 rounded-full",
                       i >= used
-                        ? "bg-muted"
+                        ? "bg-gray-200 dark:bg-gray-700"
                         : tone === "critical"
-                          ? "bg-destructive"
+                          ? "bg-red-500"
                           : tone === "warning"
-                            ? "bg-warning"
-                            : "bg-muted-foreground"
+                            ? "bg-amber-500"
+                            : "bg-emerald-500"
                     )}
                   />
                 ))}
-              </span>
+              </div>
             )}
           </li>
         )
@@ -749,133 +779,132 @@ function WeekGrid({
   const todayIndex = now.getDay()
   const slots = Object.entries(TIME_SLOTS).map(([slot, s]) => ({
     slot: Number(slot),
-    start: s.time.split("-")[0],
+    ...s,
   }))
   return (
     <div className="overflow-x-auto">
-      <div className="grid min-w-[36rem] grid-cols-[3.25rem_repeat(5,minmax(6rem,1fr))] gap-0.5 text-xs">
-        <span />
-        {WEEK_DAYS.map((d, i) => (
-          <span
-            key={d}
-            className={cn(
-              "px-2 pb-1 font-bold",
-              i + 1 === todayIndex ? "text-primary" : "text-muted-foreground"
-            )}
-          >
-            {d}
-          </span>
-        ))}
-        {slots.map(({ slot, start }) => (
-          <WeekRow key={slot} slot={slot} start={start} grid={grid} />
-        ))}
-      </div>
+      <table className="w-full min-w-[40rem] table-fixed border-collapse text-xs">
+        <thead>
+          <tr>
+            <th className="w-24 border border-gray-200 bg-gray-50 p-2 text-left font-medium text-gray-600 dark:border-gray-700 dark:bg-gray-800 dark:text-gray-300">
+              Saat
+            </th>
+            {WEEK_DAYS.map((d, i) => (
+              <th
+                key={d}
+                className={cn(
+                  "border border-gray-200 p-2 font-medium dark:border-gray-700",
+                  i + 1 === todayIndex
+                    ? "bg-emerald-50 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-300"
+                    : "bg-gray-50 text-gray-600 dark:bg-gray-800 dark:text-gray-300"
+                )}
+              >
+                {d}
+              </th>
+            ))}
+          </tr>
+        </thead>
+        <tbody>
+          {slots.map(({ slot, label, time }) => (
+            <tr key={slot}>
+              <td className="border border-gray-200 p-2 text-gray-500 dark:border-gray-700 dark:text-gray-400">
+                <span className="block font-medium text-gray-700 dark:text-gray-300">
+                  {label}
+                </span>
+                {time}
+              </td>
+              {[1, 2, 3, 4, 5].map((day) => {
+                const cell = grid.get(`${day}-${slot}`)
+                return (
+                  <td
+                    key={day}
+                    className={cn(
+                      "border border-gray-200 p-2 text-center dark:border-gray-700",
+                      cell
+                        ? cn("font-medium", COURSE_CELL[cell.colorIndex])
+                        : slot === 5 && "bg-gray-50 dark:bg-gray-800/50"
+                    )}
+                  >
+                    {cell?.courseCode}
+                  </td>
+                )
+              })}
+            </tr>
+          ))}
+        </tbody>
+      </table>
     </div>
   )
 }
 
-function WeekRow({
-  slot,
-  start,
-  grid,
-}: {
-  slot: number
-  start: string
-  grid: ReturnType<typeof weekGrid>
-}) {
-  // Slot 5 is the lunch break: no class is scheduled there.
-  const lunch = slot === 5
-  return (
-    <>
-      <span className="pt-1.5 text-muted-foreground">{start}</span>
-      {[1, 2, 3, 4, 5].map((day) => {
-        const cell = grid.get(`${day}-${slot}`)
-        return (
-          <span
-            key={day}
-            className={cn(
-              "min-h-7 rounded-md px-2 py-1.5",
-              cell
-                ? cn("font-bold", COURSE_CELL[cell.colorIndex])
-                : !lunch && "bg-card"
-            )}
-          >
-            {cell?.isFirst && cell.courseCode}
-          </span>
-        )
-      })}
-    </>
-  )
-}
-
-function Section({
+function SummaryCard({
   title,
-  link,
-  children,
-}: {
-  title: string
-  link?: { to: string; label: string }
-  children: ReactNode
-}) {
-  return (
-    <section className="min-w-0">
-      <div className="mb-3 flex items-baseline justify-between gap-3">
-        <h2 className="text-[0.95rem] font-bold tracking-tight">{title}</h2>
-        {link && (
-          <Link
-            to={link.to}
-            className="text-sm font-semibold text-primary hover:underline"
-          >
-            {link.label}
-          </Link>
-        )}
-      </div>
-      {children}
-    </section>
-  )
-}
-
-function QueryState({
+  icon: Icon,
+  to,
+  linkLabel,
   query,
   errorMessage,
   children,
 }: {
+  title: string
+  icon: ComponentType<{ className?: string }>
+  to: string
+  linkLabel: string
   query: UseQueryResult<unknown>
   errorMessage: string
   children: ReactNode
 }) {
-  if (query.isLoading) {
-    return (
-      <div className="flex items-center gap-2 rounded-xl bg-card px-4.5 py-4 text-sm text-muted-foreground">
-        <Loader2 className="size-4 animate-spin" />
-        Yükleniyor...
-      </div>
-    )
-  }
-  if (query.isError) {
-    return (
-      <div className="flex items-center gap-2 rounded-xl bg-card px-4.5 py-4 text-sm text-destructive">
-        <AlertCircle className="size-4" />
-        {apiErrorMessage(query.error, errorMessage)}
-      </div>
-    )
-  }
-  return children
+  return (
+    <Card>
+      <CardHeader className="pb-3">
+        <CardTitle className="flex items-center gap-2 text-gray-900 dark:text-white">
+          <Icon className="h-5 w-5 text-emerald-600" />
+          {title}
+        </CardTitle>
+      </CardHeader>
+      <CardContent className="space-y-4">
+        {query.isLoading ? (
+          <div className="flex items-center gap-2 text-sm text-gray-500">
+            <Loader2 className="h-4 w-4 animate-spin" />
+            Yükleniyor...
+          </div>
+        ) : query.isError ? (
+          <div className="flex items-center gap-2 text-sm text-destructive">
+            <AlertCircle className="h-4 w-4" />
+            {apiErrorMessage(query.error, errorMessage)}
+          </div>
+        ) : (
+          children
+        )}
+        <CardLink to={to} label={linkLabel} />
+      </CardContent>
+    </Card>
+  )
 }
 
-function Figure({ value, label }: { value: number; label: string }) {
+function CardLink({ to, label }: { to: string; label: string }) {
+  return (
+    <Link
+      to={to}
+      className="inline-flex items-center gap-1 text-sm font-medium text-emerald-600 hover:underline"
+    >
+      {label}
+      <ArrowRight className="h-4 w-4" />
+    </Link>
+  )
+}
+
+function Figure({ label, value }: { label: string; value: ReactNode }) {
   return (
     <div>
-      <p className="text-xl font-bold tracking-tight">{value}</p>
-      <p className="text-sm text-muted-foreground">{label}</p>
+      <p className="text-sm text-gray-500 dark:text-gray-400">{label}</p>
+      <p className="text-3xl font-bold text-gray-900 dark:text-white">
+        {value}
+      </p>
     </div>
   )
 }
 
-function Empty({ children }: { children: ReactNode }) {
-  return (
-    <p className="rounded-xl bg-card px-4.5 py-4 text-sm text-muted-foreground">
-      {children}
-    </p>
-  )
+function EmptyText({ children }: { children: ReactNode }) {
+  return <p className="text-sm text-gray-500 dark:text-gray-400">{children}</p>
 }
