@@ -5,8 +5,8 @@ import { QueryClient, QueryClientProvider } from "@tanstack/react-query"
 import type {
   CourseAttendanceDetail,
   EnrollmentProgramResponse,
+  OpenSemester,
 } from "@/lib/types"
-import { toLocalISODate } from "@/lib/services/meal-service"
 import StudentDashboardPage from "./index"
 
 function json(body: unknown, status = 200) {
@@ -16,6 +16,9 @@ function json(body: unknown, status = 200) {
   })
 }
 
+// Wednesday 21 October 2026, 13:20 local: CENG304 is in progress.
+const NOW = new Date(2026, 9, 21, 13, 20)
+
 const STUDENT = {
   id: "student-1",
   student_number: "20230001",
@@ -24,12 +27,13 @@ const STUDENT = {
   email: "zeynep@example.edu",
   faculty: "Mühendislik Fakültesi",
   department: "Bilgisayar Mühendisliği",
+  class_level: 2,
 }
 
 const GRADES = {
   student_id: "student-1",
   student_number: "20230001",
-  active_courses: [],
+  active_courses: [{ course_code: "CENG302" }, { course_code: "CENG304" }],
   completed_courses: [{ course_code: "CENG102" }],
   cumulative_gpa: 3.256,
   total_credits: 34,
@@ -37,25 +41,33 @@ const GRADES = {
 
 function course(
   code: string,
+  name: string,
   theoryAbsent: number,
-  labAbsent?: number
+  attendedToday = false
 ): CourseAttendanceDetail {
-  const stats = (absent: number) => ({
-    present_count: 6 - absent,
-    absent_count: absent,
-    total_sessions: 6,
-    min_required: 5,
-    passed: 6 - absent >= 5,
-  })
   return {
     course_id: `id-${code}`,
     course_code: code,
-    course_name: code,
+    course_name: name,
     instructor: "",
     total_weeks: 14,
-    theory: stats(theoryAbsent),
-    lab: labAbsent === undefined ? undefined : stats(labAbsent),
-    weekly_records: [],
+    theory: {
+      present_count: 5 - theoryAbsent,
+      absent_count: theoryAbsent,
+      total_sessions: 5,
+      min_required: 4,
+      passed: true,
+    },
+    weekly_records: attendedToday
+      ? [
+          {
+            week: 5,
+            session_type: "theory",
+            date: "2026-10-21",
+            marked_via: "qr_scan",
+          },
+        ]
+      : [],
     missed_sessions: [],
   }
 }
@@ -64,7 +76,11 @@ const ATTENDANCE = {
   student_id: "student-1",
   student_number: "20230001",
   semester: "2026-2027-Fall",
-  courses: [course("CENG201", 1, 2), course("MATH201", 0)],
+  courses: [
+    course("CENG302", "Bilgisayar Ağları", 0, true),
+    course("CENG304", "Veritabanı Sistemleri", 3),
+    course("CENG402", "Dağıtık Sistemler", 4),
+  ],
 }
 
 function reservation(id: string, date: string, status: string, used = false) {
@@ -82,33 +98,64 @@ function reservation(id: string, date: string, status: string, used = false) {
 
 const MEALS = {
   reservations: [
-    reservation("b", "2026-10-14", "confirmed"),
-    reservation("a", "2026-10-13", "confirmed"),
-    reservation("c", "2026-10-15", "cancelled"),
-    reservation("d", "2026-10-16", "pending"),
+    reservation("today", "2026-10-21", "confirmed", true),
+    reservation("tomorrow", "2026-10-22", "confirmed"),
+    reservation("cancelled", "2026-10-23", "cancelled"),
   ],
-  summary: { total: 4, confirmed: 2, pending: 1, used: 0, cancelled: 1 },
+  summary: { total: 3, confirmed: 2, pending: 0, used: 1, cancelled: 1 },
 }
 
-function program(semester: string, codes: string[]): EnrollmentProgramResponse {
+const theory = (day: string, slots: number[]) => ({
+  day_of_week: day,
+  slot_numbers: slots,
+  session_type: "theory" as const,
+})
+
+function program(
+  semester: string,
+  courses: [string, string, ReturnType<typeof theory>[]][]
+): EnrollmentProgramResponse {
   return {
     id: semester,
     student_id: "student-1",
     semester,
     status: "approved",
     created_at: "2026-09-01T00:00:00Z",
-    courses: codes.map((code) => ({
+    courses: courses.map(([code, name, sessions]) => ({
       id: code,
       course_code: code,
-      course_name: code,
-      credits: 4,
+      course_name: name,
+      credits: 3,
+      instructor: "Ahmet Yılmaz",
+      schedule_sessions: sessions,
     })),
   }
 }
 
 const PROGRAMS = [
-  program("2026-2027-Spring", ["CENG202"]),
-  program("2026-2027-Fall", ["CENG201", "MATH201", "PHYS101"]),
+  program("2026-2027-Spring", [["CENG499", "Bitirme", []]]),
+  program("2026-2027-Fall", [
+    ["CENG302", "Bilgisayar Ağları", [theory("wednesday", [1, 2, 3])]],
+    ["CENG304", "Veritabanı Sistemleri", [theory("wednesday", [6, 7, 8])]],
+    ["CENG402", "Dağıtık Sistemler", [theory("thursday", [1, 2, 3])]],
+  ]),
+]
+
+const OPEN_SEMESTERS: OpenSemester[] = [
+  {
+    semester: "2026-2027-Fall",
+    enrollment_open: false,
+    period_start: "2026-09-01T06:00:00Z",
+    period_end: "2026-09-14T14:00:00Z",
+    has_program: true,
+  },
+  {
+    semester: "2026-2027-Spring",
+    enrollment_open: true,
+    period_start: "2026-10-15T06:00:00Z",
+    period_end: "2026-11-04T14:00:00Z",
+    has_program: false,
+  },
 ]
 
 function stubBackend(overrides: Record<string, Response> = {}) {
@@ -119,6 +166,7 @@ function stubBackend(overrides: Record<string, Response> = {}) {
     "/api/attendance/my": () => json(ATTENDANCE),
     "/api/meals/reservations/my": () => json({ success: true, data: MEALS }),
     "/api/enrollment/my-enrollments": () => json({ programs: PROGRAMS }),
+    "/api/enrollment/open-semesters": () => json(OPEN_SEMESTERS),
   }
   vi.stubGlobal(
     "fetch",
@@ -146,64 +194,102 @@ function renderPage() {
   )
 }
 
-const card = (title: string) =>
-  within(screen.getByText(title).closest("[data-slot=card]") as HTMLElement)
+const section = (title: string) =>
+  within(
+    screen
+      .getByRole("heading", { name: title })
+      .closest("section") as HTMLElement
+  )
 
 beforeEach(() => {
+  // Only Date is faked: react-query and findBy* still need real timers.
+  vi.useFakeTimers({ toFake: ["Date"] })
+  vi.setSystemTime(NOW)
   localStorage.setItem("user", JSON.stringify({ id: "student-1" }))
 })
 
 afterEach(() => {
+  vi.useRealTimers()
   localStorage.clear()
   vi.unstubAllGlobals()
 })
 
 describe("StudentDashboardPage", () => {
-  it("summarises the student's own grades, attendance, meals and program", async () => {
+  it("leads with the class in progress and what comes next", async () => {
     const asked = stubBackend()
     renderPage()
 
-    expect(await screen.findByText("3.26")).toBeInTheDocument()
-    expect(card("Akademik Durum").getByText("34")).toBeInTheDocument()
-
-    const absences = card("Devamsızlık")
-    expect(absences.getByText("CENG201 · Lab")).toBeInTheDocument()
     expect(
-      absences.getByText("1 devamsızlık hakkınız kaldı")
+      await screen.findByRole("heading", { name: "Zeynep Arslan" })
     ).toBeInTheDocument()
-    expect(absences.queryByText(/MATH201/)).not.toBeInTheDocument()
-
-    const meals = card("Yaklaşan Yemekler")
     expect(
-      meals.getAllByRole("listitem").map((li) => li.textContent),
-      "confirmed meals only, soonest first"
-    ).toEqual([
-      expect.stringContaining("Yemekhane a"),
-      expect.stringContaining("Yemekhane b"),
-    ])
-    expect(asked["/api/meals/reservations/my"]).toBe(
-      `?from_date=${toLocalISODate(new Date())}`
+      screen.getByText(
+        "20230001 · Bilgisayar Mühendisliği, 2. sınıf · Çarşamba, 21 Ekim"
+      )
+    ).toBeInTheDocument()
+
+    const now = within(
+      await screen.findByRole("region", { name: "Şu an ve sıradaki ders" })
     )
-
-    const programCard = card("Ders Programı")
-    expect(
-      programCard.getByText("2026-2027 Güz onaylı programınız")
-    ).toBeInTheDocument()
-    expect(programCard.getByText("3 ders")).toBeInTheDocument()
+    expect(now.getByText("Şu an derstesiniz")).toBeInTheDocument()
+    expect(now.getByText("Veritabanı Sistemleri")).toBeInTheDocument()
+    expect(now.getByText("Bitiş 15:35")).toBeInTheDocument()
+    expect(now.getByText("Dağıtık Sistemler")).toBeInTheDocument()
+    expect(now.getByText("Yarın 08:30")).toBeInTheDocument()
     expect(asked["/api/enrollment/my-enrollments"]).toBe("?status=approved")
-
-    for (const stale of [
-      "Kurumsal Duyurular",
-      "Bilgi İşlem Duyuruları",
-      "Mesajlar",
-      "Kablosuz Ağ Bağlantısı",
-    ]) {
-      expect(screen.queryByText(stale)).not.toBeInTheDocument()
-    }
-    expect(screen.getByText("Günün Sözü")).toBeInTheDocument()
   })
 
-  it("says so when there is nothing to summarise yet", async () => {
+  it("lists what the student has to act on", async () => {
+    stubBackend()
+    renderPage()
+
+    const todo = await screen.findByRole("heading", {
+      name: "Yapmanız gerekenler",
+    })
+    const list = within(todo.closest("section") as HTMLElement)
+    expect(
+      await list.findByText("2026-2027 Bahar ders kaydı açık.")
+    ).toBeInTheDocument()
+    expect(list.getByText("Dağıtık Sistemler · Teori")).toBeInTheDocument()
+    expect(list.getByText(/Devamsızlık hakkınız bitti/)).toBeInTheDocument()
+    expect(list.getByText("Veritabanı Sistemleri · Teori")).toBeInTheDocument()
+    expect(list.queryByText(/Bilgisayar Ağları/)).not.toBeInTheDocument()
+  })
+
+  it("shows today's classes and meals, the record and upcoming meals", async () => {
+    const asked = stubBackend()
+    renderPage()
+
+    const today = section("Bugün")
+    expect(
+      await today.findByText("Yoklamaya katıldınız", { exact: false })
+    ).toBeInTheDocument()
+    expect(today.getByText("Öğle yemeği")).toBeInTheDocument()
+    expect(
+      today.getByText("Devam ediyor", { exact: false })
+    ).toBeInTheDocument()
+
+    expect(await screen.findByText("3.26")).toBeInTheDocument()
+    expect(section("Notlar").getByText("34")).toBeInTheDocument()
+
+    const absences = section("Devamsızlık")
+    expect(absences.getByText("Hak kalmadı")).toBeInTheDocument()
+    expect(absences.getByText("1 hak")).toBeInTheDocument()
+    expect(absences.getByText("4 hak")).toBeInTheDocument()
+
+    const meals = section("Yemek")
+    expect(
+      (await meals.findAllByRole("listitem")).map((li) => li.textContent),
+      "confirmed meals after today only"
+    ).toEqual([expect.stringContaining("Yemekhane tomorrow")])
+    expect(meals.getByText("Yarın öğle")).toBeInTheDocument()
+    expect(asked["/api/meals/reservations/my"]).toBe("?from_date=2026-10-21")
+
+    expect(section("Bu hafta").getAllByText("CENG304")).toHaveLength(1)
+    expect(screen.queryByText("Günün Sözü")).not.toBeInTheDocument()
+  })
+
+  it("says so when there is nothing to show yet", async () => {
     stubBackend({
       "/api/grades/my/grades": json({
         ...GRADES,
@@ -217,24 +303,28 @@ describe("StudentDashboardPage", () => {
         data: { ...MEALS, reservations: [] },
       }),
       "/api/enrollment/my-enrollments": json({ programs: [] }),
+      "/api/enrollment/open-semesters": json([]),
     })
     renderPage()
 
     expect(
+      await screen.findByText("Onaylı bir ders programınız yok.")
+    ).toBeInTheDocument()
+    expect(
       await screen.findByText("Henüz not ortalamanız oluşmadı.")
     ).toBeInTheDocument()
     expect(
-      await screen.findByText("Devamsızlık sınırına yaklaşan dersiniz yok.")
+      await screen.findByText("Henüz yoklama alınmadı.")
     ).toBeInTheDocument()
     expect(
       await screen.findByText("Yaklaşan yemek rezervasyonunuz yok.")
     ).toBeInTheDocument()
-    expect(
-      await screen.findByText("Onaylı bir ders programınız yok.")
-    ).toBeInTheDocument()
+    expect(screen.getByText("Bugün dersiniz yok.")).toBeInTheDocument()
+    expect(screen.queryByText("Yapmanız gerekenler")).not.toBeInTheDocument()
+    expect(screen.queryByText("Bu hafta")).not.toBeInTheDocument()
   })
 
-  it("keeps the other cards when one source fails", async () => {
+  it("keeps the other sections when one source fails", async () => {
     stubBackend({
       "/api/meals/reservations/my": json(
         { error: "Yemek servisi şu anda yanıt vermiyor", code: "INTERNAL" },
@@ -247,6 +337,6 @@ describe("StudentDashboardPage", () => {
       await screen.findByText("Yemek servisi şu anda yanıt vermiyor")
     ).toBeInTheDocument()
     expect(await screen.findByText("3.26")).toBeInTheDocument()
-    expect(await screen.findByText("3 ders")).toBeInTheDocument()
+    expect(await screen.findByText("Şu an derstesiniz")).toBeInTheDocument()
   })
 })
