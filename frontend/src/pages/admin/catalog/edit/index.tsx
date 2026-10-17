@@ -483,9 +483,9 @@ export default function EditCourseCatalogPage() {
   // Faculty & Department List View
   if (!selectedDepartment) {
     return (
-      <div className="min-h-screen bg-gray-50 py-8">
+      <div className="min-h-screen bg-background py-8">
         <div className="mx-auto max-w-4xl px-4">
-          <div className="rounded-lg bg-white p-4 shadow-md sm:p-6">
+          <div className="rounded-lg bg-card p-4 shadow-md sm:p-6">
             <div className="mb-8 flex flex-wrap items-center gap-4">
               <Button
                 variant="ghost"
@@ -496,10 +496,10 @@ export default function EditCourseCatalogPage() {
                 Geri
               </Button>
               <div className="min-w-48 flex-1">
-                <h1 className="text-2xl font-bold text-gray-900">
+                <h1 className="text-2xl font-bold text-foreground">
                   Ders Düzenle
                 </h1>
-                <p className="text-sm text-gray-600">
+                <p className="text-sm text-muted-foreground">
                   Fakülte ve bölüm seçerek dersleri düzenleyebilirsiniz
                 </p>
               </div>
@@ -535,11 +535,11 @@ export default function EditCourseCatalogPage() {
                     >
                       <button
                         onClick={() => toggleFaculty(faculty.id)}
-                        className="flex w-full items-center justify-between bg-gray-50 p-4 text-left transition-colors hover:bg-gray-100"
+                        className="flex w-full items-center justify-between bg-muted/50 p-4 text-left transition-colors hover:bg-muted"
                       >
                         <div className="flex items-center gap-3">
-                          <Building2 className="h-5 w-5 text-indigo-600" />
-                          <span className="font-semibold text-gray-900">
+                          <Building2 className="h-5 w-5 text-indigo-600 dark:text-indigo-400" />
+                          <span className="font-semibold text-foreground">
                             {faculty.name}
                           </span>
                           <Badge variant="outline" className="text-xs">
@@ -547,14 +547,14 @@ export default function EditCourseCatalogPage() {
                           </Badge>
                         </div>
                         {isExpanded ? (
-                          <ChevronDown className="h-5 w-5 text-gray-500" />
+                          <ChevronDown className="h-5 w-5 text-muted-foreground" />
                         ) : (
-                          <ChevronRight className="h-5 w-5 text-gray-500" />
+                          <ChevronRight className="h-5 w-5 text-muted-foreground" />
                         )}
                       </button>
 
                       {isExpanded && (
-                        <div className="border-t bg-white">
+                        <div className="border-t bg-card">
                           {faculty.departments.map((dept, index) => {
                             const courseCount = courseCounts[dept.name] || 0
                             return (
@@ -563,25 +563,25 @@ export default function EditCourseCatalogPage() {
                                 onClick={() =>
                                   handleDepartmentClick(dept, faculty)
                                 }
-                                className={`flex w-full items-center justify-between p-3 pl-12 text-left transition-colors hover:bg-indigo-50 ${
+                                className={`flex w-full items-center justify-between p-3 pl-12 text-left transition-colors hover:bg-indigo-50 dark:hover:bg-indigo-950/40 ${
                                   index !== faculty.departments.length - 1
-                                    ? "border-b border-gray-100"
+                                    ? "border-b border-border"
                                     : ""
                                 }`}
                               >
                                 <div className="flex items-center gap-3">
-                                  <GraduationCap className="h-4 w-4 text-gray-400" />
-                                  <span className="text-gray-700">
+                                  <GraduationCap className="h-4 w-4 text-muted-foreground/70" />
+                                  <span className="text-foreground/80">
                                     {dept.name}
                                   </span>
                                 </div>
                                 <div className="flex items-center gap-2">
                                   {courseCount > 0 && (
-                                    <span className="text-xs text-gray-500">
+                                    <span className="text-xs text-muted-foreground">
                                       {courseCount} ders
                                     </span>
                                   )}
-                                  <ChevronRight className="h-4 w-4 text-gray-400" />
+                                  <ChevronRight className="h-4 w-4 text-muted-foreground/70" />
                                 </div>
                               </button>
                             )
@@ -604,19 +604,21 @@ export default function EditCourseCatalogPage() {
 
   if (isLoading) {
     return (
-      <div className="min-h-screen bg-gray-50 py-8">
+      <div className="min-h-screen bg-background py-8">
         <div className="mx-auto max-w-7xl px-4">
-          <div className="rounded-lg bg-white p-4 shadow-md sm:p-6">
+          <div className="rounded-lg bg-card p-4 shadow-md sm:p-6">
             <button
               onClick={() => setSelectedDepartment(null)}
-              className="mb-4 flex items-center gap-2 text-indigo-600 hover:text-indigo-800"
+              className="mb-4 flex items-center gap-2 text-indigo-600 hover:text-indigo-800 dark:text-indigo-400 dark:hover:text-indigo-300"
             >
               <ArrowLeft className="h-5 w-5" />
               <span>Tüm Fakülteler</span>
             </button>
             <div className="flex items-center justify-center py-12">
-              <Loader2 className="h-12 w-12 animate-spin text-indigo-600" />
-              <span className="ml-4 text-gray-600">Dersler yükleniyor...</span>
+              <Loader2 className="h-12 w-12 animate-spin text-indigo-600 dark:text-indigo-400" />
+              <span className="ml-4 text-muted-foreground">
+                Dersler yükleniyor...
+              </span>
             </div>
           </div>
         </div>
@@ -626,22 +628,22 @@ export default function EditCourseCatalogPage() {
 
   if (error) {
     return (
-      <div className="min-h-screen bg-gray-50 py-8">
+      <div className="min-h-screen bg-background py-8">
         <div className="mx-auto max-w-7xl px-4">
-          <div className="rounded-lg bg-white p-4 shadow-md sm:p-6">
+          <div className="rounded-lg bg-card p-4 shadow-md sm:p-6">
             <button
               onClick={() => setSelectedDepartment(null)}
-              className="mb-4 flex items-center gap-2 text-indigo-600 hover:text-indigo-800"
+              className="mb-4 flex items-center gap-2 text-indigo-600 hover:text-indigo-800 dark:text-indigo-400 dark:hover:text-indigo-300"
             >
               <ArrowLeft className="h-5 w-5" />
               <span>Tüm Fakülteler</span>
             </button>
             <div className="py-12 text-center">
               <AlertCircle className="mx-auto mb-4 h-16 w-16 text-red-300" />
-              <h2 className="mb-2 text-xl font-semibold text-gray-700">
+              <h2 className="mb-2 text-xl font-semibold text-foreground/80">
                 Hata Oluştu
               </h2>
-              <p className="mb-4 text-gray-500">{error}</p>
+              <p className="mb-4 text-muted-foreground">{error}</p>
               <Button
                 onClick={() => refetchDepartmentCourses()}
                 variant="outline"
@@ -656,13 +658,13 @@ export default function EditCourseCatalogPage() {
   }
 
   return (
-    <div className="min-h-screen bg-gray-50 py-8">
+    <div className="min-h-screen bg-background py-8">
       <div className="mx-auto max-w-7xl px-4">
         {/* Header */}
-        <div className="mb-6 rounded-lg bg-white p-4 shadow-md sm:p-6">
+        <div className="mb-6 rounded-lg bg-card p-4 shadow-md sm:p-6">
           <button
             onClick={() => setSelectedDepartment(null)}
-            className="mb-4 flex items-center gap-2 text-indigo-600 transition-colors hover:text-indigo-800"
+            className="mb-4 flex items-center gap-2 text-indigo-600 transition-colors hover:text-indigo-800 dark:text-indigo-400 dark:hover:text-indigo-300"
           >
             <ArrowLeft className="h-5 w-5" />
             <span>Tüm Fakülteler</span>
@@ -670,24 +672,24 @@ export default function EditCourseCatalogPage() {
 
           <div className="flex flex-wrap items-center justify-between gap-4">
             <div className="flex items-center gap-4">
-              <div className="flex h-16 w-16 items-center justify-center rounded-xl bg-indigo-100">
-                <Edit3 className="h-8 w-8 text-indigo-600" />
+              <div className="flex h-16 w-16 items-center justify-center rounded-xl bg-indigo-100 dark:bg-indigo-900/40">
+                <Edit3 className="h-8 w-8 text-indigo-600 dark:text-indigo-400" />
               </div>
               <div>
-                <h1 className="text-2xl font-bold text-gray-900">
+                <h1 className="text-2xl font-bold text-foreground">
                   {selectedDepartment.dept.name}
                 </h1>
-                <p className="text-gray-600">
+                <p className="text-muted-foreground">
                   {selectedDepartment.faculty.name}
                 </p>
-                <p className="mt-1 text-sm text-gray-500">
+                <p className="mt-1 text-sm text-muted-foreground">
                   {departmentCourses.length} ders - Düzenleme Modu
                 </p>
               </div>
             </div>
             <Badge
               variant="outline"
-              className="flex items-center gap-1 border-amber-300 bg-amber-50 text-amber-600"
+              className="flex items-center gap-1 border-amber-300 bg-amber-50 text-amber-600 dark:border-amber-800 dark:bg-amber-950/30 dark:text-amber-400"
             >
               <Edit3 className="h-3 w-3" />
               Düzenleme
@@ -697,12 +699,12 @@ export default function EditCourseCatalogPage() {
 
         {/* Courses */}
         {departmentCourses.length === 0 ? (
-          <div className="rounded-lg bg-white p-8 text-center shadow-md">
-            <BookOpen className="mx-auto mb-4 h-16 w-16 text-gray-300" />
-            <h2 className="mb-2 text-xl font-semibold text-gray-700">
+          <div className="rounded-lg bg-card p-8 text-center shadow-md">
+            <BookOpen className="mx-auto mb-4 h-16 w-16 text-muted-foreground/40" />
+            <h2 className="mb-2 text-xl font-semibold text-foreground/80">
               Ders Bilgisi Bulunamadı
             </h2>
-            <p className="text-gray-500">
+            <p className="text-muted-foreground">
               Bu bölüm için henüz ders bilgisi eklenmemiş.
             </p>
           </div>
@@ -711,13 +713,13 @@ export default function EditCourseCatalogPage() {
             {[1, 2, 3, 4].map((year) => (
               <div
                 key={year}
-                className="overflow-hidden rounded-lg bg-white shadow-md"
+                className="overflow-hidden rounded-lg bg-card shadow-md"
               >
                 <div className="bg-gradient-to-r from-indigo-600 to-indigo-700 px-6 py-4">
                   <h2 className="text-xl font-bold text-white">{year}. Yıl</h2>
                 </div>
 
-                <div className="grid grid-cols-1 divide-y divide-gray-200 lg:grid-cols-2 lg:divide-x lg:divide-y-0">
+                <div className="grid grid-cols-1 divide-y divide-border lg:grid-cols-2 lg:divide-x lg:divide-y-0">
                   {[year * 2 - 1, year * 2].map((semester) => {
                     const semesterInfo = getSemesterInfo(semester)
                     const semesterCourses = groupedCourses[semester]
@@ -729,7 +731,7 @@ export default function EditCourseCatalogPage() {
                     return (
                       <div key={semester} className="p-6">
                         <div className="mb-4 flex items-center justify-between">
-                          <h3 className="text-lg font-semibold text-gray-800">
+                          <h3 className="text-lg font-semibold text-foreground">
                             {semester}. Dönem ({semesterInfo.term})
                           </h3>
                           <Badge variant="outline" className="text-sm">
@@ -740,27 +742,27 @@ export default function EditCourseCatalogPage() {
                         {/* Zorunlu Dersler */}
                         {semesterCourses.mandatory.length > 0 && (
                           <div className="mb-6">
-                            <h4 className="mb-3 flex items-center gap-2 text-sm font-semibold text-red-700">
+                            <h4 className="mb-3 flex items-center gap-2 text-sm font-semibold text-red-700 dark:text-red-300">
                               <div className="h-2 w-2 rounded-full bg-red-500"></div>
                               ZORUNLU DERSLER
                             </h4>
                             <div className="relative overflow-x-auto">
                               <table className="w-full text-sm">
                                 <thead>
-                                  <tr className="bg-red-50 text-left">
-                                    <th className="px-3 py-2 font-medium text-gray-700">
+                                  <tr className="bg-red-50 text-left dark:bg-red-950/30">
+                                    <th className="px-3 py-2 font-medium text-foreground/80">
                                       Ders Kodu
                                     </th>
-                                    <th className="px-3 py-2 font-medium text-gray-700">
+                                    <th className="px-3 py-2 font-medium text-foreground/80">
                                       Ders Adı
                                     </th>
-                                    <th className="px-3 py-2 text-center font-medium text-gray-700">
+                                    <th className="px-3 py-2 text-center font-medium text-foreground/80">
                                       D
                                     </th>
-                                    <th className="px-3 py-2 text-center font-medium text-gray-700">
+                                    <th className="px-3 py-2 text-center font-medium text-foreground/80">
                                       AKTS
                                     </th>
-                                    <th className="px-3 py-2 text-center font-medium text-gray-700">
+                                    <th className="px-3 py-2 text-center font-medium text-foreground/80">
                                       İşlem
                                     </th>
                                   </tr>
@@ -769,18 +771,18 @@ export default function EditCourseCatalogPage() {
                                   {semesterCourses.mandatory.map((course) => (
                                     <tr
                                       key={course.id}
-                                      className="border-b border-gray-100 transition-colors hover:bg-red-50"
+                                      className="border-b border-border transition-colors hover:bg-red-50 dark:hover:bg-red-950/40"
                                     >
-                                      <td className="px-3 py-2 font-medium text-indigo-600">
+                                      <td className="px-3 py-2 font-medium text-indigo-600 dark:text-indigo-400">
                                         {course.course_code}
                                       </td>
-                                      <td className="px-3 py-2 text-gray-800">
+                                      <td className="px-3 py-2 text-foreground">
                                         {course.name}
                                       </td>
-                                      <td className="px-3 py-2 text-center text-gray-600">
+                                      <td className="px-3 py-2 text-center text-muted-foreground">
                                         {course.theoretical_hours}
                                       </td>
-                                      <td className="px-3 py-2 text-center font-medium text-gray-800">
+                                      <td className="px-3 py-2 text-center font-medium text-foreground">
                                         {course.ects || course.credits}
                                       </td>
                                       <td className="px-3 py-2 text-center">
@@ -790,9 +792,9 @@ export default function EditCourseCatalogPage() {
                                           onClick={() =>
                                             handleEditClick(course)
                                           }
-                                          className="h-8 w-8 p-0 hover:bg-indigo-100"
+                                          className="h-8 w-8 p-0 hover:bg-indigo-100 dark:hover:bg-indigo-900/40"
                                         >
-                                          <Edit3 className="h-4 w-4 text-indigo-600" />
+                                          <Edit3 className="h-4 w-4 text-indigo-600 dark:text-indigo-400" />
                                         </Button>
                                       </td>
                                     </tr>
@@ -806,27 +808,27 @@ export default function EditCourseCatalogPage() {
                         {/* Seçmeli Dersler */}
                         {semesterCourses.elective.length > 0 && (
                           <div>
-                            <h4 className="mb-3 flex items-center gap-2 text-sm font-semibold text-green-700">
+                            <h4 className="mb-3 flex items-center gap-2 text-sm font-semibold text-green-700 dark:text-green-300">
                               <div className="h-2 w-2 rounded-full bg-green-500"></div>
                               SEÇMELİ DERSLER
                             </h4>
                             <div className="relative overflow-x-auto">
                               <table className="w-full text-sm">
                                 <thead>
-                                  <tr className="bg-green-50 text-left">
-                                    <th className="px-3 py-2 font-medium text-gray-700">
+                                  <tr className="bg-green-50 text-left dark:bg-green-950/30">
+                                    <th className="px-3 py-2 font-medium text-foreground/80">
                                       Ders Kodu
                                     </th>
-                                    <th className="px-3 py-2 font-medium text-gray-700">
+                                    <th className="px-3 py-2 font-medium text-foreground/80">
                                       Ders Adı
                                     </th>
-                                    <th className="px-3 py-2 text-center font-medium text-gray-700">
+                                    <th className="px-3 py-2 text-center font-medium text-foreground/80">
                                       D
                                     </th>
-                                    <th className="px-3 py-2 text-center font-medium text-gray-700">
+                                    <th className="px-3 py-2 text-center font-medium text-foreground/80">
                                       AKTS
                                     </th>
-                                    <th className="px-3 py-2 text-center font-medium text-gray-700">
+                                    <th className="px-3 py-2 text-center font-medium text-foreground/80">
                                       İşlem
                                     </th>
                                   </tr>
@@ -835,18 +837,18 @@ export default function EditCourseCatalogPage() {
                                   {semesterCourses.elective.map((course) => (
                                     <tr
                                       key={course.id}
-                                      className="border-b border-gray-100 transition-colors hover:bg-green-50"
+                                      className="border-b border-border transition-colors hover:bg-green-50 dark:hover:bg-green-950/40"
                                     >
-                                      <td className="px-3 py-2 font-medium text-indigo-600">
+                                      <td className="px-3 py-2 font-medium text-indigo-600 dark:text-indigo-400">
                                         {course.course_code}
                                       </td>
-                                      <td className="px-3 py-2 text-gray-800">
+                                      <td className="px-3 py-2 text-foreground">
                                         {course.name}
                                       </td>
-                                      <td className="px-3 py-2 text-center text-gray-600">
+                                      <td className="px-3 py-2 text-center text-muted-foreground">
                                         {course.theoretical_hours}
                                       </td>
-                                      <td className="px-3 py-2 text-center font-medium text-gray-800">
+                                      <td className="px-3 py-2 text-center font-medium text-foreground">
                                         {course.ects || course.credits}
                                       </td>
                                       <td className="px-3 py-2 text-center">
@@ -856,9 +858,9 @@ export default function EditCourseCatalogPage() {
                                           onClick={() =>
                                             handleEditClick(course)
                                           }
-                                          className="h-8 w-8 p-0 hover:bg-indigo-100"
+                                          className="h-8 w-8 p-0 hover:bg-indigo-100 dark:hover:bg-indigo-900/40"
                                         >
-                                          <Edit3 className="h-4 w-4 text-indigo-600" />
+                                          <Edit3 className="h-4 w-4 text-indigo-600 dark:text-indigo-400" />
                                         </Button>
                                       </td>
                                     </tr>
@@ -871,7 +873,7 @@ export default function EditCourseCatalogPage() {
 
                         {semesterCourses.mandatory.length === 0 &&
                           semesterCourses.elective.length === 0 && (
-                            <p className="text-sm text-gray-400 italic">
+                            <p className="text-sm text-muted-foreground/70 italic">
                               Bu dönem için ders bilgisi yok
                             </p>
                           )}
@@ -895,7 +897,7 @@ export default function EditCourseCatalogPage() {
             <div className="flex items-center justify-between">
               <div>
                 <DialogTitle className="flex items-center gap-2 text-xl">
-                  <Edit3 className="h-5 w-5 text-indigo-600" />
+                  <Edit3 className="h-5 w-5 text-indigo-600 dark:text-indigo-400" />
                   {editingCourse?.course_code} - {editingCourse?.name}
                 </DialogTitle>
                 <DialogDescription>
@@ -905,7 +907,7 @@ export default function EditCourseCatalogPage() {
               {hasChanges && (
                 <Badge
                   variant="outline"
-                  className="border-amber-300 bg-amber-50 text-amber-600"
+                  className="border-amber-300 bg-amber-50 text-amber-600 dark:border-amber-800 dark:bg-amber-950/30 dark:text-amber-400"
                 >
                   <AlertCircle className="mr-1 h-3 w-3" />
                   Değişiklikler var
@@ -931,7 +933,7 @@ export default function EditCourseCatalogPage() {
                       <Input
                         value={formData.course_code}
                         disabled
-                        className="bg-gray-100"
+                        className="bg-muted"
                       />
                     </div>
                     <div className="space-y-2">
@@ -1221,7 +1223,7 @@ export default function EditCourseCatalogPage() {
                         onClick={() => removeLearningOutcome(index)}
                         disabled={formData.learning_outcomes_list.length === 1}
                       >
-                        <Trash2 className="h-4 w-4 text-red-500" />
+                        <Trash2 className="h-4 w-4 text-red-500 dark:text-red-400" />
                       </Button>
                     </div>
                   ))}
@@ -1262,7 +1264,7 @@ export default function EditCourseCatalogPage() {
                           onClick={() => removeWeeklyTopic(index)}
                           disabled={formData.weekly_topics.length === 1}
                         >
-                          <Trash2 className="h-4 w-4 text-red-500" />
+                          <Trash2 className="h-4 w-4 text-red-500 dark:text-red-400" />
                         </Button>
                       </div>
                       <Input
@@ -1312,7 +1314,7 @@ export default function EditCourseCatalogPage() {
                         onClick={() => removeSource(index)}
                         disabled={formData.recommended_sources.length === 1}
                       >
-                        <Trash2 className="h-4 w-4 text-red-500" />
+                        <Trash2 className="h-4 w-4 text-red-500 dark:text-red-400" />
                       </Button>
                     </div>
                   ))}
