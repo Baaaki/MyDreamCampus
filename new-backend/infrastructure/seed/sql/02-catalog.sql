@@ -1,13 +1,19 @@
 -- catalog database: the current semester (:'semester', active) and the next
--- one (:'next_semester', planned), this semester's course offerings, the open
--- periods, the next semester's enrollment window (opening the day after this
--- one's closes), every offering's weekly schedule, and the audit entries that
--- setup leaves.
+-- one (:'next_semester', planned), both semesters' course offerings, the
+-- periods, every offering's weekly schedule, and the audit entries that setup
+-- leaves.
+--
+-- The calendar the demo stands on: this semester is five weeks into its
+-- classes, so its enrollment closed before they began and its programs,
+-- grades and attendance are already there. The one enrollment window open
+-- today is the next semester's, which nobody has a program, grade or
+-- attendance row in yet — a student enrolling now picks courses no grade has
+-- been entered for.
 --
 -- Everything is relative to the seed day, and it has to hold for six months:
 -- the hourly rewind always returns to this state, so its dates never move on
--- their own. Every period stays open 180 days; DEPLOY.md says how to extend
--- them when that runs out. The active semester's hard deadline is a year out
+-- their own. Every open period stays open 180 days; DEPLOY.md says how to
+-- extend them when that runs out. The active semester's hard deadline is a year out
 -- on purpose: once it passes, catalog completes the semester for good and no
 -- edit brings it back. Six months past the periods, it leaves time to notice
 -- they have closed and move them on (none may end past the deadline) before
@@ -60,17 +66,17 @@ JOIN _staff s ON s.email = m.email
 ON CONFLICT (semester, course_code, department) DO NOTHING;
 
 -- ============================================================
--- This semester's offerings (Bilgisayar Bilimleri, first year)
+-- Next semester's offerings (Bilgisayar Bilimleri, first year)
 -- ============================================================
--- Opened from the catalog's own first-year list for the current season (odd
--- catalog semesters in Fall, even in Spring) so a Bilgisayar Bilimleri
--- freshman has a real pool to choose from and submits the program themselves:
--- nothing is pre-registered for them in the per-service seeds. Taught by the
--- department's two teachers, alternating.
+-- Opened in the semester whose enrollment is open, from the catalog's own
+-- first-year list for that season (odd catalog semesters in Fall, even in
+-- Spring), so a Bilgisayar Bilimleri freshman has a real pool to choose from
+-- and submits the program themselves: nothing is pre-registered for them in
+-- the per-service seeds. Taught by the department's two teachers, alternating.
 INSERT INTO course_catalog.semester_courses
   (semester, course_code, department, credits, class_level, instructor_id, instructor_fullname,
    classroom_location, max_capacity, prerequisites, assessment_schema)
-SELECT :'semester', c.course_code, c.department, c.credits, c.class_level, s.id,
+SELECT :'next_semester', c.course_code, c.department, c.credits, c.class_level, s.id,
        s.first_name || ' ' || s.last_name,
        'B Blok ' || (100 + c.rn)::text,
        40,
@@ -81,42 +87,47 @@ FROM (
     FROM course_catalog.course_catalog cc
     WHERE cc.department = 'Bilgisayar Bilimleri'
       AND cc.class_level = 1
-      AND (cc.semester % 2 = 1) = (:'semester' LIKE '%-Fall')
+      AND (cc.semester % 2 = 1) = (:'next_semester' LIKE '%-Fall')
 ) c
 JOIN _staff s ON s.email = CASE c.rn % 2 WHEN 0 THEN 'kemal.tekin@uni.edu.tr' ELSE 'nur.erdogan@uni.edu.tr' END
 ON CONFLICT (semester, course_code, department) DO NOTHING;
 
 -- ============================================================
--- Periods — open today for every consuming service
+-- This semester's periods
 -- ============================================================
 -- Catalog holds one row per consuming service (source of truth); the
 -- services read local projections, normally filled by catalog's period
 -- events. The seed writes those projections directly in the per-service
 -- files, the same shortcut it takes for the view tables.
 --
--- Opened five weeks back rather than today: attendance has four weeks of
--- history (04-attendance.sql) that should fall inside its own period.
+-- Catalog, grading and attendance opened five weeks back and stay open:
+-- attendance has four weeks of history (04-attendance.sql) that should fall
+-- inside its own period. Enrollment was the two weeks before that and is
+-- closed — the programs it took were approved and classes started, so its
+-- students' grades and attendance are real, and nobody can change those
+-- programs any more.
 INSERT INTO course_catalog.academic_periods (semester, period_start, period_end, is_active, period_type)
-SELECT :'semester', NOW() - INTERVAL '35 days', NOW() + INTERVAL '180 days', true, t.period_type
-FROM (VALUES ('catalog'), ('enrollment'), ('grading'), ('attendance')) AS t(period_type)
+SELECT :'semester', t.period_start, t.period_end, true, t.period_type
+FROM (VALUES
+   ('catalog',    NOW() - INTERVAL '35 days', NOW() + INTERVAL '180 days'),
+   ('enrollment', NOW() - INTERVAL '50 days', NOW() - INTERVAL '36 days'),
+   ('grading',    NOW() - INTERVAL '35 days', NOW() + INTERVAL '180 days'),
+   ('attendance', NOW() - INTERVAL '35 days', NOW() + INTERVAL '180 days')
+ ) AS t(period_type, period_start, period_end)
 ON CONFLICT (semester, period_type) DO NOTHING;
 
 -- ============================================================
--- Prerequisite scenario — next semester's CENG201 requires CENG102
+-- Next semester — the open enrollment window
 -- ============================================================
--- A separate semester so nobody's approved program for this one blocks a
--- fresh submission (programs are per-semester exclusive). The enrollment
--- period check reads enrollment.academic_periods, a projection of catalog's
--- enrollment-typed row.
+-- The only enrollment window open today (catalog's
+-- trg_single_enrollment_window refuses a second overlapping one). The
+-- enrollment period check reads enrollment.academic_periods, a projection of
+-- catalog's enrollment-typed row. Nobody has a program here yet, so every
+-- student enrolls from a clean slate and can add and drop courses until they
+-- submit.
 --
--- Only one semester takes enrollments at a time (catalog's
--- trg_single_enrollment_window refuses a second overlapping window), so its
--- two-week window starts the day after this semester's closes. The row has to
--- exist now: the wizard can move a planned semester's window but not add one.
--- To exercise the scenario before then, move the time machine past the start.
---
--- Expected behaviour, once its window is open, when a student POSTs a program
--- for :'next_semester' containing its CENG201 offering:
+-- Prerequisite scenario — its CENG201 requires CENG102. Expected behaviour
+-- when a student POSTs a program for :'next_semester' containing it:
 --   accept  → Zeynep, Emir, Eylül, Baran (passed CENG102, class_level ≥ 2)
 --   reject  → Deniz, Selin  (class_level 2, but never passed CENG102 →
 --             ErrPrerequisitesNotMet)
@@ -129,23 +140,34 @@ ON CONFLICT (semester, period_type) DO NOTHING;
 INSERT INTO course_catalog.academic_periods (semester, period_start, period_end, is_active, period_type)
 SELECT :'next_semester', t.period_start, t.period_end, true, t.period_type
 FROM (VALUES
-   ('catalog',    NOW() - INTERVAL '1 day',    NOW() + INTERVAL '180 days'),
-   ('enrollment', NOW() + INTERVAL '181 days', NOW() + INTERVAL '195 days')
+   ('catalog',    NOW() - INTERVAL '3 days', NOW() + INTERVAL '180 days'),
+   ('enrollment', NOW() - INTERVAL '3 days', NOW() + INTERVAL '180 days')
  ) AS t(period_type, period_start, period_end)
 ON CONFLICT (semester, period_type) DO NOTHING;
 
+-- Bilgisayar Mühendisliği's offerings: the prerequisite scenario's CENG201
+-- and the third- and fourth-year courses, so the upper years — the demo
+-- student among them — have courses they have not taken to choose between.
 -- The snapshot the enrollment check walks (semester_courses.prerequisites,
 -- keyed by course_code) is the catalog course's own list.
 INSERT INTO course_catalog.semester_courses
   (semester, course_code, department, credits, class_level, instructor_id, instructor_fullname,
    classroom_location, max_capacity, prerequisites, assessment_schema)
 SELECT :'next_semester', c.course_code, c.department, c.credits, c.class_level, s.id,
-       s.first_name || ' ' || s.last_name, 'A Blok 401', 40,
+       s.first_name || ' ' || s.last_name,
+       'A Blok ' || (400 + (row_number() OVER (ORDER BY c.course_code)))::text,
+       40,
        c.prerequisites,
        '[{"slug":"midterm","name":"Vize","weight":40},{"slug":"final","name":"Final","weight":60}]'::jsonb
 FROM course_catalog.course_catalog c
-JOIN _staff s ON s.email = 'elif.aydin@uni.edu.tr'
-WHERE c.course_code = 'CENG201'
+JOIN (VALUES
+   ('CENG201', 'elif.aydin@uni.edu.tr'),
+   ('CENG302', 'mehmet.kaya@uni.edu.tr'),
+   ('CENG304', 'ahmet.yilmaz@uni.edu.tr'),
+   ('CENG402', 'mehmet.kaya@uni.edu.tr'),
+   ('CENG452', 'elif.aydin@uni.edu.tr')
+ ) AS m(course_code, email) ON m.course_code = c.course_code
+JOIN _staff s ON s.email = m.email
 ON CONFLICT (semester, course_code, department) DO NOTHING;
 
 -- ============================================================
@@ -156,7 +178,8 @@ ON CONFLICT (semester, course_code, department) DO NOTHING;
 -- lunch break. No two offerings of a semester share a slot, so a teacher's
 -- courses never collide (trg_instructor_schedule_conflict would refuse it) and
 -- neither does any pair a student takes together (CENG301+CENG350,
--- CENG102+CENG202). Next semester's CENG201 keeps this term's hours.
+-- CENG102+CENG202); next semester's five can all be taken at once. Next
+-- semester's CENG201 keeps this term's hours.
 --
 -- NOT EXISTS rather than ON CONFLICT: the conflict trigger fires before the
 -- arbiter, and on a re-run it would take an offering's own rows for a clash.
@@ -173,7 +196,11 @@ JOIN (VALUES
    ('CENG202', 'tuesday',   'theory', ARRAY[6, 7]),
    ('CENG202', 'friday',    'lab',    ARRAY[1, 2]),
    ('CENG301', 'wednesday', 'theory', ARRAY[1, 2, 3]),
-   ('CENG350', 'thursday',  'theory', ARRAY[1, 2, 3])
+   ('CENG350', 'thursday',  'theory', ARRAY[1, 2, 3]),
+   ('CENG302', 'wednesday', 'theory', ARRAY[1, 2, 3]),
+   ('CENG304', 'wednesday', 'theory', ARRAY[6, 7, 8]),
+   ('CENG402', 'thursday',  'theory', ARRAY[1, 2, 3]),
+   ('CENG452', 'friday',    'theory', ARRAY[6, 7, 8])
  ) AS s(course_code, day, session_type, slots) ON s.course_code = sc.course_code
 CROSS JOIN LATERAL unnest(s.slots) AS slot(n)
 WHERE sc.semester IN (:'semester', :'next_semester')
@@ -199,7 +226,7 @@ FROM (
         JOIN course_catalog.course_catalog c ON c.course_code = sc.course_code
         CROSS JOIN LATERAL (VALUES (1, 'theory', c.theoretical_hours), (2, 'lab', c.lab_hours))
                    AS h(ord, session_type, hours)
-        WHERE sc.semester = :'semester' AND sc.department = 'Bilgisayar Bilimleri'
+        WHERE sc.semester = :'next_semester' AND sc.department = 'Bilgisayar Bilimleri'
     ) d
     CROSS JOIN LATERAL generate_series(0, d.hours - 1) AS k
     WHERE d.hours > 0

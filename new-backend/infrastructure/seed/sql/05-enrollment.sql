@@ -6,9 +6,14 @@
 -- course_id is the OFFERING's id, the one available-courses hands a student:
 -- approving a program publishes these ids, and grades and attendance key
 -- their registrations on them.
+--
+-- Submitted inside this semester's enrollment window (50 to 36 days back,
+-- 02-catalog.sql), which has closed since. The three pending ones were sent on
+-- its last days and still wait on their advisor: approval is not bound to the
+-- window, only submitting and withdrawing are.
 INSERT INTO enrollment.enrollment_programs (student_id, semester, status, created_at)
 SELECT DISTINCT p.student_id, :'semester', p.status::enrollment.enrollment_status_enum,
-       NOW() - CASE p.status WHEN 'pending' THEN INTERVAL '2 days' ELSE INTERVAL '25 days' END
+       NOW() - CASE p.status WHEN 'pending' THEN INTERVAL '38 days' ELSE INTERVAL '45 days' END
 FROM _programs p
 ON CONFLICT (student_id, semester) DO NOTHING;
 

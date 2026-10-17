@@ -216,7 +216,7 @@ Only numbers that were actually measured are listed. Each one says where it came
 | Full stack in memory (16 containers) | ~400 MB running, ~650 MB of images | Measured on a deployed stack, see [`DEPLOY.md`](DEPLOY.md) |
 | Cold image build, all services at once | ~9 min, ~10 GB of builder memory | 4 CPU / 16 GB builder |
 | Warm build (`auth` first, shared layers cached) | ~2.5 min, ~2.5 GB of builder memory | Same builder. `make deploy` and CI now do this warm-up on purpose |
-| Seeding the demo dataset | ~30 s | Empty system, 19 faculties, 103 departments, 91 courses, 54 students |
+| Seeding the demo dataset | ~30 s | Empty system, 19 faculties, 103 departments, 95 courses, 54 students |
 
 **Not measured yet:** HTTP latency and throughput under load, Lighthouse scores, flamegraphs. There is no reproducible load-test harness in the repo, so none of those are claimed here.
 

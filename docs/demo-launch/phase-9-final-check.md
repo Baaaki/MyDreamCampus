@@ -16,13 +16,13 @@
 - [ ] Demo şeridi görünüyor.
 
 ### Demo öğrenci
-- [ ] Ders kaydı: kayıt sayfası yalnız Güz'ü, kayıt tarihleriyle birlikte
-  gösteriyor (aynı anda tek dönemin kaydı açık olabilir). Admin, Güz'ün
-  penceresi açıkken Bahar'a çakışan bir kayıt penceresi açmaya çalışınca 409
-  alıyor.
-- [ ] Önkoşul senaryosu (Bahar'ın penceresi Güz'ünkünün ertesi günü açılıyor;
-  zaman makinesiyle oraya geçince): Bahar'da "2. Sınıf Dersleri" altında
-  CENG201 listeleniyor; seçilip gönderilince program danışman onayına düşüyor.
+- [ ] Ders kaydı: Güz "Kayıt kapalı" (kaydın bittiği tarihle) ve onaylı
+  program değiştirilemiyor; Bahar "Kayıt açık" (kayıt tarihleriyle), varsayılan
+  olarak seçili ve hiç notu yok. Bahar'da CENG302/304/402/452 eklenip
+  çıkarılabiliyor. Admin, Bahar'ın penceresi açıkken Güz'e çakışan bir kayıt
+  penceresi açmaya çalışınca 409 alıyor (aynı anda tek dönemin kaydı açık).
+- [ ] Önkoşul senaryosu: Bahar'da "2. Sınıf Dersleri" altında CENG201
+  listeleniyor; seçilip gönderilince program danışman onayına düşüyor.
 - [ ] Not sayfası ve transkript dolu.
 - [ ] Yoklama sayfası (Yoklama menüsü) aktif dönemi (Güz) gösteriyor:
   CENG301 ve CENG350 için katılım sayıları ve haftalık oturumlar dolu.
