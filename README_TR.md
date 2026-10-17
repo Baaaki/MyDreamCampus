@@ -216,7 +216,7 @@ Yalnızca gerçekten ölçülmüş sayılar yazıldı. Her birinin nereden geldi
 | Tüm yığının belleği (16 konteyner) | çalışırken ~400 MB, imajlar ~650 MB | Dağıtılmış yığında ölçüldü, bkz. [`DEPLOY.md`](DEPLOY.md) |
 | Soğuk imaj derlemesi, tüm servisler aynı anda | ~9 dk, builder'da ~10 GB bellek | 4 CPU / 16 GB builder |
 | Sıcak derleme (önce `auth`, paylaşılan katmanlar önbellekte) | ~2,5 dk, builder'da ~2,5 GB bellek | Aynı builder. `make deploy` ve CI bu ısındırmayı bilerek yapar |
-| Demo veri setinin seed edilmesi | ~30 sn | Boş sistem, 19 fakülte, 103 bölüm, 91 ders, 52 öğrenci |
+| Demo veri setinin seed edilmesi | ~30 sn | Boş sistem, 19 fakülte, 103 bölüm, 91 ders, 54 öğrenci |
 
 **Henüz ölçülmedi:** yük altında HTTP gecikmesi ve verim, Lighthouse skorları, flamegraph'lar. Repoda tekrarlanabilir bir yük testi altyapısı yok; bu yüzden burada bunlarla ilgili hiçbir iddia yer almıyor.
 

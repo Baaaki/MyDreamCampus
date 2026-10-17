@@ -59,6 +59,33 @@ JOIN _staff s ON s.email = m.email
 ON CONFLICT (semester, course_code, department) DO NOTHING;
 
 -- ============================================================
+-- This semester's offerings (Bilgisayar Bilimleri, first year)
+-- ============================================================
+-- Opened from the catalog's own first-year list for the current season (odd
+-- catalog semesters in Fall, even in Spring) so a Bilgisayar Bilimleri
+-- freshman has a real pool to choose from and submits the program themselves:
+-- nothing is pre-registered for them in the per-service seeds. Taught by the
+-- department's two teachers, alternating.
+INSERT INTO course_catalog.semester_courses
+  (semester, course_code, department, credits, class_level, instructor_id, instructor_fullname,
+   classroom_location, max_capacity, prerequisites, assessment_schema)
+SELECT :'semester', c.course_code, c.department, c.credits, c.class_level, s.id,
+       s.first_name || ' ' || s.last_name,
+       'B Blok ' || (100 + c.rn)::text,
+       40,
+       c.prerequisites,
+       '[{"slug":"midterm","name":"Vize","weight":40},{"slug":"final","name":"Final","weight":60}]'::jsonb
+FROM (
+    SELECT cc.*, row_number() OVER (ORDER BY cc.course_code) AS rn
+    FROM course_catalog.course_catalog cc
+    WHERE cc.department = 'Bilgisayar Bilimleri'
+      AND cc.class_level = 1
+      AND (cc.semester % 2 = 1) = (:'semester' LIKE '%-Fall')
+) c
+JOIN _staff s ON s.email = CASE c.rn % 2 WHEN 0 THEN 'kemal.tekin@uni.edu.tr' ELSE 'nur.erdogan@uni.edu.tr' END
+ON CONFLICT (semester, course_code, department) DO NOTHING;
+
+-- ============================================================
 -- Periods — open today for every consuming service
 -- ============================================================
 -- Catalog holds one row per consuming service (source of truth); the
@@ -142,6 +169,34 @@ CROSS JOIN LATERAL unnest(s.slots) AS slot(n)
 WHERE sc.semester IN (:'semester', :'next_semester')
   AND NOT EXISTS (SELECT 1 FROM course_catalog.course_schedule_sessions x
                   WHERE x.semester_course_id = sc.id);
+
+-- Bilgisayar Bilimleri offerings are laid out by code: their hours are dealt
+-- out one after another over the week's 40 usable slots (Monday 1-4, 6-9, then
+-- Tuesday...), so no two share a slot and the freshman can take any
+-- combination without a clash. Theory hours first, then lab, as catalog counts
+-- them.
+INSERT INTO course_catalog.course_schedule_sessions (semester_course_id, day_of_week, slot_number, session_type)
+SELECT b.id,
+       (ARRAY['monday','tuesday','wednesday','thursday','friday'])[b.pos / 8 + 1]::course_catalog.day_of_week_enum,
+       (ARRAY[1,2,3,4,6,7,8,9])[b.pos % 8 + 1],
+       b.session_type::course_catalog.schedule_session_type_enum
+FROM (
+    SELECT d.id, d.session_type, d.first_pos + k AS pos
+    FROM (
+        SELECT sc.id, h.session_type, h.hours,
+               sum(h.hours) OVER (ORDER BY sc.course_code, h.ord) - h.hours AS first_pos
+        FROM course_catalog.semester_courses sc
+        JOIN course_catalog.course_catalog c ON c.course_code = sc.course_code
+        CROSS JOIN LATERAL (VALUES (1, 'theory', c.theoretical_hours), (2, 'lab', c.lab_hours))
+                   AS h(ord, session_type, hours)
+        WHERE sc.semester = :'semester' AND sc.department = 'Bilgisayar Bilimleri'
+    ) d
+    CROSS JOIN LATERAL generate_series(0, d.hours - 1) AS k
+    WHERE d.hours > 0
+) b
+WHERE b.pos < 40
+  AND NOT EXISTS (SELECT 1 FROM course_catalog.course_schedule_sessions x
+                  WHERE x.semester_course_id = b.id);
 
 -- ============================================================
 -- Audit trail of the setup above

@@ -115,5 +115,23 @@
     "department": "Yönetim Bilişim Sistemleri",
     "phone": "+90 532 333 4455",
     "office_location": "İşletme Fakültesi H-110"
+  },
+  {
+    "email": "kemal.tekin@uni.edu.tr",
+    "first_name": "Kemal",
+    "last_name": "Tekin",
+    "role": "teacher",
+    "department": "Bilgisayar Bilimleri",
+    "phone": "+90 532 444 5566",
+    "office_location": "Fen Fakültesi B-110"
+  },
+  {
+    "email": "nur.erdogan@uni.edu.tr",
+    "first_name": "Nur",
+    "last_name": "Erdoğan",
+    "role": "teacher",
+    "department": "Bilgisayar Bilimleri",
+    "phone": "+90 532 555 6677",
+    "office_location": "Fen Fakültesi B-112"
   }
 ]

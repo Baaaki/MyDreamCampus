@@ -855,5 +855,17 @@
     "profile": {
       "faculty": "İktisadi ve İdari Bilimler Fakültesi"
     }
+  },
+  {
+    "email": "kemal.tekin@uni.edu.tr",
+    "profile": {
+      "faculty": "Fen Fakültesi"
+    }
+  },
+  {
+    "email": "nur.erdogan@uni.edu.tr",
+    "profile": {
+      "faculty": "Fen Fakültesi"
+    }
   }
 ]

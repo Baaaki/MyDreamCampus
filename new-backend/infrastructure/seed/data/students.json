@@ -559,5 +559,27 @@
     "enrollment_year": 2022,
     "class_level": 2,
     "advisor_email": "elif.aydin@uni.edu.tr"
+  },
+  {
+    "student_number": "20260101050",
+    "first_name": "Mert",
+    "last_name": "Kaplan",
+    "email": "mert.kaplan@uni.edu.tr",
+    "faculty": "Fen Fakültesi",
+    "department": "Bilgisayar Bilimleri",
+    "enrollment_year": 2026,
+    "class_level": 1,
+    "advisor_email": "kemal.tekin@uni.edu.tr"
+  },
+  {
+    "student_number": "20260101051",
+    "first_name": "Elif",
+    "last_name": "Tunç",
+    "email": "elif.tunc@uni.edu.tr",
+    "faculty": "Fen Fakültesi",
+    "department": "Bilgisayar Bilimleri",
+    "enrollment_year": 2026,
+    "class_level": 1,
+    "advisor_email": "nur.erdogan@uni.edu.tr"
   }
 ]
