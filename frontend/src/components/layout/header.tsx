@@ -16,12 +16,6 @@ import { clearUserSession } from "@/lib/session"
 import { cn } from "@/lib/utils"
 import { useIsDemoMode } from "@/lib/services/demo-service"
 
-const roleTitles: Record<string, string> = {
-  admin: "Admin Panel",
-  teacher: "Akademisyen Paneli",
-  student: "Öğrenci Paneli",
-}
-
 const roleLabels: Record<string, string> = {
   admin: "Admin",
   teacher: "Akademisyen",
@@ -70,14 +64,13 @@ export function Header({ menuOpen, onMenuClick }: HeaderProps) {
   }
 
   const isDemo = useIsDemoMode()
-  const panelTitle = roleTitles[user?.role ?? ""] ?? "Panel"
   const profilePath = profilePaths[user?.role ?? ""]
   const roleLabel = roleLabels[user?.role ?? ""] ?? "Kullanıcı"
 
   return (
     <header
       className={cn(
-        "fixed right-0 left-0 z-30 h-16 border-b border-gray-200 bg-white transition-colors dark:border-gray-800 dark:bg-gray-900",
+        "fixed right-0 left-0 z-30 h-16 border-b border-border bg-background/90 backdrop-blur transition-colors",
         isDemo ? "top-8" : "top-0"
       )}
     >
@@ -89,7 +82,7 @@ export function Header({ menuOpen, onMenuClick }: HeaderProps) {
             onClick={onMenuClick}
             aria-label={menuOpen ? "Menüyü kapat" : "Menüyü aç"}
             aria-expanded={menuOpen}
-            className="-ml-2 shrink-0 text-gray-600 lg:hidden dark:text-gray-400"
+            className="-ml-2 shrink-0 text-muted-foreground lg:hidden"
           >
             {menuOpen ? (
               <X className="h-5 w-5" />
@@ -97,16 +90,21 @@ export function Header({ menuOpen, onMenuClick }: HeaderProps) {
               <Menu className="h-5 w-5" />
             )}
           </Button>
-          <h2 className="truncate text-base font-semibold text-gray-900 sm:text-lg dark:text-white">
-            {panelTitle}
-          </h2>
+          <p className="flex min-w-0 items-baseline gap-2 truncate">
+            <span className="text-[1.05rem] font-extrabold tracking-tight">
+              MyDreamCampus
+            </span>
+            <span className="hidden text-sm text-muted-foreground sm:inline">
+              {roleLabel}
+            </span>
+          </p>
         </div>
 
         {/* Right side - Actions */}
         <div className="flex shrink-0 items-center gap-1 sm:gap-3">
           {/* Notifications */}
           <Button variant="ghost" size="icon">
-            <Bell className="h-5 w-5 text-gray-600 dark:text-gray-400" />
+            <Bell className="h-5 w-5 text-muted-foreground" />
           </Button>
 
           {/* Theme Toggle */}
@@ -114,7 +112,10 @@ export function Header({ menuOpen, onMenuClick }: HeaderProps) {
             variant="ghost"
             size="icon"
             onClick={toggleTheme}
-            className="text-gray-600 dark:text-gray-400"
+            aria-label={
+              theme === "light" ? "Koyu temaya geç" : "Açık temaya geç"
+            }
+            className="text-muted-foreground"
           >
             {theme === "light" ? (
               <Moon className="h-5 w-5" />
@@ -127,16 +128,11 @@ export function Header({ menuOpen, onMenuClick }: HeaderProps) {
           <DropdownMenu>
             <DropdownMenuTrigger asChild>
               <Button variant="ghost" className="flex items-center gap-2">
-                <div className="flex h-8 w-8 items-center justify-center rounded-full bg-indigo-100 dark:bg-indigo-900">
-                  <User className="h-4 w-4 text-indigo-600 dark:text-indigo-400" />
+                <div className="flex h-8 w-8 items-center justify-center rounded-full bg-primary/10">
+                  <User className="h-4 w-4 text-primary" />
                 </div>
                 <div className="hidden text-left sm:block">
-                  <p className="text-sm font-medium text-gray-900 dark:text-white">
-                    {roleLabel}
-                  </p>
-                  <p className="text-xs text-gray-500 dark:text-gray-400">
-                    {user?.email ?? ""}
-                  </p>
+                  <p className="text-sm font-medium">{user?.email ?? ""}</p>
                 </div>
               </Button>
             </DropdownMenuTrigger>
@@ -156,7 +152,7 @@ export function Header({ menuOpen, onMenuClick }: HeaderProps) {
               <DropdownMenuSeparator />
               <DropdownMenuItem
                 onClick={handleLogout}
-                className="text-red-600 dark:text-red-400"
+                className="text-destructive"
               >
                 <LogOut className="mr-2 h-4 w-4" />
                 Çıkış Yap
