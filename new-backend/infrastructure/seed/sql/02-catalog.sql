@@ -1,7 +1,8 @@
 -- catalog database: the current semester (:'semester', active) and the next
 -- one (:'next_semester', planned), this semester's course offerings, the open
--- periods, the next semester's prerequisite enrollment window, every
--- offering's weekly schedule, and the audit entries that setup leaves.
+-- periods, the next semester's enrollment window (opening the day after this
+-- one's closes), every offering's weekly schedule, and the audit entries that
+-- setup leaves.
 --
 -- Everything is relative to the seed day, and it has to hold for six months:
 -- the hourly rewind always returns to this state, so its dates never move on
@@ -108,8 +109,14 @@ ON CONFLICT (semester, period_type) DO NOTHING;
 -- period check reads enrollment.academic_periods, a projection of catalog's
 -- enrollment-typed row.
 --
--- Expected behaviour when a student POSTs a program for :'next_semester'
--- containing its CENG201 offering:
+-- Only one semester takes enrollments at a time (catalog's
+-- trg_single_enrollment_window refuses a second overlapping window), so its
+-- two-week window starts the day after this semester's closes. The row has to
+-- exist now: the wizard can move a planned semester's window but not add one.
+-- To exercise the scenario before then, move the time machine past the start.
+--
+-- Expected behaviour, once its window is open, when a student POSTs a program
+-- for :'next_semester' containing its CENG201 offering:
 --   accept  → Zeynep, Emir, Eylül, Baran (passed CENG102, class_level ≥ 2)
 --   reject  → Deniz, Selin  (class_level 2, but never passed CENG102 →
 --             ErrPrerequisitesNotMet)
@@ -120,8 +127,11 @@ ON CONFLICT (semester, period_type) DO NOTHING;
 -- the latest-started open attendance period, so an open one here would turn
 -- that page to this empty semester.
 INSERT INTO course_catalog.academic_periods (semester, period_start, period_end, is_active, period_type)
-SELECT :'next_semester', NOW() - INTERVAL '1 day', NOW() + INTERVAL '180 days', true, t.period_type
-FROM (VALUES ('catalog'), ('enrollment')) AS t(period_type)
+SELECT :'next_semester', t.period_start, t.period_end, true, t.period_type
+FROM (VALUES
+   ('catalog',    NOW() - INTERVAL '1 day',    NOW() + INTERVAL '180 days'),
+   ('enrollment', NOW() + INTERVAL '181 days', NOW() + INTERVAL '195 days')
+ ) AS t(period_type, period_start, period_end)
 ON CONFLICT (semester, period_type) DO NOTHING;
 
 -- The snapshot the enrollment check walks (semester_courses.prerequisites,

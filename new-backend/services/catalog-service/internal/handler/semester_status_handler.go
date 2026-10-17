@@ -163,6 +163,10 @@ func (h *SemesterStatusHandler) CreateSemester(c *gin.Context) {
 		return
 	}
 
+	if h.refuseOverlappingEnrollment(c, req.Name, req.Periods) {
+		return
+	}
+
 	semester, err := h.repo.CreateSemester(ctx, req.Name, req.HardDeadline)
 	if err != nil {
 		handlerLogger.Error("failed to create semester", zap.Error(err))
@@ -224,6 +228,31 @@ func (h *SemesterStatusHandler) CreateSemester(c *gin.Context) {
 	}
 
 	c.JSON(http.StatusCreated, resp)
+}
+
+// refuseOverlappingEnrollment answers 409 when the request's enrollment window
+// would overlap another semester's open one, and reports whether it did.
+// Checked before anything is written: the period rows commit after the
+// semester itself, so a refusal there would leave a semester with no periods
+// and only a period_errors entry the wizard does not show.
+func (h *SemesterStatusHandler) refuseOverlappingEnrollment(c *gin.Context, semester string, periods *semesterPeriods) bool {
+	if periods == nil || periods.Enrollment == nil || h.periodRepo == nil {
+		return false
+	}
+	other, err := h.periodRepo.OverlappingEnrollmentSemester(c.Request.Context(), semester, periods.Enrollment.Start, periods.Enrollment.End)
+	if err != nil {
+		// The trigger still refuses an overlap at insert time.
+		logger.Warn("enrollment window overlap check failed", zap.Error(err))
+		return false
+	}
+	if other == "" {
+		return false
+	}
+	c.JSON(http.StatusConflict, gin.H{
+		"error": fmt.Sprintf("Bu tarihlerde %s döneminin ders kayıt penceresi açık. Aynı anda yalnızca bir dönemin kaydı açık olabilir.", other),
+		"code":  "ENROLLMENT_WINDOW_OVERLAP",
+	})
+	return true
 }
 
 // periodTarget pairs one period type with the range the admin submitted for it.
@@ -935,6 +964,10 @@ func (h *SemesterStatusHandler) UpdatePlannedSemester(c *gin.Context) {
 			"error": "Son tarih ileri bir tarih olmalıdır",
 			"code":  "VALIDATION_ERROR",
 		})
+		return
+	}
+
+	if h.refuseOverlappingEnrollment(c, semester.Name, req.Periods) {
 		return
 	}
 

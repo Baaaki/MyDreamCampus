@@ -234,7 +234,8 @@ q auth "UPDATE auth.users SET is_demo = true, force_password_change = false WHER
 # (YYYY-YYYY-Fall|Spring — what catalog validates and the web enrollment page
 # asks for): Sep-Jan is that autumn's Fall, Feb-Jun the academic year's Spring,
 # and Jul-Aug already the coming Fall. The next semester carries the
-# prerequisite scenario's open enrollment window.
+# prerequisite scenario's offering and an enrollment window that opens the
+# day after this semester's closes (one window at a time).
 YEAR=$(date -u +%Y)
 MONTH=$(date -u +%m | sed 's/^0//')
 if [ "$MONTH" -ge 7 ]; then

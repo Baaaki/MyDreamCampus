@@ -127,6 +127,11 @@ func (h *SimplePeriodHandler) CreatePeriod(c *gin.Context) {
 			IsActive:    true,
 			PeriodType:  periodType,
 		}, periodType)
+		if errors.Is(err, repository.ErrEnrollmentWindowOverlap) {
+			logger.Warn("enrollment window overlap refused", zap.Error(err))
+			respondEnrollmentWindowOverlap(c)
+			return
+		}
 		if err != nil {
 			logger.Error("failed to create academic period", zap.Error(err))
 			c.JSON(http.StatusConflict, gin.H{
@@ -291,6 +296,11 @@ func (h *SimplePeriodHandler) UpdatePeriod(c *gin.Context) {
 		defer func() { _ = tx.Rollback(c.Request.Context()) }()
 
 		period, err = h.repo.UpdatePeriodTx(c.Request.Context(), tx, id, req.PeriodEnd, req.IsActive)
+		if errors.Is(err, repository.ErrEnrollmentWindowOverlap) {
+			logger.Warn("enrollment window overlap refused", zap.Error(err))
+			respondEnrollmentWindowOverlap(c)
+			return
+		}
 		if err != nil {
 			if err == pgx.ErrNoRows {
 				c.JSON(http.StatusNotFound, gin.H{
@@ -503,6 +513,13 @@ func (h *SimplePeriodHandler) DeletePeriod(c *gin.Context) {
 
 	c.JSON(http.StatusOK, gin.H{
 		"message": "period deleted successfully",
+	})
+}
+
+func respondEnrollmentWindowOverlap(c *gin.Context) {
+	c.JSON(http.StatusConflict, gin.H{
+		"error": "Bu tarihlerde başka bir dönemin ders kayıt penceresi açık. Aynı anda yalnızca bir dönemin kaydı açık olabilir.",
+		"code":  "ENROLLMENT_WINDOW_OVERLAP",
 	})
 }
 

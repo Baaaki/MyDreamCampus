@@ -2,6 +2,7 @@ package repository
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"strings"
 	"time"
@@ -68,6 +69,21 @@ type SimplePeriod struct {
 type TypedPeriod struct {
 	SimplePeriod
 	PeriodType string
+}
+
+// ErrEnrollmentWindowOverlap is returned when a write would leave two
+// semesters' enrollment windows open at the same time. catalog's
+// trg_single_enrollment_window raises it, whichever path wrote the row.
+var ErrEnrollmentWindowOverlap = errors.New("enrollment window overlaps another semester's open window")
+
+// mapPeriodWriteError turns the trigger's exclusion_violation into
+// ErrEnrollmentWindowOverlap, keeping the database message for the log.
+func mapPeriodWriteError(err error) error {
+	var pgErr *pgconn.PgError
+	if errors.As(err, &pgErr) && pgErr.Code == "23P01" {
+		return fmt.Errorf("%w: %s", ErrEnrollmentWindowOverlap, pgErr.Message)
+	}
+	return err
 }
 
 // periodExecutor is satisfied by both *pgxpool.Pool and pgx.Tx so a period
@@ -213,7 +229,7 @@ func (r *SimplePeriodRepository) createPeriod(ctx context.Context, ex periodExec
 		)
 	}
 	if err != nil {
-		return nil, err
+		return nil, mapPeriodWriteError(err)
 	}
 	return &result, nil
 }
@@ -315,6 +331,33 @@ func (r *SimplePeriodRepository) ListProjectedPeriods(ctx context.Context) ([]Ty
 	return periods, rows.Err()
 }
 
+// OverlappingEnrollmentSemester names another semester whose active
+// enrollment window overlaps [start, end], or returns "" when none does. It
+// lets a caller refuse up front with a readable answer; the trigger behind
+// ErrEnrollmentWindowOverlap is still what guarantees the rule.
+func (r *SimplePeriodRepository) OverlappingEnrollmentSemester(ctx context.Context, semester string, start, end time.Time) (string, error) {
+	if err := r.requireCatalog("enrollment window overlap check"); err != nil {
+		return "", err
+	}
+
+	var other string
+	err := r.pool.QueryRow(ctx, fmt.Sprintf(`
+		SELECT semester
+		FROM %s
+		WHERE period_type = $1
+		  AND is_active
+		  AND semester <> $2
+		  AND period_start <= $4
+		  AND period_end >= $3
+		ORDER BY period_start
+		LIMIT 1
+	`, r.table), PeriodTypeEnrollment, semester, start, end).Scan(&other)
+	if errors.Is(err, pgx.ErrNoRows) {
+		return "", nil
+	}
+	return other, err
+}
+
 // GetPeriodByID returns a single period by its ID.
 func (r *SimplePeriodRepository) GetPeriodByID(ctx context.Context, id uuid.UUID) (*SimplePeriod, error) {
 	cols := "id, semester, period_start, period_end, is_active, created_at, updated_at"
@@ -380,7 +423,7 @@ func (r *SimplePeriodRepository) UpdatePeriodTx(ctx context.Context, ex periodEx
 		)
 	}
 	if err != nil {
-		return nil, err
+		return nil, mapPeriodWriteError(err)
 	}
 	return &p, nil
 }
@@ -476,7 +519,7 @@ func (r *SimplePeriodRepository) updatePeriodBySemester(ctx context.Context, ex 
 		)
 	}
 	if err != nil {
-		return nil, err
+		return nil, mapPeriodWriteError(err)
 	}
 	return &p, nil
 }
