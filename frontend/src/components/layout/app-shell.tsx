@@ -14,7 +14,7 @@ export function AppShell({ sidebar: Sidebar }: AppShellProps) {
   const [drawerOpen, setDrawerOpen] = useState(false)
 
   return (
-    <div className="min-h-screen bg-background transition-colors">
+    <div className="min-h-screen bg-gray-50 transition-colors dark:bg-gray-950">
       <Sidebar
         mobileOpen={drawerOpen}
         onMobileClose={() => setDrawerOpen(false)}
