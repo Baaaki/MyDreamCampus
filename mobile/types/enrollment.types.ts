@@ -1,7 +1,17 @@
 // Backend: monolith enrollment module DTO'lari (ogrenci kapsami).
 
+// Catalog's weekday names, as enrollment passes them on.
+export type DayOfWeek =
+  | 'monday'
+  | 'tuesday'
+  | 'wednesday'
+  | 'thursday'
+  | 'friday'
+  | 'saturday'
+  | 'sunday';
+
 export interface ScheduleSession {
-  day_of_week: number;
+  day_of_week: DayOfWeek;
   slot_numbers: number[];
   session_type: 'theory' | 'lab';
 }

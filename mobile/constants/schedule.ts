@@ -1,6 +1,8 @@
 // Ders programi sabitleri — frontend/src/lib/constants.ts ile ayni kaynak
 // (backend slot semasi). Degisirse ikisini birden guncelle.
 
+import type { DayOfWeek } from '@/types/enrollment.types';
+
 export const TIME_SLOTS: Record<number, { label: string; start: string; end: string }> = {
   1: { label: 'Ders 1', start: '08:30', end: '09:15' },
   2: { label: 'Ders 2', start: '09:25', end: '10:10' },
@@ -13,25 +15,31 @@ export const TIME_SLOTS: Record<number, { label: string; start: string; end: str
   9: { label: 'Ders 8', start: '15:45', end: '16:30' },
 };
 
-export const DAYS_OF_WEEK: Record<number, string> = {
-  1: 'Pazartesi',
-  2: 'Sali',
-  3: 'Carsamba',
-  4: 'Persembe',
-  5: 'Cuma',
-  6: 'Cumartesi',
-  7: 'Pazar',
+// Backend day_of_week names in week order, and their labels.
+export const WEEK_DAYS: readonly DayOfWeek[] = [
+  'monday',
+  'tuesday',
+  'wednesday',
+  'thursday',
+  'friday',
+  'saturday',
+  'sunday',
+];
+
+export const DAYS_OF_WEEK: Record<DayOfWeek, string> = {
+  monday: 'Pazartesi',
+  tuesday: 'Salı',
+  wednesday: 'Çarşamba',
+  thursday: 'Perşembe',
+  friday: 'Cuma',
+  saturday: 'Cumartesi',
+  sunday: 'Pazar',
 };
 
 export const SESSION_TYPE_LABEL: Record<'theory' | 'lab', string> = {
   theory: 'Teori',
   lab: 'Lab',
 };
-
-// JS getDay(): 0=Pazar..6=Cumartesi -> backend day_of_week: 1=Pazartesi..7=Pazar
-export function jsDayToBackendDay(jsDay: number): number {
-  return jsDay === 0 ? 7 : jsDay;
-}
 
 // Ardisik slot listesini tek zaman araligina cevirir: [3,4] -> "10:20 – 12:00"
 export function slotRange(slotNumbers: number[]): { start: string; end: string } | null {

@@ -6,11 +6,17 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { ScreenHeader } from '@/components/ScreenHeader';
 import { Badge, Button, Card, Text } from '@/components/ui';
-import { DAYS_OF_WEEK, SESSION_TYPE_LABEL, slotRange, timeToMinutes } from '@/constants/schedule';
+import {
+  DAYS_OF_WEEK,
+  SESSION_TYPE_LABEL,
+  WEEK_DAYS,
+  slotRange,
+  timeToMinutes,
+} from '@/constants/schedule';
 import { useTheme } from '@/contexts/ThemeContext';
 import { useMyEnrollments } from '@/hooks/useEnrollment';
 import { COLORS } from '@/lib/theme';
-import type { EnrollmentCourse } from '@/types/enrollment.types';
+import type { DayOfWeek, EnrollmentCourse } from '@/types/enrollment.types';
 
 type DaySlot = {
   course: EnrollmentCourse;
@@ -28,16 +34,15 @@ export default function ScheduleScreen() {
   const program = data?.programs?.[0];
   const courses = useMemo(() => program?.courses ?? [], [program]);
 
-  // Gunlere gore oturumlar (1=Pazartesi..7=Pazar). Seed'de slot bos olabilir;
+  // Gunlere gore oturumlar (backend gun adlariyla). Seed'de slot bos olabilir;
   // o durumda gunluk program bos gorunur ama kayitli dersler yine listelenir.
   const byDay = useMemo(() => {
-    const map: Record<number, DaySlot[]> = {};
+    const map: Partial<Record<DayOfWeek, DaySlot[]>> = {};
     for (const course of courses) {
       for (const session of course.schedule_sessions ?? []) {
         const range = slotRange(session.slot_numbers ?? []);
         if (!range) continue;
-        const day = session.day_of_week;
-        (map[day] ??= []).push({
+        (map[session.day_of_week] ??= []).push({
           course,
           type: session.session_type,
           start: range.start,
@@ -46,8 +51,8 @@ export default function ScheduleScreen() {
         });
       }
     }
-    for (const day of Object.keys(map)) {
-      map[Number(day)].sort((a, b) => a.startMin - b.startMin);
+    for (const day of WEEK_DAYS) {
+      map[day]?.sort((a, b) => a.startMin - b.startMin);
     }
     return map;
   }, [courses]);
@@ -90,15 +95,14 @@ export default function ScheduleScreen() {
             </Text>
             {hasAnySlot ? (
               <View className="gap-4">
-                {[1, 2, 3, 4, 5, 6, 7]
-                  .filter((day) => byDay[day]?.length)
+                {WEEK_DAYS.filter((day) => byDay[day]?.length)
                   .map((day) => (
                     <View key={day}>
                       <Text className="mb-2 text-sm font-bold text-foreground">
                         {DAYS_OF_WEEK[day]}
                       </Text>
                       <View className="gap-2">
-                        {byDay[day].map((slot, i) => (
+                        {(byDay[day] ?? []).map((slot, i) => (
                           <Card
                             key={`${slot.course.id}-${slot.type}-${i}`}
                             className="flex-row items-center gap-3 p-3"
