@@ -15,6 +15,7 @@ import {
 } from '@/constants/schedule';
 import { useTheme } from '@/contexts/ThemeContext';
 import { useCurrentProgram } from '@/hooks/useEnrollment';
+import { semesterLabel } from '@/lib/semester';
 import { COLORS } from '@/lib/theme';
 import type { DayOfWeek, EnrollmentCourse } from '@/types/enrollment.types';
 
@@ -59,7 +60,10 @@ export default function ScheduleScreen() {
 
   return (
     <SafeAreaView className="flex-1 bg-background" edges={['top']}>
-      <ScreenHeader title="Ders Programı" subtitle={program?.semester} />
+      <ScreenHeader
+        title="Ders Programı"
+        subtitle={program ? semesterLabel(program.semester) : undefined}
+      />
 
       {isLoading ? (
         <View className="flex-1 items-center justify-center">

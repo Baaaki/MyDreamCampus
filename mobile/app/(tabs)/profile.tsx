@@ -11,6 +11,7 @@ import { useTheme } from '@/contexts/ThemeContext';
 import { useCurrentProgram } from '@/hooks/useEnrollment';
 import { useHaptic } from '@/hooks/useHaptic';
 import { useMyProfile } from '@/hooks/useStudent';
+import { semesterLabel } from '@/lib/semester';
 import { COLORS } from '@/lib/theme';
 
 function initialsOf(name: string): string {
@@ -31,7 +32,7 @@ export default function ProfileScreen() {
 
   const { program } = useCurrentProgram();
   const { data: profile } = useMyProfile();
-  const semester = program?.semester ?? '';
+  const semester = program ? semesterLabel(program.semester) : '';
 
   const displayName = profile
     ? `${profile.first_name} ${profile.last_name}`

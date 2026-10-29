@@ -10,6 +10,7 @@ import { formatDateLongTR } from '@/constants/datetime';
 import { useTheme } from '@/contexts/ThemeContext';
 import { useMyAttendance } from '@/hooks/useAttendance';
 import { sessionRows, type SessionRow } from '@/lib/attendance';
+import { semesterLabel } from '@/lib/semester';
 import { COLORS } from '@/lib/theme';
 import type { AttendanceStats, CourseAttendance, WeeklyRecord } from '@/types/attendance.types';
 
@@ -100,7 +101,10 @@ export default function AttendanceScreen() {
 
   return (
     <SafeAreaView className="flex-1 bg-background" edges={['top']}>
-      <ScreenHeader title="Devamsızlık" subtitle={data?.semester} />
+      <ScreenHeader
+        title="Devamsızlık"
+        subtitle={data?.semester ? semesterLabel(data.semester) : undefined}
+      />
 
       {isLoading ? (
         <View className="flex-1 items-center justify-center">
