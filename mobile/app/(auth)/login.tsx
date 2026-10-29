@@ -62,6 +62,13 @@ export default function LoginScreen() {
             return;
           }
 
+          // No answer at all: a wrong address or no network, which a
+          // generic login failure would hide.
+          if (!error.response) {
+            setFormError('Sunucuya ulaşılamadı. İnternet bağlantını kontrol edip tekrar dene.');
+            return;
+          }
+
           // Lockout and deactivated accounts answer INVALID_CREDENTIALS too —
           // the backend does not say which, so an address cannot be probed.
           if (errorData?.error === 'INVALID_CREDENTIALS') {
