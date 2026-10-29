@@ -4,12 +4,14 @@ import (
 	"context"
 	"net/http"
 	"testing"
+	"time"
 
 	"github.com/baaaki/mydreamcampus/enrollment/internal/db"
 	serviceErrors "github.com/baaaki/mydreamcampus/enrollment/internal/errors"
 	"github.com/baaaki/mydreamcampus/shared/contracts"
 	sharedErrors "github.com/baaaki/mydreamcampus/shared/platform/errors"
 	"github.com/baaaki/mydreamcampus/shared/platform/logger"
+	sharedRepo "github.com/baaaki/mydreamcampus/shared/platform/repository"
 	"github.com/baaaki/mydreamcampus/shared/platform/utils"
 	"github.com/google/uuid"
 	"github.com/stretchr/testify/assert"
@@ -102,4 +104,34 @@ func TestApproveEnrollmentProgram_NotPending_Returns409(t *testing.T) {
 
 	require.ErrorIs(t, err, serviceErrors.ErrProgramNotPending)
 	assert.Equal(t, http.StatusConflict, httpStatusOf(t, err))
+}
+
+type openWindow struct{ PeriodStore }
+
+func (openWindow) GetActivePeriodBySemester(_ context.Context, semester string) (*sharedRepo.SimplePeriod, error) {
+	return &sharedRepo.SimplePeriod{Semester: semester, PeriodStart: time.Now().Add(-time.Hour), PeriodEnd: time.Now().Add(time.Hour), IsActive: true}, nil
+}
+
+type approvedProgramStore struct{ EnrollmentStore }
+
+func (approvedProgramStore) GetEnrollmentProgramByStudentAndSemester(context.Context, uuid.UUID, string) (db.EnrollmentProgram, error) {
+	return db.EnrollmentProgram{
+		ID:     utils.UUIDToPgtype(uuid.New()),
+		Status: db.NullEnrollmentStatusEnum{EnrollmentStatusEnum: db.EnrollmentEnrollmentStatusEnumApproved, Valid: true},
+	}, nil
+}
+
+// Withdrawing an approved program answered FORBIDDEN, the code every other
+// refusal uses, while approving it again answered CANNOT_MODIFY_APPROVED.
+func TestCancelMyEnrollment_Approved_RefusedWithItsOwnCode(t *testing.T) {
+	require.NoError(t, logger.Init("test"))
+	svc := &EnrollmentService{enrollmentRepo: approvedProgramStore{}, periodRepo: openWindow{}}
+
+	err := svc.CancelMyEnrollment(context.Background(), uuid.New(), "2026-2027-Spring")
+
+	require.ErrorIs(t, err, serviceErrors.ErrCannotWithdrawApproved)
+	appErr, ok := serviceErrors.MapSentinel(err)
+	require.True(t, ok)
+	assert.Equal(t, "CANNOT_WITHDRAW_APPROVED", appErr.Code)
+	assert.Equal(t, http.StatusForbidden, appErr.HTTPStatus)
 }

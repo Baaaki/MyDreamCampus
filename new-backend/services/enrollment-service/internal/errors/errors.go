@@ -20,11 +20,12 @@ var (
 	ErrStudentNotFound    = errors.New("student not found in cache")
 
 	// Enrollment errors
-	ErrAlreadySubmitted     = errors.New("enrollment program already submitted for this semester")
-	ErrProgramNotFound      = errors.New("enrollment program not found")
-	ErrInvalidStatus        = errors.New("invalid enrollment status")
-	ErrCannotModifyApproved = errors.New("cannot modify approved enrollment program")
-	ErrProgramNotPending    = errors.New("enrollment program is not pending")
+	ErrAlreadySubmitted       = errors.New("enrollment program already submitted for this semester")
+	ErrProgramNotFound        = errors.New("enrollment program not found")
+	ErrInvalidStatus          = errors.New("invalid enrollment status")
+	ErrCannotModifyApproved   = errors.New("cannot modify approved enrollment program")
+	ErrCannotWithdrawApproved = errors.New("cannot withdraw approved enrollment program")
+	ErrProgramNotPending      = errors.New("enrollment program is not pending")
 	// ErrSubmissionConflict: another write to the student's program for the
 	// semester committed between this submission's read and its transaction.
 	ErrSubmissionConflict = errors.New("enrollment program changed during submission")
@@ -69,6 +70,7 @@ var sentinelMapping = []struct {
 	{ErrProgramNotFound, sharedErrors.New("PROGRAM_NOT_FOUND", "Ders kayıt programı bulunamadı", http.StatusNotFound)},
 	{ErrInvalidStatus, sharedErrors.New("INVALID_STATUS", "Geçersiz kayıt durumu", http.StatusBadRequest)},
 	{ErrCannotModifyApproved, sharedErrors.New("CANNOT_MODIFY_APPROVED", "Onaylanmış ders kaydı değiştirilemez", http.StatusForbidden)},
+	{ErrCannotWithdrawApproved, sharedErrors.New("CANNOT_WITHDRAW_APPROVED", "Onaylanmış ders kaydı geri çekilemez", http.StatusForbidden)},
 	{ErrProgramNotPending, sharedErrors.New("PROGRAM_NOT_PENDING", "Ders kayıt programı artık onay beklemiyor", http.StatusConflict)},
 	{ErrSubmissionConflict, sharedErrors.New("SUBMISSION_CONFLICT", "Ders kaydınız aynı anda başka bir işlemle değişti, lütfen sayfayı yenileyip tekrar deneyin", http.StatusConflict)},
 	{ErrCourseFull, sharedErrors.New("COURSE_FULL", "Ders kontenjanı dolu", http.StatusConflict)},

@@ -430,7 +430,7 @@ func (s *EnrollmentService) CancelMyEnrollment(ctx context.Context, studentID uu
 	// Check if already approved - cannot cancel approved enrollments
 	if existingProgram.Status.EnrollmentStatusEnum == db.EnrollmentEnrollmentStatusEnumApproved {
 		serviceLogger.Warn("cannot cancel approved enrollment")
-		return sharedErrors.WrapWithMessage(sharedErrors.ErrForbidden, serviceErrors.ErrCannotModifyApproved, "Onaylanmış ders kaydı iptal edilemez")
+		return serviceErrors.ErrCannotWithdrawApproved
 	}
 
 	// Get courses to decrement enrollments
