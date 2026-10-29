@@ -162,7 +162,9 @@ export default function WeeklyScheduleGrid({
                     <span className="font-semibold text-red-900 dark:text-red-100">
                       {conflict.dayLabel}
                     </span>
-                    <span className="text-red-700 dark:text-red-300">{conflict.timeRange}</span>
+                    <span className="text-red-700 dark:text-red-300">
+                      {conflict.timeRange}
+                    </span>
                     <span className="text-red-600 dark:text-red-400">→</span>
                     <span className="font-bold text-red-900 dark:text-red-100">
                       {conflict.courses.join(" & ")}
@@ -221,7 +223,7 @@ export default function WeeklyScheduleGrid({
                         return (
                           <td
                             key={key}
-                            className="border-2 border-red-500 bg-red-100 p-2 dark:bg-red-900/40 transition-all duration-200"
+                            className="border-2 border-red-500 bg-red-100 p-2 transition-all duration-200 dark:bg-red-900/40"
                           >
                             <div className="flex h-12 flex-col items-center justify-center gap-1">
                               <svg
