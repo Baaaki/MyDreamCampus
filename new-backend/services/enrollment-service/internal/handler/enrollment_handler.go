@@ -131,7 +131,7 @@ func (h *EnrollmentHandler) CreateEnrollmentProgram(c *gin.Context) {
 	var req dto.CreateEnrollmentRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
 		handlerLogger.Error("invalid request body", zap.Error(err))
-		c.JSON(http.StatusBadRequest, gin.H{"error": sharedErrors.ErrValidation.Message})
+		c.JSON(http.StatusBadRequest, gin.H{"error": sharedErrors.ErrValidation.Message, "code": sharedErrors.ErrValidation.Code})
 		return
 	}
 
@@ -457,7 +457,7 @@ func (h *EnrollmentHandler) RejectEnrollmentProgram(c *gin.Context) {
 	var req dto.RejectEnrollmentRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
 		handlerLogger.Error("invalid request body", zap.Error(err))
-		c.JSON(http.StatusBadRequest, gin.H{"error": sharedErrors.ErrValidation.Message})
+		c.JSON(http.StatusBadRequest, gin.H{"error": sharedErrors.ErrValidation.Message, "code": sharedErrors.ErrValidation.Code})
 		return
 	}
 
