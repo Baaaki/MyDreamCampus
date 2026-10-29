@@ -15,7 +15,13 @@ import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
 import { Calendar, User, BookOpen, Clock } from "lucide-react"
 
-export default function EnrollmentPage() {
+// Teachers review their advisees' programs; an admin reviews those of the
+// students no advisor's list holds.
+export default function EnrollmentPage({
+  description = "Danışmanı olduğunuz öğrencilerin ders kayıt taleplerini buradan inceleyebilirsiniz.",
+}: {
+  description?: string
+}) {
   const queryClient = useQueryClient()
   const pendingKey = ["enrollment", "pending"]
   const { data: enrollments = [], isLoading: loading } = useQuery({
@@ -65,10 +71,7 @@ export default function EnrollmentPage() {
         <h1 className="text-3xl font-bold tracking-tight text-gray-900 dark:text-white">
           Ders Kaydı Onaylama
         </h1>
-        <p className="mt-2 text-gray-500 dark:text-gray-400">
-          Danışmanı olduğunuz öğrencilerin ders kayıt taleplerini buradan
-          inceleyebilirsiniz.
-        </p>
+        <p className="mt-2 text-gray-500 dark:text-gray-400">{description}</p>
       </div>
 
       {enrollments.length === 0 ? (

@@ -127,6 +127,12 @@ export function AppRoutes() {
               <Route path="/students" element={<StudentsPage />} />
               <Route path="/students/student" element={<StudentPage />} />
               <Route path="/students/advisors" element={<AdvisorsPage />} />
+              <Route
+                path="/students/enrollment"
+                element={
+                  <TeacherEnrollmentPage description="Danışmanı olmayan öğrencilerin ders kayıt taleplerini buradan inceleyebilirsiniz." />
+                }
+              />
               <Route path="/catalog" element={<CatalogPage />} />
               <Route path="/catalog/add" element={<CatalogAddPage />} />
               <Route path="/catalog/edit" element={<CatalogEditPage />} />

@@ -37,6 +37,7 @@ const navItems: SidebarNavItem[] = [
     children: [
       { label: "Öğrenci Listesi", href: "/students" },
       { label: "Danışman Atamaları", href: "/students/advisors" },
+      { label: "Ders Kaydı Onayları", href: "/students/enrollment" },
       { label: "Öğrenci Profili", href: "/students/student" },
     ],
   },
