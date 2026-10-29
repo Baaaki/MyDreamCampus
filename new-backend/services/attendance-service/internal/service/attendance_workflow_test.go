@@ -199,8 +199,14 @@ func (v attRecordView) CreateAttendanceRecordManual(_ context.Context, p db.Crea
 	return r, nil
 }
 
-func (v attRecordView) GetAttendanceRecordsBySession(context.Context, uuid.UUID) ([]db.GetAttendanceRecordsBySessionRow, error) {
-	return nil, nil
+func (v attRecordView) GetAttendanceRecordsBySession(_ context.Context, sessionID uuid.UUID) ([]db.GetAttendanceRecordsBySessionRow, error) {
+	var out []db.GetAttendanceRecordsBySessionRow
+	for _, r := range v.w.records {
+		if utils.PgUUIDToUUID(r.SessionID) == sessionID {
+			out = append(out, db.GetAttendanceRecordsBySessionRow{ID: r.ID, SessionID: r.SessionID, StudentID: r.StudentID, MarkedVia: r.MarkedVia, SessionType: r.SessionType})
+		}
+	}
+	return out, nil
 }
 
 func (v attRecordView) BatchCreateAttendanceRecordsQR(ctx context.Context, records []db.CreateAttendanceRecordQRParams) error {
@@ -1198,6 +1204,37 @@ func TestFinalizeAttendance_ApprovedLate_NotFailedForEarlierSessions(t *testing.
 	require.NoError(t, err)
 	assert.Empty(t, resp.FailedStudents, "1 of the 1 session held since approval is a pass")
 	assert.Equal(t, 4, resp.Thresholds.TheoryMinRequired, "the course-wide minimum still reads 4 of 5")
+}
+
+// The instructor's page polls every five seconds; a scan waiting for the
+// flusher used to be missing from all three of its reads.
+func TestSessionViews_ScanAwaitingFlush_ShownOnce(t *testing.T) {
+	w, courseID, s := newAttWorld(t)
+	svc := w.service(nil)
+	ctx := context.Background()
+	sessionID := openTheory(t, w, courseID, 1)
+	_, err := svc.ScanQR(ctx, s[0], scanRequest(w, sessionID, time.Now()))
+	require.NoError(t, err)
+
+	check := func(stage string) {
+		records, err := svc.GetSessionRecords(ctx, sessionID, teacherID, false)
+		require.NoError(t, err)
+		require.Len(t, records.Records, 1, stage)
+		assert.Equal(t, s[0], records.Records[0].StudentID, stage)
+		assert.Equal(t, 1, records.PresentCount, stage)
+
+		students, err := svc.GetSessionStudents(ctx, sessionID, teacherID, false, "")
+		require.NoError(t, err)
+		assert.Equal(t, 1, students.MarkedCount, stage)
+
+		details, err := svc.GetSessionDetails(ctx, sessionID, teacherID, false)
+		require.NoError(t, err)
+		assert.Equal(t, 1, details.PresentCount, stage)
+	}
+	check("buffered")
+
+	require.NoError(t, FlushSessionBuffer(ctx, attRecordView{w}, attRedisView{w}, sessionID.String()))
+	check("flushed")
 }
 
 func jsonField(t *testing.T, raw []byte, field string) string {

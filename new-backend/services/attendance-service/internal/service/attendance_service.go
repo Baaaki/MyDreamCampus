@@ -604,6 +604,41 @@ func missedSessions(sessions []db.GetSessionsByCourseRow, attended []db.GetStude
 	return missed
 }
 
+// pendingScans returns the students whose QR scan of the session still
+// waits in the buffer for the flusher, leaving out the recorded ones. The
+// instructor's live page polls every five seconds and the flusher runs as
+// often: read from the database alone, a scan showed up to ten seconds late,
+// long enough for the instructor to mark the student by hand and turn their
+// scan into a manual record. With Redis unreadable they show once flushed.
+func (s *AttendanceService) pendingScans(ctx context.Context, sessionID uuid.UUID, recorded map[uuid.UUID]bool) []uuid.UUID {
+	buffered, err := s.redisService.GetBuffer(ctx, sessionID.String())
+	if err != nil {
+		logger.Warn("failed to read scan buffer for session view",
+			zap.String("session_id", sessionID.String()),
+			zap.Error(err),
+		)
+		return nil
+	}
+	pending := make([]uuid.UUID, 0, len(buffered))
+	for raw := range buffered {
+		studentID, err := uuid.Parse(raw)
+		if err != nil || recorded[studentID] {
+			continue
+		}
+		pending = append(pending, studentID)
+	}
+	sort.Slice(pending, func(i, j int) bool { return pending[i].String() < pending[j].String() })
+	return pending
+}
+
+func idSet(ids []uuid.UUID) map[uuid.UUID]bool {
+	set := make(map[uuid.UUID]bool, len(ids))
+	for _, id := range ids {
+		set[id] = true
+	}
+	return set
+}
+
 // sessionsSince drops the sessions run before the student was enrolled: they
 // could not scan into them, so those are neither held nor missed for them.
 // enrolledAt is NULL for enrollments from the start.
@@ -1096,12 +1131,12 @@ func (s *AttendanceService) GetSessionDetails(ctx context.Context, sessionID, in
 		return dto.GetSessionDetailsResponse{}, err
 	}
 
-	// Get present count
-	presentCount, err := s.attendanceRepo.GetSessionAttendanceCount(ctx, sessionID)
+	marked, err := s.attendanceRepo.GetMarkedStudentsBySession(ctx, sessionID)
 	if err != nil {
-		logger.Error("failed to get attendance count", zap.Error(err))
+		logger.Error("failed to get marked students", zap.Error(err))
 		return dto.GetSessionDetailsResponse{}, err
 	}
+	presentCount := len(marked) + len(s.pendingScans(ctx, sessionID, idSet(marked)))
 
 	totalEnrolled := len(enrolledStudents)
 
@@ -1118,8 +1153,8 @@ func (s *AttendanceService) GetSessionDetails(ctx context.Context, sessionID, in
 		StartedAt:            utils.PgTimestampToTime(session.StartedAt),
 		ExpiresAt:            utils.PgTimestampToTime(session.ExpiresAt),
 		EnrolledStudentCount: totalEnrolled,
-		PresentCount:         int(presentCount),
-		AbsentCount:          totalEnrolled - int(presentCount),
+		PresentCount:         presentCount,
+		AbsentCount:          totalEnrolled - presentCount,
 		QRRotationInterval:   int(qrRotation(session) / time.Second),
 	}, nil
 }
@@ -1142,9 +1177,11 @@ func (s *AttendanceService) GetSessionRecords(ctx context.Context, sessionID, in
 	}
 
 	var items []dto.AttendanceRecordItem
+	recorded := make(map[uuid.UUID]bool, len(records))
 
 	for _, record := range records {
 		studentID := utils.PgUUIDToUUID(record.StudentID)
+		recorded[studentID] = true
 		student, err := s.cacheRepo.GetStudentCacheByID(ctx, studentID)
 		if err != nil {
 			logger.Error("failed to get student info", zap.String("student_id", studentID.String()), zap.Error(err))
@@ -1173,10 +1210,27 @@ func (s *AttendanceService) GetSessionRecords(ctx context.Context, sessionID, in
 		})
 	}
 
+	pending := s.pendingScans(ctx, sessionID, recorded)
+	for _, studentID := range pending {
+		student, err := s.cacheRepo.GetStudentCacheByID(ctx, studentID)
+		if err != nil {
+			logger.Error("failed to get student info", zap.String("student_id", studentID.String()), zap.Error(err))
+			continue
+		}
+		items = append(items, dto.AttendanceRecordItem{
+			// No record yet: the flusher writes it within seconds.
+			ID:            uuid.Nil,
+			StudentID:     studentID,
+			StudentNumber: student.StudentNumber,
+			StudentName:   fmt.Sprintf("%s %s", utils.PgTextToString(student.FirstName), utils.PgTextToString(student.LastName)),
+			MarkedVia:     "qr_scan",
+		})
+	}
+
 	return dto.GetSessionRecordsResponse{
 		SessionID:    sessionID,
 		WeekNumber:   session.WeekNumber,
-		PresentCount: len(records),
+		PresentCount: len(records) + len(pending),
 		Records:      items,
 	}, nil
 }
@@ -1206,8 +1260,8 @@ func (s *AttendanceService) GetSessionStudents(ctx context.Context, sessionID, i
 		return dto.GetSessionStudentsResponse{}, err
 	}
 
-	markedMap := make(map[uuid.UUID]bool)
-	for _, id := range markedStudents {
+	markedMap := idSet(markedStudents)
+	for _, id := range s.pendingScans(ctx, sessionID, markedMap) {
 		markedMap[id] = true
 	}
 
