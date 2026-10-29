@@ -6,7 +6,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { ScreenHeader } from '@/components/ScreenHeader';
 import { Badge, Button, Card, Text } from '@/components/ui';
-import { assessmentLabel, gradePointColor } from '@/constants/grades';
+import { assessmentLabel, formatGradePoint, gradePointColor } from '@/constants/grades';
 import { useTheme } from '@/contexts/ThemeContext';
 import { useMyGrades } from '@/hooks/useGrades';
 import { COLORS } from '@/lib/theme';
@@ -65,7 +65,7 @@ function CompletedCourseCard({ course }: { course: CompletedCourse }) {
         </Text>
       </View>
       <Badge variant={gradePointColor(course.grade_point)}>
-        <Text className="text-sm font-extrabold text-primary-foreground">{course.grade_point}</Text>
+        <Text className="text-sm font-extrabold">{formatGradePoint(course.grade_point)}</Text>
       </Badge>
     </Card>
   );

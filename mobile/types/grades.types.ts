@@ -20,8 +20,10 @@ export interface CompletedCourse {
   semester: string;
   credits: number;
   weighted_average: number;
+  // 4-point coefficient as text, e.g. "2.75".
   grade_point: string;
-  assessment_scores: Record<string, ScoreDetail>;
+  // Final scores only; absent when the transcript row has none.
+  assessment_scores?: Record<string, number>;
 }
 
 export interface MyGradesResponse {

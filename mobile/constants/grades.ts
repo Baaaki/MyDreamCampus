@@ -1,4 +1,4 @@
-// Not sistemi yardimcilari — harf notu renkleri ve degerlendirme etiketleri.
+// Not sistemi yardimcilari — basari katsayisi renkleri ve degerlendirme etiketleri.
 
 export const ASSESSMENT_LABELS: Record<string, string> = {
   midterm: 'Vize',
@@ -16,11 +16,17 @@ export function assessmentLabel(slug: string): string {
   return ASSESSMENT_LABELS[slug] ?? slug.charAt(0).toUpperCase() + slug.slice(1);
 }
 
-// Harf notuna gore renk (mavi/beyaz temaya notr, sadece anlam tasir).
+// grade_point harf notu degil, 4'luk katsayinin metnidir ("2.75"); web'deki
+// gibi: 2.00 ve ustu gecer, 1.00-1.99 sartli gecer, altinda kalir.
 export function gradePointColor(gp: string): 'success' | 'warning' | 'destructive' | 'secondary' {
-  const g = gp.toUpperCase();
-  if (['AA', 'BA', 'BB'].includes(g)) return 'success';
-  if (['CB', 'CC', 'DC'].includes(g)) return 'warning';
-  if (['DD', 'FD', 'FF'].includes(g)) return 'destructive';
-  return 'secondary';
+  const value = parseFloat(gp);
+  if (Number.isNaN(value)) return 'secondary';
+  if (value >= 2) return 'success';
+  if (value >= 1) return 'warning';
+  return 'destructive';
+}
+
+export function formatGradePoint(gp: string): string {
+  const value = parseFloat(gp);
+  return Number.isNaN(value) ? gp : value.toFixed(2);
 }
