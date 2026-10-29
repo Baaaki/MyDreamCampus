@@ -1,0 +1,19 @@
+# Test fixtures, CI-only credentials and legacy docs the weekly full-history
+# scan flags as generic-api-key/jwt. Each line is one exact finding
+# (commit:file:rule:line); a new secret anywhere is still caught.
+1fb4036e19103e318b079434518e7fafd0b59b58:.github/workflows/ci.yml:generic-api-key:130
+1fb4036e19103e318b079434518e7fafd0b59b58:.github/workflows/ci.yml:generic-api-key:131
+1fb4036e19103e318b079434518e7fafd0b59b58:.github/workflows/ci.yml:generic-api-key:132
+2dd38df5aa28d62301a7507b1335847440bdb3d9:new-backend/services/auth-service/internal/service/reset_password_test.go:generic-api-key:22
+472424a8ff83b776a464140388e4cc2a420f804f:new-backend/services/auth-service/internal/service/session_current_test.go:generic-api-key:79
+5424b2346ad9c03f9f91a5b44c94797704ff4e77:legacy-codebase/backend/docs/services/auth-service.md:generic-api-key:295
+5424b2346ad9c03f9f91a5b44c94797704ff4e77:legacy-codebase/backend/docs/services/auth-service.md:generic-api-key:299
+5424b2346ad9c03f9f91a5b44c94797704ff4e77:legacy-codebase/backend/docs/services/auth-service.md:generic-api-key:314
+5424b2346ad9c03f9f91a5b44c94797704ff4e77:legacy-codebase/backend/docs/services/auth-service.md:generic-api-key:388
+5424b2346ad9c03f9f91a5b44c94797704ff4e77:legacy-codebase/backend/docs/services/auth-service.md:generic-api-key:467
+5424b2346ad9c03f9f91a5b44c94797704ff4e77:legacy-codebase/backend/docs/services/auth-service.md:generic-api-key:479
+5424b2346ad9c03f9f91a5b44c94797704ff4e77:legacy-codebase/backend/docs/services/auth-service.md:generic-api-key:518
+5424b2346ad9c03f9f91a5b44c94797704ff4e77:legacy-codebase/backend/docs/services/auth-service.md:generic-api-key:535
+5424b2346ad9c03f9f91a5b44c94797704ff4e77:legacy-codebase/backend/docs/services/payment-service.md:generic-api-key:71
+5424b2346ad9c03f9f91a5b44c94797704ff4e77:legacy-codebase/backend/shared/utils/jwt_test.go:jwt:73
+5424b2346ad9c03f9f91a5b44c94797704ff4e77:new-backend/monolith/internal/platform/utils/jwt_test.go:jwt:73
