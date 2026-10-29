@@ -213,6 +213,10 @@ func (s *AttendanceService) ScanQR(ctx context.Context, studentID uuid.UUID, req
 	if clock.Now().After(utils.PgTimestampToTime(session.ExpiresAt)) {
 		return dto.ScanQRResponse{}, errors.ErrSessionExpired
 	}
+	// Closed by the instructor before it ran out.
+	if !session.IsActive.Bool {
+		return dto.ScanQRResponse{}, errors.ErrSessionNotActive
+	}
 
 	// Semester enforcement: checks hard_deadline + period window
 	if err := s.checkSemesterEnforcement(ctx, session.Semester, false); err != nil {
@@ -1003,7 +1007,9 @@ func (s *AttendanceService) getSessionWithFallback(ctx context.Context, sessionI
 		return db.AttendanceSession{}, fmt.Errorf("invalid session ID: %w", err)
 	}
 	// DB is source of truth; session cache is cleared on close and not rehydrated here.
-	return s.sessionRepo.GetActiveSessionByID(ctx, sessionUUID)
+	// Read open or not: a student who scans late is told the session ended,
+	// not that it does not exist.
+	return s.sessionRepo.GetSessionByID(ctx, sessionUUID)
 }
 
 func (s *AttendanceService) checkEnrollmentWithFallback(ctx context.Context, sessionID string, studentID, courseID uuid.UUID, semester string) (bool, error) {

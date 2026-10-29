@@ -626,7 +626,7 @@ func TestScanQR_Refused(t *testing.T) {
 	assert.Empty(t, w.records)
 }
 
-func TestScanQR_ClosedSession_NotFound(t *testing.T) {
+func TestScanQR_ClosedSession_NotActive(t *testing.T) {
 	w, courseID, students := newAttWorld(t)
 	sessionID := openTheory(t, w, courseID, 1)
 	req := scanRequest(w, sessionID, time.Now())
@@ -635,7 +635,7 @@ func TestScanQR_ClosedSession_NotFound(t *testing.T) {
 
 	_, err = w.service(nil).ScanQR(context.Background(), students[0], req)
 
-	assert.ErrorIs(t, err, attErrors.ErrSessionNotFound)
+	assert.ErrorIs(t, err, attErrors.ErrSessionNotActive, "a late scan hears the session ended, not that it does not exist")
 }
 
 // ---------------------------------------------------------- QR and manual mark
