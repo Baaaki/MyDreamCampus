@@ -75,6 +75,8 @@ function ReservationCard({
   const colors = COLORS[isDark ? 'dark' : 'light'];
   const active = reservation.status === 'confirmed' || reservation.status === 'pending';
   const cancellable = active && !reservation.is_used && isCancellable(reservation.date);
+  // A used reservation stays `confirmed`; only is_used tells it apart.
+  const shownStatus = reservation.is_used ? 'used' : reservation.status;
 
   return (
     <Pressable
@@ -112,9 +114,9 @@ function ReservationCard({
             </Text>
           )}
         </View>
-        <Badge variant={statusVariant(reservation.status)}>
-          <Text className="text-xs font-semibold text-primary-foreground">
-            {STATUS_LABEL[reservation.status] ?? reservation.status}
+        <Badge variant={statusVariant(shownStatus)}>
+          <Text className="text-xs font-semibold">
+            {STATUS_LABEL[shownStatus] ?? shownStatus}
           </Text>
         </Badge>
       </View>
