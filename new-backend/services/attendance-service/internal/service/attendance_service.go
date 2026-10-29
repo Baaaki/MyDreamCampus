@@ -518,6 +518,7 @@ func (s *AttendanceService) GetMyAttendance(ctx context.Context, studentID uuid.
 		if err != nil {
 			return dto.GetMyAttendanceResponse{}, fmt.Errorf("list sessions of course %s: %w", courseID, err)
 		}
+		records = append(records, s.bufferedScans(ctx, studentID, sessions, records)...)
 
 		weeklyRecords := make([]dto.WeeklyAttendanceRecord, 0, len(records))
 		for _, record := range records {
@@ -602,11 +603,52 @@ func missedSessions(sessions []db.GetSessionsByCourseRow, attended []db.GetStude
 	return missed
 }
 
+// bufferedScans returns the student's QR scans of open sessions that still
+// wait in Redis for the flusher, as records: a student who has just scanned
+// sees the session attended at once instead of up to five seconds later, by
+// when the app has already refetched and cached the page without it. With
+// Redis unreadable the scan shows once it is flushed.
+func (s *AttendanceService) bufferedScans(ctx context.Context, studentID uuid.UUID, sessions []db.GetSessionsByCourseRow, recorded []db.GetStudentAttendanceByCourseRow) []db.GetStudentAttendanceByCourseRow {
+	type slot struct {
+		week        int16
+		sessionType db.SessionTypeEnum
+	}
+	have := make(map[slot]bool, len(recorded))
+	for _, r := range recorded {
+		have[slot{r.WeekNumber, r.SessionType}] = true
+	}
+
+	var scans []db.GetStudentAttendanceByCourseRow
+	for _, session := range sessions {
+		if !session.IsActive.Bool || have[slot{session.WeekNumber, session.SessionType}] {
+			continue
+		}
+		sessionID := utils.PgUUIDToUUID(session.ID).String()
+		buffered, err := s.redisService.GetBuffer(ctx, sessionID)
+		if err != nil {
+			logger.Warn("failed to read scan buffer for student attendance",
+				zap.String("session_id", sessionID),
+				zap.Error(err),
+			)
+			continue
+		}
+		if _, ok := buffered[studentID.String()]; ok {
+			scans = append(scans, db.GetStudentAttendanceByCourseRow{
+				WeekNumber:  session.WeekNumber,
+				SessionDate: session.SessionDate,
+				MarkedVia:   "qr_scan",
+				SessionType: session.SessionType,
+			})
+		}
+	}
+	return scans
+}
+
 // heldAndAttended counts a course's sessions of one type and the student's
 // records among them. An open session the student has no record for is left
-// out, as missedSessions leaves it out: a scan waits in Redis for the flusher,
-// and counting the session would show a student who has just scanned one
-// absence short — below the minimum, on a close call.
+// out, as missedSessions leaves it out: the student can still scan into it,
+// and counting it would put them one absence short — below the minimum, on a
+// close call — while class is still going on.
 func heldAndAttended(sessions []db.GetSessionsByCourseRow, attended []db.GetStudentAttendanceByCourseRow, sessionType db.SessionTypeEnum) (held int64, present int) {
 	attendedWeeks := make(map[int16]bool, len(attended))
 	for _, r := range attended {

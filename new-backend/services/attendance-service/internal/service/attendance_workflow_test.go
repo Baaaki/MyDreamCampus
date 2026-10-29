@@ -1077,9 +1077,9 @@ func TestGetMyAttendance_NothingToList_MarshalsEmptyArrays(t *testing.T) {
 }
 
 // Weeks 1-4 are closed and the student missed week 2. Week 5 is open and the
-// student's scan still waits in the buffer: counting that session made the
-// page read 3 of 5, below the minimum of 4, right after a successful scan.
-func TestGetMyAttendance_ScanAwaitingFlush_NotCountedAsAbsence(t *testing.T) {
+// student's scan still waits in the buffer: the page read 3 of 5, below the
+// minimum of 4, right after a successful scan.
+func TestGetMyAttendance_ScanAwaitingFlush_CountedAsAttended(t *testing.T) {
 	w, courseID, s := newAttWorld(t)
 	svc := w.service(nil)
 	ctx := context.Background()
@@ -1097,10 +1097,13 @@ func TestGetMyAttendance_ScanAwaitingFlush_NotCountedAsAbsence(t *testing.T) {
 	require.NoError(t, err)
 	w.myEnrollments = []db.GetStudentEnrollmentsBySemesterRow{{CourseID: utils.UUIDToPgtype(courseID), CourseCode: "FIZ101"}}
 
+	attended := &dto.SessionTypeAttendance{PresentCount: 4, AbsentCount: 1, TotalSessions: 5, MinRequired: 4, Passed: true}
+
 	resp, err := svc.GetMyAttendance(ctx, s[0], semester)
 	require.NoError(t, err)
 	require.Len(t, resp.Courses, 1)
-	assert.Equal(t, &dto.SessionTypeAttendance{PresentCount: 3, AbsentCount: 1, TotalSessions: 4, MinRequired: 3, Passed: true}, resp.Courses[0].Theory)
+	assert.Equal(t, attended, resp.Courses[0].Theory)
+	assert.Len(t, resp.Courses[0].WeeklyRecords, 4, "the buffered scan is listed as attended")
 	assert.Len(t, resp.Courses[0].MissedSessions, 1)
 	assert.Nil(t, resp.Courses[0].Lab, "no lab session was held")
 
@@ -1108,10 +1111,17 @@ func TestGetMyAttendance_ScanAwaitingFlush_NotCountedAsAbsence(t *testing.T) {
 	require.NoError(t, err)
 	assert.Equal(t, 4, other.Courses[0].Theory.TotalSessions, "a student who has not scanned yet is not marked absent while it is open")
 
+	w.redisDown = true
+	resp, err = svc.GetMyAttendance(ctx, s[0], semester)
+	require.NoError(t, err)
+	assert.Equal(t, &dto.SessionTypeAttendance{PresentCount: 3, AbsentCount: 1, TotalSessions: 4, MinRequired: 3, Passed: true}, resp.Courses[0].Theory,
+		"without the buffer the open session waits for the flush")
+	w.redisDown = false
+
 	require.NoError(t, FlushSessionBuffer(ctx, attRecordView{w}, attRedisView{w}, open.String()))
 	resp, err = svc.GetMyAttendance(ctx, s[0], semester)
 	require.NoError(t, err)
-	assert.Equal(t, &dto.SessionTypeAttendance{PresentCount: 4, AbsentCount: 1, TotalSessions: 5, MinRequired: 4, Passed: true}, resp.Courses[0].Theory)
+	assert.Equal(t, attended, resp.Courses[0].Theory, "counted once after the flush")
 	assert.Len(t, resp.Courses[0].WeeklyRecords, 4)
 }
 
