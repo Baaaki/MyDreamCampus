@@ -9,14 +9,17 @@ import { Badge, Button, Card, Text } from '@/components/ui';
 import { formatDateLongTR } from '@/constants/datetime';
 import { useTheme } from '@/contexts/ThemeContext';
 import { useMyAttendance } from '@/hooks/useAttendance';
+import { sessionRows, type SessionRow } from '@/lib/attendance';
 import { COLORS } from '@/lib/theme';
-import type {
-  AttendanceStats,
-  CourseAttendance,
-  WeeklyRecord,
-} from '@/types/attendance.types';
+import type { AttendanceStats, CourseAttendance, WeeklyRecord } from '@/types/attendance.types';
 
 const SESSION_LABEL = { theory: 'Teori', lab: 'Lab' } as const;
+
+// Shown only when someone other than the QR marked the student present.
+const MARKED_BY_LABEL: Partial<Record<WeeklyRecord['marked_via'], string>> = {
+  manual: 'hoca işaretledi',
+  admin: 'yönetici işaretledi',
+};
 
 function StatsRow({ label, stats }: { label: string; stats: AttendanceStats }) {
   return (
@@ -35,19 +38,28 @@ function StatsRow({ label, stats }: { label: string; stats: AttendanceStats }) {
   );
 }
 
-function RecordRow({ record }: { record: WeeklyRecord }) {
+function SessionRowItem({ row }: { row: SessionRow }) {
+  const markedBy = row.attended ? MARKED_BY_LABEL[row.marked_via] : undefined;
   return (
-    <View className="flex-row items-center justify-between py-1">
-      <Text className="text-sm text-muted-foreground">
-        {record.week}. hafta · {SESSION_LABEL[record.session_type] ?? record.session_type}
-      </Text>
-      <Text className="font-mono text-xs text-foreground">{formatDateLongTR(record.date)}</Text>
+    <View className="flex-row items-center justify-between py-1.5">
+      <View className="flex-1 pr-3">
+        <Text className="text-sm text-foreground">
+          {row.week}. hafta · {SESSION_LABEL[row.session_type] ?? row.session_type}
+        </Text>
+        <Text className="font-mono text-xs text-muted-foreground">
+          {formatDateLongTR(row.date)}
+          {markedBy ? ` · ${markedBy}` : ''}
+        </Text>
+      </View>
+      <Badge variant={row.attended ? 'success' : 'destructive'}>
+        <Text className="text-xs font-semibold">{row.attended ? 'Katıldın' : 'Katılmadın'}</Text>
+      </Badge>
     </View>
   );
 }
 
 function CourseCard({ course }: { course: CourseAttendance }) {
-  const records = course.weekly_records ?? [];
+  const rows = sessionRows(course);
   return (
     <Card className="mb-3 p-4">
       <Text className="text-base font-bold text-card-foreground" numberOfLines={2}>
@@ -65,14 +77,14 @@ function CourseCard({ course }: { course: CourseAttendance }) {
 
       <View className="mt-2 border-t border-border pt-2">
         <Text className="mb-1 font-mono text-xs uppercase tracking-widest text-muted-foreground">
-          Haftalık kayıtlar
+          Oturumlar
         </Text>
-        {records.length > 0 ? (
-          records.map((record) => (
-            <RecordRow key={`${record.week}-${record.session_type}`} record={record} />
-          ))
+        {rows.length > 0 ? (
+          rows.map((row) => <SessionRowItem key={`${row.week}-${row.session_type}`} row={row} />)
         ) : (
-          <Text className="py-1 text-sm text-muted-foreground">Henüz yoklama kaydın yok.</Text>
+          <Text className="py-1 text-sm text-muted-foreground">
+            Bu derste henüz yoklama alınmadı.
+          </Text>
         )}
       </View>
     </Card>

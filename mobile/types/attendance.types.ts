@@ -33,8 +33,16 @@ export interface WeeklyRecord {
   week: number;
   session_type: 'theory' | 'lab';
   date: string;
-  marked_via: 'qr' | 'manual';
+  marked_via: 'qr_scan' | 'manual' | 'admin';
   note?: string;
+}
+
+// A session the course held without the student on its roll. An open session
+// is never listed: the student can still scan into it.
+export interface MissedSession {
+  week: number;
+  session_type: 'theory' | 'lab';
+  date: string;
 }
 
 export interface CourseAttendance {
@@ -47,6 +55,7 @@ export interface CourseAttendance {
   theory?: AttendanceStats;
   lab?: AttendanceStats;
   weekly_records: WeeklyRecord[];
+  missed_sessions: MissedSession[];
 }
 
 export interface MyAttendanceResponse {
