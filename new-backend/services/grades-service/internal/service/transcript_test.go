@@ -6,6 +6,7 @@ import (
 	"math/rand/v2"
 	"slices"
 	"testing"
+	"time"
 
 	"github.com/baaaki/mydreamcampus/grades/internal/db"
 	gradeErrors "github.com/baaaki/mydreamcampus/grades/internal/errors"
@@ -132,4 +133,16 @@ func TestGetTranscript_Semesters_ReturnedInChronologicalOrder(t *testing.T) {
 		}
 		require.Equal(t, []string{"2025-2026 Güz", "2025-2026 Bahar", "2026-2027 Güz", "2026-2027 Bahar"}, got)
 	}
+}
+
+// generated_at was never set and every transcript claimed to be from year 1.
+func TestGetTranscript_StampsWhenItWasGenerated(t *testing.T) {
+	w, courseID := newGradesWorld(t)
+	reg := w.enroll(courseID, "1", 90, 90, false)
+	svc := &StudentGradesService{cacheRepo: cacheView{w}, registrationRepo: regView{w: w}, scoreRepo: scoreView{w: w}, completedRepo: completedView{w: w}}
+
+	tr, err := svc.GetTranscript(context.Background(), uuid.New(), "admin", reg.StudentID)
+
+	require.NoError(t, err)
+	assert.WithinDuration(t, time.Now(), tr.GeneratedAt, time.Minute)
 }

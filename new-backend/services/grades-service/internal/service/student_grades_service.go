@@ -14,6 +14,7 @@ import (
 	"github.com/baaaki/mydreamcampus/grades/internal/errors"
 	"github.com/baaaki/mydreamcampus/grades/internal/repository"
 	"github.com/baaaki/mydreamcampus/shared/contracts"
+	"github.com/baaaki/mydreamcampus/shared/platform/clock"
 	"github.com/baaaki/mydreamcampus/shared/platform/logger"
 	"github.com/baaaki/mydreamcampus/shared/platform/utils"
 	"github.com/google/uuid"
@@ -253,6 +254,7 @@ func (s *StudentGradesService) GetTranscript(ctx context.Context, requesterID uu
 			TotalCredits:  int(totalCredits),
 			CumulativeGPA: gpa,
 		},
+		GeneratedAt: clock.Now(),
 	}, nil
 }
 
