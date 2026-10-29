@@ -46,7 +46,7 @@ func serveOpenSemesters(t *testing.T, periods service.PeriodStore, userID string
 	gin.SetMode(gin.TestMode)
 	_ = logger.Init("test")
 
-	h := NewEnrollmentHandler(service.NewEnrollmentService(&stubProgramStore{}, nil, nil, nil, periods))
+	h := NewEnrollmentHandler(service.NewEnrollmentService(&stubProgramStore{}, nil, nil, nil, periods, nil))
 	router := gin.New()
 	router.GET("/open-semesters", func(c *gin.Context) {
 		if userID != "" {

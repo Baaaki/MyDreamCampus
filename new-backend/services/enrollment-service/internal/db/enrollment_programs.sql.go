@@ -188,6 +188,31 @@ func (q *Queries) LockPendingProgram(ctx context.Context, id pgtype.UUID) (Enrol
 	return i, err
 }
 
+const lockProgramInStatus = `-- name: LockProgramInStatus :one
+SELECT id, student_id, semester, status, created_at
+FROM enrollment.enrollment_programs
+WHERE id = $1 AND status = $2
+FOR UPDATE
+`
+
+type LockProgramInStatusParams struct {
+	ID     pgtype.UUID              `json:"id"`
+	Status NullEnrollmentStatusEnum `json:"status"`
+}
+
+func (q *Queries) LockProgramInStatus(ctx context.Context, arg LockProgramInStatusParams) (EnrollmentProgram, error) {
+	row := q.db.QueryRow(ctx, lockProgramInStatus, arg.ID, arg.Status)
+	var i EnrollmentProgram
+	err := row.Scan(
+		&i.ID,
+		&i.StudentID,
+		&i.Semester,
+		&i.Status,
+		&i.CreatedAt,
+	)
+	return i, err
+}
+
 const updateProgramStatus = `-- name: UpdateProgramStatus :one
 UPDATE enrollment.enrollment_programs
 SET status = $2

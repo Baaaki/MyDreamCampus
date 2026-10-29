@@ -48,13 +48,14 @@ func New(
 	studentClient service.StudentClient,
 	courseCatalogClient service.CourseCatalogClient,
 	periodRepo *platformRepo.SimplePeriodRepository,
+	activityClients []service.SemesterActivityClient,
 ) *Module {
 	enrollmentRepo := repository.NewEnrollmentRepository(pool)
 	outboxRepo := repository.NewOutboxRepository(pool)
 	processedEventsRepo := repository.NewProcessedEventsRepository(pool)
 	passedPrereqRepo := repository.NewPassedPrerequisitesRepository(pool)
 
-	enrollmentSvc := service.NewEnrollmentService(enrollmentRepo, passedPrereqRepo, studentClient, courseCatalogClient, periodRepo)
+	enrollmentSvc := service.NewEnrollmentService(enrollmentRepo, passedPrereqRepo, studentClient, courseCatalogClient, periodRepo, activityClients)
 
 	return &Module{
 		pool:                pool,

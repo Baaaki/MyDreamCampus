@@ -192,3 +192,32 @@ func TestHTTPCourseCatalogClient_GetCoursesByIDs_NotFoundWrapsLikeInProcess(t *t
 	assert.Contains(t, err.Error(), "course not found")
 	assert.ErrorIs(t, err, client.ErrNotFound)
 }
+
+func TestHTTPSemesterActivityClient_HasSemesterActivity_ReadsTheAnswer(t *testing.T) {
+	id := uuid.New()
+	var gotPath, gotSemester string
+	c := NewHTTPSemesterActivityClient(newTestBase(t, func(w http.ResponseWriter, r *http.Request) {
+		gotPath, gotSemester = r.URL.Path, r.URL.Query().Get("semester")
+		_ = json.NewEncoder(w).Encode(contracts.SemesterActivity{HasActivity: true})
+	}))
+
+	has, err := c.HasSemesterActivity(context.Background(), id, "2026-2027-Spring")
+	require.NoError(t, err)
+
+	assert.True(t, has)
+	assert.Equal(t, "/internal/students/"+id.String()+"/semester-activity", gotPath)
+	assert.Equal(t, "2026-2027-Spring", gotSemester)
+}
+
+// A peer that cannot answer must not read as "no records": that would let
+// a program with attendance behind it change.
+func TestHTTPSemesterActivityClient_ServerError_IsAnError(t *testing.T) {
+	c := NewHTTPSemesterActivityClient(newTestBase(t, func(w http.ResponseWriter, _ *http.Request) {
+		w.WriteHeader(http.StatusInternalServerError)
+	}))
+
+	has, err := c.HasSemesterActivity(context.Background(), uuid.New(), "2026-2027-Spring")
+
+	require.ErrorIs(t, err, client.ErrUnavailable)
+	assert.False(t, has)
+}

@@ -24,6 +24,14 @@ type CourseCatalogClient interface {
 	GetCoursesByIDs(ctx context.Context, semester string, ids []uuid.UUID) ([]contracts.SemesterCourseResponse, error)
 }
 
+// SemesterActivityClient asks a service that keeps a student's records for a
+// semester whether there already is one. Attendance and grades serve it: an
+// approved program reached both, and changing it must not orphan an
+// attendance record or a score.
+type SemesterActivityClient interface {
+	HasSemesterActivity(ctx context.Context, studentID uuid.UUID, semester string) (bool, error)
+}
+
 // upstreamError maps a failed call to student or catalog. A peer that cannot
 // answer (down, 5xx, open breaker) is a 503 the caller may retry: the request
 // itself was fine, so neither the 404 nor the 500 it used to surface as fits.

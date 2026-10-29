@@ -45,7 +45,7 @@ type ServerConfig struct {
 // with a shared secret, one entry per target.
 type InternalClientConfig struct {
 	// ServiceURLs is keyed by target name (staff, student, catalog,
-	// payment, meal).
+	// payment, meal, attendance, grades).
 	ServiceURLs    map[string]string
 	TimeoutSeconds int `mapstructure:"INTERNAL_CLIENT_TIMEOUT_SECONDS"`
 	Breaker        CircuitBreakerConfig
@@ -246,6 +246,9 @@ func Load() (*Config, error) {
 				"catalog": viper.GetString("CATALOG_SERVICE_URL"),
 				"payment": viper.GetString("PAYMENT_SERVICE_URL"),
 				"meal":    viper.GetString("MEAL_SERVICE_URL"),
+				// Enrollment asks both before an approved program changes.
+				"attendance": viper.GetString("ATTENDANCE_SERVICE_URL"),
+				"grades":     viper.GetString("GRADES_SERVICE_URL"),
 			},
 			TimeoutSeconds: viper.GetInt("INTERNAL_CLIENT_TIMEOUT_SECONDS"),
 			Breaker: CircuitBreakerConfig{

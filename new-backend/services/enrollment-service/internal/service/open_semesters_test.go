@@ -128,7 +128,7 @@ func TestGetOpenSemesters_UsesServiceClockAndStudentPrograms(t *testing.T) {
 		activePeriod("2025-2026-Spring", testNow.AddDate(0, 0, -1), testNow.AddDate(0, 0, 6)),
 	}}
 	store := &programsByStudentStore{programs: []db.EnrollmentProgram{{Semester: "2025-2026-Fall"}}}
-	svc := NewEnrollmentService(store, nil, nil, nil, periods)
+	svc := NewEnrollmentService(store, nil, nil, nil, periods, nil)
 
 	got, err := svc.GetOpenSemesters(context.Background(), uuid.New())
 
@@ -144,7 +144,7 @@ func TestGetOpenSemesters_UsesServiceClockAndStudentPrograms(t *testing.T) {
 
 func TestGetOpenSemesters_PeriodStoreFails_ReturnsInternal(t *testing.T) {
 	initTestLogger(t)
-	svc := NewEnrollmentService(&programsByStudentStore{}, nil, nil, nil, &fakePeriodStore{err: errors.New("db down")})
+	svc := NewEnrollmentService(&programsByStudentStore{}, nil, nil, nil, &fakePeriodStore{err: errors.New("db down")}, nil)
 
 	_, err := svc.GetOpenSemesters(context.Background(), uuid.New())
 

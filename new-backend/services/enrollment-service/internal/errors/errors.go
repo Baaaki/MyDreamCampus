@@ -20,12 +20,16 @@ var (
 	ErrStudentNotFound    = errors.New("student not found in cache")
 
 	// Enrollment errors
-	ErrAlreadySubmitted       = errors.New("enrollment program already submitted for this semester")
-	ErrProgramNotFound        = errors.New("enrollment program not found")
-	ErrInvalidStatus          = errors.New("invalid enrollment status")
-	ErrCannotModifyApproved   = errors.New("cannot modify approved enrollment program")
+	ErrProgramNotFound      = errors.New("enrollment program not found")
+	ErrInvalidStatus        = errors.New("invalid enrollment status")
+	ErrCannotModifyApproved = errors.New("cannot modify approved enrollment program")
+	// ErrCannotWithdrawApproved: an approved program is changed by sending a
+	// new selection while the window is open, never withdrawn outright.
 	ErrCannotWithdrawApproved = errors.New("cannot withdraw approved enrollment program")
-	ErrProgramNotPending      = errors.New("enrollment program is not pending")
+	// ErrApprovedProgramInUse: the semester already has an attendance record
+	// or a score for the student, which changing the program would orphan.
+	ErrApprovedProgramInUse = errors.New("approved enrollment program already has attendance or grades")
+	ErrProgramNotPending    = errors.New("enrollment program is not pending")
 	// ErrSubmissionConflict: another write to the student's program for the
 	// semester committed between this submission's read and its transaction.
 	ErrSubmissionConflict = errors.New("enrollment program changed during submission")
@@ -66,11 +70,11 @@ var sentinelMapping = []struct {
 }{
 	{ErrStudentDeactivated, sharedErrors.New("STUDENT_DEACTIVATED", "Öğrenci hesabı devre dışı", http.StatusForbidden)},
 	{ErrStudentNotFound, sharedErrors.New("STUDENT_NOT_FOUND", "Öğrenci bulunamadı", http.StatusNotFound)},
-	{ErrAlreadySubmitted, sharedErrors.New("ALREADY_SUBMITTED", "Bu dönem için ders kaydı zaten yapılmış", http.StatusConflict)},
 	{ErrProgramNotFound, sharedErrors.New("PROGRAM_NOT_FOUND", "Ders kayıt programı bulunamadı", http.StatusNotFound)},
 	{ErrInvalidStatus, sharedErrors.New("INVALID_STATUS", "Geçersiz kayıt durumu", http.StatusBadRequest)},
 	{ErrCannotModifyApproved, sharedErrors.New("CANNOT_MODIFY_APPROVED", "Onaylanmış ders kaydı değiştirilemez", http.StatusForbidden)},
-	{ErrCannotWithdrawApproved, sharedErrors.New("CANNOT_WITHDRAW_APPROVED", "Onaylanmış ders kaydı geri çekilemez", http.StatusForbidden)},
+	{ErrCannotWithdrawApproved, sharedErrors.New("CANNOT_WITHDRAW_APPROVED", "Onaylanmış ders kaydı geri çekilemez; değiştirmek için yeni ders seçimini gönder", http.StatusForbidden)},
+	{ErrApprovedProgramInUse, sharedErrors.New("APPROVED_PROGRAM_IN_USE", "Bu dönemin derslerinde yoklama veya not kaydınız olduğu için onaylanmış ders kaydınız değiştirilemez", http.StatusConflict)},
 	{ErrProgramNotPending, sharedErrors.New("PROGRAM_NOT_PENDING", "Ders kayıt programı artık onay beklemiyor", http.StatusConflict)},
 	{ErrSubmissionConflict, sharedErrors.New("SUBMISSION_CONFLICT", "Ders kaydınız aynı anda başka bir işlemle değişti, lütfen sayfayı yenileyip tekrar deneyin", http.StatusConflict)},
 	{ErrCourseFull, sharedErrors.New("COURSE_FULL", "Ders kontenjanı dolu", http.StatusConflict)},

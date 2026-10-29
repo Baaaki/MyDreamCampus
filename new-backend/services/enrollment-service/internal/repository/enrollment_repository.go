@@ -42,10 +42,11 @@ type ProgramCourseSnapshot struct {
 	MaxCapacity int16
 }
 
-// ProgramReplacement is the pending program a submission supersedes and the
-// cancelled event that announces it.
+// ProgramReplacement is the program a submission supersedes, the status it
+// was read in, and the cancelled event that announces it.
 type ProgramReplacement struct {
 	ProgramID    uuid.UUID
+	Status       db.EnrollmentStatusEnum
 	EventPayload map[string]any
 }
 
@@ -67,7 +68,7 @@ func courseLockIDs(courses []ProgramCourseSnapshot) []int64 {
 }
 
 // CreateProgramWithCoursesAndEvent creates enrollment program, courses and
-// outbox event atomically. With replace set, the student's pending program
+// outbox event atomically. With replace set, the student's current program
 // goes in the same transaction: a new selection that fails here — a course
 // filled up meanwhile — leaves the old one standing instead of leaving the
 // student with nothing.
@@ -88,7 +89,7 @@ func (r *EnrollmentRepository) CreateProgramWithCoursesAndEvent(
 	qtx := r.queries.WithTx(tx)
 
 	if replace != nil {
-		if err := supersedePendingProgram(ctx, qtx, *replace); err != nil {
+		if err := supersedeProgram(ctx, qtx, *replace); err != nil {
 			return db.EnrollmentProgram{}, err
 		}
 	}
@@ -157,13 +158,18 @@ func (r *EnrollmentRepository) CreateProgramWithCoursesAndEvent(
 	return program, nil
 }
 
-// supersedePendingProgram deletes the program a submission replaces and
-// writes its cancelled event, inside the submission's transaction. That event
-// and the new program's submitted event share the transaction's timestamp, so
-// their relay order is undefined; nothing consumes them in order today.
-func supersedePendingProgram(ctx context.Context, qtx *db.Queries, replace ProgramReplacement) error {
+// supersedeProgram deletes the program a submission replaces and writes its
+// cancelled event, inside the submission's transaction. That event and the
+// new program's submitted event share the transaction's timestamp, so their
+// relay order is undefined; nothing consumes them in order today. Attendance
+// and grades consume the cancelled one, and match it to their rows by
+// program id rather than by arrival order.
+func supersedeProgram(ctx context.Context, qtx *db.Queries, replace ProgramReplacement) error {
 	id := utils.UUIDToPgtype(replace.ProgramID)
-	if _, err := qtx.LockPendingProgram(ctx, id); err != nil {
+	if _, err := qtx.LockProgramInStatus(ctx, db.LockProgramInStatusParams{
+		ID:     id,
+		Status: db.NullEnrollmentStatusEnum{EnrollmentStatusEnum: replace.Status, Valid: true},
+	}); err != nil {
 		if errors.Is(err, pgx.ErrNoRows) {
 			// Approved, rejected or already replaced since the caller read it.
 			return serviceErrors.ErrSubmissionConflict

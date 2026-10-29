@@ -44,6 +44,12 @@ FROM enrollment.enrollment_programs
 WHERE id = $1 AND status = 'pending'
 FOR UPDATE;
 
+-- name: LockProgramInStatus :one
+SELECT id, student_id, semester, status, created_at
+FROM enrollment.enrollment_programs
+WHERE id = $1 AND status = $2
+FOR UPDATE;
+
 -- name: DeleteEnrollmentProgram :exec
 DELETE FROM enrollment.enrollment_programs
 WHERE id = $1;

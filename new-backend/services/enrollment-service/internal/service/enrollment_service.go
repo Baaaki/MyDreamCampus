@@ -56,6 +56,9 @@ type EnrollmentService struct {
 	studentClient       StudentClient
 	courseCatalogClient CourseCatalogClient
 	periodRepo          PeriodStore
+	// activityClients are the services an approved program reached
+	// (attendance, grades), asked before it may change.
+	activityClients []SemesterActivityClient
 }
 
 func NewEnrollmentService(
@@ -64,6 +67,7 @@ func NewEnrollmentService(
 	studentClient StudentClient,
 	courseCatalogClient CourseCatalogClient,
 	periodRepo PeriodStore,
+	activityClients []SemesterActivityClient,
 ) *EnrollmentService {
 	return &EnrollmentService{
 		enrollmentRepo:      enrollmentRepo,
@@ -71,6 +75,7 @@ func NewEnrollmentService(
 		studentClient:       studentClient,
 		courseCatalogClient: courseCatalogClient,
 		periodRepo:          periodRepo,
+		activityClients:     activityClients,
 	}
 }
 
@@ -208,24 +213,28 @@ func (s *EnrollmentService) CreateEnrollmentProgram(ctx context.Context, req dto
 		return dto.EnrollmentProgramResponse{}, sharedErrors.Wrap(sharedErrors.ErrInternal, err)
 	}
 
-	// A pending program is replaced by the new selection, but only once that
-	// selection has passed every check below, and in the same transaction
-	// that creates it. Deleting it here, up front, cost the student their
-	// program whenever the new one failed a check.
+	// The program the student already has is replaced by the new selection,
+	// but only once that selection has passed every check below, and in the
+	// same transaction that creates it. Deleting it here, up front, cost the
+	// student their program whenever the new one failed a check. An approved
+	// one may change too while the window is open (checked above): the new
+	// selection goes back to the advisor, and attendance and grades drop the
+	// old courses on its cancelled event.
 	var replace *repository.ProgramReplacement
 	if existingProgram.ID.Valid {
-		if existingProgram.Status.EnrollmentStatusEnum != db.EnrollmentEnrollmentStatusEnumPending {
-			serviceLogger.Warn("student already has an approved program for this semester",
-				zap.String("existing_status", string(existingProgram.Status.EnrollmentStatusEnum)),
-			)
-			return dto.EnrollmentProgramResponse{}, serviceErrors.ErrAlreadySubmitted
+		if existingProgram.Status.EnrollmentStatusEnum == db.EnrollmentEnrollmentStatusEnumApproved {
+			if err := s.checkNoSemesterActivity(ctx, req.StudentID, req.Semester); err != nil {
+				serviceLogger.Warn("approved program cannot change", zap.Error(err))
+				return dto.EnrollmentProgramResponse{}, err
+			}
 		}
-		replace, err = s.pendingProgramReplacement(ctx, existingProgram, req)
+		replace, err = s.programReplacement(ctx, existingProgram, req)
 		if err != nil {
 			return dto.EnrollmentProgramResponse{}, sharedErrors.Wrap(sharedErrors.ErrInternal, err)
 		}
-		serviceLogger.Info("new selection will replace the pending program",
+		serviceLogger.Info("new selection will replace the current program",
 			zap.String("old_program_id", replace.ProgramID.String()),
+			zap.String("old_status", string(replace.Status)),
 		)
 	}
 
@@ -308,9 +317,27 @@ func (s *EnrollmentService) checkPrerequisites(ctx context.Context, studentID uu
 	return nil
 }
 
-// pendingProgramReplacement describes the pending program a submission will
-// supersede, with the cancelled event that announces it.
-func (s *EnrollmentService) pendingProgramReplacement(ctx context.Context, existing db.EnrollmentProgram, req dto.CreateEnrollmentRequest) (*repository.ProgramReplacement, error) {
+// checkNoSemesterActivity refuses to change an approved program once the
+// student has an attendance record or a score in the semester: the change
+// takes the student off every course until the advisor approves again, and
+// those records would be left behind. A peer that cannot answer is a 503,
+// never a yes.
+func (s *EnrollmentService) checkNoSemesterActivity(ctx context.Context, studentID uuid.UUID, semester string) error {
+	for _, activity := range s.activityClients {
+		has, err := activity.HasSemesterActivity(ctx, studentID, semester)
+		if err != nil {
+			return upstreamError(err)
+		}
+		if has {
+			return serviceErrors.ErrApprovedProgramInUse
+		}
+	}
+	return nil
+}
+
+// programReplacement describes the program a submission will supersede,
+// with the cancelled event that announces it.
+func (s *EnrollmentService) programReplacement(ctx context.Context, existing db.EnrollmentProgram, req dto.CreateEnrollmentRequest) (*repository.ProgramReplacement, error) {
 	programID := utils.PgtypeToUUID(existing.ID)
 	rows, err := s.enrollmentRepo.GetCoursesByProgramID(ctx, programID)
 	if err != nil {
@@ -322,6 +349,7 @@ func (s *EnrollmentService) pendingProgramReplacement(ctx context.Context, exist
 	}
 	return &repository.ProgramReplacement{
 		ProgramID: programID,
+		Status:    existing.Status.EnrollmentStatusEnum,
 		EventPayload: buildEnrollmentCancelledPayload(EnrollmentCancelledInputs{
 			ProgramID:   programID,
 			StudentID:   req.StudentID,

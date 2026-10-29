@@ -35,6 +35,12 @@ func main() {
 		service.NewHTTPStudentClient(rt.InternalClient("student")),
 		service.NewHTTPCourseCatalogClient(rt.InternalClient("catalog")),
 		periodRepo,
+		// An approved program reached both; either may hold a record that
+		// changing it would orphan.
+		[]service.SemesterActivityClient{
+			service.NewHTTPSemesterActivityClient(rt.InternalClient("attendance")),
+			service.NewHTTPSemesterActivityClient(rt.InternalClient("grades")),
+		},
 	)
 	if err := module.Bootstrap(rt.Ctx); err != nil {
 		logger.Fatal("failed to bootstrap enrollment module", zap.Error(err))

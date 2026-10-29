@@ -22,7 +22,7 @@ func TestEnrollmentAppErrors(t *testing.T) {
 func TestEnrollmentSentinelErrors_DistinctMessages(t *testing.T) {
 	all := []error{
 		ErrStudentDeactivated, ErrStudentNotFound,
-		ErrAlreadySubmitted, ErrProgramNotFound, ErrInvalidStatus, ErrCannotModifyApproved, ErrCannotWithdrawApproved, ErrProgramNotPending,
+		ErrProgramNotFound, ErrInvalidStatus, ErrCannotModifyApproved, ErrCannotWithdrawApproved, ErrApprovedProgramInUse, ErrProgramNotPending,
 		ErrSubmissionConflict,
 		ErrCourseFull, ErrCourseNotFound, ErrInvalidDepartment, ErrInvalidClassLevel,
 		ErrPrerequisitesNotMet, ErrPrerequisiteNotFound,
@@ -42,8 +42,8 @@ func TestSentinels_AreNotAppErrors(t *testing.T) {
 	// Distinguishing sentinel errors from AppError matters for the
 	// service-layer error handling — the service wraps sentinels via
 	// sharedErrors.Wrap or maps them to specific AppErrors.
-	_, ok := sharedErrors.As(ErrAlreadySubmitted)
-	assert.False(t, ok, "ErrAlreadySubmitted should be a plain sentinel, not AppError")
+	_, ok := sharedErrors.As(ErrProgramNotFound)
+	assert.False(t, ok, "ErrProgramNotFound should be a plain sentinel, not AppError")
 }
 
 func TestMaxCoursesPerEnrollment_SaneLimit(t *testing.T) {

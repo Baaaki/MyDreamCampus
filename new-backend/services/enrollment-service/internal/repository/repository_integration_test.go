@@ -41,7 +41,7 @@ func resubmit(repo *EnrollmentRepository, student uuid.UUID, replace *ProgramRep
 }
 
 func replacing(program db.EnrollmentProgram) *ProgramReplacement {
-	return &ProgramReplacement{ProgramID: utils.PgtypeToUUID(program.ID), EventPayload: map[string]any{}}
+	return &ProgramReplacement{ProgramID: utils.PgtypeToUUID(program.ID), Status: db.EnrollmentEnrollmentStatusEnumPending, EventPayload: map[string]any{}}
 }
 
 func course(capacity int16) ProgramCourseSnapshot {

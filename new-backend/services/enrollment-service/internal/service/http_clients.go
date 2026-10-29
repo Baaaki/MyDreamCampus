@@ -136,5 +136,26 @@ func (c *HTTPCourseCatalogClient) GetCoursesByIDs(ctx context.Context, semester 
 	return res, nil
 }
 
+// HTTPSemesterActivityClient implements SemesterActivityClient over internal
+// REST; attendance and grades serve the same route and contract.
+type HTTPSemesterActivityClient struct {
+	base *client.Base
+}
+
+func NewHTTPSemesterActivityClient(base *client.Base) *HTTPSemesterActivityClient {
+	return &HTTPSemesterActivityClient{base: base}
+}
+
+func (c *HTTPSemesterActivityClient) HasSemesterActivity(ctx context.Context, studentID uuid.UUID, semester string) (bool, error) {
+	query := url.Values{"semester": {semester}}.Encode()
+
+	var resp contracts.SemesterActivity
+	if err := c.base.Get(ctx, "/internal/students/"+url.PathEscape(studentID.String())+"/semester-activity?"+query, &resp); err != nil {
+		return false, err
+	}
+	return resp.HasActivity, nil
+}
+
 var _ StudentClient = (*HTTPStudentClient)(nil)
 var _ CourseCatalogClient = (*HTTPCourseCatalogClient)(nil)
+var _ SemesterActivityClient = (*HTTPSemesterActivityClient)(nil)
