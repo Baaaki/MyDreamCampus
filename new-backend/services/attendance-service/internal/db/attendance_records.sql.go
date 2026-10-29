@@ -632,3 +632,22 @@ func (q *Queries) GetTotalSessionsByCourseAndType(ctx context.Context, arg GetTo
 	err := row.Scan(&total_sessions)
 	return total_sessions, err
 }
+
+const studentHasRecordsInSemester = `-- name: StudentHasRecordsInSemester :one
+SELECT EXISTS (
+    SELECT 1 FROM attendance.attendance_records
+    WHERE student_id = $1 AND semester = $2
+)
+`
+
+type StudentHasRecordsInSemesterParams struct {
+	StudentID pgtype.UUID `json:"student_id"`
+	Semester  string      `json:"semester"`
+}
+
+func (q *Queries) StudentHasRecordsInSemester(ctx context.Context, arg StudentHasRecordsInSemesterParams) (bool, error) {
+	row := q.db.QueryRow(ctx, studentHasRecordsInSemester, arg.StudentID, arg.Semester)
+	var exists bool
+	err := row.Scan(&exists)
+	return exists, err
+}

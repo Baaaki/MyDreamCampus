@@ -42,6 +42,7 @@ type attendanceStore interface {
 	GetStudentAttendanceByCourse(ctx context.Context, studentID, courseID uuid.UUID, semester string) ([]db.GetStudentAttendanceByCourseRow, error)
 	GetTotalSessionsByCourseAndType(ctx context.Context, courseID uuid.UUID, semester string, sessionType db.SessionTypeEnum) (int64, error)
 	GetCourseAttendanceByStudentAndType(ctx context.Context, courseID uuid.UUID, semester string, sessionType db.SessionTypeEnum) ([]db.GetCourseAttendanceByStudentAndTypeRow, error)
+	StudentHasRecordsInSemester(ctx context.Context, studentID uuid.UUID, semester string) (bool, error)
 }
 
 type finalizationStore interface {

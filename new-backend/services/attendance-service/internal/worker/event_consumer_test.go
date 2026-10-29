@@ -17,6 +17,10 @@ type fakeCacheWriter struct {
 	failFor    map[uuid.UUID]error
 	created    []uuid.UUID
 	enrolledAt []time.Time
+	programIDs []uuid.UUID
+
+	deletedProgram uuid.UUID
+	deletedCourses []uuid.UUID
 }
 
 func (f *fakeCacheWriter) UpsertStudentCache(context.Context, db.UpsertStudentCacheParams) error {
@@ -29,13 +33,20 @@ func (f *fakeCacheWriter) UpsertCourseCache(context.Context, db.UpsertCourseCach
 	return nil
 }
 
-func (f *fakeCacheWriter) CreateEnrollmentCache(_ context.Context, _, courseID uuid.UUID, _ string, enrolledAt time.Time) error {
+func (f *fakeCacheWriter) CreateEnrollmentCache(_ context.Context, programID, _, courseID uuid.UUID, _ string, enrolledAt time.Time) error {
 	if err := f.failFor[courseID]; err != nil {
 		return err
 	}
 	f.created = append(f.created, courseID)
 	f.enrolledAt = append(f.enrolledAt, enrolledAt)
+	f.programIDs = append(f.programIDs, programID)
 	return nil
+}
+
+func (f *fakeCacheWriter) DeleteProgramEnrollments(_ context.Context, programID, _ uuid.UUID, courseIDs []uuid.UUID) (int64, error) {
+	f.deletedProgram = programID
+	f.deletedCourses = courseIDs
+	return int64(len(courseIDs)), nil
 }
 
 type fakeProcessedEvents struct {
@@ -58,6 +69,11 @@ var approvedAt = time.Date(2026, 10, 29, 9, 30, 0, 0, time.UTC)
 // the outbox worker.
 func programApprovedBody(t *testing.T, eventID uuid.UUID, courseIDs []uuid.UUID) []byte {
 	t.Helper()
+	return programApprovedBodyFor(t, eventID, uuid.New(), courseIDs)
+}
+
+func programApprovedBodyFor(t *testing.T, eventID, programID uuid.UUID, courseIDs []uuid.UUID) []byte {
+	t.Helper()
 	ids := make([]string, len(courseIDs))
 	for i, id := range courseIDs {
 		ids[i] = id.String()
@@ -69,7 +85,7 @@ func programApprovedBody(t *testing.T, eventID uuid.UUID, courseIDs []uuid.UUID)
 			"event_id":   eventID.String(),
 			"event_type": "enrollment.program.approved",
 			"data": map[string]any{
-				"program_id":  uuid.New().String(),
+				"program_id":  programID.String(),
 				"student_id":  uuid.New().String(),
 				"semester":    "2025-2026-Fall",
 				"course_ids":  ids,
@@ -104,12 +120,41 @@ func TestHandleEnrollmentProgramApproved_AllCoursesSucceed_MarksProcessed(t *tes
 	cache := &fakeCacheWriter{}
 	events := &fakeProcessedEvents{}
 	w := newTestEventConsumer(t, cache, events)
-	eventID := uuid.New()
+	eventID, programID := uuid.New(), uuid.New()
 
-	err := w.handleMessage(t.Context(), programApprovedBody(t, eventID, courses))
+	err := w.handleMessage(t.Context(), programApprovedBodyFor(t, eventID, programID, courses))
 
 	require.NoError(t, err)
 	assert.Equal(t, courses, cache.created)
 	assert.Equal(t, []time.Time{approvedAt, approvedAt}, cache.enrolledAt, "the student is held to sessions from the approval on")
+	assert.Equal(t, []uuid.UUID{programID, programID}, cache.programIDs, "the rows must name their program, or its cancel cannot find them")
+	assert.Equal(t, []uuid.UUID{eventID}, events.marked)
+}
+
+// The cancelled payload is flat under the envelope's data, one level less
+// than approved's: reading it as approved's shape found no program at all.
+func TestHandleEnrollmentProgramCancelled_RemovesThatProgramsCourses(t *testing.T) {
+	courses := []uuid.UUID{uuid.New(), uuid.New()}
+	cache := &fakeCacheWriter{}
+	events := &fakeProcessedEvents{}
+	w := newTestEventConsumer(t, cache, events)
+	eventID, programID := uuid.New(), uuid.New()
+
+	body := mustMarshal(t, map[string]any{
+		"event_id":   eventID.String(),
+		"event_type": "enrollment.program.cancelled",
+		"data": map[string]any{
+			"program_id":   programID.String(),
+			"student_id":   uuid.New().String(),
+			"semester":     "2026-2027-Spring",
+			"course_ids":   []string{courses[0].String(), courses[1].String()},
+			"cancelled_by": "student",
+			"cancel_type":  "auto_replace",
+		},
+	})
+
+	require.NoError(t, w.handleMessage(t.Context(), body))
+	assert.Equal(t, programID, cache.deletedProgram)
+	assert.Equal(t, courses, cache.deletedCourses)
 	assert.Equal(t, []uuid.UUID{eventID}, events.marked)
 }

@@ -30,6 +30,8 @@ func main() {
 		{Queue: worker.QueueSyncEvents, Exchange: "student.events", RoutingKey: "student.deactivated"},
 		{Queue: worker.QueueSyncEvents, Exchange: "course_catalog.events", RoutingKey: "course.semester.created"},
 		{Queue: worker.QueueSyncEvents, Exchange: "enrollment.events", RoutingKey: "enrollment.program.approved"},
+		// A withdrawn or replaced program comes off the roster again.
+		{Queue: worker.QueueSyncEvents, Exchange: "enrollment.events", RoutingKey: "enrollment.program.cancelled"},
 		{Queue: worker.QueuePeriodEvents, Exchange: "course_catalog.events",
 			RoutingKey: events.PeriodEventRoutingPattern(platformRepo.PeriodTypeAttendance)},
 	})

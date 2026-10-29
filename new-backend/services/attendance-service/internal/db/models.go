@@ -168,6 +168,7 @@ type EnrollmentView struct {
 	Semester   string           `json:"semester"`
 	SyncedAt   pgtype.Timestamp `json:"synced_at"`
 	EnrolledAt pgtype.Timestamp `json:"enrolled_at"`
+	ProgramID  pgtype.UUID      `json:"program_id"`
 }
 
 type OutboxEvent struct {

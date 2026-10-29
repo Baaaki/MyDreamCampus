@@ -170,3 +170,9 @@ WHERE course_id = $1 AND semester = $2 AND session_type = $3;
 SELECT COUNT(*) as present_count
 FROM attendance.attendance_records
 WHERE student_id = $1 AND course_id = $2 AND semester = $3 AND session_type = $4;
+
+-- name: StudentHasRecordsInSemester :one
+SELECT EXISTS (
+    SELECT 1 FROM attendance.attendance_records
+    WHERE student_id = $1 AND semester = $2
+);

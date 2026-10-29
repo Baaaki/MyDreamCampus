@@ -143,3 +143,14 @@ func (m *Module) RegisterRoutes(rg *gin.RouterGroup) {
 		protected.GET("/admin/sessions", platformMiddleware.RequireAdmin(), m.attendanceHandler.AdminListSessions)
 	}
 }
+
+// RegisterPublicRoutes mounts the internal read enrollment performs. It sits
+// at the root rather than under /api because Caddy only proxies /api; the
+// secret check stays behind that as the second line of defence.
+func (m *Module) RegisterPublicRoutes(r *gin.Engine) {
+	internal := r.Group("/internal")
+	internal.Use(platformMiddleware.RequireInternalSecret(m.cfg.Server.InternalSecret))
+	{
+		internal.GET("/students/:id/semester-activity", m.attendanceHandler.GetSemesterActivity)
+	}
+}

@@ -26,7 +26,8 @@ type cacheWriter interface {
 	UpsertStudentCache(ctx context.Context, student db.UpsertStudentCacheParams) error
 	DeactivateStudentCache(ctx context.Context, studentID uuid.UUID) error
 	UpsertCourseCache(ctx context.Context, course db.UpsertCourseCacheParams) error
-	CreateEnrollmentCache(ctx context.Context, studentID, courseID uuid.UUID, semester string, enrolledAt time.Time) error
+	CreateEnrollmentCache(ctx context.Context, programID, studentID, courseID uuid.UUID, semester string, enrolledAt time.Time) error
+	DeleteProgramEnrollments(ctx context.Context, programID, studentID uuid.UUID, courseIDs []uuid.UUID) (int64, error)
 }
 
 type processedEvents interface {
@@ -125,6 +126,8 @@ func (w *EventConsumer) handleMessage(ctx context.Context, body []byte) error {
 		return w.handleCourseSemesterCreated(ctx, body, eventID)
 	case "enrollment.program.approved":
 		return w.handleEnrollmentProgramApproved(ctx, body, eventID)
+	case "enrollment.program.cancelled":
+		return w.handleEnrollmentProgramCancelled(ctx, body, eventID)
 	default:
 		log.Warn("unknown event type", zap.String("type", event.EventType))
 		// Mark as processed anyway to avoid reprocessing
@@ -310,6 +313,7 @@ func (w *EventConsumer) handleEnrollmentProgramApproved(ctx context.Context, bod
 	for _, courseID := range eventData.CourseIDs {
 		err := w.cacheRepo.CreateEnrollmentCache(
 			ctx,
+			eventData.ProgramID,
 			eventData.StudentID,
 			courseID,
 			eventData.Semester,
@@ -350,4 +354,39 @@ func (w *EventConsumer) handleEnrollmentProgramApproved(ctx context.Context, bod
 	}
 
 	return w.eventRepo.MarkEventProcessed(ctx, eventID, "enrollment.program.approved")
+}
+
+// handleEnrollmentProgramCancelled takes the student off the courses of a
+// program that was withdrawn or replaced by a new submission. Most such
+// programs were still pending and never reached the roster, so removing
+// nothing is the usual outcome. An approved one changed in the window
+// leaves the roster until its replacement is approved.
+func (w *EventConsumer) handleEnrollmentProgramCancelled(ctx context.Context, body []byte, eventID uuid.UUID) error {
+	log := logger.WithContextAndFields(ctx,
+		zap.String("worker", "EventConsumer"),
+		zap.String("method", "handleEnrollmentProgramCancelled"),
+	)
+
+	// Unlike approved, the cancelled payload is flat: envelope.data.
+	eventData, err := unwrapEventData[dto.EnrollmentProgramCancelledEventData](body)
+	if err != nil {
+		return err
+	}
+
+	removed, err := w.cacheRepo.DeleteProgramEnrollments(ctx, eventData.ProgramID, eventData.StudentID, eventData.CourseIDs)
+	if err != nil {
+		log.Error("failed to remove cancelled program's enrollments",
+			zap.String("program_id", eventData.ProgramID.String()),
+			zap.Error(err),
+		)
+		return err
+	}
+
+	log.Info("cancelled program's enrollments removed",
+		zap.String("program_id", eventData.ProgramID.String()),
+		zap.String("student_id", eventData.StudentID.String()),
+		zap.Int64("removed", removed),
+	)
+
+	return w.eventRepo.MarkEventProcessed(ctx, eventID, "enrollment.program.cancelled")
 }

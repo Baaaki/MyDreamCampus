@@ -52,7 +52,7 @@ func (a *attendanceDB) enrollAt(t *testing.T, number string, enrolledAt time.Tim
 	require.NoError(t, a.cache.UpsertStudentCache(ctx, db.UpsertStudentCacheParams{
 		ID: utils.UUIDToPgtype(id), StudentNumber: number, IsActive: pgtype.Bool{Bool: true, Valid: true},
 	}))
-	require.NoError(t, a.cache.CreateEnrollmentCache(ctx, id, a.course, fall, enrolledAt))
+	require.NoError(t, a.cache.CreateEnrollmentCache(ctx, uuid.New(), id, a.course, fall, enrolledAt))
 	return id
 }
 
@@ -202,6 +202,58 @@ func TestCourseAttendanceByStudentAndType_HeldSinceEnrollment(t *testing.T) {
 		got[utils.PgtypeToUUID(r.StudentID)] = [2]int64{r.HeldCount, r.PresentCount}
 	}
 	assert.Equal(t, map[uuid.UUID][2]int64{early: {4, 4}, late: {1, 1}}, got, "held, present — the lab session is not counted")
+}
+
+// A changed approved program is cancelled and its replacement approved;
+// the two events can be consumed in either order. Approved first must not
+// let the cancel take the course both programs share off the roster.
+func TestDeleteProgramEnrollments_OnlyTheCancelledProgramsRows(t *testing.T) {
+	a := newAttendanceDB(t)
+	ctx := context.Background()
+	student := a.enroll(t, "1")
+	other := uuid.New()
+	require.NoError(t, a.cache.UpsertCourseCache(ctx, db.UpsertCourseCacheParams{
+		ID: utils.UUIDToPgtype(other), CourseCode: "BLM102", CourseName: "Veri Yapıları", Credits: 4,
+		Semester: fall, InstructorID: utils.UUIDToPgtype(uuid.New()),
+	}))
+	oldProgram, newProgram := uuid.New(), uuid.New()
+	// enroll wrote the shared course under a random program: take it over
+	// the way the old program's approval would have.
+	require.NoError(t, a.cache.CreateEnrollmentCache(ctx, oldProgram, student, a.course, fall, time.Time{}))
+	require.NoError(t, a.cache.CreateEnrollmentCache(ctx, oldProgram, student, other, fall, time.Time{}))
+
+	// The new program keeps a.course and drops other; its approval lands first.
+	approvedAt := time.Now().UTC().Truncate(time.Microsecond)
+	require.NoError(t, a.cache.CreateEnrollmentCache(ctx, newProgram, student, a.course, fall, approvedAt))
+	removed, err := a.cache.DeleteProgramEnrollments(ctx, oldProgram, student, []uuid.UUID{a.course, other})
+
+	require.NoError(t, err)
+	assert.Equal(t, int64(1), removed)
+	rows, err := a.cache.GetStudentEnrollmentsBySemester(ctx, student, fall)
+	require.NoError(t, err)
+	require.Len(t, rows, 1)
+	assert.Equal(t, a.course, utils.PgtypeToUUID(rows[0].CourseID))
+	assert.Equal(t, approvedAt, rows[0].EnrolledAt.Time, "the replacement's approval time holds")
+}
+
+func TestStudentHasRecordsInSemester_OnlyThatSemester(t *testing.T) {
+	a := newAttendanceDB(t)
+	ctx := context.Background()
+	student, idle := a.enroll(t, "1"), a.enroll(t, "2")
+	s := a.session(t, 1, db.AttendanceSessionTypeEnumTheory)
+	require.NoError(t, a.attendance.BatchCreateAttendanceRecordsQR(ctx, []db.CreateAttendanceRecordQRParams{
+		a.scan(s, student, 1, db.AttendanceSessionTypeEnumTheory, 0),
+	}))
+
+	for _, tc := range []struct {
+		student  uuid.UUID
+		semester string
+		want     bool
+	}{{student, fall, true}, {student, "2026-2027-Spring", false}, {idle, fall, false}} {
+		got, err := a.attendance.StudentHasRecordsInSemester(ctx, tc.student, tc.semester)
+		require.NoError(t, err)
+		assert.Equal(t, tc.want, got, tc.semester)
+	}
 }
 
 // The finalization record and its events commit together, and the primary

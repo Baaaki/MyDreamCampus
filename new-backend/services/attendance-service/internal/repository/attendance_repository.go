@@ -146,3 +146,10 @@ func (r *AttendanceRepository) GetStudentPresentCountByType(ctx context.Context,
 		SessionType: sessionType,
 	})
 }
+
+func (r *AttendanceRepository) StudentHasRecordsInSemester(ctx context.Context, studentID uuid.UUID, semester string) (bool, error) {
+	return r.queries.StudentHasRecordsInSemester(ctx, db.StudentHasRecordsInSemesterParams{
+		StudentID: utils.UUIDToPgUUID(studentID),
+		Semester:  semester,
+	})
+}

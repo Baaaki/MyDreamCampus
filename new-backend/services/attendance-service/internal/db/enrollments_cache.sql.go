@@ -31,9 +31,12 @@ func (q *Queries) CheckEnrollment(ctx context.Context, arg CheckEnrollmentParams
 }
 
 const createEnrollmentCache = `-- name: CreateEnrollmentCache :exec
-INSERT INTO attendance.enrollments_view (student_id, course_id, semester, enrolled_at)
-VALUES ($1, $2, $3, $4)
-ON CONFLICT (student_id, course_id) DO NOTHING
+INSERT INTO attendance.enrollments_view (student_id, course_id, semester, enrolled_at, program_id)
+VALUES ($1, $2, $3, $4, $5)
+ON CONFLICT (student_id, course_id) DO UPDATE
+SET semester = EXCLUDED.semester,
+    enrolled_at = EXCLUDED.enrolled_at,
+    program_id = EXCLUDED.program_id
 `
 
 type CreateEnrollmentCacheParams struct {
@@ -41,16 +44,42 @@ type CreateEnrollmentCacheParams struct {
 	CourseID   pgtype.UUID      `json:"course_id"`
 	Semester   string           `json:"semester"`
 	EnrolledAt pgtype.Timestamp `json:"enrolled_at"`
+	ProgramID  pgtype.UUID      `json:"program_id"`
 }
 
+// A row that is still there belongs to an earlier program of the same
+// student whose cancelled event has not been consumed yet: the new program
+// takes it over, so that event no longer removes the course.
 func (q *Queries) CreateEnrollmentCache(ctx context.Context, arg CreateEnrollmentCacheParams) error {
 	_, err := q.db.Exec(ctx, createEnrollmentCache,
 		arg.StudentID,
 		arg.CourseID,
 		arg.Semester,
 		arg.EnrolledAt,
+		arg.ProgramID,
 	)
 	return err
+}
+
+const deleteProgramEnrollments = `-- name: DeleteProgramEnrollments :execrows
+DELETE FROM attendance.enrollments_view
+WHERE student_id = $1
+  AND course_id = ANY($2::uuid[])
+  AND (program_id = $3 OR program_id IS NULL)
+`
+
+type DeleteProgramEnrollmentsParams struct {
+	StudentID pgtype.UUID   `json:"student_id"`
+	CourseIds []pgtype.UUID `json:"course_ids"`
+	ProgramID pgtype.UUID   `json:"program_id"`
+}
+
+func (q *Queries) DeleteProgramEnrollments(ctx context.Context, arg DeleteProgramEnrollmentsParams) (int64, error) {
+	result, err := q.db.Exec(ctx, deleteProgramEnrollments, arg.StudentID, arg.CourseIds, arg.ProgramID)
+	if err != nil {
+		return 0, err
+	}
+	return result.RowsAffected(), nil
 }
 
 const getEnrolledStudentsByCourse = `-- name: GetEnrolledStudentsByCourse :many

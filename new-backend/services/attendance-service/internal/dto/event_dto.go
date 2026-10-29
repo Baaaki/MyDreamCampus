@@ -73,6 +73,16 @@ type EnrollmentProgramApprovedEventData struct {
 	ApprovedAt time.Time   `json:"approved_at"`
 }
 
+// EnrollmentProgramCancelledEventData is consumed from enrollment service:
+// a program withdrawn by the student or replaced by a new submission. Flat
+// under the envelope's data, unlike the approved event.
+type EnrollmentProgramCancelledEventData struct {
+	ProgramID uuid.UUID   `json:"program_id"`
+	StudentID uuid.UUID   `json:"student_id"`
+	Semester  string      `json:"semester"`
+	CourseIDs []uuid.UUID `json:"course_ids"`
+}
+
 // =======================================
 // PUBLISHED EVENTS
 // =======================================

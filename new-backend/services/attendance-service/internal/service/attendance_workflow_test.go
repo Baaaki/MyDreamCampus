@@ -251,6 +251,15 @@ func (v attRecordView) GetStudentAttendanceByCourse(_ context.Context, studentID
 	return out, nil
 }
 
+func (v attRecordView) StudentHasRecordsInSemester(_ context.Context, studentID uuid.UUID, semester string) (bool, error) {
+	for _, r := range v.w.records {
+		if utils.PgUUIDToUUID(r.StudentID) == studentID && r.Semester == semester {
+			return true, nil
+		}
+	}
+	return false, nil
+}
+
 func (v attRecordView) GetTotalSessionsByCourseAndType(_ context.Context, courseID uuid.UUID, semester string, st db.SessionTypeEnum) (int64, error) {
 	if v.w.failSessionTotals {
 		return 0, errors.New("connection reset")
@@ -1272,4 +1281,24 @@ func TestCreateSession_SessionDate_IsCampusLocalDay(t *testing.T) {
 			assert.Equal(t, tc.want, stored.Format("2006-01-02"), "pgx encodes the date from its calendar fields")
 		})
 	}
+}
+
+// Enrollment asks this before a student changes an approved program: a
+// student marked present once must not have the course pulled from under
+// that record.
+func TestGetSemesterActivity_TrueOnceTheStudentHasARecord(t *testing.T) {
+	w, courseID, students := newAttWorld(t)
+	closeTheory(t, w, courseID, 1, time.Now().Add(-time.Hour), students[0])
+	svc := w.service(nil)
+
+	marked, err := svc.GetSemesterActivity(context.Background(), students[0], semester)
+	require.NoError(t, err)
+	absent, err := svc.GetSemesterActivity(context.Background(), students[1], semester)
+	require.NoError(t, err)
+	otherTerm, err := svc.GetSemesterActivity(context.Background(), students[0], "2026-2027-Spring")
+	require.NoError(t, err)
+
+	assert.True(t, marked.HasActivity)
+	assert.False(t, absent.HasActivity, "an absence leaves no record")
+	assert.False(t, otherTerm.HasActivity)
 }

@@ -46,9 +46,10 @@ func (r *CacheRepository) GetCourseCacheByID(ctx context.Context, courseID uuid.
 }
 
 // Enrollment cache operations
-// CreateEnrollmentCache records that the student takes the course since
-// enrolledAt; a zero enrolledAt (an event without it) means from the start.
-func (r *CacheRepository) CreateEnrollmentCache(ctx context.Context, studentID, courseID uuid.UUID, semester string, enrolledAt time.Time) error {
+// CreateEnrollmentCache records that the student takes the course under
+// programID since enrolledAt; a zero enrolledAt (an event without it) means
+// from the start.
+func (r *CacheRepository) CreateEnrollmentCache(ctx context.Context, programID, studentID, courseID uuid.UUID, semester string, enrolledAt time.Time) error {
 	since := pgtype.Timestamp{}
 	if !enrolledAt.IsZero() {
 		// Stored as UTC like started_at, which it is compared with.
@@ -59,6 +60,21 @@ func (r *CacheRepository) CreateEnrollmentCache(ctx context.Context, studentID, 
 		CourseID:   utils.UUIDToPgUUID(courseID),
 		Semester:   semester,
 		EnrolledAt: since,
+		ProgramID:  utils.UUIDToPgUUID(programID),
+	})
+}
+
+// DeleteProgramEnrollments takes the student off the courses of a program
+// that was withdrawn or replaced, and returns how many rows it removed.
+func (r *CacheRepository) DeleteProgramEnrollments(ctx context.Context, programID, studentID uuid.UUID, courseIDs []uuid.UUID) (int64, error) {
+	ids := make([]pgtype.UUID, len(courseIDs))
+	for i, id := range courseIDs {
+		ids[i] = utils.UUIDToPgUUID(id)
+	}
+	return r.queries.DeleteProgramEnrollments(ctx, db.DeleteProgramEnrollmentsParams{
+		StudentID: utils.UUIDToPgUUID(studentID),
+		CourseIds: ids,
+		ProgramID: utils.UUIDToPgUUID(programID),
 	})
 }
 

@@ -14,6 +14,7 @@ import (
 	"github.com/baaaki/mydreamcampus/attendance/internal/errors"
 	"github.com/baaaki/mydreamcampus/attendance/internal/repository"
 	"github.com/baaaki/mydreamcampus/shared/client"
+	"github.com/baaaki/mydreamcampus/shared/contracts"
 	"github.com/baaaki/mydreamcampus/shared/events"
 	"github.com/baaaki/mydreamcampus/shared/platform/clock"
 	"github.com/baaaki/mydreamcampus/shared/platform/logger"
@@ -1400,4 +1401,15 @@ func (s *AttendanceService) checkSemesterEnforcement(ctx context.Context, semest
 	}
 
 	return nil
+}
+
+// GetSemesterActivity tells enrollment whether the student already has an
+// attendance record in the semester. Taking their approved program back
+// would leave those records off any roster.
+func (s *AttendanceService) GetSemesterActivity(ctx context.Context, studentID uuid.UUID, semester string) (contracts.SemesterActivity, error) {
+	has, err := s.attendanceRepo.StudentHasRecordsInSemester(ctx, studentID, semester)
+	if err != nil {
+		return contracts.SemesterActivity{}, fmt.Errorf("read student's semester records: %w", err)
+	}
+	return contracts.SemesterActivity{HasActivity: has}, nil
 }
