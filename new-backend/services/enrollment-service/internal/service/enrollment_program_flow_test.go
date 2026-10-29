@@ -7,6 +7,7 @@ import (
 	"testing"
 
 	"github.com/baaaki/mydreamcampus/enrollment/internal/db"
+	"github.com/baaaki/mydreamcampus/enrollment/internal/dto"
 
 	serviceErrors "github.com/baaaki/mydreamcampus/enrollment/internal/errors"
 	"github.com/baaaki/mydreamcampus/shared/contracts"
@@ -106,6 +107,18 @@ func (m *mockEnrollmentStore) GetPendingProgramsByStudentIDs(ctx context.Context
 	for _, p := range m.programs {
 		sid := utils.PgtypeToUUID(p.StudentID)
 		if idSet[sid] && p.Status.EnrollmentStatusEnum == db.EnrollmentEnrollmentStatusEnumPending {
+			res = append(res, p)
+		}
+	}
+	return res, nil
+}
+
+func (m *mockEnrollmentStore) GetEnrollmentProgramsByStudent(ctx context.Context, studentID uuid.UUID, semester *string, status *string) ([]db.EnrollmentProgram, error) {
+	m.mu.RLock()
+	defer m.mu.RUnlock()
+	var res []db.EnrollmentProgram
+	for _, p := range m.programs {
+		if utils.PgtypeToUUID(p.StudentID) == studentID {
 			res = append(res, p)
 		}
 	}
@@ -363,6 +376,42 @@ func TestRejectEnrollmentProgram_AlreadyApproved(t *testing.T) {
 
 	err := svc.RejectEnrollmentProgram(ctx, programID, advisorID, "Dr. Ali", "Sebep")
 	require.ErrorIs(t, err, serviceErrors.ErrCannotModifyApproved)
+}
+
+// The student's schedule screens list each course with its instructor; the
+// catalog answer that carried the sessions carried the name too, and it was
+// dropped.
+func TestGetMyEnrollments_CatalogAnswers_CourseCarriesInstructorAndSessions(t *testing.T) {
+	initTestLogger(t)
+	studentID, programID, courseID := uuid.New(), uuid.New(), uuid.New()
+	store := newMockEnrollmentStore()
+	store.programs[programID] = db.EnrollmentProgram{
+		ID: utils.UUIDToPgtype(programID), StudentID: utils.UUIDToPgtype(studentID), Semester: "2026-2027-Fall",
+		Status: db.NullEnrollmentStatusEnum{EnrollmentStatusEnum: db.EnrollmentEnrollmentStatusEnumApproved, Valid: true},
+	}
+	store.coursesByProg[programID] = []db.EnrollmentProgramCourse{
+		{CourseID: utils.UUIDToPgtype(courseID), CourseCode: "CENG301", CourseName: "İşletim Sistemleri", Credits: 3},
+	}
+	catalog := &mockCourseCatalogClient{coursesByIDs: []contracts.SemesterCourseResponse{{
+		ID: courseID, InstructorFullname: "Ahmet Yılmaz",
+		ScheduleSessions: []contracts.ScheduleSession{{DayOfWeek: "wednesday", SlotNumbers: []int16{1, 2}, SessionType: "theory"}},
+	}}}
+	svc := &EnrollmentService{enrollmentRepo: store, courseCatalogClient: catalog}
+
+	resp, err := svc.GetMyEnrollments(context.Background(), studentID, nil, nil)
+	require.NoError(t, err)
+	require.Len(t, resp.Programs, 1)
+	require.Len(t, resp.Programs[0].Courses, 1)
+	course := resp.Programs[0].Courses[0]
+	assert.Equal(t, "Ahmet Yılmaz", course.InstructorName)
+	assert.Equal(t, []dto.ScheduleSession{{DayOfWeek: "wednesday", SlotNumbers: []int{1, 2}, SessionType: "theory"}}, course.ScheduleSessions)
+
+	// Without the catalog the program still lists its courses.
+	catalog.getByIDsErr = errors.New("catalog down")
+	resp, err = svc.GetMyEnrollments(context.Background(), studentID, nil, nil)
+	require.NoError(t, err)
+	assert.Empty(t, resp.Programs[0].Courses[0].InstructorName)
+	assertSessionsMarshalEmpty(t, resp.Programs[0].Courses[0].ScheduleSessions)
 }
 
 func TestGetPendingProgramsByAdvisor(t *testing.T) {

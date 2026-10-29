@@ -59,9 +59,9 @@ func (s *EnrollmentService) GetMyEnrollments(ctx context.Context, studentID uuid
 		}
 
 		// Create a map for quick lookup
-		catalogMap := make(map[uuid.UUID][]contracts.ScheduleSession)
+		catalogMap := make(map[uuid.UUID]contracts.SemesterCourseResponse, len(coursesFromCatalog))
 		for _, c := range coursesFromCatalog {
-			catalogMap[c.ID] = c.ScheduleSessions
+			catalogMap[c.ID] = c
 		}
 
 		coursesDTO := make([]dto.CourseBasic, 0, len(coursesRows))
@@ -73,7 +73,8 @@ func (s *EnrollmentService) GetMyEnrollments(ctx context.Context, studentID uuid
 				CourseCode:       row.CourseCode,
 				CourseName:       row.CourseName,
 				Credits:          row.Credits,
-				ScheduleSessions: toScheduleSessions(catalogMap[cID]),
+				InstructorName:   catalogMap[cID].InstructorFullname,
+				ScheduleSessions: toScheduleSessions(catalogMap[cID].ScheduleSessions),
 			})
 		}
 
