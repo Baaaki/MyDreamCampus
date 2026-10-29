@@ -575,6 +575,29 @@ func (s *StudentService) ListAdviseesPage(ctx context.Context, advisorID uuid.UU
 	}, nil
 }
 
+// orphanedPageSize is how many advisor-less students one query fetches when
+// all of them are wanted at once.
+const orphanedPageSize = 500
+
+// ListStudentsWithoutAdvisor returns every active student with no advisor,
+// for enrollment: nobody's advisee list holds them, so the admin decides on
+// their programs.
+func (s *StudentService) ListStudentsWithoutAdvisor(ctx context.Context) ([]dto.StudentResponse, error) {
+	out := make([]dto.StudentResponse, 0)
+	for offset := int32(0); ; offset += orphanedPageSize {
+		students, _, err := s.studentRepo.ListOrphanedStudents(ctx, orphanedPageSize, offset)
+		if err != nil {
+			return nil, sharedErrors.Wrap(sharedErrors.ErrInternal, err)
+		}
+		for _, student := range students {
+			out = append(out, s.toStudentResponse(student))
+		}
+		if len(students) < orphanedPageSize {
+			return out, nil
+		}
+	}
+}
+
 // ListOrphanedStudents lists students without advisor
 func (s *StudentService) ListOrphanedStudents(ctx context.Context, query dto.PaginationQuery) (dto.OrphanedStudentsResponse, error) {
 	limit := utils.ClampToInt32(query.Limit)

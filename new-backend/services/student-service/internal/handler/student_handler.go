@@ -408,7 +408,8 @@ func (h *StudentHandler) GetMyAdvisees(c *gin.Context) {
 }
 
 // ListStudentsByAdvisor serves GET /internal/students?advisor_id=X for
-// service-to-service reads. Unlike GetMyAdvisees the advisor comes from the
+// service-to-service reads, and ?without_advisor=true for the students no
+// advisor is assigned to. Unlike GetMyAdvisees the advisor comes from the
 // query string, so this handler must stay behind RequireInternalSecret —
 // on a user-facing route it would be an IDOR.
 func (h *StudentHandler) ListStudentsByAdvisor(c *gin.Context) {
@@ -419,6 +420,20 @@ func (h *StudentHandler) ListStudentsByAdvisor(c *gin.Context) {
 		zap.String("handler", "StudentHandler"),
 		zap.String("method", "ListStudentsByAdvisor"),
 	)
+
+	if c.Query("without_advisor") == "true" {
+		students, err := h.service.ListStudentsWithoutAdvisor(ctx)
+		if err != nil {
+			reqLogger.Error("failed to list students without advisor", zap.Error(err))
+			c.JSON(http.StatusInternalServerError, dto.ErrorResponse{
+				Error: errors.ErrInternal.Message,
+				Code:  errors.ErrInternal.Code,
+			})
+			return
+		}
+		c.JSON(http.StatusOK, dto.MyAdviseesResponse{Students: students, TotalCount: len(students)})
+		return
+	}
 
 	advisorID, err := uuid.Parse(c.Query("advisor_id"))
 	if err != nil {
