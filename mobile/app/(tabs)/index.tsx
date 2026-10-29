@@ -9,8 +9,9 @@ import { QuoteRotator } from '@/components/QuoteRotator';
 import { Text } from '@/components/ui';
 import { useAuthContext } from '@/contexts/AuthContext';
 import { useTheme } from '@/contexts/ThemeContext';
-import { useMyEnrollments } from '@/hooks/useEnrollment';
+import { useCurrentProgram } from '@/hooks/useEnrollment';
 import { useHaptic } from '@/hooks/useHaptic';
+import { useMyProfile } from '@/hooks/useStudent';
 import { COLORS } from '@/lib/theme';
 
 type IconName = React.ComponentProps<typeof Ionicons>['name'];
@@ -63,12 +64,11 @@ export default function HomeScreen() {
   const { isDark } = useTheme();
   const colors = COLORS[isDark ? 'dark' : 'light'];
 
-  const enrollmentsQuery = useMyEnrollments(undefined, 'approved');
-  const program = enrollmentsQuery.data?.programs?.[0];
-  const hasProgram = (program?.courses?.length ?? 0) > 0;
+  const current = useCurrentProgram();
+  const profile = useMyProfile();
+  const hasProgram = (current.program?.courses?.length ?? 0) > 0;
 
-  const firstName =
-    program?.student_name?.split(/\s+/)[0] ?? user?.email?.split('@')[0] ?? 'öğrenci';
+  const firstName = profile.data?.first_name ?? user?.email?.split('@')[0] ?? 'öğrenci';
 
   // Ikon tile renkleri mavi ailesinden + yemekhane icin sicak bir aksan;
   // zemin beyaz/mavi kalirken kartlar Getir'deki gibi ayirt edilebilir olur.
@@ -129,8 +129,8 @@ export default function HomeScreen() {
         contentContainerClassName="px-5 pb-10 pt-4"
         refreshControl={
           <RefreshControl
-            refreshing={enrollmentsQuery.isRefetching}
-            onRefresh={() => enrollmentsQuery.refetch()}
+            refreshing={current.isRefetching}
+            onRefresh={() => current.refetch()}
             tintColor={colors.primary}
           />
         }
@@ -146,7 +146,7 @@ export default function HomeScreen() {
           <Text className="mt-1 text-sm text-muted-foreground">Bugün ne yapmak istersin?</Text>
         </Animated.View>
 
-        {enrollmentsQuery.isLoading ? (
+        {current.isLoading ? (
           <View className="items-center py-10">
             <ActivityIndicator color={colors.primary} />
           </View>

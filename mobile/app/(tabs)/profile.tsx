@@ -8,8 +8,9 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { Badge, Button, Card, Text } from '@/components/ui';
 import { useAuthContext } from '@/contexts/AuthContext';
 import { useTheme } from '@/contexts/ThemeContext';
-import { useMyEnrollments } from '@/hooks/useEnrollment';
+import { useCurrentProgram } from '@/hooks/useEnrollment';
 import { useHaptic } from '@/hooks/useHaptic';
+import { useMyProfile } from '@/hooks/useStudent';
 import { COLORS } from '@/lib/theme';
 
 function initialsOf(name: string): string {
@@ -28,11 +29,13 @@ export default function ProfileScreen() {
   const { isDark, toggleTheme } = useTheme();
   const colors = COLORS[isDark ? 'dark' : 'light'];
 
-  const enrollmentsQuery = useMyEnrollments(undefined, 'approved');
-  const program = enrollmentsQuery.data?.programs?.[0];
+  const { program } = useCurrentProgram();
+  const { data: profile } = useMyProfile();
   const semester = program?.semester ?? '';
 
-  const displayName = program?.student_name ?? user?.email?.split('@')[0] ?? 'Ogrenci';
+  const displayName = profile
+    ? `${profile.first_name} ${profile.last_name}`
+    : (user?.email?.split('@')[0] ?? 'Ogrenci');
 
   const handleLogout = () => {
     haptic.light();
@@ -69,24 +72,24 @@ export default function ProfileScreen() {
               <Text className="mt-1 text-sm text-muted-foreground">{user.email}</Text>
             )}
             <View className="mt-4 flex-row flex-wrap justify-center gap-2">
-              {program?.student_number && (
+              {profile?.student_number && (
                 <Badge variant="secondary">
                   <Text className="font-mono text-xs font-semibold text-secondary-foreground">
-                    {program.student_number}
+                    {profile.student_number}
                   </Text>
                 </Badge>
               )}
-              {(program?.department ?? user?.department) && (
+              {(profile?.department ?? user?.department) && (
                 <Badge variant="outline">
                   <Text className="text-xs font-semibold text-foreground">
-                    {program?.department ?? user?.department}
+                    {profile?.department ?? user?.department}
                   </Text>
                 </Badge>
               )}
-              {program?.class_level ? (
+              {profile?.class_level ? (
                 <Badge variant="outline">
                   <Text className="text-xs font-semibold text-foreground">
-                    {program.class_level}. Sinif
+                    {profile.class_level}. Sinif
                   </Text>
                 </Badge>
               ) : null}

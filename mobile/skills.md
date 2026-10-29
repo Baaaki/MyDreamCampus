@@ -43,7 +43,7 @@ mobile/
 │   ├── CardCheckout.tsx       # yemekhane: test kartiyla odeme adimi (form + sonuc)
 │   └── QuoteRotator.tsx       # ana sayfa: 2dk'da bir donen ilham sozu
 ├── contexts/                  # AuthContext, ThemeContext
-├── hooks/                     # useAuth, useAttendance, useEnrollment, useGrades, useMeals, useHaptic
+├── hooks/                     # useAuth, useAttendance, useEnrollment, useGrades, useMeals, useStudent, useHaptic
 ├── services/                  # API service'leri
 │   ├── api.ts                 # axios instance + 401 refresh interceptor
 │   ├── authService.ts         # login, logout, refresh
@@ -63,8 +63,11 @@ onayli program varsa gorunur.
 
 > **Backend yol tuzaklari** (dogrulanmis): notlar `/grades/my/grades` (NOT
 > `/grades/student/my`); yemekhane slug'i `meals` (`/meals/*`) ve yanitlar
-> `{success, data}` zarfli; odeme (`/payments/*`) zarfsiz duz JSON; aktif donem endpoint'i (`/catalog/...`) admin-only,
-> ogrenci uygulamasi donemi `my-enrollments` yanitindan okur.
+> `{success, data}` zarfli; odeme (`/payments/*`) zarfsiz duz JSON; aktif donem endpoint'i (`/catalog/...`) admin-only:
+> yuruyen donem `/attendance/my` yanitindaki `semester`, o donemin onayli programi
+> `useCurrentProgram` (`my-enrollments` yeni onaylanan sonraki donemi basa koyar).
+> `my-enrollments` ogrenci adi/numarasi/bolumu tasimaz — onlar `/students/:id`
+> (kendi user id'si, `useMyProfile`). `day_of_week` `"monday"`…`"sunday"` metnidir.
 
 **Route grup parantezleri** (Expo Router):
 - `(auth)`, `(tabs)` → URL'de **gorunmez**, sadece organize amacli

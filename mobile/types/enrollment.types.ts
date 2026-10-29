@@ -1,4 +1,6 @@
-// Backend: monolith enrollment module DTO'lari (ogrenci kapsami).
+// Backend: enrollment-service DTO'lari (ogrenci kapsami). Ogrencinin kendi
+// programlarinda ogrenci adi/numarasi/bolumu yok — onlar danisman gorunumunde;
+// ogrenci bilgisi icin bkz. student.types.ts.
 
 // Catalog's weekday names, as enrollment passes them on.
 export type DayOfWeek =
@@ -21,17 +23,13 @@ export interface EnrollmentCourse {
   course_code: string;
   course_name: string;
   credits: number;
-  instructor: string;
+  instructor?: string;
   schedule_sessions: ScheduleSession[];
 }
 
 export interface EnrollmentProgramResponse {
   id: string;
   student_id: string;
-  student_number: string;
-  student_name: string;
-  department: string;
-  class_level: number;
   semester: string;
   status: 'pending' | 'approved' | 'rejected';
   courses: EnrollmentCourse[];
@@ -39,6 +37,6 @@ export interface EnrollmentProgramResponse {
 }
 
 export interface MyEnrollmentsResponse {
+  student_id: string;
   programs: EnrollmentProgramResponse[];
-  total_count: number;
 }

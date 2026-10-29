@@ -14,7 +14,7 @@ import {
   timeToMinutes,
 } from '@/constants/schedule';
 import { useTheme } from '@/contexts/ThemeContext';
-import { useMyEnrollments } from '@/hooks/useEnrollment';
+import { useCurrentProgram } from '@/hooks/useEnrollment';
 import { COLORS } from '@/lib/theme';
 import type { DayOfWeek, EnrollmentCourse } from '@/types/enrollment.types';
 
@@ -29,9 +29,7 @@ type DaySlot = {
 export default function ScheduleScreen() {
   const { isDark } = useTheme();
   const colors = COLORS[isDark ? 'dark' : 'light'];
-  const { data, isLoading, isError, refetch, isRefetching } = useMyEnrollments(undefined, 'approved');
-
-  const program = data?.programs?.[0];
+  const { program, isLoading, isError, refetch, isRefetching } = useCurrentProgram();
   const courses = useMemo(() => program?.courses ?? [], [program]);
 
   // Gunlere gore oturumlar (backend gun adlariyla). Seed'de slot bos olabilir;
