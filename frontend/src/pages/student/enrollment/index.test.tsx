@@ -1,8 +1,12 @@
 import { afterEach, describe, expect, it, vi } from "vitest"
-import { render, screen, waitFor } from "@testing-library/react"
+import { act, render, screen } from "@testing-library/react"
 import userEvent from "@testing-library/user-event"
 import { MemoryRouter } from "react-router"
-import { QueryClient, QueryClientProvider } from "@tanstack/react-query"
+import {
+  focusManager,
+  QueryClient,
+  QueryClientProvider,
+} from "@tanstack/react-query"
 import type {
   AvailableCourse,
   EnrollmentProgramResponse,
@@ -86,12 +90,29 @@ function program(
   }
 }
 
-const REJECTION = {
-  id: "rej-1",
-  advisor_fullname: "Prof. Dr. Veli Demir",
-  rejection_reason: "Kredi sınırı aşıldı, lütfen bir ders çıkarın.",
-  rejected_at: "2026-09-27T09:00:00Z",
+// The backend deletes a rejected program; what it sent lives on in the
+// rejection.
+function rejection(reason: string, courses: AvailableCourse[] = []) {
+  return {
+    id: "rej-1",
+    advisor_fullname: "Prof. Dr. Veli Demir",
+    rejection_reason: reason,
+    rejected_at: "2026-09-27T09:00:00Z",
+    rejected_courses: {
+      courses: courses.map((c) => ({
+        course_id: c.id,
+        course_code: c.course_code,
+        course_name: c.course_name,
+        credits: c.credits,
+        instructor: c.instructor,
+      })),
+      total_credits: courses.length * 4,
+      submitted_at: "2026-09-26T09:00:00Z",
+    },
+  }
 }
+
+const REJECTION = rejection("Kredi sınırı aşıldı, lütfen bir ders çıkarın.")
 
 /**
  * Stands in for the enrollment service and records what the page sent to
@@ -106,6 +127,7 @@ function stubBackend({
   }),
   programs = [] as EnrollmentProgramResponse[],
   rejection = null as typeof REJECTION | null,
+  withdraw = () => new Response(null, { status: 204 }),
   submit = (body: { course_ids: string[] }) =>
     json(
       program(
@@ -121,6 +143,8 @@ function stubBackend({
     submitted: [] as unknown[],
     deleted: [] as string[],
     coursesAskedFor: [] as (string | null)[],
+    // What the server holds now; a test changes it to play the advisor.
+    live: { programs, rejection },
   }
   vi.stubGlobal(
     "fetch",
@@ -138,12 +162,12 @@ function stubBackend({
           return courses.clone()
         case "GET /api/enrollment/my-enrollments":
           return json({
-            programs: programs.filter((p) => p.semester === semester),
+            programs: sent.live.programs.filter((p) => p.semester === semester),
           })
         case "GET /api/enrollment/latest-rejection":
           return json(
-            rejection
-              ? { has_rejection: true, latest_rejection: rejection }
+            sent.live.rejection
+              ? { has_rejection: true, latest_rejection: sent.live.rejection }
               : { has_rejection: false }
           )
         case "POST /api/enrollment/programs": {
@@ -153,7 +177,7 @@ function stubBackend({
         }
         case "DELETE /api/enrollment/programs":
           sent.deleted.push(url.search)
-          return new Response(null, { status: 204 })
+          return withdraw()
       }
       return json({}, 404)
     })
@@ -180,8 +204,17 @@ const submitButton = (count: number) =>
     name: `Ders Kaydını Tamamla (${count} Ders)`,
   })
 
+// The student comes back to the tab.
+function refocus() {
+  act(() => {
+    focusManager.setFocused(false)
+    focusManager.setFocused(true)
+  })
+}
+
 afterEach(() => {
   vi.unstubAllGlobals()
+  focusManager.setFocused(undefined)
 })
 
 describe("StudentEnrollmentPage", () => {
@@ -318,7 +351,7 @@ describe("StudentEnrollmentPage", () => {
     renderPage()
 
     await user.click(
-      await screen.findByRole("button", { name: "Yeniden Ders Kaydı Yap" })
+      await screen.findByRole("button", { name: "Programı Geri Çek" })
     )
 
     expect(
@@ -333,7 +366,67 @@ describe("StudentEnrollmentPage", () => {
     expect(screen.getByText("3 ders • 0 seçili")).toBeInTheDocument()
   })
 
-  it("shows an approved program as final", async () => {
+  it("edits a pending program in place: the new selection replaces it in one submission", async () => {
+    const sent = stubBackend({ programs: [program("pending", [CENG101])] })
+    const user = userEvent.setup()
+    renderPage()
+
+    await user.click(
+      await screen.findByRole("button", { name: "Programı Düzenle" })
+    )
+    expect(
+      await screen.findByText("3 ders • 1 seçili"),
+      "the program's courses come chosen"
+    ).toBeInTheDocument()
+    await user.click(screen.getByText("MATH101"))
+    await user.click(
+      screen.getByRole("button", { name: "Değişikliği Gönder (2 Ders)" })
+    )
+
+    expect(
+      await screen.findByText("Değişiklik danışman onayına gönderildi")
+    ).toBeInTheDocument()
+    expect(sent.submitted).toEqual([
+      { semester: FALL, course_ids: ["c-101", "c-m101"] },
+    ])
+    expect(
+      sent.deleted,
+      "deleting first freed the seats and lost the program when the new one failed"
+    ).toEqual([])
+  })
+
+  it("keeps a pending program the backend would not withdraw", async () => {
+    const sent = stubBackend({
+      programs: [program("pending", [CENG101])],
+      withdraw: () =>
+        json(
+          {
+            error: "Bu dönem için ders kayıt süresi sona erdi",
+            code: "ENROLLMENT_PERIOD_ENDED",
+          },
+          403
+        ),
+    })
+    const user = userEvent.setup()
+    renderPage()
+
+    await user.click(
+      await screen.findByRole("button", { name: "Programı Geri Çek" })
+    )
+
+    expect(
+      await screen.findByText("Bu dönem için ders kayıt süresi sona erdi")
+    ).toBeInTheDocument()
+    expect(sent.deleted).toHaveLength(1)
+    expect(
+      screen.getByText(
+        "Ders kaydınız danışman hoca tarafından onaylanmayı bekliyor"
+      ),
+      "the program is still on the server"
+    ).toBeInTheDocument()
+  })
+
+  it("shows an approved program read-only until the student changes it", async () => {
     stubBackend({ programs: [program("approved", [CENG101])] })
     renderPage()
 
@@ -347,40 +440,64 @@ describe("StudentEnrollmentPage", () => {
       screen.queryByRole("button", { name: /Ders Kaydını Tamamla/ })
     ).not.toBeInTheDocument()
     expect(
-      screen.queryByRole("button", { name: "Yeniden Ders Kaydı Yap" })
+      screen.queryByRole("button", { name: "Programı Geri Çek" }),
+      "an approved program is changed, never withdrawn"
     ).not.toBeInTheDocument()
   })
 
-  it("shows the advisor's reason for a rejection and lets the student re-enroll", async () => {
-    const sent = stubBackend({
-      programs: [program("rejected", [])],
-      rejection: REJECTION,
-    })
+  it("sends a change to an approved program back to the advisor", async () => {
+    const sent = stubBackend({ programs: [program("approved", [CENG101])] })
     const user = userEvent.setup()
+    renderPage()
+
+    await user.click(
+      await screen.findByRole("button", { name: "Programı Değiştir" })
+    )
+    await user.click(await screen.findByText("MATH101"))
+    await user.click(
+      screen.getByRole("button", { name: "Değişikliği Gönder (2 Ders)" })
+    )
+
+    expect(
+      await screen.findByText(
+        "Ders kaydınız danışman hoca tarafından onaylanmayı bekliyor"
+      )
+    ).toBeInTheDocument()
+    expect(sent.submitted).toEqual([
+      { semester: FALL, course_ids: ["c-101", "c-m101"] },
+    ])
+  })
+
+  it("leaves an approved program as it was when the student backs out", async () => {
+    const sent = stubBackend({ programs: [program("approved", [CENG101])] })
+    const user = userEvent.setup()
+    renderPage()
+
+    await user.click(
+      await screen.findByRole("button", { name: "Programı Değiştir" })
+    )
+    await user.click(await screen.findByText("MATH101"))
+    await user.click(screen.getByRole("button", { name: "Vazgeç" }))
+
+    expect(screen.queryByText("Açılan Dersler")).not.toBeInTheDocument()
+    expect(screen.queryByText("MATH101")).not.toBeInTheDocument()
+    expect(sent.submitted).toEqual([])
+  })
+
+  it("shows the advisor's reason for a rejection", async () => {
+    stubBackend({ rejection: REJECTION })
     renderPage()
 
     expect(
       await screen.findByText(REJECTION.rejection_reason)
     ).toBeInTheDocument()
     expect(screen.getByText(/Prof\. Dr\. Veli Demir/)).toBeInTheDocument()
-
-    await user.click(
-      screen.getByRole("button", { name: "Yeniden Ders Kaydı Yap" })
-    )
-
-    await waitFor(() =>
-      expect(
-        screen.queryByText(REJECTION.rejection_reason)
-      ).not.toBeInTheDocument()
-    )
-    expect(sent.deleted).toHaveLength(1)
     expect(submitButton(0)).toBeEnabled()
   })
 
   it("keeps a rejected program's courses chosen so it can be adjusted and sent again", async () => {
     const sent = stubBackend({
-      programs: [program("rejected", [CENG101])],
-      rejection: REJECTION,
+      rejection: rejection(REJECTION.rejection_reason, [CENG101]),
     })
     const user = userEvent.setup()
     renderPage()
@@ -412,7 +529,7 @@ describe("StudentEnrollmentPage", () => {
     renderPage()
 
     await user.click(
-      await screen.findByRole("button", { name: "Yeniden Ders Kaydı Yap" })
+      await screen.findByRole("button", { name: "Programı Geri Çek" })
     )
 
     expect(
@@ -422,6 +539,45 @@ describe("StudentEnrollmentPage", () => {
     expect(
       screen.queryByText(REJECTION.rejection_reason)
     ).not.toBeInTheDocument()
+  })
+
+  it("shows the advisor's decision when the student returns to the tab", async () => {
+    const sent = stubBackend({ programs: [program("pending", [CENG101])] })
+    renderPage()
+    await screen.findByText(
+      "Ders kaydınız danışman hoca tarafından onaylanmayı bekliyor"
+    )
+
+    sent.live.programs = [program("approved", [CENG101])]
+    refocus()
+
+    expect(
+      await screen.findByText(
+        "Ders kaydınız danışman hoca tarafından onaylandı"
+      )
+    ).toBeInTheDocument()
+  })
+
+  it("shows a second rejection of a resubmitted program", async () => {
+    const sent = stubBackend({
+      rejection: rejection("İlk ret", [CENG101]),
+    })
+    const user = userEvent.setup()
+    renderPage()
+    expect(await screen.findByText("İlk ret")).toBeInTheDocument()
+    await user.click(screen.getByText("MATH101"))
+    await user.click(submitButton(2))
+    await screen.findByText(
+      "Ders kaydınız danışman hoca tarafından onaylanmayı bekliyor"
+    )
+
+    // The advisor rejects the resubmission: the program is gone again.
+    sent.live.programs = []
+    sent.live.rejection = rejection("İkinci ret", [CENG101, MATH101])
+    refocus()
+
+    expect(await screen.findByText("İkinci ret")).toBeInTheDocument()
+    expect(screen.getByText("3 ders • 2 seçili")).toBeInTheDocument()
   })
 
   it("opens the semester whose window is open and still shows the current program", async () => {
@@ -487,9 +643,9 @@ describe("StudentEnrollmentPage", () => {
         "Ders kaydınız danışman hoca tarafından onaylanmayı bekliyor"
       )
     ).toBeInTheDocument()
-    expect(
-      screen.queryByRole("button", { name: "Yeniden Ders Kaydı Yap" })
-    ).not.toBeInTheDocument()
+    for (const name of ["Programı Düzenle", "Programı Geri Çek"]) {
+      expect(screen.queryByRole("button", { name })).not.toBeInTheDocument()
+    }
   })
 
   it("says so when no semester is open for enrollment", async () => {

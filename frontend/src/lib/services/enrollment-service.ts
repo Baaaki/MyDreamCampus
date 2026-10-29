@@ -1,3 +1,4 @@
+import { HTTPError } from "ky"
 import { enrollmentApi } from "@/lib/api-client"
 import { normalizeAvailableCourse } from "@/lib/normalize-schedule"
 import type {
@@ -96,10 +97,16 @@ export const enrollmentService = {
   },
 
   /**
-   * Withdraw the semester's pending or rejected program to start over
+   * Withdraw the semester's pending program. One that is already gone is
+   * what the student asked for; any other failure leaves it standing.
    */
   async withdrawProgram(semester: string): Promise<void> {
-    await enrollmentApi.delete("programs", { searchParams: { semester } })
+    try {
+      await enrollmentApi.delete("programs", { searchParams: { semester } })
+    } catch (err) {
+      if (err instanceof HTTPError && err.response.status === 404) return
+      throw err
+    }
   },
 
   /**

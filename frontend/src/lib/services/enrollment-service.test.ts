@@ -1,6 +1,7 @@
-import { describe, expect, it } from "vitest"
+import { afterEach, describe, expect, it, vi } from "vitest"
+import { HTTPError } from "ky"
 import type { EnrollmentProgramResponse } from "@/lib/types"
-import { currentProgram } from "./enrollment-service"
+import { currentProgram, enrollmentService } from "./enrollment-service"
 
 function program(semester: string, status: string): EnrollmentProgramResponse {
   return {
@@ -32,5 +33,42 @@ describe("currentProgram", () => {
 
   it("has nothing to show without an approved program", () => {
     expect(currentProgram([program("2026-2027-Fall", "rejected")])).toBeNull()
+  })
+})
+
+describe("withdrawProgram", () => {
+  afterEach(() => vi.unstubAllGlobals())
+
+  function answer(status: number, body?: unknown) {
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(
+        async () =>
+          new Response(body === undefined ? null : JSON.stringify(body), {
+            status,
+            headers: { "Content-Type": "application/json" },
+          })
+      )
+    )
+  }
+
+  it("takes a program that is already gone as withdrawn", async () => {
+    answer(404, {
+      error: "Bu dönem için ders kaydı bulunamadı",
+      code: "NOT_FOUND",
+    })
+    await expect(
+      enrollmentService.withdrawProgram("2026-2027-Fall")
+    ).resolves.toBeUndefined()
+  })
+
+  it("fails when the program is still there", async () => {
+    answer(403, {
+      error: "Bu dönem için ders kayıt süresi sona erdi",
+      code: "ENROLLMENT_PERIOD_ENDED",
+    })
+    await expect(
+      enrollmentService.withdrawProgram("2026-2027-Fall")
+    ).rejects.toBeInstanceOf(HTTPError)
   })
 })

@@ -116,6 +116,9 @@ function EnrollmentWindow({ semester }: { semester: OpenSemester }) {
 
 type ToastType = "error" | "warning" | "success" | "info"
 
+// The advisor's decision lands on the server, not on this page.
+const PENDING_REFRESH_MS = 15_000
+
 // A program's course in the shape the schedule grid draws.
 function toAvailableCourse(course: CourseBasic): AvailableCourse {
   return {
@@ -152,6 +155,11 @@ function EnrollmentWorkspace({
   const programQuery = useQuery({
     queryKey: programKey,
     queryFn: () => enrollmentService.getLatestProgram(semester),
+    // A program waiting for the advisor is read again until the decision
+    // comes, and whenever the student returns to the tab.
+    refetchInterval: (query) =>
+      query.state.data?.status === "pending" ? PENDING_REFRESH_MS : false,
+    refetchOnWindowFocus: "always",
   })
   // A failed read must not block the page; it then offers a fresh program.
   const program = programQuery.data ?? null
@@ -159,17 +167,22 @@ function EnrollmentWorkspace({
   const rejectionQuery = useQuery({
     queryKey: rejectionKey,
     queryFn: () => enrollmentService.getLatestRejection(semester),
-    enabled:
-      !programQuery.isPending && (!program || program.status === "rejected"),
-    // Only this page's own submit and withdraw change it, and they write it.
+    // A rejection deletes the program: there is one to show only while the
+    // semester has no program.
+    enabled: !programQuery.isPending && !program,
+    // A withdraw clears it for good. A submit marks it stale, so the
+    // advisor's answer to that submission is read once its program is gone.
     staleTime: Infinity,
   })
   const rejectionInfo = rejectionQuery.data ?? null
   const availableCourses = coursesQuery.data ?? []
 
-  // null until the student picks; until then a rejected program's courses
-  // stay chosen so it can be adjusted and sent again.
+  // null until the student picks; until then the program being edited, or
+  // the rejected one, stays chosen so it can be adjusted and sent again.
   const [picked, setPicked] = useState<string[] | null>(null)
+  // Set while the student reworks a program already sent; the new selection
+  // replaces it on the server in one step, so it is never lost in between.
+  const [editing, setEditing] = useState(false)
   const [courseColorMap, setCourseColorMap] = useState<Record<string, number>>(
     {}
   )
@@ -185,20 +198,22 @@ function EnrollmentWorkspace({
   const showToast = (message: string, type: ToastType) =>
     setToast({ message, type, isVisible: true })
 
-  // ReadOnly is true for pending or approved status (not for rejected - user can re-enroll)
-  const isReadOnly =
-    !enrollmentOpen ||
-    enrollmentStatus === "pending" ||
-    enrollmentStatus === "approved"
-  const showSubmitButton =
-    enrollmentOpen && (!enrollmentStatus || enrollmentStatus === "rejected")
-  const buttonText = "Ders Kaydını Tamamla"
+  const isEditing = editing && enrollmentOpen && program !== null
+  const isReadOnly = !enrollmentOpen || (program !== null && !isEditing)
+  const showSubmitButton = enrollmentOpen && (!program || isEditing)
+  const buttonText = isEditing ? "Değişikliği Gönder" : "Ders Kaydını Tamamla"
 
   const programCourses = (program?.courses ?? []).map(toAvailableCourse)
   const programCourseIds = programCourses.map((c) => c.id)
+  // The rejected program itself is gone; its courses come back from the
+  // rejection, less any no longer offered.
+  const offeredIds = new Set(availableCourses.map((c) => c.id))
+  const rejectedCourseIds = (rejectionInfo?.rejected_courses.courses ?? [])
+    .map((c) => c.course_id)
+    .filter((id) => offeredIds.has(id))
   const selectedCourseIds = isReadOnly
     ? programCourseIds
-    : (picked ?? (enrollmentStatus === "rejected" ? programCourseIds : []))
+    : (picked ?? (program ? programCourseIds : rejectedCourseIds))
   const selectedCourses = isReadOnly
     ? programCourses
     : availableCourses.filter((course) => selectedCourseIds.includes(course.id))
@@ -279,9 +294,19 @@ function EnrollmentWorkspace({
     // flicker.
     onSuccess: (created) => {
       queryClient.setQueryData(programKey, created)
-      queryClient.setQueryData(rejectionKey, null)
+      // Stale, not refetched: the server still holds the old rejection now.
+      void queryClient.invalidateQueries({
+        queryKey: rejectionKey,
+        refetchType: "none",
+      })
       setPicked(null)
-      showToast("Ders kaydı başarıyla oluşturuldu", "success")
+      setEditing(false)
+      showToast(
+        isEditing
+          ? "Değişiklik danışman onayına gönderildi"
+          : "Ders kaydı başarıyla oluşturuldu",
+        "success"
+      )
     },
     onError: (err) =>
       showToast(apiErrorMessage(err, "Kayıt işlemi başarısız"), "error"),
@@ -298,21 +323,32 @@ function EnrollmentWorkspace({
 
   const withdraw = useMutation({
     mutationFn: () => enrollmentService.withdrawProgram(semester),
-    onSuccess: () => showToast("Yeni ders kaydı yapabilirsiniz", "success"),
-    // Nothing left to withdraw still leaves the student free to start over.
-    onError: () => showToast("Yeni ders kaydı yapabilirsiniz", "info"),
-    onSettled: () => {
+    onSuccess: () => {
       queryClient.setQueryData(programKey, null)
       queryClient.setQueryData(rejectionKey, null)
       setPicked(null)
+      setEditing(false)
       setCourseColorMap({})
+      showToast("Yeni ders kaydı yapabilirsiniz", "success")
     },
+    // The program is still on the server, where the advisor can approve it:
+    // it stays on screen.
+    onError: (err) =>
+      showToast(apiErrorMessage(err, "Program geri çekilemedi"), "error"),
   })
 
-  // Cancel current enrollment and allow re-registration
-  const handleCancelEnrollment = () => {
-    if (withdraw.isPending) return
-    if (enrollmentStatus === "pending" || rejectionInfo) withdraw.mutate()
+  const handleWithdraw = () => {
+    if (!withdraw.isPending) withdraw.mutate()
+  }
+
+  const startEditing = () => {
+    setPicked(null)
+    setEditing(true)
+  }
+
+  const stopEditing = () => {
+    setPicked(null)
+    setEditing(false)
   }
 
   const closeToast = () => {
@@ -342,90 +378,117 @@ function EnrollmentWorkspace({
               Ders kaydınız danışman hoca tarafından onaylanmayı bekliyor
             </span>
           </div>
-          {enrollmentOpen && (
-            <button
-              onClick={handleCancelEnrollment}
-              className="rounded-lg bg-amber-600 px-4 py-2 font-medium text-white transition-colors hover:bg-amber-700"
-            >
-              Yeniden Ders Kaydı Yap
-            </button>
-          )}
+          {enrollmentOpen &&
+            (isEditing ? (
+              <Button variant="outline" onClick={stopEditing}>
+                Vazgeç
+              </Button>
+            ) : (
+              <div className="flex flex-shrink-0 gap-2">
+                <button
+                  onClick={startEditing}
+                  className="rounded-lg bg-amber-600 px-4 py-2 font-medium text-white transition-colors hover:bg-amber-700"
+                >
+                  Programı Düzenle
+                </button>
+                <Button
+                  variant="outline"
+                  onClick={handleWithdraw}
+                  disabled={withdraw.isPending}
+                >
+                  Programı Geri Çek
+                </Button>
+              </div>
+            ))}
         </div>
       )}
 
       {/* Approved Status Banner */}
       {enrollmentStatus === "approved" && (
-        <div className="mb-4 flex items-center gap-3 rounded-lg border border-green-200 bg-green-50 p-4 dark:border-green-700 dark:bg-green-900/30">
-          <svg
-            className="h-6 w-6 text-green-600 dark:text-green-400"
-            fill="none"
-            stroke="currentColor"
-            viewBox="0 0 24 24"
-          >
-            <path
-              strokeLinecap="round"
-              strokeLinejoin="round"
-              strokeWidth={2}
-              d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"
-            />
-          </svg>
-          <span className="font-medium text-green-800 dark:text-green-200">
-            Ders kaydınız danışman hoca tarafından onaylandı
-          </span>
+        <div className="mb-4 flex items-center justify-between gap-3 rounded-lg border border-green-200 bg-green-50 p-4 dark:border-green-700 dark:bg-green-900/30">
+          <div className="flex items-center gap-3">
+            <svg
+              className="h-6 w-6 flex-shrink-0 text-green-600 dark:text-green-400"
+              fill="none"
+              stroke="currentColor"
+              viewBox="0 0 24 24"
+            >
+              <path
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                strokeWidth={2}
+                d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"
+              />
+            </svg>
+            <div>
+              <p className="font-medium text-green-800 dark:text-green-200">
+                Ders kaydınız danışman hoca tarafından onaylandı
+              </p>
+              {isEditing && (
+                <p className="text-sm text-green-700 dark:text-green-300">
+                  Gönderdiğiniz değişiklik danışman hocanızın onayına yeniden
+                  düşer.
+                </p>
+              )}
+            </div>
+          </div>
+          {enrollmentOpen &&
+            (isEditing ? (
+              <Button variant="outline" onClick={stopEditing}>
+                Vazgeç
+              </Button>
+            ) : (
+              <button
+                onClick={startEditing}
+                className="flex-shrink-0 rounded-lg bg-green-600 px-4 py-2 font-medium text-white transition-colors hover:bg-green-700"
+              >
+                Programı Değiştir
+              </button>
+            ))}
         </div>
       )}
 
       {/* Rejected Status Banner */}
-      {(enrollmentStatus === "rejected" ||
-        (!enrollmentStatus && rejectionInfo)) &&
-        rejectionInfo && (
-          <div className="mb-4 rounded-lg border border-red-200 bg-red-50 p-4 dark:border-red-700 dark:bg-red-900/30">
-            <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
-              <div className="flex flex-1 items-start gap-3">
-                <svg
-                  className="mt-0.5 h-6 w-6 flex-shrink-0 text-red-600 dark:text-red-400"
-                  fill="none"
-                  stroke="currentColor"
-                  viewBox="0 0 24 24"
-                >
-                  <path
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                    strokeWidth={2}
-                    d="M10 14l2-2m0 0l2-2m-2 2l-2-2m2 2l2 2m7-2a9 9 0 11-18 0 9 9 0 0118 0z"
-                  />
-                </svg>
-                <div className="flex-1">
-                  <p className="mb-2 font-medium text-red-800 dark:text-red-200">
-                    Ders kaydınız danışman hoca tarafından reddedildi
+      {!program && rejectionInfo && (
+        <div className="mb-4 rounded-lg border border-red-200 bg-red-50 p-4 dark:border-red-700 dark:bg-red-900/30">
+          <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
+            <div className="flex flex-1 items-start gap-3">
+              <svg
+                className="mt-0.5 h-6 w-6 flex-shrink-0 text-red-600 dark:text-red-400"
+                fill="none"
+                stroke="currentColor"
+                viewBox="0 0 24 24"
+              >
+                <path
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  strokeWidth={2}
+                  d="M10 14l2-2m0 0l2-2m-2 2l-2-2m2 2l2 2m7-2a9 9 0 11-18 0 9 9 0 0118 0z"
+                />
+              </svg>
+              <div className="flex-1">
+                <p className="mb-2 font-medium text-red-800 dark:text-red-200">
+                  Ders kaydınız danışman hoca tarafından reddedildi
+                </p>
+                <div className="mb-2 rounded-lg bg-red-100 p-3 dark:bg-red-900/50">
+                  <p className="mb-1 text-sm font-medium text-red-700 dark:text-red-300">
+                    Ret Sebebi:
                   </p>
-                  <div className="mb-2 rounded-lg bg-red-100 p-3 dark:bg-red-900/50">
-                    <p className="mb-1 text-sm font-medium text-red-700 dark:text-red-300">
-                      Ret Sebebi:
-                    </p>
-                    <p className="text-red-800 dark:text-red-200">
-                      {rejectionInfo.rejection_reason}
-                    </p>
-                  </div>
-                  <p className="text-sm text-red-600 dark:text-red-400">
-                    Reddeden: {rejectionInfo.advisor_fullname} •{" "}
-                    {new Date(rejectionInfo.rejected_at).toLocaleDateString(
-                      "tr-TR"
-                    )}
+                  <p className="text-red-800 dark:text-red-200">
+                    {rejectionInfo.rejection_reason}
                   </p>
                 </div>
+                <p className="text-sm text-red-600 dark:text-red-400">
+                  Reddeden: {rejectionInfo.advisor_fullname} •{" "}
+                  {new Date(rejectionInfo.rejected_at).toLocaleDateString(
+                    "tr-TR"
+                  )}
+                </p>
               </div>
-              {enrollmentOpen && (
-                <button
-                  onClick={handleCancelEnrollment}
-                  className="flex-shrink-0 self-start rounded-lg bg-red-600 px-4 py-2 font-medium text-white transition-colors hover:bg-red-700"
-                >
-                  Yeniden Ders Kaydı Yap
-                </button>
-              )}
             </div>
           </div>
-        )}
+        </div>
+      )}
 
       {!isReadOnly && coursesQuery.isError && (
         <div className="mb-4 flex items-center gap-2 rounded-lg border border-red-200 bg-red-50 p-3 text-sm text-red-700 dark:border-red-700 dark:bg-red-900/30 dark:text-red-300">
