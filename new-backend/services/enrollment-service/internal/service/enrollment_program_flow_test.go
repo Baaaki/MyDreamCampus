@@ -2,6 +2,7 @@ package service
 
 import (
 	"context"
+	"encoding/json"
 	"errors"
 	"sync"
 	"testing"
@@ -150,6 +151,19 @@ func (m *mockStudentClient) GetStudentByID(ctx context.Context, id uuid.UUID) (c
 	return st, nil
 }
 
+func (m *mockStudentClient) GetStudentsWithoutAdvisor(ctx context.Context) ([]contracts.StudentResponse, error) {
+	if m.listErr != nil {
+		return nil, m.listErr
+	}
+	var res []contracts.StudentResponse
+	for _, st := range m.students {
+		if st.AdvisorID == nil {
+			res = append(res, st)
+		}
+	}
+	return res, nil
+}
+
 func (m *mockStudentClient) GetStudentsByAdvisorID(ctx context.Context, advisorID uuid.UUID) ([]contracts.StudentResponse, error) {
 	if m.listErr != nil {
 		return nil, m.listErr
@@ -231,20 +245,78 @@ func TestApproveEnrollmentProgram_Success(t *testing.T) {
 		},
 	}
 
+	catalog := &mockCourseCatalogClient{coursesByIDs: []contracts.SemesterCourseResponse{{
+		ID: courseID, InstructorFullname: "Ahmet Yılmaz",
+		ScheduleSessions: []contracts.ScheduleSession{{DayOfWeek: "monday", SlotNumbers: []int16{1}, SessionType: "theory"}},
+	}}}
 	svc := &EnrollmentService{
-		enrollmentRepo: store,
-		studentClient:  stClient,
+		enrollmentRepo:      store,
+		studentClient:       stClient,
+		courseCatalogClient: catalog,
 	}
 
-	resp, err := svc.ApproveEnrollmentProgram(ctx, programID, advisorID)
+	resp, err := svc.ApproveEnrollmentProgram(ctx, programID, advisorID, false)
 	require.NoError(t, err)
 	assert.Equal(t, programID, resp.ID)
 	assert.Equal(t, studentID, resp.StudentID)
 	assert.Equal(t, "approved", resp.Status)
 	assert.Len(t, resp.Courses, 1)
 	assert.Equal(t, "CENG101", resp.Courses[0].CourseCode)
-	assertSessionsMarshalEmpty(t, resp.Courses[0].ScheduleSessions)
+	assert.Equal(t, "Ahmet Yılmaz", resp.Courses[0].InstructorName)
+	assert.Len(t, resp.Courses[0].ScheduleSessions, 1, "the approved program comes back as my-enrollments draws it")
 	assert.NotNil(t, store.lastApproveEvt)
+}
+
+// The route lets admins in; without the advisor check giving way to them, a
+// student whose advisor was deactivated had a program no one could decide.
+func TestApproveEnrollmentProgram_WhoMayDecide(t *testing.T) {
+	initTestLogger(t)
+	ctx := context.Background()
+	advisorID, otherTeacher, adminID := uuid.New(), uuid.New(), uuid.New()
+	advStr := advisorID.String()
+	withAdvisor, withoutAdvisor := uuid.New(), uuid.New()
+
+	cases := []struct {
+		name    string
+		student uuid.UUID
+		caller  uuid.UUID
+		isAdmin bool
+		wantErr error
+	}{
+		{"the student's advisor", withAdvisor, advisorID, false, nil},
+		{"another teacher", withAdvisor, otherTeacher, false, sharedErrors.ErrForbidden},
+		{"an admin, for a student with an advisor", withAdvisor, adminID, true, nil},
+		{"an admin, for a student without one", withoutAdvisor, adminID, true, nil},
+		{"a teacher, for a student without an advisor", withoutAdvisor, otherTeacher, false, sharedErrors.ErrForbidden},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			programID := uuid.New()
+			store := newMockEnrollmentStore()
+			store.programs[programID] = db.EnrollmentProgram{
+				ID: utils.UUIDToPgtype(programID), StudentID: utils.UUIDToPgtype(tc.student), Semester: "2026-2027-Spring",
+				Status: db.NullEnrollmentStatusEnum{EnrollmentStatusEnum: db.EnrollmentEnrollmentStatusEnumPending, Valid: true},
+			}
+			svc := &EnrollmentService{
+				enrollmentRepo: store,
+				studentClient: &mockStudentClient{students: map[uuid.UUID]contracts.StudentResponse{
+					withAdvisor:    {ID: withAdvisor.String(), AdvisorID: &advStr, Status: "active"},
+					withoutAdvisor: {ID: withoutAdvisor.String(), Status: "active"},
+				}},
+				courseCatalogClient: &mockCourseCatalogClient{},
+			}
+
+			_, err := svc.ApproveEnrollmentProgram(ctx, programID, tc.caller, tc.isAdmin)
+
+			if tc.wantErr != nil {
+				assert.ErrorIs(t, err, tc.wantErr)
+				assert.Nil(t, store.lastApproveEvt)
+				return
+			}
+			require.NoError(t, err)
+			assert.Equal(t, tc.caller.String(), store.lastApproveEvt["data"].(map[string]any)["approved_by"])
+		})
+	}
 }
 
 func TestApproveEnrollmentProgram_ProgramNotFound(t *testing.T) {
@@ -258,7 +330,7 @@ func TestApproveEnrollmentProgram_ProgramNotFound(t *testing.T) {
 		studentClient:  &mockStudentClient{},
 	}
 
-	_, err := svc.ApproveEnrollmentProgram(ctx, uuid.New(), advisorID)
+	_, err := svc.ApproveEnrollmentProgram(ctx, uuid.New(), advisorID, false)
 	require.ErrorIs(t, err, serviceErrors.ErrProgramNotFound)
 }
 
@@ -282,7 +354,7 @@ func TestApproveEnrollmentProgram_AlreadyApproved(t *testing.T) {
 		studentClient:  &mockStudentClient{},
 	}
 
-	_, err := svc.ApproveEnrollmentProgram(ctx, programID, advisorID)
+	_, err := svc.ApproveEnrollmentProgram(ctx, programID, advisorID, false)
 	require.ErrorIs(t, err, serviceErrors.ErrCannotModifyApproved)
 }
 
@@ -315,12 +387,14 @@ func TestRejectEnrollmentProgram_Success(t *testing.T) {
 		},
 	}
 
+	advisorName := "Dr. Mehmet Yilmaz"
 	stClient := &mockStudentClient{
 		students: map[uuid.UUID]contracts.StudentResponse{
 			studentID: {
-				ID:        studentID.String(),
-				AdvisorID: &advStr,
-				Status:    "active",
+				ID:          studentID.String(),
+				AdvisorID:   &advStr,
+				AdvisorName: &advisorName,
+				Status:      "active",
 			},
 		},
 	}
@@ -328,12 +402,20 @@ func TestRejectEnrollmentProgram_Success(t *testing.T) {
 	svc := &EnrollmentService{
 		enrollmentRepo: store,
 		studentClient:  stClient,
+		courseCatalogClient: &mockCourseCatalogClient{coursesByIDs: []contracts.SemesterCourseResponse{
+			{ID: courseID, InstructorFullname: "Ayşe Demir"},
+		}},
 	}
 
-	err := svc.RejectEnrollmentProgram(ctx, programID, advisorID, "Dr. Mehmet Yilmaz", "Eksik kredi")
+	err := svc.RejectEnrollmentProgram(ctx, programID, advisorID, false, "Eksik kredi")
 	require.NoError(t, err)
 
+	// The token carries no names: the rejection used to say "Reddeden: •".
 	assert.Equal(t, "Dr. Mehmet Yilmaz", store.lastRejection.AdvisorFullname)
+	var snapshot dto.RejectedCoursesData
+	require.NoError(t, json.Unmarshal(store.lastRejection.RejectedCourses, &snapshot))
+	require.Len(t, snapshot.Courses, 1)
+	assert.Equal(t, "Ayşe Demir", snapshot.Courses[0].Instructor)
 	assert.Equal(t, "Eksik kredi", store.lastRejection.RejectionReason)
 	assert.NotNil(t, store.lastRejectEvt)
 	assert.Equal(t, "Eksik kredi", store.lastRejectEvt["rejection_reason"])
@@ -350,7 +432,7 @@ func TestRejectEnrollmentProgram_ProgramNotFound(t *testing.T) {
 		studentClient:  &mockStudentClient{},
 	}
 
-	err := svc.RejectEnrollmentProgram(ctx, uuid.New(), advisorID, "Dr. Ali", "Sebep")
+	err := svc.RejectEnrollmentProgram(ctx, uuid.New(), advisorID, false, "Sebep")
 	require.ErrorIs(t, err, serviceErrors.ErrProgramNotFound)
 }
 
@@ -374,8 +456,29 @@ func TestRejectEnrollmentProgram_AlreadyApproved(t *testing.T) {
 		studentClient:  &mockStudentClient{},
 	}
 
-	err := svc.RejectEnrollmentProgram(ctx, programID, advisorID, "Dr. Ali", "Sebep")
+	err := svc.RejectEnrollmentProgram(ctx, programID, advisorID, false, "Sebep")
 	require.ErrorIs(t, err, serviceErrors.ErrCannotModifyApproved)
+}
+
+func TestRejectEnrollmentProgram_ByAdmin_SignedAsAdmin(t *testing.T) {
+	initTestLogger(t)
+	programID, studentID, adminID := uuid.New(), uuid.New(), uuid.New()
+	store := newMockEnrollmentStore()
+	store.programs[programID] = db.EnrollmentProgram{
+		ID: utils.UUIDToPgtype(programID), StudentID: utils.UUIDToPgtype(studentID), Semester: "2026-2027-Spring",
+		Status: db.NullEnrollmentStatusEnum{EnrollmentStatusEnum: db.EnrollmentEnrollmentStatusEnumPending, Valid: true},
+	}
+	svc := &EnrollmentService{
+		enrollmentRepo:      store,
+		studentClient:       &mockStudentClient{students: map[uuid.UUID]contracts.StudentResponse{studentID: {ID: studentID.String(), Status: "active"}}},
+		courseCatalogClient: &mockCourseCatalogClient{getByIDsErr: errors.New("catalog down")},
+	}
+
+	err := svc.RejectEnrollmentProgram(context.Background(), programID, adminID, true, "Danışman atanana kadar")
+
+	require.NoError(t, err, "a catalog outage only leaves the instructors out")
+	assert.Equal(t, "Yönetici", store.lastRejection.AdvisorFullname)
+	assert.Equal(t, utils.UUIDToPgtype(adminID), store.lastRejection.AdvisorID)
 }
 
 // The student's schedule screens list each course with its instructor; the
@@ -427,7 +530,7 @@ func TestGetPendingProgramsByAdvisor(t *testing.T) {
 			studentClient:  &mockStudentClient{},
 		}
 
-		resp, err := svc.GetPendingProgramsByAdvisor(ctx, advisorID)
+		resp, err := svc.GetPendingProgramsByAdvisor(ctx, advisorID, false)
 		require.NoError(t, err)
 		assert.Equal(t, advisorID, resp.AdvisorID)
 		assert.Empty(t, resp.Programs)
@@ -491,7 +594,7 @@ func TestGetPendingProgramsByAdvisor(t *testing.T) {
 			courseCatalogClient: catalog,
 		}
 
-		resp, err := svc.GetPendingProgramsByAdvisor(ctx, advisorID)
+		resp, err := svc.GetPendingProgramsByAdvisor(ctx, advisorID, false)
 		require.NoError(t, err)
 		assert.Equal(t, advisorID, resp.AdvisorID)
 		require.Len(t, resp.Programs, 1)
@@ -510,7 +613,7 @@ func TestGetPendingProgramsByAdvisor(t *testing.T) {
 		// The instructor is a label: a catalog outage must not hide the
 		// programs waiting for the advisor's decision.
 		catalog.getByIDsErr = errors.New("catalog down")
-		resp, err = svc.GetPendingProgramsByAdvisor(ctx, advisorID)
+		resp, err = svc.GetPendingProgramsByAdvisor(ctx, advisorID, false)
 		require.NoError(t, err)
 		require.Len(t, resp.Programs, 1)
 		assert.Equal(t, "2024001", resp.Programs[0].StudentNumber)
@@ -622,4 +725,34 @@ func TestGetAvailableCourses(t *testing.T) {
 		assert.Equal(t, int16(0), c2.AvailableSeats)
 		assertSessionsMarshalEmpty(t, c2.ScheduleSessions)
 	})
+}
+
+// No advisor's list holds a student without one; the admin's does.
+func TestGetPendingProgramsByAdvisor_Admin_ListsStudentsWithoutAdvisor(t *testing.T) {
+	initTestLogger(t)
+	advisorID, adminID := uuid.New(), uuid.New()
+	advStr := advisorID.String()
+	advised, orphan := uuid.New(), uuid.New()
+	store := newMockEnrollmentStore()
+	for _, student := range []uuid.UUID{advised, orphan} {
+		programID := uuid.New()
+		store.programs[programID] = db.EnrollmentProgram{
+			ID: utils.UUIDToPgtype(programID), StudentID: utils.UUIDToPgtype(student), Semester: "2026-2027-Spring",
+			Status: db.NullEnrollmentStatusEnum{EnrollmentStatusEnum: db.EnrollmentEnrollmentStatusEnumPending, Valid: true},
+		}
+	}
+	svc := &EnrollmentService{
+		enrollmentRepo: store,
+		studentClient: &mockStudentClient{students: map[uuid.UUID]contracts.StudentResponse{
+			advised: {ID: advised.String(), AdvisorID: &advStr, Status: "active"},
+			orphan:  {ID: orphan.String(), StudentNumber: "2024001", Status: "active"},
+		}},
+		courseCatalogClient: &mockCourseCatalogClient{},
+	}
+
+	resp, err := svc.GetPendingProgramsByAdvisor(context.Background(), adminID, true)
+
+	require.NoError(t, err)
+	require.Len(t, resp.Programs, 1)
+	assert.Equal(t, orphan, resp.Programs[0].StudentID)
 }

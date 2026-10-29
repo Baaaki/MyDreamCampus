@@ -393,7 +393,7 @@ func (h *EnrollmentHandler) ApproveEnrollmentProgram(c *gin.Context) {
 		zap.String("program_id", programID.String()),
 	)
 
-	response, err := h.enrollmentService.ApproveEnrollmentProgram(ctx, programID, advisorID)
+	response, err := h.enrollmentService.ApproveEnrollmentProgram(ctx, programID, advisorID, c.GetString("role") == "admin")
 	if err != nil {
 		handlerLogger.Error("failed to approve enrollment program", zap.Error(err))
 		h.handleError(c, err)
@@ -431,7 +431,7 @@ func (h *EnrollmentHandler) RejectEnrollmentProgram(c *gin.Context) {
 		zap.String("method", "RejectEnrollmentProgram"),
 	)
 
-	// Get advisor ID and fullname from JWT context
+	// Get advisor ID from JWT context
 	advisorIDStr, exists := c.Get("user_id")
 	if !exists {
 		handlerLogger.Error("user_id not found in context")
@@ -444,13 +444,6 @@ func (h *EnrollmentHandler) RejectEnrollmentProgram(c *gin.Context) {
 		handlerLogger.Error("invalid user_id format", zap.Error(err))
 		c.JSON(http.StatusBadRequest, gin.H{"error": "Geçersiz kullanıcı kimliği"})
 		return
-	}
-
-	// Get advisor fullname from context (set by auth middleware)
-	advisorFullname, _ := c.Get("fullname")
-	advisorFullnameStr := ""
-	if advisorFullname != nil {
-		advisorFullnameStr = advisorFullname.(string)
 	}
 
 	programIDStr := c.Param("program_id")
@@ -474,7 +467,7 @@ func (h *EnrollmentHandler) RejectEnrollmentProgram(c *gin.Context) {
 		zap.String("reason", req.RejectionReason),
 	)
 
-	err = h.enrollmentService.RejectEnrollmentProgram(ctx, programID, advisorID, advisorFullnameStr, req.RejectionReason)
+	err = h.enrollmentService.RejectEnrollmentProgram(ctx, programID, advisorID, c.GetString("role") == "admin", req.RejectionReason)
 	if err != nil {
 		handlerLogger.Error("failed to reject enrollment program", zap.Error(err))
 		h.handleError(c, err)
@@ -592,7 +585,7 @@ func (h *EnrollmentHandler) GetPendingProgramsByAdvisor(c *gin.Context) {
 		zap.String("advisor_id", advisorID.String()),
 	)
 
-	response, err := h.enrollmentService.GetPendingProgramsByAdvisor(ctx, advisorID)
+	response, err := h.enrollmentService.GetPendingProgramsByAdvisor(ctx, advisorID, c.GetString("role") == "admin")
 	if err != nil {
 		handlerLogger.Error("failed to get pending programs", zap.Error(err))
 		h.handleError(c, err)

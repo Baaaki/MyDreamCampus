@@ -70,6 +70,14 @@ func (c *HTTPStudentClient) GetStudentsByAdvisorID(ctx context.Context, advisorI
 	return resp.Students, nil
 }
 
+func (c *HTTPStudentClient) GetStudentsWithoutAdvisor(ctx context.Context) ([]contracts.StudentResponse, error) {
+	var resp adviseeList
+	if err := c.base.Get(ctx, "/internal/students?without_advisor=true", &resp); err != nil {
+		return nil, err
+	}
+	return resp.Students, nil
+}
+
 // HTTPCourseCatalogClient implements CourseCatalogClient over internal REST.
 type HTTPCourseCatalogClient struct {
 	base *client.Base

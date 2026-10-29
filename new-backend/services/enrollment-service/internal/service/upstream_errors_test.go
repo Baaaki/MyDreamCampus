@@ -68,7 +68,7 @@ func TestApproveEnrollmentProgram_StudentServiceDown_Returns503(t *testing.T) {
 	}
 	svc := &EnrollmentService{enrollmentRepo: store, studentClient: &mockStudentClient{getErr: errPeerDown}}
 
-	_, err := svc.ApproveEnrollmentProgram(context.Background(), programID, uuid.New())
+	_, err := svc.ApproveEnrollmentProgram(context.Background(), programID, uuid.New(), false)
 
 	requireStatus(t, err, http.StatusServiceUnavailable)
 }

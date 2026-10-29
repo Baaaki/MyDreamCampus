@@ -15,13 +15,16 @@ import (
 	"go.uber.org/zap"
 )
 
-// ApproveEnrollmentProgram approves a student's enrollment program
-func (s *EnrollmentService) ApproveEnrollmentProgram(ctx context.Context, programID uuid.UUID, advisorID uuid.UUID) (dto.EnrollmentProgramResponse, error) {
+// ApproveEnrollmentProgram approves a student's enrollment program. The
+// student's advisor decides; an admin may decide for any student, which is
+// the only way a student without an advisor (none assigned yet, or the
+// advisor deactivated) gets an answer.
+func (s *EnrollmentService) ApproveEnrollmentProgram(ctx context.Context, programID uuid.UUID, callerID uuid.UUID, isAdmin bool) (dto.EnrollmentProgramResponse, error) {
 	serviceLogger := logger.WithContextAndFields(ctx,
 		zap.String("service", "EnrollmentService"),
 		zap.String("method", "ApproveEnrollmentProgram"),
 		zap.String("program_id", programID.String()),
-		zap.String("advisor_id", advisorID.String()),
+		zap.String("caller_id", callerID.String()),
 	)
 
 	// Get program
@@ -46,11 +49,8 @@ func (s *EnrollmentService) ApproveEnrollmentProgram(ctx context.Context, progra
 		return dto.EnrollmentProgramResponse{}, err
 	}
 
-	// Verify advisor — student must have an assigned advisor and it must match
-	if student.AdvisorID == nil || *student.AdvisorID != advisorID.String() {
-		serviceLogger.Warn("advisor mismatch",
-			zap.String("requesting_advisor", advisorID.String()),
-		)
+	if !isAdmin && !isAdvisorOf(student, callerID) {
+		serviceLogger.Warn("advisor mismatch")
 		// 403, not 401: the caller is signed in. A 401 makes the web client
 		// refresh and then log the user out.
 		return dto.EnrollmentProgramResponse{}, sharedErrors.ErrForbidden
@@ -72,7 +72,7 @@ func (s *EnrollmentService) ApproveEnrollmentProgram(ctx context.Context, progra
 		StudentID:  utils.PgtypeToUUID(program.StudentID),
 		Semester:   program.Semester,
 		CourseIDs:  courseIDs,
-		ApprovedBy: advisorID,
+		ApprovedBy: callerID,
 	})
 
 	// Approve program (with event)
@@ -87,15 +87,19 @@ func (s *EnrollmentService) ApproveEnrollmentProgram(ctx context.Context, progra
 
 	serviceLogger.Info("enrollment program approved successfully")
 
-	// Build response
+	// The same course details my-enrollments shows, so the advisor's screen
+	// can draw the approved program without another read.
+	catalog := s.catalogCourses(ctx, approvedProgram.Semester, courseIDs)
 	coursesDTO := make([]dto.CourseBasic, 0, len(coursesRows))
 	for _, row := range coursesRows {
+		course := catalog[utils.PgtypeToUUID(row.CourseID)]
 		coursesDTO = append(coursesDTO, dto.CourseBasic{
 			ID:               utils.PgtypeToUUID(row.CourseID).String(),
 			CourseCode:       row.CourseCode,
 			CourseName:       row.CourseName,
 			Credits:          row.Credits,
-			ScheduleSessions: []dto.ScheduleSession{},
+			InstructorName:   course.InstructorFullname,
+			ScheduleSessions: toScheduleSessions(course.ScheduleSessions),
 		})
 	}
 
@@ -109,13 +113,14 @@ func (s *EnrollmentService) ApproveEnrollmentProgram(ctx context.Context, progra
 	}, nil
 }
 
-// RejectEnrollmentProgram rejects a student's enrollment program
-func (s *EnrollmentService) RejectEnrollmentProgram(ctx context.Context, programID uuid.UUID, advisorID uuid.UUID, advisorFullname string, rejectionReason string) error {
+// RejectEnrollmentProgram rejects a student's enrollment program. Who may
+// decide is the same as for ApproveEnrollmentProgram.
+func (s *EnrollmentService) RejectEnrollmentProgram(ctx context.Context, programID uuid.UUID, callerID uuid.UUID, isAdmin bool, rejectionReason string) error {
 	serviceLogger := logger.WithContextAndFields(ctx,
 		zap.String("service", "EnrollmentService"),
 		zap.String("method", "RejectEnrollmentProgram"),
 		zap.String("program_id", programID.String()),
-		zap.String("advisor_id", advisorID.String()),
+		zap.String("caller_id", callerID.String()),
 	)
 
 	// Get program
@@ -140,12 +145,17 @@ func (s *EnrollmentService) RejectEnrollmentProgram(ctx context.Context, program
 		return err
 	}
 
-	// Verify advisor
-	if student.AdvisorID == nil || *student.AdvisorID != advisorID.String() {
-		serviceLogger.Warn("advisor mismatch",
-			zap.String("requesting_advisor", advisorID.String()),
-		)
+	if !isAdmin && !isAdvisorOf(student, callerID) {
+		serviceLogger.Warn("advisor mismatch")
 		return sharedErrors.ErrForbidden
+	}
+
+	// The name the student reads on the rejection. The token carries no
+	// names, the student's record carries the advisor's; an admin deciding
+	// in a missing advisor's place is shown as such.
+	rejectedBy := "Yönetici"
+	if isAdvisorOf(student, callerID) && student.AdvisorName != nil {
+		rejectedBy = *student.AdvisorName
 	}
 
 	// Get courses
@@ -158,14 +168,19 @@ func (s *EnrollmentService) RejectEnrollmentProgram(ctx context.Context, program
 	rejectedCourseDetails := make([]dto.RejectedCourseDetail, 0, len(coursesRows))
 	totalCredits := 0
 	courseIDs := make([]uuid.UUID, len(coursesRows))
-
 	for i, row := range coursesRows {
 		courseIDs[i] = utils.PgtypeToUUID(row.CourseID)
+	}
+	catalog := s.catalogCourses(ctx, program.Semester, courseIDs)
+
+	for _, row := range coursesRows {
+		courseID := utils.PgtypeToUUID(row.CourseID)
 		rejectedCourseDetails = append(rejectedCourseDetails, dto.RejectedCourseDetail{
-			CourseID:   utils.PgtypeToUUID(row.CourseID),
+			CourseID:   courseID,
 			CourseCode: row.CourseCode,
 			CourseName: row.CourseName,
 			Credits:    row.Credits,
+			Instructor: catalog[courseID].InstructorFullname,
 		})
 		totalCredits += int(row.Credits)
 	}
@@ -185,8 +200,8 @@ func (s *EnrollmentService) RejectEnrollmentProgram(ctx context.Context, program
 	rejectionLogParams := db.CreateRejectionLogParams{
 		OriginalProgramID: utils.UUIDToPgtype(programID),
 		StudentID:         program.StudentID,
-		AdvisorID:         utils.UUIDToPgtype(advisorID),
-		AdvisorFullname:   advisorFullname,
+		AdvisorID:         utils.UUIDToPgtype(callerID),
+		AdvisorFullname:   rejectedBy,
 		Semester:          program.Semester,
 		RejectionReason:   rejectionReason,
 		RejectedCourses:   rejectedCoursesJSON,
@@ -197,7 +212,7 @@ func (s *EnrollmentService) RejectEnrollmentProgram(ctx context.Context, program
 		StudentID:       utils.PgtypeToUUID(program.StudentID),
 		Semester:        program.Semester,
 		CourseIDs:       courseIDs,
-		RejectedBy:      advisorID,
+		RejectedBy:      callerID,
 		RejectionReason: rejectionReason,
 	})
 
@@ -212,15 +227,23 @@ func (s *EnrollmentService) RejectEnrollmentProgram(ctx context.Context, program
 	return nil
 }
 
-// GetPendingProgramsByAdvisor returns pending programs for an advisor
-func (s *EnrollmentService) GetPendingProgramsByAdvisor(ctx context.Context, advisorID uuid.UUID) (dto.AdvisorPendingProgramsResponse, error) {
+// GetPendingProgramsByAdvisor returns the pending programs of an advisor's
+// students. For an admin it returns those of the students without an
+// advisor, which no advisor's list holds.
+func (s *EnrollmentService) GetPendingProgramsByAdvisor(ctx context.Context, advisorID uuid.UUID, isAdmin bool) (dto.AdvisorPendingProgramsResponse, error) {
 	serviceLogger := logger.WithContextAndFields(ctx,
 		zap.String("service", "EnrollmentService"),
 		zap.String("method", "GetPendingProgramsByAdvisor"),
 		zap.String("advisor_id", advisorID.String()),
 	)
 
-	students, err := s.studentClient.GetStudentsByAdvisorID(ctx, advisorID)
+	var students []contracts.StudentResponse
+	var err error
+	if isAdmin {
+		students, err = s.studentClient.GetStudentsWithoutAdvisor(ctx)
+	} else {
+		students, err = s.studentClient.GetStudentsByAdvisorID(ctx, advisorID)
+	}
 	if err != nil {
 		return dto.AdvisorPendingProgramsResponse{}, upstreamError(err)
 	}
@@ -331,4 +354,25 @@ func (s *EnrollmentService) GetPendingProgramsByAdvisor(ctx context.Context, adv
 		AdvisorID: advisorID,
 		Programs:  programsDTO,
 	}, nil
+}
+
+func isAdvisorOf(student contracts.StudentResponse, callerID uuid.UUID) bool {
+	return student.AdvisorID != nil && *student.AdvisorID == callerID.String()
+}
+
+// catalogCourses reads courses from the catalog for their instructor and
+// weekly sessions. They only label a program, so a catalog outage leaves
+// them out rather than failing a decision already made.
+func (s *EnrollmentService) catalogCourses(ctx context.Context, semester string, ids []uuid.UUID) map[uuid.UUID]contracts.SemesterCourseResponse {
+	out := make(map[uuid.UUID]contracts.SemesterCourseResponse, len(ids))
+	courses, err := s.courseCatalogClient.GetCoursesByIDs(ctx, semester, ids)
+	if err != nil {
+		logger.WithContextAndFields(ctx, zap.String("method", "catalogCourses")).
+			Warn("failed to read course details from catalog", zap.Error(err))
+		return out
+	}
+	for _, c := range courses {
+		out[c.ID] = c
+	}
+	return out
 }

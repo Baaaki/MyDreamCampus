@@ -15,6 +15,7 @@ import (
 type StudentClient interface {
 	GetStudentByID(ctx context.Context, id uuid.UUID) (contracts.StudentResponse, error)
 	GetStudentsByAdvisorID(ctx context.Context, advisorID uuid.UUID) ([]contracts.StudentResponse, error)
+	GetStudentsWithoutAdvisor(ctx context.Context) ([]contracts.StudentResponse, error)
 }
 
 // CourseCatalogClient defines the interface for communicating with the Course Catalog module

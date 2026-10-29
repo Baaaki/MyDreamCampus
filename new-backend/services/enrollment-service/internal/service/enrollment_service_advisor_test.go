@@ -59,8 +59,9 @@ func newAdvisorTestService(t *testing.T, advisorID uuid.UUID) (*EnrollmentServic
 		},
 	}}
 	return &EnrollmentService{
-		enrollmentRepo: store,
-		studentClient:  advisedStudent{advisorID: advisorID.String()},
+		enrollmentRepo:      store,
+		studentClient:       advisedStudent{advisorID: advisorID.String()},
+		courseCatalogClient: &mockCourseCatalogClient{},
 	}, store
 }
 
@@ -77,7 +78,7 @@ func httpStatusOf(t *testing.T, err error) int {
 func TestApproveEnrollmentProgram_WrongAdvisor_Returns403(t *testing.T) {
 	svc, _ := newAdvisorTestService(t, uuid.New())
 
-	_, err := svc.ApproveEnrollmentProgram(context.Background(), uuid.New(), uuid.New())
+	_, err := svc.ApproveEnrollmentProgram(context.Background(), uuid.New(), uuid.New(), false)
 
 	require.Error(t, err)
 	assert.Equal(t, http.StatusForbidden, httpStatusOf(t, err))
@@ -86,7 +87,7 @@ func TestApproveEnrollmentProgram_WrongAdvisor_Returns403(t *testing.T) {
 func TestRejectEnrollmentProgram_WrongAdvisor_Returns403(t *testing.T) {
 	svc, _ := newAdvisorTestService(t, uuid.New())
 
-	err := svc.RejectEnrollmentProgram(context.Background(), uuid.New(), uuid.New(), "Dr. Baska", "Yanlis ders secimi yapilmis")
+	err := svc.RejectEnrollmentProgram(context.Background(), uuid.New(), uuid.New(), false, "Yanlis ders secimi yapilmis")
 
 	require.Error(t, err)
 	assert.Equal(t, http.StatusForbidden, httpStatusOf(t, err))
@@ -97,7 +98,7 @@ func TestApproveEnrollmentProgram_NotPending_Returns409(t *testing.T) {
 	svc, store := newAdvisorTestService(t, advisorID)
 	store.approveErr = serviceErrors.ErrProgramNotPending
 
-	_, err := svc.ApproveEnrollmentProgram(context.Background(), uuid.New(), advisorID)
+	_, err := svc.ApproveEnrollmentProgram(context.Background(), uuid.New(), advisorID, false)
 
 	require.ErrorIs(t, err, serviceErrors.ErrProgramNotPending)
 	assert.Equal(t, http.StatusConflict, httpStatusOf(t, err))
