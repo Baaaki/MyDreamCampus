@@ -42,6 +42,8 @@ catalog     ──► staff       (instructor doğrulama)
 student     ──► staff       (danışman doğrulama)
 enrollment  ──► student     (öğrenci doğrulama)
 enrollment  ──► catalog     (ders listesi / ders doğrulama)
+enrollment  ──► attendance  (onaylı program değişmeden önce: dönemde yoklama kaydı var mı)
+enrollment  ──► grades      (onaylı program değişmeden önce: dönemde puan/not var mı)
 attendance  ──► catalog     (SemesterInfo)
 grades      ──► catalog     (SemesterInfo)
 grades      ──► student     (danışman doğrulama: öğretmen yalnız danışmanı olduğu öğrencinin transkriptini görür)
@@ -62,11 +64,14 @@ Tüm internal çağrılar `X-Internal-Secret` header'ı taşır; doğrulama
 | staff | `GET /internal/staff?department=X&role=instructor` | yukarıdakinin listesi |
 | student | `GET /internal/students/:id` | StudentResponse |
 | student | `GET /internal/students?advisor_id=X` | StudentResponse listesi |
+| student | `GET /internal/students?without_advisor=true` | danışmanı olmayan aktif öğrencilerin StudentResponse listesi |
 | catalog | `GET /internal/semesters/:name` | name, status, hard_deadline, is_past_deadline |
 | catalog | `GET /internal/semester-courses?semester=&department=&class_level=` | SemesterCourseListItem listesi |
 | catalog | `GET /internal/semester-courses/:id?semester=` | SemesterCourseResponse |
 | payment | `POST /internal/payments/initiate` | InitiatePaymentResponse |
 | payment | `POST /internal/payments/refund` | RefundResponse |
+| attendance | `GET /internal/students/:id/semester-activity?semester=` | `{has_activity}` — öğrencinin dönemde yoklama kaydı var mı |
+| grades | `GET /internal/students/:id/semester-activity?semester=` | `{has_activity}` — öğrencinin dönemde puanı ya da kesinleşmiş notu var mı |
 
 Bu endpoint'ler `/api/*` altında **değil** — Caddy bunları dışarı proxy'lemez,
 sadece compose network'ünden erişilir.
@@ -83,7 +88,7 @@ sadece compose network'ünden erişilir.
 |---|---|---|---|
 | `auth_events_queue` | staff.events, student.events | `staff.*`, `student.*` (created/updated/deactivated) | auth |
 | `student.staff_events` | staff.events | `staff.deactivated` | student |
-| `attendance.sync_events` | student, course_catalog, enrollment | `student.*`, `course.semester.created`, `enrollment.program.approved` | attendance |
+| `attendance.sync_events` | student, course_catalog, enrollment | `student.*`, `course.semester.created`, `enrollment.program.approved`, `enrollment.program.cancelled` | attendance |
 | `grades.sync_events` | student, course_catalog, enrollment, attendance | yukarıdakiler + `attendance.semester.failed` | grades |
 | `grades.finalize_requested` | grades.events | `grade.finalize.requested` | grades (self-loop) |
 | `enrollment.sync_events` | grades.events | `grade.student.prerequisite.passed` | enrollment |
@@ -210,7 +215,7 @@ Servise özel:
 | attendance | `REDIS_ADDR`, `REDIS_PASSWORD`, `QR_SECRET`, `CATALOG_SERVICE_URL` |
 | meal | `REDIS_ADDR`, `REDIS_PASSWORD`, `QR_SECRET`, `PAYMENT_SERVICE_URL` |
 | grades | `CATALOG_SERVICE_URL` |
-| enrollment | `STUDENT_SERVICE_URL`, `CATALOG_SERVICE_URL` |
+| enrollment | `STUDENT_SERVICE_URL`, `CATALOG_SERVICE_URL`, `ATTENDANCE_SERVICE_URL`, `GRADES_SERVICE_URL` |
 | catalog | `STAFF_SERVICE_URL` |
 | student | `STAFF_SERVICE_URL` |
 | tüm servisler (rate limit) | `REDIS_ADDR`, `REDIS_PASSWORD` |

@@ -19,6 +19,14 @@
   yığında** test amaçlı veri değişikliği yapıldı (kontenjanı 1'e çekmek, fazladan
   ders saati eklemek, danışmanı `NULL` yapmak); her birinin yanında belirtildi.
 
+## Durum (29 Ekim 2026, ikinci tur)
+
+1–10 düzeltildi ve izole yığında uçtan uca doğrulandı. 11'de kalan tek madde
+(`Idempotency-Key` olmadan da kabul) bilinçli bir not. Bulgu 5'in çözümü:
+pencere açıkken öğrenci onaylı programını yeniden gönderir, program danışman
+onayına döner; o dönemde yoklama ya da not kaydı varsa `409
+APPROVED_PROGRAM_IN_USE`.
+
 ## Özet
 
 | # | Önem | Katman | Bulgu |
