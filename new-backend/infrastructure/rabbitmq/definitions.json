@@ -823,6 +823,14 @@
       "arguments": {}
     },
     {
+      "source": "enrollment.events",
+      "vhost": "/",
+      "destination": "grades.sync_events",
+      "destination_type": "queue",
+      "routing_key": "enrollment.program.cancelled",
+      "arguments": {}
+    },
+    {
       "source": "attendance.events",
       "vhost": "/",
       "destination": "grades.sync_events",

@@ -1,11 +1,40 @@
 -- name: CreateRegistration :one
+-- A row that is still there belongs to an earlier program of the same
+-- student whose cancelled event has not been consumed yet: the new program
+-- takes it over, so that event no longer removes the course.
 INSERT INTO grades.student_course_registrations (
-    student_id, course_id, semester, is_attendance_failed
+    student_id, course_id, semester, is_attendance_failed, program_id
 ) VALUES (
-    $1, $2, $3, $4
+    $1, $2, $3, $4, $5
 )
-ON CONFLICT (student_id, course_id) DO NOTHING
+ON CONFLICT (student_id, course_id) DO UPDATE
+SET program_id = EXCLUDED.program_id
 RETURNING *;
+
+-- name: DeleteProgramRegistrations :execrows
+-- A registration that holds a score stays: deleting it would cascade the
+-- score away. Enrollment refuses the change when one exists, so this only
+-- matters for a score entered while the change was in flight.
+DELETE FROM grades.student_course_registrations r
+WHERE r.student_id = @student_id
+  AND r.course_id = ANY(@course_ids::uuid[])
+  AND (r.program_id = @program_id OR r.program_id IS NULL)
+  AND NOT EXISTS (
+      SELECT 1 FROM grades.student_assessment_scores sa WHERE sa.registration_id = r.id
+  );
+
+-- name: StudentHasGradesInSemester :one
+SELECT (
+    EXISTS (
+        SELECT 1
+        FROM grades.student_assessment_scores sa
+        JOIN grades.student_course_registrations r ON r.id = sa.registration_id
+        WHERE r.student_id = @student_id AND r.semester = @semester
+    ) OR EXISTS (
+        SELECT 1 FROM grades.student_completed_courses cc
+        WHERE cc.student_id = @student_id AND cc.semester = @semester
+    )
+)::boolean AS has_grades;
 
 -- name: GetRegistrationByID :one
 SELECT

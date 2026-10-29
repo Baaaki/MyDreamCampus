@@ -4,6 +4,7 @@ import (
 	"context"
 
 	"github.com/baaaki/mydreamcampus/grades/internal/db"
+	"github.com/baaaki/mydreamcampus/shared/platform/utils"
 	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgxpool"
@@ -23,6 +24,23 @@ func NewRegistrationRepository(pool *pgxpool.Pool) *RegistrationRepository {
 
 func (r *RegistrationRepository) CreateRegistration(ctx context.Context, arg db.CreateRegistrationParams) (db.GradesStudentCourseRegistration, error) {
 	return r.queries.CreateRegistration(ctx, arg)
+}
+
+// DeleteProgramRegistrations takes the student off the courses of a program
+// that was withdrawn or replaced, and returns how many rows it removed.
+func (r *RegistrationRepository) DeleteProgramRegistrations(ctx context.Context, programID, studentID uuid.UUID, courseIDs []uuid.UUID) (int64, error) {
+	return r.queries.DeleteProgramRegistrations(ctx, db.DeleteProgramRegistrationsParams{
+		StudentID: studentID,
+		CourseIds: courseIDs,
+		ProgramID: utils.UUIDToPgtype(programID),
+	})
+}
+
+func (r *RegistrationRepository) StudentHasGradesInSemester(ctx context.Context, studentID uuid.UUID, semester string) (bool, error) {
+	return r.queries.StudentHasGradesInSemester(ctx, db.StudentHasGradesInSemesterParams{
+		StudentID: studentID,
+		Semester:  semester,
+	})
 }
 
 func (r *RegistrationRepository) GetRegistrationByID(ctx context.Context, id uuid.UUID) (db.GetRegistrationByIDRow, error) {

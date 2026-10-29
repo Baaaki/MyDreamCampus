@@ -19,7 +19,8 @@ import (
 )
 
 type Module struct {
-	pool *pgxpool.Pool
+	pool           *pgxpool.Pool
+	internalSecret string
 
 	cacheRepo        *repository.CacheRepository
 	registrationRepo *repository.RegistrationRepository
@@ -45,6 +46,7 @@ func New(
 	periodRepo *platformRepo.SimplePeriodRepository,
 	semesterClient service.SemesterClient,
 	studentClient service.StudentClient,
+	internalSecret string,
 ) *Module {
 	cacheRepo := repository.NewCacheRepository(pool)
 	registrationRepo := repository.NewRegistrationRepository(pool)
@@ -78,6 +80,7 @@ func New(
 
 	return &Module{
 		pool:             pool,
+		internalSecret:   internalSecret,
 		cacheRepo:        cacheRepo,
 		registrationRepo: registrationRepo,
 		scoreRepo:        scoreRepo,
@@ -161,5 +164,16 @@ func (m *Module) RegisterRoutes(rg *gin.RouterGroup) {
 			admin.POST("/scores/lock", m.gradeHandler.LockScore)
 			admin.POST("/scores/unlock", m.gradeHandler.UnlockScore)
 		}
+	}
+}
+
+// RegisterPublicRoutes mounts the internal read enrollment performs. It sits
+// at the root rather than under /api because Caddy only proxies /api; the
+// secret check stays behind that as the second line of defence.
+func (m *Module) RegisterPublicRoutes(r *gin.Engine) {
+	internal := r.Group("/internal")
+	internal.Use(platformMiddleware.RequireInternalSecret(m.internalSecret))
+	{
+		internal.GET("/students/:id/semester-activity", m.gradeHandler.GetSemesterActivity)
 	}
 }

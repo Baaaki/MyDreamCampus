@@ -238,6 +238,7 @@ type GradesStudentCourseRegistration struct {
 	Semester           string           `json:"semester"`
 	IsAttendanceFailed pgtype.Bool      `json:"is_attendance_failed"`
 	CreatedAt          pgtype.Timestamp `json:"created_at"`
+	ProgramID          pgtype.UUID      `json:"program_id"`
 }
 
 type GradesStudentsView struct {

@@ -341,3 +341,76 @@ func TestScoreRepository_LockCourseGrading_TheNextJobWaitsForTheFirst(t *testing
 		t.Fatal("the second job never got the course after the first ended")
 	}
 }
+
+// registrationOf reads the student's registration on the course, if any.
+func (g *gradesDB) registrationOf(t *testing.T, student uuid.UUID) (uuid.UUID, bool) {
+	t.Helper()
+	var id, program pgtype.UUID
+	err := g.pool.QueryRow(context.Background(),
+		"SELECT id, program_id FROM grades.student_course_registrations WHERE student_id = $1 AND course_id = $2",
+		student, g.course).Scan(&id, &program)
+	if err != nil {
+		return uuid.Nil, false
+	}
+	return utils.PgtypeToUUID(program), true
+}
+
+func (g *gradesDB) studentOf(t *testing.T, reg uuid.UUID) uuid.UUID {
+	t.Helper()
+	var student uuid.UUID
+	require.NoError(t, g.pool.QueryRow(context.Background(),
+		"SELECT student_id FROM grades.student_course_registrations WHERE id = $1", reg).Scan(&student))
+	return student
+}
+
+// A changed approved program is cancelled and its replacement approved; the
+// replacement's approval may be consumed first. The cancel then leaves the
+// course it took over, and never takes a registration that holds a score.
+func TestDeleteProgramRegistrations_KeepsTakenOverAndScoredRows(t *testing.T) {
+	g := newGradesDB(t)
+	ctx := context.Background()
+	oldProgram, newProgram := uuid.New(), uuid.New()
+	takenOver := g.studentOf(t, g.register(t, "1", false))
+	scoredReg := g.register(t, "2", false)
+	scored := g.studentOf(t, scoredReg)
+	dropped := g.studentOf(t, g.register(t, "3", false))
+	_, err := g.scores.UpsertAssessmentScoreWithEvent(ctx, score(t, scoredReg, "vize", 70), nil)
+	require.NoError(t, err)
+
+	_, err = g.regs.CreateRegistration(ctx, db.CreateRegistrationParams{
+		StudentID: takenOver, CourseID: g.course, Semester: "2026-2027-Fall", ProgramID: utils.UUIDToPgtype(newProgram),
+	})
+	require.NoError(t, err)
+	for _, student := range []uuid.UUID{takenOver, scored, dropped} {
+		_, err := g.regs.DeleteProgramRegistrations(ctx, oldProgram, student, []uuid.UUID{g.course})
+		require.NoError(t, err)
+	}
+
+	program, ok := g.registrationOf(t, takenOver)
+	assert.True(t, ok, "the replacement program owns the course now")
+	assert.Equal(t, newProgram, program)
+	_, ok = g.registrationOf(t, scored)
+	assert.True(t, ok, "deleting it would cascade the score away")
+	_, ok = g.registrationOf(t, dropped)
+	assert.False(t, ok)
+}
+
+func TestStudentHasGradesInSemester_ScoreCounts(t *testing.T) {
+	g := newGradesDB(t)
+	ctx := context.Background()
+	scoredReg := g.register(t, "1", false)
+	idle := g.studentOf(t, g.register(t, "2", false))
+	_, err := g.scores.UpsertAssessmentScoreWithEvent(ctx, score(t, scoredReg, "vize", 70), nil)
+	require.NoError(t, err)
+	scored := g.studentOf(t, scoredReg)
+
+	for _, tc := range []struct {
+		student  uuid.UUID
+		semester string
+		want     bool
+	}{{scored, "2026-2027-Fall", true}, {scored, "2026-2027-Spring", false}, {idle, "2026-2027-Fall", false}} {
+		got, err := g.regs.StudentHasGradesInSemester(ctx, tc.student, tc.semester)
+		require.NoError(t, err)
+		assert.Equal(t, tc.want, got, tc.semester)
+	}
+}

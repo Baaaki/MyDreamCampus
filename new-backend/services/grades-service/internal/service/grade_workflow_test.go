@@ -151,6 +151,10 @@ func (v regView) GetRegistrationsByCourse(_ context.Context, courseID uuid.UUID)
 	return out, nil
 }
 
+func (v regView) StudentHasGradesInSemester(context.Context, uuid.UUID, string) (bool, error) {
+	return false, nil
+}
+
 func (v regView) GetActiveRegistrationsByStudent(context.Context, uuid.UUID) ([]db.GetActiveRegistrationsByStudentRow, error) {
 	return nil, nil
 }

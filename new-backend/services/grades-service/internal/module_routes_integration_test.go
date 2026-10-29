@@ -70,7 +70,7 @@ func TestTranscriptRoutes_WhoGetsWhichTranscript(t *testing.T) {
 	})
 	require.NoError(t, err)
 
-	m := New(pool, nil, sharedRepo.NewSimplePeriodRepository(pool, "grades"), nil, advisorsByStudent{advisee: advisor})
+	m := New(pool, nil, sharedRepo.NewSimplePeriodRepository(pool, "grades"), nil, advisorsByStudent{advisee: advisor}, "")
 	router := gin.New()
 	m.RegisterRoutes(router.Group("/api/grades"))
 
@@ -139,7 +139,7 @@ func TestLockAssessmentRoute_InstructorLocksAScoredAssessment(t *testing.T) {
 	}, nil)
 	require.NoError(t, err)
 
-	m := New(pool, nil, sharedRepo.NewSimplePeriodRepository(pool, "grades"), nil, advisorsByStudent{})
+	m := New(pool, nil, sharedRepo.NewSimplePeriodRepository(pool, "grades"), nil, advisorsByStudent{}, "")
 	router := gin.New()
 	m.RegisterRoutes(router.Group("/api/grades"))
 

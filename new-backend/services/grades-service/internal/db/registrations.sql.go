@@ -40,12 +40,13 @@ func (q *Queries) CountRegistrationsByCourse(ctx context.Context, courseID uuid.
 
 const createRegistration = `-- name: CreateRegistration :one
 INSERT INTO grades.student_course_registrations (
-    student_id, course_id, semester, is_attendance_failed
+    student_id, course_id, semester, is_attendance_failed, program_id
 ) VALUES (
-    $1, $2, $3, $4
+    $1, $2, $3, $4, $5
 )
-ON CONFLICT (student_id, course_id) DO NOTHING
-RETURNING id, student_id, course_id, semester, is_attendance_failed, created_at
+ON CONFLICT (student_id, course_id) DO UPDATE
+SET program_id = EXCLUDED.program_id
+RETURNING id, student_id, course_id, semester, is_attendance_failed, created_at, program_id
 `
 
 type CreateRegistrationParams struct {
@@ -53,14 +54,19 @@ type CreateRegistrationParams struct {
 	CourseID           uuid.UUID   `json:"course_id"`
 	Semester           string      `json:"semester"`
 	IsAttendanceFailed pgtype.Bool `json:"is_attendance_failed"`
+	ProgramID          pgtype.UUID `json:"program_id"`
 }
 
+// A row that is still there belongs to an earlier program of the same
+// student whose cancelled event has not been consumed yet: the new program
+// takes it over, so that event no longer removes the course.
 func (q *Queries) CreateRegistration(ctx context.Context, arg CreateRegistrationParams) (GradesStudentCourseRegistration, error) {
 	row := q.db.QueryRow(ctx, createRegistration,
 		arg.StudentID,
 		arg.CourseID,
 		arg.Semester,
 		arg.IsAttendanceFailed,
+		arg.ProgramID,
 	)
 	var i GradesStudentCourseRegistration
 	err := row.Scan(
@@ -70,8 +76,36 @@ func (q *Queries) CreateRegistration(ctx context.Context, arg CreateRegistration
 		&i.Semester,
 		&i.IsAttendanceFailed,
 		&i.CreatedAt,
+		&i.ProgramID,
 	)
 	return i, err
+}
+
+const deleteProgramRegistrations = `-- name: DeleteProgramRegistrations :execrows
+DELETE FROM grades.student_course_registrations r
+WHERE r.student_id = $1
+  AND r.course_id = ANY($2::uuid[])
+  AND (r.program_id = $3 OR r.program_id IS NULL)
+  AND NOT EXISTS (
+      SELECT 1 FROM grades.student_assessment_scores sa WHERE sa.registration_id = r.id
+  )
+`
+
+type DeleteProgramRegistrationsParams struct {
+	StudentID uuid.UUID   `json:"student_id"`
+	CourseIds []uuid.UUID `json:"course_ids"`
+	ProgramID pgtype.UUID `json:"program_id"`
+}
+
+// A registration that holds a score stays: deleting it would cascade the
+// score away. Enrollment refuses the change when one exists, so this only
+// matters for a score entered while the change was in flight.
+func (q *Queries) DeleteProgramRegistrations(ctx context.Context, arg DeleteProgramRegistrationsParams) (int64, error) {
+	result, err := q.db.Exec(ctx, deleteProgramRegistrations, arg.StudentID, arg.CourseIds, arg.ProgramID)
+	if err != nil {
+		return 0, err
+	}
+	return result.RowsAffected(), nil
 }
 
 const deleteRegistrationsByCourse = `-- name: DeleteRegistrationsByCourse :exec
@@ -155,7 +189,7 @@ func (q *Queries) GetActiveRegistrationsByStudent(ctx context.Context, studentID
 
 const getRegistrationByID = `-- name: GetRegistrationByID :one
 SELECT
-    r.id, r.student_id, r.course_id, r.semester, r.is_attendance_failed, r.created_at,
+    r.id, r.student_id, r.course_id, r.semester, r.is_attendance_failed, r.created_at, r.program_id,
     s.student_number,
     s.first_name as student_first_name,
     s.last_name as student_last_name,
@@ -177,6 +211,7 @@ type GetRegistrationByIDRow struct {
 	Semester           string           `json:"semester"`
 	IsAttendanceFailed pgtype.Bool      `json:"is_attendance_failed"`
 	CreatedAt          pgtype.Timestamp `json:"created_at"`
+	ProgramID          pgtype.UUID      `json:"program_id"`
 	StudentNumber      string           `json:"student_number"`
 	StudentFirstName   pgtype.Text      `json:"student_first_name"`
 	StudentLastName    pgtype.Text      `json:"student_last_name"`
@@ -197,6 +232,7 @@ func (q *Queries) GetRegistrationByID(ctx context.Context, id uuid.UUID) (GetReg
 		&i.Semester,
 		&i.IsAttendanceFailed,
 		&i.CreatedAt,
+		&i.ProgramID,
 		&i.StudentNumber,
 		&i.StudentFirstName,
 		&i.StudentLastName,
@@ -211,7 +247,7 @@ func (q *Queries) GetRegistrationByID(ctx context.Context, id uuid.UUID) (GetReg
 
 const getRegistrationsByCourse = `-- name: GetRegistrationsByCourse :many
 SELECT
-    r.id, r.student_id, r.course_id, r.semester, r.is_attendance_failed, r.created_at,
+    r.id, r.student_id, r.course_id, r.semester, r.is_attendance_failed, r.created_at, r.program_id,
     s.student_number,
     s.first_name as student_first_name,
     s.last_name as student_last_name,
@@ -229,6 +265,7 @@ type GetRegistrationsByCourseRow struct {
 	Semester           string           `json:"semester"`
 	IsAttendanceFailed pgtype.Bool      `json:"is_attendance_failed"`
 	CreatedAt          pgtype.Timestamp `json:"created_at"`
+	ProgramID          pgtype.UUID      `json:"program_id"`
 	StudentNumber      string           `json:"student_number"`
 	StudentFirstName   pgtype.Text      `json:"student_first_name"`
 	StudentLastName    pgtype.Text      `json:"student_last_name"`
@@ -251,6 +288,7 @@ func (q *Queries) GetRegistrationsByCourse(ctx context.Context, courseID uuid.UU
 			&i.Semester,
 			&i.IsAttendanceFailed,
 			&i.CreatedAt,
+			&i.ProgramID,
 			&i.StudentNumber,
 			&i.StudentFirstName,
 			&i.StudentLastName,
@@ -268,7 +306,7 @@ func (q *Queries) GetRegistrationsByCourse(ctx context.Context, courseID uuid.UU
 
 const getRegistrationsByIDs = `-- name: GetRegistrationsByIDs :many
 SELECT
-    r.id, r.student_id, r.course_id, r.semester, r.is_attendance_failed, r.created_at,
+    r.id, r.student_id, r.course_id, r.semester, r.is_attendance_failed, r.created_at, r.program_id,
     s.student_number,
     s.first_name as student_first_name,
     s.last_name as student_last_name,
@@ -290,6 +328,7 @@ type GetRegistrationsByIDsRow struct {
 	Semester           string           `json:"semester"`
 	IsAttendanceFailed pgtype.Bool      `json:"is_attendance_failed"`
 	CreatedAt          pgtype.Timestamp `json:"created_at"`
+	ProgramID          pgtype.UUID      `json:"program_id"`
 	StudentNumber      string           `json:"student_number"`
 	StudentFirstName   pgtype.Text      `json:"student_first_name"`
 	StudentLastName    pgtype.Text      `json:"student_last_name"`
@@ -316,6 +355,7 @@ func (q *Queries) GetRegistrationsByIDs(ctx context.Context, dollar_1 []uuid.UUI
 			&i.Semester,
 			&i.IsAttendanceFailed,
 			&i.CreatedAt,
+			&i.ProgramID,
 			&i.StudentNumber,
 			&i.StudentFirstName,
 			&i.StudentLastName,
@@ -349,4 +389,30 @@ type MarkAttendanceFailedParams struct {
 func (q *Queries) MarkAttendanceFailed(ctx context.Context, arg MarkAttendanceFailedParams) error {
 	_, err := q.db.Exec(ctx, markAttendanceFailed, arg.StudentID, arg.CourseID)
 	return err
+}
+
+const studentHasGradesInSemester = `-- name: StudentHasGradesInSemester :one
+SELECT (
+    EXISTS (
+        SELECT 1
+        FROM grades.student_assessment_scores sa
+        JOIN grades.student_course_registrations r ON r.id = sa.registration_id
+        WHERE r.student_id = $1 AND r.semester = $2
+    ) OR EXISTS (
+        SELECT 1 FROM grades.student_completed_courses cc
+        WHERE cc.student_id = $1 AND cc.semester = $2
+    )
+)::boolean AS has_grades
+`
+
+type StudentHasGradesInSemesterParams struct {
+	StudentID uuid.UUID `json:"student_id"`
+	Semester  string    `json:"semester"`
+}
+
+func (q *Queries) StudentHasGradesInSemester(ctx context.Context, arg StudentHasGradesInSemesterParams) (bool, error) {
+	row := q.db.QueryRow(ctx, studentHasGradesInSemester, arg.StudentID, arg.Semester)
+	var has_grades bool
+	err := row.Scan(&has_grades)
+	return has_grades, err
 }

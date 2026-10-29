@@ -13,6 +13,7 @@ import (
 	"github.com/baaaki/mydreamcampus/grades/internal/dto"
 	"github.com/baaaki/mydreamcampus/grades/internal/errors"
 	"github.com/baaaki/mydreamcampus/grades/internal/repository"
+	"github.com/baaaki/mydreamcampus/shared/contracts"
 	"github.com/baaaki/mydreamcampus/shared/platform/logger"
 	"github.com/baaaki/mydreamcampus/shared/platform/utils"
 	"github.com/google/uuid"
@@ -498,4 +499,15 @@ func parseInterfaceToInt64(v any) int64 {
 		i, _ := strconv.ParseInt(s, 10, 64)
 		return i
 	}
+}
+
+// GetSemesterActivity tells enrollment whether the student already has a
+// score or a finalized grade in the semester. Taking their approved program
+// back would delete the registrations those scores hang on.
+func (s *StudentGradesService) GetSemesterActivity(ctx context.Context, studentID uuid.UUID, semester string) (contracts.SemesterActivity, error) {
+	has, err := s.registrationRepo.StudentHasGradesInSemester(ctx, studentID, semester)
+	if err != nil {
+		return contracts.SemesterActivity{}, fmt.Errorf("read student's semester grades: %w", err)
+	}
+	return contracts.SemesterActivity{HasActivity: has}, nil
 }

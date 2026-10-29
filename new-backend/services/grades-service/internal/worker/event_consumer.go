@@ -3,7 +3,6 @@ package worker
 import (
 	"context"
 	"encoding/json"
-	"errors"
 
 	"github.com/baaaki/mydreamcampus/grades/internal/db"
 	"github.com/baaaki/mydreamcampus/grades/internal/dto"
@@ -12,7 +11,6 @@ import (
 	"github.com/baaaki/mydreamcampus/shared/platform/rabbitmq"
 	"github.com/baaaki/mydreamcampus/shared/platform/utils"
 	"github.com/google/uuid"
-	"github.com/jackc/pgx/v5"
 	"go.uber.org/zap"
 )
 
@@ -53,6 +51,7 @@ type cacheWriter interface {
 
 type registrationWriter interface {
 	CreateRegistration(ctx context.Context, arg db.CreateRegistrationParams) (db.GradesStudentCourseRegistration, error)
+	DeleteProgramRegistrations(ctx context.Context, programID, studentID uuid.UUID, courseIDs []uuid.UUID) (int64, error)
 	MarkAttendanceFailed(ctx context.Context, arg db.MarkAttendanceFailedParams) error
 }
 
@@ -106,6 +105,8 @@ func (w *EventConsumer) handleMessage(ctx context.Context, body []byte) error {
 		return w.handleCourseSemesterCreated(ctx, env)
 	case "enrollment.program.approved":
 		return w.handleEnrollmentApproved(ctx, env)
+	case "enrollment.program.cancelled":
+		return w.handleEnrollmentCancelled(ctx, env)
 	case "attendance.semester.failed":
 		return w.handleAttendanceFailed(ctx, env)
 	default:
@@ -250,13 +251,9 @@ func (w *EventConsumer) handleEnrollmentApproved(ctx context.Context, env outbox
 			CourseID:           courseID,
 			Semester:           event.Data.Semester,
 			IsAttendanceFailed: utils.BoolToPgBool(false),
+			ProgramID:          utils.UUIDToPgtype(event.Data.ProgramID),
 		})
 		if err != nil {
-			// ON CONFLICT DO NOTHING + :one → pgx.ErrNoRows on redelivery
-			// of an already-registered pair; that is success, not failure.
-			if errors.Is(err, pgx.ErrNoRows) {
-				continue
-			}
 			log.Error("failed to create registration", zap.Error(err),
 				zap.String("student_id", event.Data.StudentID.String()),
 				zap.String("course_id", courseID.String()),
@@ -268,8 +265,8 @@ func (w *EventConsumer) handleEnrollmentApproved(ctx context.Context, env outbox
 
 	// One failed course is enough to requeue the whole event: acking it
 	// would leave that course without a registration, so no grade could ever
-	// be entered for it. The courses that already landed come back as
-	// ErrNoRows on redelivery (handled above), and the consumer dead-letters
+	// be entered for it. The courses that already landed are rewritten with
+	// the same values on redelivery, and the consumer dead-letters
 	// the message once its retries run out. The usual cause is the
 	// student/course rows not having reached the local caches yet (FK);
 	// the retry lets the sync events win that race.
@@ -286,6 +283,40 @@ func (w *EventConsumer) handleEnrollmentApproved(ctx context.Context, env outbox
 	log.Info("registrations created",
 		zap.String("student_id", event.Data.StudentID.String()),
 		zap.Int("count", len(event.Data.CourseIDs)),
+	)
+	return nil
+}
+
+// handleEnrollmentCancelled takes the student off the courses of a program
+// that was withdrawn or replaced by a new submission. Most such programs were
+// still pending and never registered, so removing nothing is the usual
+// outcome. An approved one changed in the window is registered again once
+// its replacement is approved.
+func (w *EventConsumer) handleEnrollmentCancelled(ctx context.Context, env outboxEnvelope) error {
+	log := logger.WithContextAndFields(ctx,
+		zap.String("worker", "GradesEventConsumer"),
+		zap.String("method", "handleEnrollmentCancelled"),
+	)
+
+	var event dto.EnrollmentProgramCancelledEvent
+	if err := json.Unmarshal(env.Data, &event); err != nil {
+		log.Error("payload did not match contract, dropping", zap.Error(err))
+		return nil
+	}
+
+	removed, err := w.regRepo.DeleteProgramRegistrations(ctx, event.ProgramID, event.StudentID, event.CourseIDs)
+	if err != nil {
+		log.Error("failed to remove cancelled program's registrations",
+			zap.String("program_id", event.ProgramID.String()),
+			zap.Error(err),
+		)
+		return err
+	}
+
+	log.Info("cancelled program's registrations removed",
+		zap.String("program_id", event.ProgramID.String()),
+		zap.String("student_id", event.StudentID.String()),
+		zap.Int64("removed", removed),
 	)
 	return nil
 }

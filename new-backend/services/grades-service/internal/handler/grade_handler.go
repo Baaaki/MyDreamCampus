@@ -371,6 +371,30 @@ func (h *GradeHandler) LockAssessment(c *gin.Context) {
 // ============================================
 
 // GetMyGrades - GET /api/v1/grades/student/my
+// GetSemesterActivity is enrollment's internal read before it lets a
+// student change an approved program.
+func (h *GradeHandler) GetSemesterActivity(c *gin.Context) {
+	ctx, cancel := context.WithTimeout(c.Request.Context(), requestTimeout)
+	defer cancel()
+
+	studentID, err := uuid.Parse(c.Param("id"))
+	semester := c.Query("semester")
+	if err != nil || semester == "" {
+		c.JSON(http.StatusBadRequest, dto.ErrorResponse{
+			Error: sharedErrors.ErrValidation.Message,
+			Code:  sharedErrors.ErrValidation.Code,
+		})
+		return
+	}
+
+	resp, err := h.studentGradeService.GetSemesterActivity(ctx, studentID, semester)
+	if err != nil {
+		h.handleError(c, err)
+		return
+	}
+	c.JSON(http.StatusOK, resp)
+}
+
 func (h *GradeHandler) GetMyGrades(c *gin.Context) {
 	ctx, cancel := context.WithTimeout(c.Request.Context(), requestTimeout)
 	defer cancel()

@@ -33,6 +33,7 @@ type registrationStore interface {
 	CountRegistrationsByCourse(ctx context.Context, courseID uuid.UUID) (int64, error)
 	CountEligibleRegistrationsByCourse(ctx context.Context, courseID uuid.UUID) (int64, error)
 	DeleteRegistrationsByCourse(ctx context.Context, courseID uuid.UUID) error
+	StudentHasGradesInSemester(ctx context.Context, studentID uuid.UUID, semester string) (bool, error)
 	WithTx(tx pgx.Tx) registrationStore
 }
 

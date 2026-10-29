@@ -25,6 +25,8 @@ func main() {
 		{Queue: worker.QueueSyncEvents, Exchange: "student.events", RoutingKey: "student.deactivated"},
 		{Queue: worker.QueueSyncEvents, Exchange: "course_catalog.events", RoutingKey: "course.semester.created"},
 		{Queue: worker.QueueSyncEvents, Exchange: "enrollment.events", RoutingKey: "enrollment.program.approved"},
+		// A withdrawn or replaced program comes off the roster again.
+		{Queue: worker.QueueSyncEvents, Exchange: "enrollment.events", RoutingKey: "enrollment.program.cancelled"},
 		{Queue: worker.QueueSyncEvents, Exchange: "attendance.events", RoutingKey: "attendance.semester.failed"},
 		// Self-loop: finalizing a whole course runs off the request path.
 		{Queue: worker.QueueFinalizeRequested, Exchange: "grades.events", RoutingKey: "grade.finalize.requested"},
@@ -37,7 +39,8 @@ func main() {
 	module := grades.New(rt.Pool, rt.Rabbit, periodRepo,
 		service.NewHTTPSemesterClient(rt.InternalClient("catalog")),
 		// Transcript access: a teacher must be the student's advisor.
-		service.NewHTTPStudentClient(rt.InternalClient("student")))
+		service.NewHTTPStudentClient(rt.InternalClient("student")),
+		rt.Cfg.Server.InternalSecret)
 	if err := module.Bootstrap(rt.Ctx); err != nil {
 		logger.Fatal("failed to bootstrap grades module", zap.Error(err))
 	}
