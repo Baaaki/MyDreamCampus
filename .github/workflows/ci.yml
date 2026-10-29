@@ -287,7 +287,7 @@ jobs:
 
           code=$(api "http://localhost/api/catalog/courses?limit=100")
           expect 200 "$code" "list courses (catalog)"
-          [ "$(jq '.pagination.total' /tmp/body)" -eq 91 ] || { echo "::error::expected 91 seeded courses, got $(jq '.pagination.total' /tmp/body)"; exit 1; }
+          [ "$(jq '.pagination.total' /tmp/body)" -eq 95 ] || { echo "::error::expected 95 seeded courses, got $(jq '.pagination.total' /tmp/body)"; exit 1; }
 
           # Public, like the course list: the faculty filters are built from it.
           code=$(api http://localhost/api/catalog/faculties)
