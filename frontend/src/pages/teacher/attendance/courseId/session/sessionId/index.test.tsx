@@ -276,6 +276,19 @@ describe("AttendanceSessionPage", () => {
     expect(screen.getAllByText("2 / 2")).toHaveLength(2)
   })
 
+  it("refetches the QR code three times per rotation", async () => {
+    vi.useFakeTimers({ shouldAdvanceTime: true })
+    const sent = stubBackend()
+    renderPage()
+
+    await screen.findByRole("button", { name: /Şimdi Yenile/ })
+    expect(sent.qrFetches).toBe(1)
+    await vi.advanceTimersByTimeAsync(5000)
+    expect(sent.qrFetches).toBe(2)
+    await vi.advanceTimersByTimeAsync(10_000)
+    expect(sent.qrFetches).toBe(4)
+  })
+
   it("fetches a fresh QR code on demand", async () => {
     const sent = stubBackend()
     const user = userEvent.setup()

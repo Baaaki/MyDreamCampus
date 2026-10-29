@@ -129,7 +129,11 @@ export default function AttendanceSessionPage() {
     fetchSessionInfo()
   }, [sessionId, fetchQRCode, fetchRecords, fetchStudents])
 
-  // QR code auto-refresh
+  // QR code auto-refresh. A code is accepted until the end of the window
+  // after its own, which counts from the window's start, not from the fetch:
+  // polling once per rotation could keep a code on screen that the backend
+  // drops a moment after a student captures it. Polling three times per
+  // rotation leaves every code on screen at least two thirds of one.
   useEffect(() => {
     if (!sessionInfo || !sessionInfo.is_active) return
 
@@ -137,7 +141,7 @@ export default function AttendanceSessionPage() {
       () => {
         fetchQRCode()
       },
-      (sessionInfo.qr_rotation_interval || 15) * 1000
+      ((sessionInfo.qr_rotation_interval || 15) * 1000) / 3
     )
 
     return () => clearInterval(interval)
