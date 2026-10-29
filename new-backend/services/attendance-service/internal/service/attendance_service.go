@@ -525,13 +525,8 @@ func (s *AttendanceService) GetMyAttendance(ctx context.Context, studentID uuid.
 			})
 		}
 
-		// Get theory stats
-		theoryTotal, _ := s.attendanceRepo.GetTotalSessionsByCourseAndType(ctx, courseID, semester, db.AttendanceSessionTypeEnumTheory)
-		theoryPresent, _ := s.attendanceRepo.GetStudentPresentCountByType(ctx, studentID, courseID, semester, db.AttendanceSessionTypeEnumTheory)
-
-		// Get lab stats
-		labTotal, _ := s.attendanceRepo.GetTotalSessionsByCourseAndType(ctx, courseID, semester, db.AttendanceSessionTypeEnumLab)
-		labPresent, _ := s.attendanceRepo.GetStudentPresentCountByType(ctx, studentID, courseID, semester, db.AttendanceSessionTypeEnumLab)
+		theoryTotal, theoryPresent := heldAndAttended(sessions, records, db.AttendanceSessionTypeEnumTheory)
+		labTotal, labPresent := heldAndAttended(sessions, records, db.AttendanceSessionTypeEnumLab)
 
 		detail := dto.CourseAttendanceDetail{
 			CourseID:       courseID,
@@ -546,22 +541,22 @@ func (s *AttendanceService) GetMyAttendance(ctx context.Context, studentID uuid.
 		if theoryTotal > 0 {
 			minTheory := minTheoryRequired(theoryTotal)
 			detail.Theory = &dto.SessionTypeAttendance{
-				PresentCount:  int(theoryPresent),
-				AbsentCount:   int(theoryTotal) - int(theoryPresent),
+				PresentCount:  theoryPresent,
+				AbsentCount:   int(theoryTotal) - theoryPresent,
 				TotalSessions: int(theoryTotal),
 				MinRequired:   minTheory,
-				Passed:        int(theoryPresent) >= minTheory,
+				Passed:        theoryPresent >= minTheory,
 			}
 		}
 
 		if labTotal > 0 {
 			minLab := minLabRequired(labTotal)
 			detail.Lab = &dto.SessionTypeAttendance{
-				PresentCount:  int(labPresent),
-				AbsentCount:   int(labTotal) - int(labPresent),
+				PresentCount:  labPresent,
+				AbsentCount:   int(labTotal) - labPresent,
 				TotalSessions: int(labTotal),
 				MinRequired:   minLab,
-				Passed:        int(labPresent) >= minLab,
+				Passed:        labPresent >= minLab,
 			}
 		}
 
@@ -601,6 +596,33 @@ func missedSessions(sessions []db.GetSessionsByCourseRow, attended []db.GetStude
 		})
 	}
 	return missed
+}
+
+// heldAndAttended counts a course's sessions of one type and the student's
+// records among them. An open session the student has no record for is left
+// out, as missedSessions leaves it out: a scan waits in Redis for the flusher,
+// and counting the session would show a student who has just scanned one
+// absence short — below the minimum, on a close call.
+func heldAndAttended(sessions []db.GetSessionsByCourseRow, attended []db.GetStudentAttendanceByCourseRow, sessionType db.SessionTypeEnum) (held int64, present int) {
+	attendedWeeks := make(map[int16]bool, len(attended))
+	for _, r := range attended {
+		if r.SessionType == sessionType {
+			attendedWeeks[r.WeekNumber] = true
+		}
+	}
+	for _, session := range sessions {
+		if session.SessionType != sessionType {
+			continue
+		}
+		switch {
+		case attendedWeeks[session.WeekNumber]:
+			held++
+			present++
+		case !session.IsActive.Bool:
+			held++
+		}
+	}
+	return held, present
 }
 
 // currentSemester picks the semester whose attendance period holds now, on

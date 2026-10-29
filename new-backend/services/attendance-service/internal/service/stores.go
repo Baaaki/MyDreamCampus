@@ -40,7 +40,6 @@ type attendanceStore interface {
 	GetMarkedStudentsBySession(ctx context.Context, sessionID uuid.UUID) ([]uuid.UUID, error)
 	GetSessionAttendanceCount(ctx context.Context, sessionID uuid.UUID) (int64, error)
 	GetStudentAttendanceByCourse(ctx context.Context, studentID, courseID uuid.UUID, semester string) ([]db.GetStudentAttendanceByCourseRow, error)
-	GetStudentPresentCountByType(ctx context.Context, studentID, courseID uuid.UUID, semester string, sessionType db.SessionTypeEnum) (int64, error)
 	GetTotalSessionsByCourseAndType(ctx context.Context, courseID uuid.UUID, semester string, sessionType db.SessionTypeEnum) (int64, error)
 	GetFailingStudentsByCourseByType(ctx context.Context, courseID uuid.UUID, semester string, sessionType db.SessionTypeEnum, totalSessions int64, minRequired int64) ([]db.GetFailingStudentsByCourseByTypeRow, error)
 }

@@ -234,12 +234,14 @@ func (v attRecordView) GetSessionAttendanceCount(_ context.Context, sessionID uu
 	return n, nil
 }
 
-func (v attRecordView) GetStudentAttendanceByCourse(context.Context, uuid.UUID, uuid.UUID, string) ([]db.GetStudentAttendanceByCourseRow, error) {
-	return nil, nil
-}
-
-func (v attRecordView) GetStudentPresentCountByType(context.Context, uuid.UUID, uuid.UUID, string, db.SessionTypeEnum) (int64, error) {
-	return 0, nil
+func (v attRecordView) GetStudentAttendanceByCourse(_ context.Context, studentID, courseID uuid.UUID, semester string) ([]db.GetStudentAttendanceByCourseRow, error) {
+	var out []db.GetStudentAttendanceByCourseRow
+	for _, r := range v.w.records {
+		if utils.PgUUIDToUUID(r.StudentID) == studentID && utils.PgUUIDToUUID(r.CourseID) == courseID && r.Semester == semester {
+			out = append(out, db.GetStudentAttendanceByCourseRow{WeekNumber: r.WeekNumber, MarkedVia: r.MarkedVia, SessionType: r.SessionType})
+		}
+	}
+	return out, nil
 }
 
 func (v attRecordView) GetTotalSessionsByCourseAndType(_ context.Context, courseID uuid.UUID, semester string, st db.SessionTypeEnum) (int64, error) {
@@ -1072,6 +1074,45 @@ func TestGetMyAttendance_NothingToList_MarshalsEmptyArrays(t *testing.T) {
 	raw, err = json.Marshal(resp.Courses[0])
 	require.NoError(t, err)
 	assert.JSONEq(t, `[]`, jsonField(t, raw, "weekly_records"))
+}
+
+// Weeks 1-4 are closed and the student missed week 2. Week 5 is open and the
+// student's scan still waits in the buffer: counting that session made the
+// page read 3 of 5, below the minimum of 4, right after a successful scan.
+func TestGetMyAttendance_ScanAwaitingFlush_NotCountedAsAbsence(t *testing.T) {
+	w, courseID, s := newAttWorld(t)
+	svc := w.service(nil)
+	ctx := context.Background()
+	for week := int16(1); week <= 4; week++ {
+		sessionID := openTheory(t, w, courseID, week)
+		if week != 2 {
+			_, err := svc.ScanQR(ctx, s[0], scanRequest(w, sessionID, time.Now()))
+			require.NoError(t, err)
+		}
+		_, err := svc.CloseSession(ctx, sessionID, teacherID, false)
+		require.NoError(t, err)
+	}
+	open := openTheory(t, w, courseID, 5)
+	_, err := svc.ScanQR(ctx, s[0], scanRequest(w, open, time.Now()))
+	require.NoError(t, err)
+	w.myEnrollments = []db.GetStudentEnrollmentsBySemesterRow{{CourseID: utils.UUIDToPgtype(courseID), CourseCode: "FIZ101"}}
+
+	resp, err := svc.GetMyAttendance(ctx, s[0], semester)
+	require.NoError(t, err)
+	require.Len(t, resp.Courses, 1)
+	assert.Equal(t, &dto.SessionTypeAttendance{PresentCount: 3, AbsentCount: 1, TotalSessions: 4, MinRequired: 3, Passed: true}, resp.Courses[0].Theory)
+	assert.Len(t, resp.Courses[0].MissedSessions, 1)
+	assert.Nil(t, resp.Courses[0].Lab, "no lab session was held")
+
+	other, err := svc.GetMyAttendance(ctx, s[1], semester)
+	require.NoError(t, err)
+	assert.Equal(t, 4, other.Courses[0].Theory.TotalSessions, "a student who has not scanned yet is not marked absent while it is open")
+
+	require.NoError(t, FlushSessionBuffer(ctx, attRecordView{w}, attRedisView{w}, open.String()))
+	resp, err = svc.GetMyAttendance(ctx, s[0], semester)
+	require.NoError(t, err)
+	assert.Equal(t, &dto.SessionTypeAttendance{PresentCount: 4, AbsentCount: 1, TotalSessions: 5, MinRequired: 4, Passed: true}, resp.Courses[0].Theory)
+	assert.Len(t, resp.Courses[0].WeeklyRecords, 4)
 }
 
 func jsonField(t *testing.T, raw []byte, field string) string {
