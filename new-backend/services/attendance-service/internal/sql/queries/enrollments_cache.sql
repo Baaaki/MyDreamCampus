@@ -1,6 +1,6 @@
 -- name: CreateEnrollmentCache :exec
-INSERT INTO attendance.enrollments_view (student_id, course_id, semester)
-VALUES ($1, $2, $3)
+INSERT INTO attendance.enrollments_view (student_id, course_id, semester, enrolled_at)
+VALUES ($1, $2, $3, $4)
 ON CONFLICT (student_id, course_id) DO NOTHING;
 
 -- name: GetEnrolledStudentsByCourse :many
@@ -28,7 +28,8 @@ SELECT
     c.course_name,
     c.instructor_fullname,
     c.total_weeks,
-    c.semester
+    c.semester,
+    e.enrolled_at
 FROM attendance.enrollments_view e
 JOIN attendance.courses_view c ON e.course_id = c.id
 WHERE e.student_id = $1 AND e.semester = $2;

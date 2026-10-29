@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"testing"
+	"time"
 
 	"github.com/baaaki/mydreamcampus/attendance/internal/db"
 	"github.com/baaaki/mydreamcampus/shared/platform/logger"
@@ -13,8 +14,9 @@ import (
 )
 
 type fakeCacheWriter struct {
-	failFor map[uuid.UUID]error
-	created []uuid.UUID
+	failFor    map[uuid.UUID]error
+	created    []uuid.UUID
+	enrolledAt []time.Time
 }
 
 func (f *fakeCacheWriter) UpsertStudentCache(context.Context, db.UpsertStudentCacheParams) error {
@@ -27,11 +29,12 @@ func (f *fakeCacheWriter) UpsertCourseCache(context.Context, db.UpsertCourseCach
 	return nil
 }
 
-func (f *fakeCacheWriter) CreateEnrollmentCache(_ context.Context, _, courseID uuid.UUID, _ string) error {
+func (f *fakeCacheWriter) CreateEnrollmentCache(_ context.Context, _, courseID uuid.UUID, _ string, enrolledAt time.Time) error {
 	if err := f.failFor[courseID]; err != nil {
 		return err
 	}
 	f.created = append(f.created, courseID)
+	f.enrolledAt = append(f.enrolledAt, enrolledAt)
 	return nil
 }
 
@@ -47,6 +50,8 @@ func (f *fakeProcessedEvents) MarkEventProcessed(_ context.Context, eventID uuid
 	f.marked = append(f.marked, eventID)
 	return nil
 }
+
+var approvedAt = time.Date(2026, 10, 29, 9, 30, 0, 0, time.UTC)
 
 // programApprovedBody builds enrollment.program.approved the way it arrives:
 // the enrollment outbox payload is itself an envelope, wrapped once more by
@@ -64,10 +69,11 @@ func programApprovedBody(t *testing.T, eventID uuid.UUID, courseIDs []uuid.UUID)
 			"event_id":   eventID.String(),
 			"event_type": "enrollment.program.approved",
 			"data": map[string]any{
-				"program_id": uuid.New().String(),
-				"student_id": uuid.New().String(),
-				"semester":   "2025-2026-Fall",
-				"course_ids": ids,
+				"program_id":  uuid.New().String(),
+				"student_id":  uuid.New().String(),
+				"semester":    "2025-2026-Fall",
+				"course_ids":  ids,
+				"approved_at": approvedAt.Format(time.RFC3339Nano),
 			},
 		},
 	})
@@ -104,5 +110,6 @@ func TestHandleEnrollmentProgramApproved_AllCoursesSucceed_MarksProcessed(t *tes
 
 	require.NoError(t, err)
 	assert.Equal(t, courses, cache.created)
+	assert.Equal(t, []time.Time{approvedAt, approvedAt}, cache.enrolledAt, "the student is held to sessions from the approval on")
 	assert.Equal(t, []uuid.UUID{eventID}, events.marked)
 }

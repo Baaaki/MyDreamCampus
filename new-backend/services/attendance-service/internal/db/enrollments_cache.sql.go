@@ -31,19 +31,25 @@ func (q *Queries) CheckEnrollment(ctx context.Context, arg CheckEnrollmentParams
 }
 
 const createEnrollmentCache = `-- name: CreateEnrollmentCache :exec
-INSERT INTO attendance.enrollments_view (student_id, course_id, semester)
-VALUES ($1, $2, $3)
+INSERT INTO attendance.enrollments_view (student_id, course_id, semester, enrolled_at)
+VALUES ($1, $2, $3, $4)
 ON CONFLICT (student_id, course_id) DO NOTHING
 `
 
 type CreateEnrollmentCacheParams struct {
-	StudentID pgtype.UUID `json:"student_id"`
-	CourseID  pgtype.UUID `json:"course_id"`
-	Semester  string      `json:"semester"`
+	StudentID  pgtype.UUID      `json:"student_id"`
+	CourseID   pgtype.UUID      `json:"course_id"`
+	Semester   string           `json:"semester"`
+	EnrolledAt pgtype.Timestamp `json:"enrolled_at"`
 }
 
 func (q *Queries) CreateEnrollmentCache(ctx context.Context, arg CreateEnrollmentCacheParams) error {
-	_, err := q.db.Exec(ctx, createEnrollmentCache, arg.StudentID, arg.CourseID, arg.Semester)
+	_, err := q.db.Exec(ctx, createEnrollmentCache,
+		arg.StudentID,
+		arg.CourseID,
+		arg.Semester,
+		arg.EnrolledAt,
+	)
 	return err
 }
 
@@ -111,7 +117,8 @@ SELECT
     c.course_name,
     c.instructor_fullname,
     c.total_weeks,
-    c.semester
+    c.semester,
+    e.enrolled_at
 FROM attendance.enrollments_view e
 JOIN attendance.courses_view c ON e.course_id = c.id
 WHERE e.student_id = $1 AND e.semester = $2
@@ -123,12 +130,13 @@ type GetStudentEnrollmentsBySemesterParams struct {
 }
 
 type GetStudentEnrollmentsBySemesterRow struct {
-	CourseID           pgtype.UUID `json:"course_id"`
-	CourseCode         string      `json:"course_code"`
-	CourseName         string      `json:"course_name"`
-	InstructorFullname pgtype.Text `json:"instructor_fullname"`
-	TotalWeeks         pgtype.Int2 `json:"total_weeks"`
-	Semester           string      `json:"semester"`
+	CourseID           pgtype.UUID      `json:"course_id"`
+	CourseCode         string           `json:"course_code"`
+	CourseName         string           `json:"course_name"`
+	InstructorFullname pgtype.Text      `json:"instructor_fullname"`
+	TotalWeeks         pgtype.Int2      `json:"total_weeks"`
+	Semester           string           `json:"semester"`
+	EnrolledAt         pgtype.Timestamp `json:"enrolled_at"`
 }
 
 func (q *Queries) GetStudentEnrollmentsBySemester(ctx context.Context, arg GetStudentEnrollmentsBySemesterParams) ([]GetStudentEnrollmentsBySemesterRow, error) {
@@ -147,6 +155,7 @@ func (q *Queries) GetStudentEnrollmentsBySemester(ctx context.Context, arg GetSt
 			&i.InstructorFullname,
 			&i.TotalWeeks,
 			&i.Semester,
+			&i.EnrolledAt,
 		); err != nil {
 			return nil, err
 		}

@@ -162,11 +162,12 @@ type CourseView struct {
 }
 
 type EnrollmentView struct {
-	ID        pgtype.UUID      `json:"id"`
-	StudentID pgtype.UUID      `json:"student_id"`
-	CourseID  pgtype.UUID      `json:"course_id"`
-	Semester  string           `json:"semester"`
-	SyncedAt  pgtype.Timestamp `json:"synced_at"`
+	ID         pgtype.UUID      `json:"id"`
+	StudentID  pgtype.UUID      `json:"student_id"`
+	CourseID   pgtype.UUID      `json:"course_id"`
+	Semester   string           `json:"semester"`
+	SyncedAt   pgtype.Timestamp `json:"synced_at"`
+	EnrolledAt pgtype.Timestamp `json:"enrolled_at"`
 }
 
 type OutboxEvent struct {

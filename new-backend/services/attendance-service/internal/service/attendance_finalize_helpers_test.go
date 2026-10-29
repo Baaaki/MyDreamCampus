@@ -36,97 +36,103 @@ func TestDeriveFailedType(t *testing.T) {
 	}
 }
 
-func TestMergeFailureRows_SeparateStudents(t *testing.T) {
+func TestFailingStudents_EachTypeOnItsOwn(t *testing.T) {
 	studentA := uuid.New()
 	studentB := uuid.New()
 
-	theory := []db.GetFailingStudentsByCourseByTypeRow{
-		failingRow(t, studentA, "20210001", "Ahmet", "Yilmaz", "a@x.x", 3, 7),
+	// 14 theory and 14 lab sessions: 10 and 11 are the minimums.
+	theory := []db.GetCourseAttendanceByStudentAndTypeRow{
+		attendanceRow(t, studentA, "20210001", "Ahmet", "Yilmaz", "a@x.x", 14, 7),
+		attendanceRow(t, studentB, "20210002", "Mehmet", "Demir", "b@x.x", 14, 12),
 	}
-	lab := []db.GetFailingStudentsByCourseByTypeRow{
-		failingRow(t, studentB, "20210002", "Mehmet", "Demir", "b@x.x", 2, 5),
+	lab := []db.GetCourseAttendanceByStudentAndTypeRow{
+		attendanceRow(t, studentA, "20210001", "Ahmet", "Yilmaz", "a@x.x", 14, 13),
+		attendanceRow(t, studentB, "20210002", "Mehmet", "Demir", "b@x.x", 14, 5),
 	}
 
-	out := mergeFailureRows(theory, lab)
+	out := failingStudents(theory, lab)
 	require.Len(t, out, 2)
 
 	a := out[studentA]
 	require.NotNil(t, a)
-	assert.True(t, a.TheoryFailed)
-	assert.False(t, a.LabFailed)
-	assert.Equal(t, 3, a.TheoryPresent)
-	assert.Equal(t, 7, a.TheoryAbsent)
-	assert.Equal(t, 0, a.LabPresent, "untouched lab counts must remain zero, not inherit theory's")
+	assert.Equal(t, TypeAttendance{Held: 14, Present: 7, MinRequired: 10, Failed: true}, a.Theory)
+	assert.Equal(t, TypeAttendance{Held: 14, Present: 13, MinRequired: 11}, a.Lab, "the passed type keeps its real standing")
 
 	b := out[studentB]
 	require.NotNil(t, b)
-	assert.False(t, b.TheoryFailed)
-	assert.True(t, b.LabFailed)
-	assert.Equal(t, 2, b.LabPresent)
+	assert.False(t, b.Theory.Failed)
+	assert.True(t, b.Lab.Failed)
+	assert.Equal(t, 9, b.Lab.response().AbsentCount)
 }
 
-func TestMergeFailureRows_StudentInBothLists(t *testing.T) {
-	// The merge contract: a student appearing in BOTH theory and lab failure
-	// rows ends up with one entry that has both flags set. Without this
-	// behaviour the publisher would emit two events for the same student and
-	// grades-service would double-count them.
+func TestFailingStudents_BothTypes_OneRecord(t *testing.T) {
+	// A student failing BOTH theory and lab ends up with one entry that has
+	// both flags set. Two entries would make the publisher emit two events
+	// for the same student and grades-service would double-count them.
 	id := uuid.New()
-	theory := []db.GetFailingStudentsByCourseByTypeRow{
-		failingRow(t, id, "20210001", "Ahmet", "Yilmaz", "a@x.x", 3, 7),
-	}
-	lab := []db.GetFailingStudentsByCourseByTypeRow{
-		failingRow(t, id, "20210001", "Ahmet", "Yilmaz", "a@x.x", 1, 5),
-	}
+	theory := []db.GetCourseAttendanceByStudentAndTypeRow{attendanceRow(t, id, "20210001", "Ahmet", "Yilmaz", "a@x.x", 14, 3)}
+	lab := []db.GetCourseAttendanceByStudentAndTypeRow{attendanceRow(t, id, "20210001", "Ahmet", "Yilmaz", "a@x.x", 14, 1)}
 
-	out := mergeFailureRows(theory, lab)
+	out := failingStudents(theory, lab)
 	require.Len(t, out, 1, "the same student must collapse into a single failure record")
-
-	info := out[id]
-	require.NotNil(t, info)
-	assert.True(t, info.TheoryFailed)
-	assert.True(t, info.LabFailed)
-	assert.Equal(t, 3, info.TheoryPresent)
-	assert.Equal(t, 7, info.TheoryAbsent)
-	assert.Equal(t, 1, info.LabPresent)
-	assert.Equal(t, 5, info.LabAbsent)
-	assert.Equal(t, "Ahmet Yilmaz", info.StudentName,
-		"name must be set from the theory pass — the lab pass must NOT overwrite it (it would still be the same name in practice, but checking that the helper doesn't reset other fields)")
+	assert.True(t, out[id].Theory.Failed)
+	assert.True(t, out[id].Lab.Failed)
+	assert.Equal(t, "Ahmet Yilmaz", out[id].StudentName)
 }
 
-func TestMergeFailureRows_EmptyInputs(t *testing.T) {
-	out := mergeFailureRows(nil, nil)
+// A student approved late is held to the 4 sessions run since: attending 3
+// meets their minimum of ceil(4*10/14)=3. The same 3 out of the course's 8
+// sessions fails a student enrolled from the start (minimum 6).
+func TestFailingStudents_LateEnrollment_HeldToTheirOwnSessions(t *testing.T) {
+	late, early := uuid.New(), uuid.New()
+	theory := []db.GetCourseAttendanceByStudentAndTypeRow{
+		attendanceRow(t, late, "20210001", "Geç", "Kayıt", "g@x.x", 4, 3),
+		attendanceRow(t, early, "20210002", "Erken", "Kayıt", "e@x.x", 8, 3),
+	}
+
+	out := failingStudents(theory, nil)
+
+	assert.NotContains(t, out, late, "3 of the 4 sessions held since approval meets ceil(4*10/14)=3")
+	require.Contains(t, out, early)
+	assert.Equal(t, 6, out[early].Theory.MinRequired)
+}
+
+func TestFailingStudents_NothingHeldForThem_CannotFail(t *testing.T) {
+	id := uuid.New()
+	out := failingStudents([]db.GetCourseAttendanceByStudentAndTypeRow{attendanceRow(t, id, "1", "A", "B", "a@x.x", 0, 0)}, nil)
+	assert.Empty(t, out)
+}
+
+func TestFailingStudents_EmptyInputs(t *testing.T) {
+	out := failingStudents(nil, nil)
 	assert.Empty(t, out, "no failures means an empty (not nil) map for safe iteration")
 }
 
-func TestMergeFailureRows_StudentNamePopulation(t *testing.T) {
+func TestFailingStudents_StudentNamePopulation(t *testing.T) {
 	// Defensive — exercises the fmt.Sprintf path so a regression that drops
 	// the space between first/last name shows up in CI rather than in a UI bug.
 	id := uuid.New()
-	theory := []db.GetFailingStudentsByCourseByTypeRow{
-		failingRow(t, id, "20210001", "Ali Baba", "Yilmaz Demir", "ali@x.x", 0, 10),
-	}
-	out := mergeFailureRows(theory, nil)
+	theory := []db.GetCourseAttendanceByStudentAndTypeRow{attendanceRow(t, id, "20210001", "Ali Baba", "Yilmaz Demir", "ali@x.x", 10, 0)}
+	out := failingStudents(theory, nil)
 	assert.Equal(t, "Ali Baba Yilmaz Demir", out[id].StudentName)
 	assert.Equal(t, "ali@x.x", out[id].StudentEmail)
 }
 
-// failingRow is a tiny constructor that hides the pgtype noise — every field
-// is required by the merge code path, so the helpers are easier to read with
-// it factored out.
-func failingRow(
+// attendanceRow hides the pgtype noise of one student's row.
+func attendanceRow(
 	t *testing.T,
 	studentID uuid.UUID,
 	number, first, last, email string,
-	present, absent int,
-) db.GetFailingStudentsByCourseByTypeRow {
+	held, present int,
+) db.GetCourseAttendanceByStudentAndTypeRow {
 	t.Helper()
-	return db.GetFailingStudentsByCourseByTypeRow{
+	return db.GetCourseAttendanceByStudentAndTypeRow{
 		StudentID:     utils.UUIDToPgUUID(studentID),
 		StudentNumber: number,
 		FirstName:     pgtype.Text{String: first, Valid: true},
 		LastName:      pgtype.Text{String: last, Valid: true},
 		Email:         pgtype.Text{String: email, Valid: true},
+		HeldCount:     int64(held),
 		PresentCount:  int64(present),
-		AbsentCount:   int64(absent),
 	}
 }

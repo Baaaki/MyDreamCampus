@@ -40,19 +40,28 @@ func newAttendanceDB(t *testing.T) *attendanceDB {
 }
 
 func (a *attendanceDB) enroll(t *testing.T, number string) uuid.UUID {
+	return a.enrollAt(t, number, time.Time{})
+}
+
+// enrollAt enrolls a student whose program was approved at enrolledAt; zero
+// means from the start.
+func (a *attendanceDB) enrollAt(t *testing.T, number string, enrolledAt time.Time) uuid.UUID {
 	t.Helper()
 	ctx := context.Background()
 	id := uuid.New()
 	require.NoError(t, a.cache.UpsertStudentCache(ctx, db.UpsertStudentCacheParams{
 		ID: utils.UUIDToPgtype(id), StudentNumber: number, IsActive: pgtype.Bool{Bool: true, Valid: true},
 	}))
-	require.NoError(t, a.cache.CreateEnrollmentCache(ctx, id, a.course, fall))
+	require.NoError(t, a.cache.CreateEnrollmentCache(ctx, id, a.course, fall, enrolledAt))
 	return id
 }
 
 func (a *attendanceDB) session(t *testing.T, week int16, kind db.SessionTypeEnum) pgtype.UUID {
+	return a.sessionAt(t, week, kind, time.Now())
+}
+
+func (a *attendanceDB) sessionAt(t *testing.T, week int16, kind db.SessionTypeEnum, now time.Time) pgtype.UUID {
 	t.Helper()
-	now := time.Now()
 	s, err := a.sessions.CreateAttendanceSession(context.Background(), db.CreateAttendanceSessionParams{
 		CourseID: utils.UUIDToPgtype(a.course), InstructorID: utils.UUIDToPgtype(uuid.New()), Semester: fall, WeekNumber: week,
 		SessionDate: pgtype.Date{Time: now, Valid: true}, QrSecret: "secret",
@@ -164,6 +173,35 @@ func TestFailingStudents_AbsencesCountedAgainstTheSessionsHeld(t *testing.T) {
 	require.NoError(t, err)
 	require.Len(t, stats, 3, "a student who never came still appears, with zero")
 	assert.Equal(t, int64(0), stats[2].PresentCount)
+}
+
+// Finalize holds each student to the sessions run since their program was
+// approved: weeks 1-3 ran before the late student's approval.
+func TestCourseAttendanceByStudentAndType_HeldSinceEnrollment(t *testing.T) {
+	a := newAttendanceDB(t)
+	ctx := context.Background()
+	base := time.Now().UTC().Add(-10 * 24 * time.Hour)
+	early := a.enroll(t, "1")
+	late := a.enrollAt(t, "2", base.Add(3*24*time.Hour+time.Hour))
+	var batch []db.CreateAttendanceRecordQRParams
+	for week := int16(1); week <= 4; week++ {
+		s := a.sessionAt(t, week, db.AttendanceSessionTypeEnumTheory, base.Add(time.Duration(week)*24*time.Hour))
+		batch = append(batch, a.scan(s, early, week, db.AttendanceSessionTypeEnumTheory, 0))
+		if week == 4 {
+			batch = append(batch, a.scan(s, late, week, db.AttendanceSessionTypeEnumTheory, 0))
+		}
+	}
+	a.sessionAt(t, 1, db.AttendanceSessionTypeEnumLab, base.Add(5*24*time.Hour))
+	require.NoError(t, a.attendance.BatchCreateAttendanceRecordsQR(ctx, batch))
+
+	rows, err := a.attendance.GetCourseAttendanceByStudentAndType(ctx, a.course, fall, db.AttendanceSessionTypeEnumTheory)
+
+	require.NoError(t, err)
+	got := map[uuid.UUID][2]int64{}
+	for _, r := range rows {
+		got[utils.PgtypeToUUID(r.StudentID)] = [2]int64{r.HeldCount, r.PresentCount}
+	}
+	assert.Equal(t, map[uuid.UUID][2]int64{early: {4, 4}, late: {1, 1}}, got, "held, present — the lab session is not counted")
 }
 
 // The finalization record and its events commit together, and the primary

@@ -39,6 +39,7 @@ type attWorld struct {
 
 	periodStart, periodEnd *time.Time
 	periods                []sharedRepo.SimplePeriod
+	enrolledAt             map[uuid.UUID]time.Time // student -> approved late; absent: from the start
 	failSessionTotals      bool
 	enrollmentSemester     string
 	myEnrollments          []db.GetStudentEnrollmentsBySemesterRow
@@ -144,7 +145,7 @@ func (v attSessionView) GetSessionsByCourse(_ context.Context, courseID uuid.UUI
 	var out []db.GetSessionsByCourseRow
 	for _, s := range v.w.sessions {
 		if utils.PgUUIDToUUID(s.CourseID) == courseID {
-			out = append(out, db.GetSessionsByCourseRow{ID: s.ID, WeekNumber: s.WeekNumber, IsActive: s.IsActive, SessionType: s.SessionType})
+			out = append(out, db.GetSessionsByCourseRow{ID: s.ID, WeekNumber: s.WeekNumber, IsActive: s.IsActive, SessionType: s.SessionType, StartedAt: s.StartedAt})
 		}
 	}
 	return out, nil
@@ -257,22 +258,27 @@ func (v attRecordView) GetTotalSessionsByCourseAndType(_ context.Context, course
 	return n, nil
 }
 
-func (v attRecordView) GetFailingStudentsByCourseByType(_ context.Context, courseID uuid.UUID, semester string, st db.SessionTypeEnum, total, min int64) ([]db.GetFailingStudentsByCourseByTypeRow, error) {
-	var out []db.GetFailingStudentsByCourseByTypeRow
+func (v attRecordView) GetCourseAttendanceByStudentAndType(_ context.Context, courseID uuid.UUID, semester string, st db.SessionTypeEnum) ([]db.GetCourseAttendanceByStudentAndTypeRow, error) {
+	var out []db.GetCourseAttendanceByStudentAndTypeRow
 	for _, studentID := range v.w.enrolled[courseID] {
-		var present int64
+		var held, present int64
+		since, late := v.w.enrolledAt[studentID]
+		for _, session := range v.w.sessions {
+			if utils.PgUUIDToUUID(session.CourseID) == courseID && session.Semester == semester && session.SessionType == st &&
+				(!late || !session.StartedAt.Time.Before(since)) {
+				held++
+			}
+		}
 		for _, r := range v.w.records {
 			if utils.PgUUIDToUUID(r.StudentID) == studentID && utils.PgUUIDToUUID(r.CourseID) == courseID && r.Semester == semester && r.SessionType == st {
 				present++
 			}
 		}
-		if present < min {
-			s := v.w.students[studentID]
-			out = append(out, db.GetFailingStudentsByCourseByTypeRow{
-				StudentID: s.ID, StudentNumber: s.StudentNumber, FirstName: s.FirstName, LastName: s.LastName,
-				Email: s.Email, PresentCount: present, AbsentCount: total - present,
-			})
-		}
+		student := v.w.students[studentID]
+		out = append(out, db.GetCourseAttendanceByStudentAndTypeRow{
+			StudentID: student.ID, StudentNumber: student.StudentNumber, FirstName: student.FirstName, LastName: student.LastName,
+			Email: student.Email, HeldCount: held, PresentCount: present,
+		})
 	}
 	return out, nil
 }
@@ -459,6 +465,25 @@ func openTheory(t *testing.T, w *attWorld, courseID uuid.UUID, week int16) uuid.
 	})
 	require.NoError(t, err)
 	return resp.SessionID
+}
+
+// closeTheory opens a theory session dated to startedAt, marks the given
+// students present by hand and closes it, the way the weeks before a late
+// approval look.
+func closeTheory(t *testing.T, w *attWorld, courseID uuid.UUID, week int16, startedAt time.Time, present ...uuid.UUID) uuid.UUID {
+	t.Helper()
+	sessionID := openTheory(t, w, courseID, week)
+	session := w.sessions[sessionID]
+	session.StartedAt = utils.TimeToPgTimestamp(startedAt)
+	w.sessions[sessionID] = session
+	svc := w.service(nil)
+	for _, student := range present {
+		_, err := svc.CreateManualAttendance(context.Background(), sessionID, teacherID, false, dto.ManualAttendanceRequest{StudentID: student})
+		require.NoError(t, err)
+	}
+	_, err := svc.CloseSession(context.Background(), sessionID, teacherID, false)
+	require.NoError(t, err)
+	return sessionID
 }
 
 func scanRequest(w *attWorld, sessionID uuid.UUID, at time.Time) dto.ScanQRRequest {
@@ -1123,6 +1148,56 @@ func TestGetMyAttendance_ScanAwaitingFlush_CountedAsAttended(t *testing.T) {
 	require.NoError(t, err)
 	assert.Equal(t, attended, resp.Courses[0].Theory, "counted once after the flush")
 	assert.Len(t, resp.Courses[0].WeeklyRecords, 4)
+}
+
+// Approved in week 5, after four closed sessions: the student could not scan
+// into those, so they are neither held nor missed for them.
+func TestGetMyAttendance_ApprovedLate_HeldOnlyToLaterSessions(t *testing.T) {
+	w, courseID, s := newAttWorld(t)
+	svc := w.service(nil)
+	ctx := context.Background()
+	for week := int16(1); week <= 4; week++ {
+		closeTheory(t, w, courseID, week, time.Now().Add(-time.Duration(30-week)*24*time.Hour))
+	}
+	approvedAt := time.Now().Add(-time.Hour)
+	held := openTheory(t, w, courseID, 5)
+	_, err := svc.ScanQR(ctx, s[0], scanRequest(w, held, time.Now()))
+	require.NoError(t, err)
+	_, err = svc.CloseSession(ctx, held, teacherID, false)
+	require.NoError(t, err)
+	w.myEnrollments = []db.GetStudentEnrollmentsBySemesterRow{{
+		CourseID: utils.UUIDToPgtype(courseID), CourseCode: "FIZ101", EnrolledAt: utils.TimeToPgTimestamp(approvedAt),
+	}}
+
+	resp, err := svc.GetMyAttendance(ctx, s[0], semester)
+
+	require.NoError(t, err)
+	assert.Equal(t, &dto.SessionTypeAttendance{PresentCount: 1, AbsentCount: 0, TotalSessions: 1, MinRequired: 1, Passed: true}, resp.Courses[0].Theory)
+	assert.Empty(t, resp.Courses[0].MissedSessions, "weeks 1-4 ran before the approval")
+}
+
+func TestFinalizeAttendance_ApprovedLate_NotFailedForEarlierSessions(t *testing.T) {
+	w, courseID, s := newAttWorld(t)
+	svc := w.service(nil)
+	ctx := context.Background()
+	for week := int16(1); week <= 4; week++ {
+		closeTheory(t, w, courseID, week, time.Now().Add(-time.Duration(30-week)*24*time.Hour), s[0], s[1])
+	}
+	// s[2] is approved now and attends the one session held since.
+	w.enrolledAt = map[uuid.UUID]time.Time{s[2]: time.Now().Add(-time.Hour)}
+	last := openTheory(t, w, courseID, 5)
+	for _, student := range s {
+		_, err := svc.ScanQR(ctx, student, scanRequest(w, last, time.Now()))
+		require.NoError(t, err)
+	}
+	_, err := svc.CloseSession(ctx, last, teacherID, false)
+	require.NoError(t, err)
+
+	resp, err := svc.FinalizeAttendance(ctx, courseID, teacherID, semester)
+
+	require.NoError(t, err)
+	assert.Empty(t, resp.FailedStudents, "1 of the 1 session held since approval is a pass")
+	assert.Equal(t, 4, resp.Thresholds.TheoryMinRequired, "the course-wide minimum still reads 4 of 5")
 }
 
 func jsonField(t *testing.T, raw []byte, field string) string {

@@ -229,6 +229,74 @@ func (q *Queries) GetAttendanceRecordsBySession(ctx context.Context, sessionID p
 	return items, nil
 }
 
+const getCourseAttendanceByStudentAndType = `-- name: GetCourseAttendanceByStudentAndType :many
+SELECT
+    s.id AS student_id,
+    s.student_number,
+    s.first_name,
+    s.last_name,
+    s.email,
+    (SELECT COUNT(*) FROM attendance.attendance_sessions ats
+     WHERE ats.course_id = e.course_id AND ats.semester = e.semester
+       AND ats.session_type = $1
+       AND (e.enrolled_at IS NULL OR ats.started_at >= e.enrolled_at))::bigint AS held_count,
+    (SELECT COUNT(*) FROM attendance.attendance_records ar
+     WHERE ar.student_id = e.student_id AND ar.course_id = e.course_id AND ar.semester = e.semester
+       AND ar.session_type = $1)::bigint AS present_count
+FROM attendance.enrollments_view e
+JOIN attendance.students_view s ON e.student_id = s.id
+WHERE e.course_id = $2 AND e.semester = $3
+ORDER BY s.student_number
+`
+
+type GetCourseAttendanceByStudentAndTypeParams struct {
+	SessionType SessionTypeEnum `json:"session_type"`
+	CourseID    pgtype.UUID     `json:"course_id"`
+	Semester    string          `json:"semester"`
+}
+
+type GetCourseAttendanceByStudentAndTypeRow struct {
+	StudentID     pgtype.UUID `json:"student_id"`
+	StudentNumber string      `json:"student_number"`
+	FirstName     pgtype.Text `json:"first_name"`
+	LastName      pgtype.Text `json:"last_name"`
+	Email         pgtype.Text `json:"email"`
+	HeldCount     int64       `json:"held_count"`
+	PresentCount  int64       `json:"present_count"`
+}
+
+// Per enrolled student, the sessions of one type held since they were
+// enrolled (enrolled_at NULL: since the start) and how many they attended.
+// Finalize holds each student to their own count, so one approved late is
+// not failed for the weeks before.
+func (q *Queries) GetCourseAttendanceByStudentAndType(ctx context.Context, arg GetCourseAttendanceByStudentAndTypeParams) ([]GetCourseAttendanceByStudentAndTypeRow, error) {
+	rows, err := q.db.Query(ctx, getCourseAttendanceByStudentAndType, arg.SessionType, arg.CourseID, arg.Semester)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	items := []GetCourseAttendanceByStudentAndTypeRow{}
+	for rows.Next() {
+		var i GetCourseAttendanceByStudentAndTypeRow
+		if err := rows.Scan(
+			&i.StudentID,
+			&i.StudentNumber,
+			&i.FirstName,
+			&i.LastName,
+			&i.Email,
+			&i.HeldCount,
+			&i.PresentCount,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
 const getCourseAttendanceStats = `-- name: GetCourseAttendanceStats :many
 SELECT
     s.id as student_id,
@@ -386,75 +454,6 @@ func (q *Queries) GetFailingStudentsByCourse(ctx context.Context, arg GetFailing
 	items := []GetFailingStudentsByCourseRow{}
 	for rows.Next() {
 		var i GetFailingStudentsByCourseRow
-		if err := rows.Scan(
-			&i.StudentID,
-			&i.StudentNumber,
-			&i.FirstName,
-			&i.LastName,
-			&i.Email,
-			&i.PresentCount,
-			&i.AbsentCount,
-		); err != nil {
-			return nil, err
-		}
-		items = append(items, i)
-	}
-	if err := rows.Err(); err != nil {
-		return nil, err
-	}
-	return items, nil
-}
-
-const getFailingStudentsByCourseByType = `-- name: GetFailingStudentsByCourseByType :many
-SELECT
-    s.id as student_id,
-    s.student_number,
-    s.first_name,
-    s.last_name,
-    s.email,
-    COUNT(ar.id) as present_count,
-    ($4::bigint - COUNT(ar.id))::bigint as absent_count
-FROM attendance.enrollments_view e
-JOIN attendance.students_view s ON e.student_id = s.id
-LEFT JOIN attendance.attendance_records ar ON ar.student_id = s.id AND ar.course_id = e.course_id AND ar.semester = e.semester AND ar.session_type = $3
-WHERE e.course_id = $1 AND e.semester = $2
-GROUP BY s.id, s.student_number, s.first_name, s.last_name, s.email
-HAVING COUNT(ar.id) < $5::bigint
-`
-
-type GetFailingStudentsByCourseByTypeParams struct {
-	CourseID              pgtype.UUID     `json:"course_id"`
-	Semester              string          `json:"semester"`
-	SessionType           SessionTypeEnum `json:"session_type"`
-	TotalSessions         int64           `json:"total_sessions"`
-	MinRequiredAttendance int64           `json:"min_required_attendance"`
-}
-
-type GetFailingStudentsByCourseByTypeRow struct {
-	StudentID     pgtype.UUID `json:"student_id"`
-	StudentNumber string      `json:"student_number"`
-	FirstName     pgtype.Text `json:"first_name"`
-	LastName      pgtype.Text `json:"last_name"`
-	Email         pgtype.Text `json:"email"`
-	PresentCount  int64       `json:"present_count"`
-	AbsentCount   int64       `json:"absent_count"`
-}
-
-func (q *Queries) GetFailingStudentsByCourseByType(ctx context.Context, arg GetFailingStudentsByCourseByTypeParams) ([]GetFailingStudentsByCourseByTypeRow, error) {
-	rows, err := q.db.Query(ctx, getFailingStudentsByCourseByType,
-		arg.CourseID,
-		arg.Semester,
-		arg.SessionType,
-		arg.TotalSessions,
-		arg.MinRequiredAttendance,
-	)
-	if err != nil {
-		return nil, err
-	}
-	defer rows.Close()
-	items := []GetFailingStudentsByCourseByTypeRow{}
-	for rows.Next() {
-		var i GetFailingStudentsByCourseByTypeRow
 		if err := rows.Scan(
 			&i.StudentID,
 			&i.StudentNumber,

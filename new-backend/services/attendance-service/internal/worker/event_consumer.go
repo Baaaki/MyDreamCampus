@@ -3,6 +3,7 @@ package worker
 import (
 	"context"
 	"encoding/json"
+	"time"
 
 	"github.com/baaaki/mydreamcampus/attendance/internal/db"
 	"github.com/baaaki/mydreamcampus/attendance/internal/dto"
@@ -25,7 +26,7 @@ type cacheWriter interface {
 	UpsertStudentCache(ctx context.Context, student db.UpsertStudentCacheParams) error
 	DeactivateStudentCache(ctx context.Context, studentID uuid.UUID) error
 	UpsertCourseCache(ctx context.Context, course db.UpsertCourseCacheParams) error
-	CreateEnrollmentCache(ctx context.Context, studentID, courseID uuid.UUID, semester string) error
+	CreateEnrollmentCache(ctx context.Context, studentID, courseID uuid.UUID, semester string, enrolledAt time.Time) error
 }
 
 type processedEvents interface {
@@ -312,6 +313,7 @@ func (w *EventConsumer) handleEnrollmentProgramApproved(ctx context.Context, bod
 			eventData.StudentID,
 			courseID,
 			eventData.Semester,
+			eventData.ApprovedAt,
 		)
 		if err != nil {
 			log.Error("failed to create enrollment cache",

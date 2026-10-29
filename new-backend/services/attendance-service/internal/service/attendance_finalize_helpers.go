@@ -4,23 +4,49 @@ import (
 	"fmt"
 
 	"github.com/baaaki/mydreamcampus/attendance/internal/db"
+	"github.com/baaaki/mydreamcampus/attendance/internal/dto"
 	"github.com/baaaki/mydreamcampus/shared/platform/utils"
 	"github.com/google/uuid"
 )
 
-// FailureInfo aggregates a single student's theory + lab failure state during
+// FailureInfo is one failing student's standing in both session types during
 // FinalizeAttendance. Exported only so the helper tests can build instances —
-// production code never touches it outside of mergeFailureRows / deriveFailedType.
+// production code never touches it outside of failingStudents / deriveFailedType.
 type FailureInfo struct {
 	StudentNumber string
 	StudentName   string
 	StudentEmail  string
-	TheoryPresent int
-	TheoryAbsent  int
-	TheoryFailed  bool
-	LabPresent    int
-	LabAbsent     int
-	LabFailed     bool
+	Theory        TypeAttendance
+	Lab           TypeAttendance
+}
+
+// TypeAttendance is a student's standing in one session type: the sessions
+// held since they were enrolled, how many they attended, and the minimum
+// that number of sessions requires.
+type TypeAttendance struct {
+	Held        int
+	Present     int
+	MinRequired int
+	Failed      bool
+}
+
+func (a TypeAttendance) response() *dto.SessionTypeAttendance {
+	return &dto.SessionTypeAttendance{
+		PresentCount:  a.Present,
+		AbsentCount:   a.Held - a.Present,
+		TotalSessions: a.Held,
+		MinRequired:   a.MinRequired,
+		Passed:        !a.Failed,
+	}
+}
+
+func (a TypeAttendance) eventDetail() *dto.AttendanceFailedTypeDetail {
+	return &dto.AttendanceFailedTypeDetail{
+		TotalSessions: a.Held,
+		PresentCount:  a.Present,
+		AbsentCount:   a.Held - a.Present,
+		MinRequired:   a.MinRequired,
+	}
 }
 
 // minTheoryRequired / minLabRequired scale the attendance thresholds to the
@@ -60,49 +86,50 @@ func deriveFailedType(theoryFailed, labFailed bool) string {
 	return "both"
 }
 
-// mergeFailureRows combines failing-student rows from the theory and lab
-// queries into a single per-student record. A student can appear in either
-// list (or both) — the merge marks each failure type independently so the
-// publisher can build a complete event without re-querying.
+// failingStudents holds every enrolled student to the sessions of each type
+// run since they were enrolled, with the minimum scaled to that count, and
+// returns the ones below it in either type. Holding them to the course's
+// total failed a student approved in week 5 for the four weeks they could
+// not attend. A student enrolled after a type's last session had nothing to
+// attend there and cannot fail it.
 //
 // Returning a map (not a slice) is intentional: downstream iteration order
-// is not part of the contract, and the map structure makes the lab-side
-// "is this student already in the failure set?" lookup an O(1) op.
-func mergeFailureRows(
-	theory []db.GetFailingStudentsByCourseByTypeRow,
-	lab []db.GetFailingStudentsByCourseByTypeRow,
-) map[uuid.UUID]*FailureInfo {
-	out := make(map[uuid.UUID]*FailureInfo, len(theory)+len(lab))
-
-	for _, row := range theory {
-		sid := utils.PgUUIDToUUID(row.StudentID)
-		out[sid] = &FailureInfo{
-			StudentNumber: row.StudentNumber,
-			StudentName:   fmt.Sprintf("%s %s", utils.PgTextToString(row.FirstName), utils.PgTextToString(row.LastName)),
-			StudentEmail:  utils.PgTextToString(row.Email),
-			TheoryPresent: int(row.PresentCount),
-			TheoryAbsent:  int(row.AbsentCount),
-			TheoryFailed:  true,
-		}
-	}
-
-	for _, row := range lab {
+// is not part of the contract.
+func failingStudents(theory, lab []db.GetCourseAttendanceByStudentAndTypeRow) map[uuid.UUID]*FailureInfo {
+	out := make(map[uuid.UUID]*FailureInfo, len(theory))
+	info := func(row db.GetCourseAttendanceByStudentAndTypeRow) *FailureInfo {
 		sid := utils.PgUUIDToUUID(row.StudentID)
 		if existing, ok := out[sid]; ok {
-			existing.LabPresent = int(row.PresentCount)
-			existing.LabAbsent = int(row.AbsentCount)
-			existing.LabFailed = true
-			continue
+			return existing
 		}
-		out[sid] = &FailureInfo{
+		created := &FailureInfo{
 			StudentNumber: row.StudentNumber,
 			StudentName:   fmt.Sprintf("%s %s", utils.PgTextToString(row.FirstName), utils.PgTextToString(row.LastName)),
 			StudentEmail:  utils.PgTextToString(row.Email),
-			LabPresent:    int(row.PresentCount),
-			LabAbsent:     int(row.AbsentCount),
-			LabFailed:     true,
+		}
+		out[sid] = created
+		return created
+	}
+	for _, row := range theory {
+		info(row).Theory = standing(row, minTheoryRequired)
+	}
+	for _, row := range lab {
+		info(row).Lab = standing(row, minLabRequired)
+	}
+	for sid, student := range out {
+		if !student.Theory.Failed && !student.Lab.Failed {
+			delete(out, sid)
 		}
 	}
-
 	return out
+}
+
+func standing(row db.GetCourseAttendanceByStudentAndTypeRow, minRequired func(int64) int) TypeAttendance {
+	minimum := minRequired(row.HeldCount)
+	return TypeAttendance{
+		Held:        int(row.HeldCount),
+		Present:     int(row.PresentCount),
+		MinRequired: minimum,
+		Failed:      int(row.PresentCount) < minimum,
+	}
 }

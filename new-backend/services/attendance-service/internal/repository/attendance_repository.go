@@ -130,13 +130,11 @@ func (r *AttendanceRepository) GetTotalSessionsByCourseAndType(ctx context.Conte
 	})
 }
 
-func (r *AttendanceRepository) GetFailingStudentsByCourseByType(ctx context.Context, courseID uuid.UUID, semester string, sessionType db.SessionTypeEnum, totalSessions int64, minRequired int64) ([]db.GetFailingStudentsByCourseByTypeRow, error) {
-	return r.queries.GetFailingStudentsByCourseByType(ctx, db.GetFailingStudentsByCourseByTypeParams{
-		CourseID:              utils.UUIDToPgUUID(courseID),
-		Semester:              semester,
-		SessionType:           sessionType,
-		TotalSessions:         totalSessions,
-		MinRequiredAttendance: minRequired,
+func (r *AttendanceRepository) GetCourseAttendanceByStudentAndType(ctx context.Context, courseID uuid.UUID, semester string, sessionType db.SessionTypeEnum) ([]db.GetCourseAttendanceByStudentAndTypeRow, error) {
+	return r.queries.GetCourseAttendanceByStudentAndType(ctx, db.GetCourseAttendanceByStudentAndTypeParams{
+		CourseID:    utils.UUIDToPgUUID(courseID),
+		Semester:    semester,
+		SessionType: sessionType,
 	})
 }
 

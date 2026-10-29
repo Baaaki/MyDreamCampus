@@ -518,6 +518,7 @@ func (s *AttendanceService) GetMyAttendance(ctx context.Context, studentID uuid.
 		if err != nil {
 			return dto.GetMyAttendanceResponse{}, fmt.Errorf("list sessions of course %s: %w", courseID, err)
 		}
+		sessions = sessionsSince(sessions, enrollment.EnrolledAt)
 		records = append(records, s.bufferedScans(ctx, studentID, sessions, records)...)
 
 		weeklyRecords := make([]dto.WeeklyAttendanceRecord, 0, len(records))
@@ -601,6 +602,22 @@ func missedSessions(sessions []db.GetSessionsByCourseRow, attended []db.GetStude
 		})
 	}
 	return missed
+}
+
+// sessionsSince drops the sessions run before the student was enrolled: they
+// could not scan into them, so those are neither held nor missed for them.
+// enrolledAt is NULL for enrollments from the start.
+func sessionsSince(sessions []db.GetSessionsByCourseRow, enrolledAt pgtype.Timestamp) []db.GetSessionsByCourseRow {
+	if !enrolledAt.Valid {
+		return sessions
+	}
+	kept := make([]db.GetSessionsByCourseRow, 0, len(sessions))
+	for _, session := range sessions {
+		if !session.StartedAt.Time.Before(enrolledAt.Time) {
+			kept = append(kept, session)
+		}
+	}
+	return kept
 }
 
 // bufferedScans returns the student's QR scans of open sessions that still
@@ -759,28 +776,26 @@ func (s *AttendanceService) FinalizeAttendance(ctx context.Context, courseID, in
 	if err != nil {
 		return dto.FinalizeAttendanceResponse{}, fmt.Errorf("count lab sessions: %w", err)
 	}
+	// The course-wide minimums, for a student enrolled from the start; each
+	// student is held to the sessions run since their own enrollment.
 	minTheory := minTheoryRequired(theoryTotal)
 	minLab := minLabRequired(labTotal)
 
-	// Get failing students for theory (present_count < minTheory)
-	var theoryFailing []db.GetFailingStudentsByCourseByTypeRow
+	var theoryRows, labRows []db.GetCourseAttendanceByStudentAndTypeRow
 	if theoryTotal > 0 {
-		theoryFailing, err = s.attendanceRepo.GetFailingStudentsByCourseByType(ctx, courseID, semester, db.AttendanceSessionTypeEnumTheory, theoryTotal, int64(minTheory))
+		theoryRows, err = s.attendanceRepo.GetCourseAttendanceByStudentAndType(ctx, courseID, semester, db.AttendanceSessionTypeEnumTheory)
 		if err != nil {
 			return dto.FinalizeAttendanceResponse{}, err
 		}
 	}
-
-	// Get failing students for lab (present_count < minLab)
-	var labFailing []db.GetFailingStudentsByCourseByTypeRow
 	if labTotal > 0 {
-		labFailing, err = s.attendanceRepo.GetFailingStudentsByCourseByType(ctx, courseID, semester, db.AttendanceSessionTypeEnumLab, labTotal, int64(minLab))
+		labRows, err = s.attendanceRepo.GetCourseAttendanceByStudentAndType(ctx, courseID, semester, db.AttendanceSessionTypeEnumLab)
 		if err != nil {
 			return dto.FinalizeAttendanceResponse{}, err
 		}
 	}
 
-	failMap := mergeFailureRows(theoryFailing, labFailing)
+	failMap := failingStudents(theoryRows, labRows)
 
 	// Get all students for total count
 	allStudents, err := s.cacheRepo.GetEnrolledStudentsByCourse(ctx, courseID, semester)
@@ -793,7 +808,7 @@ func (s *AttendanceService) FinalizeAttendance(ctx context.Context, courseID, in
 	var failedEvents []repository.OutboxEvent
 
 	for studentID, info := range failMap {
-		failedType := deriveFailedType(info.TheoryFailed, info.LabFailed)
+		failedType := deriveFailedType(info.Theory.Failed, info.Lab.Failed)
 
 		failedStudent := dto.FailedStudent{
 			StudentID:     studentID,
@@ -803,23 +818,11 @@ func (s *AttendanceService) FinalizeAttendance(ctx context.Context, courseID, in
 		}
 
 		if theoryTotal > 0 {
-			failedStudent.Theory = &dto.SessionTypeAttendance{
-				PresentCount:  info.TheoryPresent,
-				AbsentCount:   info.TheoryAbsent,
-				TotalSessions: int(theoryTotal),
-				MinRequired:   minTheory,
-				Passed:        !info.TheoryFailed,
-			}
+			failedStudent.Theory = info.Theory.response()
 		}
 
 		if labTotal > 0 {
-			failedStudent.Lab = &dto.SessionTypeAttendance{
-				PresentCount:  info.LabPresent,
-				AbsentCount:   info.LabAbsent,
-				TotalSessions: int(labTotal),
-				MinRequired:   minLab,
-				Passed:        !info.LabFailed,
-			}
+			failedStudent.Lab = info.Lab.response()
 		}
 
 		failed = append(failed, failedStudent)
@@ -837,21 +840,11 @@ func (s *AttendanceService) FinalizeAttendance(ctx context.Context, courseID, in
 		}
 
 		if theoryTotal > 0 {
-			eventData.Theory = &dto.AttendanceFailedTypeDetail{
-				TotalSessions: int(theoryTotal),
-				PresentCount:  info.TheoryPresent,
-				AbsentCount:   info.TheoryAbsent,
-				MinRequired:   minTheory,
-			}
+			eventData.Theory = info.Theory.eventDetail()
 		}
 
 		if labTotal > 0 {
-			eventData.Lab = &dto.AttendanceFailedTypeDetail{
-				TotalSessions: int(labTotal),
-				PresentCount:  info.LabPresent,
-				AbsentCount:   info.LabAbsent,
-				MinRequired:   minLab,
-			}
+			eventData.Lab = info.Lab.eventDetail()
 		}
 
 		payload, err := failedAttendancePayload(eventData)

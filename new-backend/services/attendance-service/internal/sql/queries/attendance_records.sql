@@ -113,21 +113,28 @@ WHERE e.course_id = $1 AND e.semester = $2
 GROUP BY s.id, s.student_number, s.first_name, s.last_name, s.email
 HAVING (sqlc.arg(total_sessions)::bigint - COUNT(ar.id)) > sqlc.arg(max_allowed_absences)::bigint;
 
--- name: GetFailingStudentsByCourseByType :many
+-- name: GetCourseAttendanceByStudentAndType :many
+-- Per enrolled student, the sessions of one type held since they were
+-- enrolled (enrolled_at NULL: since the start) and how many they attended.
+-- Finalize holds each student to their own count, so one approved late is
+-- not failed for the weeks before.
 SELECT
-    s.id as student_id,
+    s.id AS student_id,
     s.student_number,
     s.first_name,
     s.last_name,
     s.email,
-    COUNT(ar.id) as present_count,
-    (sqlc.arg(total_sessions)::bigint - COUNT(ar.id))::bigint as absent_count
+    (SELECT COUNT(*) FROM attendance.attendance_sessions ats
+     WHERE ats.course_id = e.course_id AND ats.semester = e.semester
+       AND ats.session_type = sqlc.arg(session_type)
+       AND (e.enrolled_at IS NULL OR ats.started_at >= e.enrolled_at))::bigint AS held_count,
+    (SELECT COUNT(*) FROM attendance.attendance_records ar
+     WHERE ar.student_id = e.student_id AND ar.course_id = e.course_id AND ar.semester = e.semester
+       AND ar.session_type = sqlc.arg(session_type))::bigint AS present_count
 FROM attendance.enrollments_view e
 JOIN attendance.students_view s ON e.student_id = s.id
-LEFT JOIN attendance.attendance_records ar ON ar.student_id = s.id AND ar.course_id = e.course_id AND ar.semester = e.semester AND ar.session_type = $3
-WHERE e.course_id = $1 AND e.semester = $2
-GROUP BY s.id, s.student_number, s.first_name, s.last_name, s.email
-HAVING COUNT(ar.id) < sqlc.arg(min_required_attendance)::bigint;
+WHERE e.course_id = sqlc.arg(course_id) AND e.semester = sqlc.arg(semester)
+ORDER BY s.student_number;
 
 -- name: GetAttendanceRecordsBySession :many
 SELECT

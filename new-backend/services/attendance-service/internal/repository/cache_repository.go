@@ -2,10 +2,12 @@ package repository
 
 import (
 	"context"
+	"time"
 
 	"github.com/baaaki/mydreamcampus/attendance/internal/db"
 	"github.com/baaaki/mydreamcampus/shared/platform/utils"
 	"github.com/google/uuid"
+	"github.com/jackc/pgx/v5/pgtype"
 	"github.com/jackc/pgx/v5/pgxpool"
 )
 
@@ -44,11 +46,19 @@ func (r *CacheRepository) GetCourseCacheByID(ctx context.Context, courseID uuid.
 }
 
 // Enrollment cache operations
-func (r *CacheRepository) CreateEnrollmentCache(ctx context.Context, studentID, courseID uuid.UUID, semester string) error {
+// CreateEnrollmentCache records that the student takes the course since
+// enrolledAt; a zero enrolledAt (an event without it) means from the start.
+func (r *CacheRepository) CreateEnrollmentCache(ctx context.Context, studentID, courseID uuid.UUID, semester string, enrolledAt time.Time) error {
+	since := pgtype.Timestamp{}
+	if !enrolledAt.IsZero() {
+		// Stored as UTC like started_at, which it is compared with.
+		since = utils.TimeToPgTimestamp(enrolledAt.UTC())
+	}
 	return r.queries.CreateEnrollmentCache(ctx, db.CreateEnrollmentCacheParams{
-		StudentID: utils.UUIDToPgUUID(studentID),
-		CourseID:  utils.UUIDToPgUUID(courseID),
-		Semester:  semester,
+		StudentID:  utils.UUIDToPgUUID(studentID),
+		CourseID:   utils.UUIDToPgUUID(courseID),
+		Semester:   semester,
+		EnrolledAt: since,
 	})
 }
 

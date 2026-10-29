@@ -70,6 +70,7 @@ type EnrollmentProgramApprovedEventData struct {
 	Semester   string      `json:"semester"`
 	CourseIDs  []uuid.UUID `json:"course_ids"`
 	ApprovedBy uuid.UUID   `json:"approved_by"`
+	ApprovedAt time.Time   `json:"approved_at"`
 }
 
 // =======================================
