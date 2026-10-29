@@ -1,12 +1,23 @@
 import axios, { AxiosError, InternalAxiosRequestConfig } from 'axios';
+import Constants from 'expo-constants';
 import * as SecureStore from 'expo-secure-store';
 import { Platform } from 'react-native';
 
-// EXPO_PUBLIC_API_URL from .env wins; otherwise fall back to simulator defaults.
-// Android emulator: 10.0.2.2 aliases host localhost. iOS simulator hits localhost directly.
-const getBaseURL = () => {
+const LOOPBACK_HOSTS = new Set(['localhost', '127.0.0.1']);
+
+// EXPO_PUBLIC_API_URL from .env wins (release builds always set it). In
+// development the device already reaches the dev machine at Metro's address,
+// and Caddy listens on port 80 of that same machine, so that host is used: a
+// LAN IP written into .env goes stale whenever DHCP hands out a new one.
+// Metro behind `adb reverse` reports localhost, which on Android is the device
+// itself; the emulator reaches the host's loopback as 10.0.2.2.
+export const getBaseURL = () => {
   const envUrl = process.env.EXPO_PUBLIC_API_URL;
   if (envUrl) return envUrl;
+  const devHost = Constants.expoConfig?.hostUri?.split(':')[0];
+  if (devHost && !(Platform.OS === 'android' && LOOPBACK_HOSTS.has(devHost))) {
+    return `http://${devHost}/api`;
+  }
   if (Platform.OS === 'android') return 'http://10.0.2.2/api';
   return 'http://localhost/api';
 };

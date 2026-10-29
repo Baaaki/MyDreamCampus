@@ -58,6 +58,46 @@ beforeEach(() => {
   jest.clearAllMocks();
 });
 
+describe("getBaseURL", () => {
+  const configured = process.env.EXPO_PUBLIC_API_URL;
+  afterEach(() => {
+    if (configured === undefined) delete process.env.EXPO_PUBLIC_API_URL;
+    else process.env.EXPO_PUBLIC_API_URL = configured;
+  });
+
+  function baseURLFor(opts: { env?: string; hostUri?: string; os: "ios" | "android" }): string {
+    if (opts.env === undefined) delete process.env.EXPO_PUBLIC_API_URL;
+    else process.env.EXPO_PUBLIC_API_URL = opts.env;
+    let url = "";
+    jest.isolateModules(() => {
+      require("expo-constants").default.expoConfig = opts.hostUri ? { hostUri: opts.hostUri } : null;
+      require("react-native").Platform.OS = opts.os;
+      url = require("./api").getBaseURL();
+    });
+    return url;
+  }
+
+  it("prefers EXPO_PUBLIC_API_URL", () => {
+    expect(baseURLFor({ env: "https://campus.example/api", hostUri: "192.168.1.106:8081", os: "android" })).toBe(
+      "https://campus.example/api"
+    );
+  });
+
+  it("reaches the backend on the machine Metro runs on", () => {
+    expect(baseURLFor({ hostUri: "192.168.1.106:8081", os: "android" })).toBe("http://192.168.1.106/api");
+    expect(baseURLFor({ hostUri: "192.168.1.106:8081", os: "ios" })).toBe("http://192.168.1.106/api");
+  });
+
+  it("uses the emulator's alias for the host when Metro is reached through adb reverse", () => {
+    expect(baseURLFor({ hostUri: "localhost:8081", os: "android" })).toBe("http://10.0.2.2/api");
+  });
+
+  it("falls back to the simulator defaults without a dev server", () => {
+    expect(baseURLFor({ os: "android" })).toBe("http://10.0.2.2/api");
+    expect(baseURLFor({ os: "ios" })).toBe("http://localhost/api");
+  });
+});
+
 describe("api.ts request interceptor", () => {
   it("attaches Bearer token from SecureStore when present", async () => {
     await SecureStore.setItemAsync("jwt_token", "secret-jwt-123");

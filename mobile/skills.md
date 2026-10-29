@@ -481,22 +481,21 @@ if (Platform.OS === 'web') { /* ... */ }
 (Not: tema icin `ThemeContext` + NativeWind `colorScheme` kullaniliyor; ayri
 `useColorScheme` dosyasi yok.)
 
-API base URL ornek (`services/api.ts`):
-```ts
-const getBaseURL = () => {
-  const envUrl = process.env.EXPO_PUBLIC_API_URL;
-  if (envUrl) return envUrl;
-  if (Platform.OS === 'android') return 'http://10.0.2.2/api';  // Android emulator
-  return 'http://localhost/api';                                  // iOS simulator
-};
-```
+API base URL secimi (`services/api.ts` `getBaseURL`), oncelik sirasiyla:
+1. `EXPO_PUBLIC_API_URL` (`.env` veya shell) — release APK hep bunu kullanir
+   (`scripts/build-apk.sh` verir).
+2. Gelistirmede Metro'nun host'u (`Constants.expoConfig.hostUri`) + `:80/api`:
+   telefon/emulator Metro'ya hangi adresle ulasiyorsa backend'e de o adresle
+   ulasir (Caddy ayni makinede 80'de). LAN IP `.env`'e yazilmaz — DHCP IP'yi
+   degistirince eskiyordu.
+3. `adb reverse` ile gelen `localhost` Android'de cihazin kendisidir; o zaman
+   ve dev server yokken emulator `http://10.0.2.2/api`, iOS simulator
+   `http://localhost/api`.
 
 **Gercek cihaz (LAN) testi:**
-Simulator/emulator yerine telefonda Expo Go kullaniliyorsa `localhost`/`10.0.2.2` calismaz — telefon ev/ofis WiFi'sinden Mac/PC'ye ulasamaz. Cozum:
-1. Mac/PC'nin LAN IP'sini bul: `ipconfig getifaddr en0` (Mac) / `ip addr show` (Linux) / `ipconfig` (Windows)
-2. `.env`: `EXPO_PUBLIC_API_URL=http://192.168.1.X/api`
-3. Telefon ayni WiFi'de olmali, firewall 80 portunu izin vermeli
-4. `npm start` -> QR kodunu Expo Go ile tara
+1. `.env`'de `EXPO_PUBLIC_API_URL` bos/yorumlu kalsin (backend baska makinedeyse yaz).
+2. Telefon ayni WiFi'de olmali, firewall 80 portunu izin vermeli.
+3. `npm start` -> QR kodunu Expo Go ile tara.
 
 ---
 
@@ -551,8 +550,7 @@ npm run test:coverage # kapsam raporu
 | Metro cache bozuk | `npx expo start -c` (cache temizle) | `node_modules` sil |
 | Build fail | Expo Go yeterli mi kontrol (native modul varsa Dev Client gerekir) | `android/build.gradle`'i elle yamamak (sonraki prebuild siler) — Gradle log'unu oku, gerekiyorsa config plugin'i duzelt |
 | 401 sonsuz dongu | `services/api.ts` _retried flag kontrol | Interceptor'i bypass et |
-| iOS simulator API'ye ulasamiyor | Mac IP'sini `EXPO_PUBLIC_API_URL`'e yaz | `localhost` Android'de calismaz |
-| Android emulator API'ye ulasamiyor | `http://10.0.2.2/api` kullan | `localhost` direkt |
+| Cihaz/emulator API'ye ulasamiyor | `.env`'deki eski `EXPO_PUBLIC_API_URL`'i kaldir (Metro host'u kullanilir) veya backend'in gercek adresini yaz; `curl http://<ip>/health` ile dene | LAN IP'yi koda gommek |
 | SecureStore null | iOS keychain reset olmus olabilir, login'e yonlendir | Crash'le, hata yutma |
 
 ---
