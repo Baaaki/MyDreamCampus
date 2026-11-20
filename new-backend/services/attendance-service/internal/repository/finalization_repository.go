@@ -6,6 +6,7 @@ import (
 	"fmt"
 
 	"github.com/baaaki/mydreamcampus/attendance/internal/db"
+	attErrors "github.com/baaaki/mydreamcampus/attendance/internal/errors"
 	"github.com/baaaki/mydreamcampus/shared/platform/utils"
 	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5"
@@ -55,6 +56,18 @@ func (r *FinalizationRepository) SaveCourseFinalization(ctx context.Context, par
 	}
 	// Rollback after a successful commit is a no-op returning ErrTxClosed.
 	defer func() { _ = tx.Rollback(ctx) }()
+
+	courseID := utils.PgUUIDToUUID(params.CourseID)
+	if _, err := tx.Exec(ctx, `SELECT pg_advisory_xact_lock(hashtext('attendance_course:' || $1::text))`, courseID.String()); err != nil {
+		return false, fmt.Errorf("lock course for finalization: %w", err)
+	}
+	var hasOpenSession bool
+	if err := tx.QueryRow(ctx, `SELECT EXISTS (SELECT 1 FROM attendance.attendance_sessions WHERE course_id = $1 AND is_active = TRUE)`, params.CourseID).Scan(&hasOpenSession); err != nil {
+		return false, fmt.Errorf("check open sessions: %w", err)
+	}
+	if hasOpenSession {
+		return false, attErrors.ErrOpenSessionExists
+	}
 
 	queries := r.queries.WithTx(tx)
 	inserted, err := queries.InsertCourseFinalization(ctx, params)

@@ -2,11 +2,15 @@ package repository
 
 import (
 	"context"
+	"errors"
+	"fmt"
 
 	"github.com/baaaki/mydreamcampus/attendance/internal/db"
+	attErrors "github.com/baaaki/mydreamcampus/attendance/internal/errors"
 	"github.com/baaaki/mydreamcampus/shared/platform/clock"
 	"github.com/baaaki/mydreamcampus/shared/platform/utils"
 	"github.com/google/uuid"
+	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgxpool"
 )
 
@@ -23,7 +27,50 @@ func NewSessionRepository(pool *pgxpool.Pool) *SessionRepository {
 }
 
 func (r *SessionRepository) CreateAttendanceSession(ctx context.Context, params db.CreateAttendanceSessionParams) (db.AttendanceSession, error) {
-	return r.queries.CreateAttendanceSession(ctx, params)
+	tx, err := r.pool.Begin(ctx)
+	if err != nil {
+		return db.AttendanceSession{}, fmt.Errorf("begin session tx: %w", err)
+	}
+	defer func() { _ = tx.Rollback(ctx) }()
+
+	courseID := utils.PgUUIDToUUID(params.CourseID)
+	if _, err := tx.Exec(ctx, `SELECT pg_advisory_xact_lock(hashtext('attendance_course:' || $1::text))`, courseID.String()); err != nil {
+		return db.AttendanceSession{}, fmt.Errorf("lock course for session: %w", err)
+	}
+
+	qtx := r.queries.WithTx(tx)
+	if _, err := qtx.GetCourseFinalization(ctx, params.CourseID); err == nil {
+		return db.AttendanceSession{}, attErrors.ErrAttendanceFinalized
+	} else if !errors.Is(err, pgx.ErrNoRows) {
+		return db.AttendanceSession{}, fmt.Errorf("check course finalization: %w", err)
+	}
+
+	session, err := qtx.CreateAttendanceSession(ctx, params)
+	if err != nil {
+		return db.AttendanceSession{}, err
+	}
+	if err := tx.Commit(ctx); err != nil {
+		return db.AttendanceSession{}, fmt.Errorf("commit session tx: %w", err)
+	}
+	return session, nil
+}
+
+func (r *SessionRepository) GetActiveSessionIDsByCourse(ctx context.Context, courseID uuid.UUID) ([]uuid.UUID, error) {
+	rows, err := r.pool.Query(ctx, `SELECT id FROM attendance.attendance_sessions WHERE course_id = $1 AND is_active = TRUE`, utils.UUIDToPgUUID(courseID))
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	var ids []uuid.UUID
+	for rows.Next() {
+		var id uuid.UUID
+		if err := rows.Scan(&id); err != nil {
+			return nil, err
+		}
+		ids = append(ids, id)
+	}
+	return ids, rows.Err()
 }
 
 func (r *SessionRepository) GetSessionByID(ctx context.Context, sessionID uuid.UUID) (db.AttendanceSession, error) {

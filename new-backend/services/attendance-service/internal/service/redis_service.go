@@ -61,6 +61,11 @@ func (s *RedisService) IsStudentEnrolled(ctx context.Context, sessionID, student
 	return s.client.SIsMember(ctx, key, studentID).Result()
 }
 
+func (s *RedisService) RemoveEnrolledStudent(ctx context.Context, sessionID, studentID string) error {
+	key := fmt.Sprintf("attendance:session:%s:enrolled", sessionID)
+	return s.client.SRem(ctx, key, studentID).Err()
+}
+
 // AddToBuffer claims a scan slot atomically and writes it to the buffer.
 // Returns (true, nil) when the scan is newly recorded, (false, nil) when the
 // student already scanned this session. SADD is used as the dedup primitive so

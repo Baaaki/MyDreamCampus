@@ -36,6 +36,7 @@ type StudentUpdatedEventData struct {
 	LastName      string    `json:"last_name"`
 	Email         string    `json:"email"`
 	Department    string    `json:"department"`
+	Status        string    `json:"status"`
 }
 
 // StudentDeactivatedEventData is consumed from student service

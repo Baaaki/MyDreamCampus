@@ -47,9 +47,12 @@ func (s *OutboxStore) ClaimPending(ctx context.Context, limit int32, settle func
 		}
 		result := make([]eventbus.OutboxEvent, len(events))
 		for i, e := range events {
-			var retryCount int16
+			var retryCount, maxRetries int16
 			if e.RetryCount.Valid {
 				retryCount = e.RetryCount.Int16
+			}
+			if e.MaxRetries.Valid {
+				maxRetries = e.MaxRetries.Int16
 			}
 			result[i] = eventbus.OutboxEvent{
 				ID:            e.ID.Bytes,
@@ -57,6 +60,8 @@ func (s *OutboxStore) ClaimPending(ctx context.Context, limit int32, settle func
 				RoutingKey:    e.RoutingKey,
 				Payload:       e.Payload,
 				RetryCount:    retryCount,
+				MaxRetries:    maxRetries,
+				CreatedAt:     utils.PgTimestampToTime(e.CreatedAt),
 				CorrelationID: utils.CorrelationIDString(e.CorrelationID),
 			}
 		}
@@ -72,9 +77,12 @@ func (s *OutboxStore) GetPending(ctx context.Context, batchSize int32) ([]eventb
 
 	result := make([]eventbus.OutboxEvent, len(events))
 	for i, e := range events {
-		var retryCount int16
+		var retryCount, maxRetries int16
 		if e.RetryCount.Valid {
 			retryCount = e.RetryCount.Int16
+		}
+		if e.MaxRetries.Valid {
+			maxRetries = e.MaxRetries.Int16
 		}
 
 		result[i] = eventbus.OutboxEvent{
@@ -83,6 +91,8 @@ func (s *OutboxStore) GetPending(ctx context.Context, batchSize int32) ([]eventb
 			RoutingKey:    e.RoutingKey,
 			Payload:       e.Payload,
 			RetryCount:    retryCount,
+			MaxRetries:    maxRetries,
+			CreatedAt:     utils.PgTimestampToTime(e.CreatedAt),
 			CorrelationID: utils.CorrelationIDString(e.CorrelationID),
 		}
 	}
@@ -107,9 +117,12 @@ func (s *OutboxStore) GetFailed(ctx context.Context, batchSize int32) ([]eventbu
 
 	result := make([]eventbus.OutboxEvent, len(events))
 	for i, e := range events {
-		var retryCount int16
+		var retryCount, maxRetries int16
 		if e.RetryCount.Valid {
 			retryCount = e.RetryCount.Int16
+		}
+		if e.MaxRetries.Valid {
+			maxRetries = e.MaxRetries.Int16
 		}
 
 		result[i] = eventbus.OutboxEvent{
@@ -118,6 +131,8 @@ func (s *OutboxStore) GetFailed(ctx context.Context, batchSize int32) ([]eventbu
 			RoutingKey:    e.RoutingKey,
 			Payload:       e.Payload,
 			RetryCount:    retryCount,
+			MaxRetries:    maxRetries,
+			CreatedAt:     utils.PgTimestampToTime(e.CreatedAt),
 			CorrelationID: utils.CorrelationIDString(e.CorrelationID),
 		}
 	}

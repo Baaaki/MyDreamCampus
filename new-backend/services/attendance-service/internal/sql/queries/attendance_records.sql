@@ -148,7 +148,7 @@ SELECT
     ar.scanned_at,
     ar.qr_timestamp,
     ar.manually_marked_by,
-    ar.manually_marked_at as marked_at,
+    COALESCE(ar.scanned_at, ar.manually_marked_at)::timestamp as marked_at,
     ar.manual_note,
     ar.created_at,
     ar.session_type

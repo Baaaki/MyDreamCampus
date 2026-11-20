@@ -49,7 +49,7 @@ func (q *Queries) DeleteProcessedOutboxEvents(ctx context.Context, processedAt p
 }
 
 const getFailedOutboxEvents = `-- name: GetFailedOutboxEvents :many
-SELECT id, event_type, routing_key, payload, retry_count, max_retries, correlation_id
+SELECT id, event_type, routing_key, payload, retry_count, max_retries, correlation_id, created_at
 FROM attendance.outbox_events
 WHERE status = 'failed'
 ORDER BY created_at ASC
@@ -57,13 +57,14 @@ LIMIT $1
 `
 
 type GetFailedOutboxEventsRow struct {
-	ID            pgtype.UUID `json:"id"`
-	EventType     string      `json:"event_type"`
-	RoutingKey    string      `json:"routing_key"`
-	Payload       []byte      `json:"payload"`
-	RetryCount    pgtype.Int2 `json:"retry_count"`
-	MaxRetries    pgtype.Int2 `json:"max_retries"`
-	CorrelationID pgtype.UUID `json:"correlation_id"`
+	ID            pgtype.UUID      `json:"id"`
+	EventType     string           `json:"event_type"`
+	RoutingKey    string           `json:"routing_key"`
+	Payload       []byte           `json:"payload"`
+	RetryCount    pgtype.Int2      `json:"retry_count"`
+	MaxRetries    pgtype.Int2      `json:"max_retries"`
+	CorrelationID pgtype.UUID      `json:"correlation_id"`
+	CreatedAt     pgtype.Timestamp `json:"created_at"`
 }
 
 func (q *Queries) GetFailedOutboxEvents(ctx context.Context, limit int32) ([]GetFailedOutboxEventsRow, error) {
@@ -83,6 +84,7 @@ func (q *Queries) GetFailedOutboxEvents(ctx context.Context, limit int32) ([]Get
 			&i.RetryCount,
 			&i.MaxRetries,
 			&i.CorrelationID,
+			&i.CreatedAt,
 		); err != nil {
 			return nil, err
 		}
@@ -95,7 +97,7 @@ func (q *Queries) GetFailedOutboxEvents(ctx context.Context, limit int32) ([]Get
 }
 
 const getPendingOutboxEvents = `-- name: GetPendingOutboxEvents :many
-SELECT id, event_type, routing_key, payload, retry_count, max_retries, correlation_id
+SELECT id, event_type, routing_key, payload, retry_count, max_retries, correlation_id, created_at
 FROM attendance.outbox_events
 WHERE status = 'pending'
 ORDER BY created_at ASC
@@ -104,13 +106,14 @@ FOR UPDATE SKIP LOCKED
 `
 
 type GetPendingOutboxEventsRow struct {
-	ID            pgtype.UUID `json:"id"`
-	EventType     string      `json:"event_type"`
-	RoutingKey    string      `json:"routing_key"`
-	Payload       []byte      `json:"payload"`
-	RetryCount    pgtype.Int2 `json:"retry_count"`
-	MaxRetries    pgtype.Int2 `json:"max_retries"`
-	CorrelationID pgtype.UUID `json:"correlation_id"`
+	ID            pgtype.UUID      `json:"id"`
+	EventType     string           `json:"event_type"`
+	RoutingKey    string           `json:"routing_key"`
+	Payload       []byte           `json:"payload"`
+	RetryCount    pgtype.Int2      `json:"retry_count"`
+	MaxRetries    pgtype.Int2      `json:"max_retries"`
+	CorrelationID pgtype.UUID      `json:"correlation_id"`
+	CreatedAt     pgtype.Timestamp `json:"created_at"`
 }
 
 func (q *Queries) GetPendingOutboxEvents(ctx context.Context, limit int32) ([]GetPendingOutboxEventsRow, error) {
@@ -130,6 +133,7 @@ func (q *Queries) GetPendingOutboxEvents(ctx context.Context, limit int32) ([]Ge
 			&i.RetryCount,
 			&i.MaxRetries,
 			&i.CorrelationID,
+			&i.CreatedAt,
 		); err != nil {
 			return nil, err
 		}
@@ -145,8 +149,8 @@ const markOutboxEventFailed = `-- name: MarkOutboxEventFailed :exec
 UPDATE attendance.outbox_events
 SET retry_count = retry_count + 1,
     status = CASE
-        WHEN retry_count + 1 >= max_retries THEN 'failed'::outbox_status_enum
-        ELSE 'pending'::outbox_status_enum
+        WHEN retry_count + 1 >= max_retries THEN 'failed'::attendance.outbox_status_enum
+        ELSE 'pending'::attendance.outbox_status_enum
     END,
     error_message = $2
 WHERE id = $1

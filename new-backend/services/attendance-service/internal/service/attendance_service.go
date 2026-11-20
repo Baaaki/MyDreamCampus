@@ -343,7 +343,7 @@ func (s *AttendanceService) CreateManualAttendance(ctx context.Context, sessionI
 	}
 
 	// Semester enforcement: checks hard_deadline + period window
-	if err := s.checkSemesterEnforcement(ctx, session.Semester, false); err != nil {
+	if err := s.checkSemesterEnforcement(ctx, session.Semester, isAdmin); err != nil {
 		return dto.ManualAttendanceResponse{}, err
 	}
 
@@ -779,6 +779,10 @@ func (s *AttendanceService) FinalizeAttendance(ctx context.Context, courseID, in
 	}
 	semester = course.Semester
 
+	if err := s.checkSemesterHardDeadline(ctx, semester); err != nil {
+		return dto.FinalizeAttendanceResponse{}, err
+	}
+
 	if _, finalized, err := s.finalizations.GetCourseFinalization(ctx, courseID); err != nil {
 		return dto.FinalizeAttendanceResponse{}, fmt.Errorf("read course finalization: %w", err)
 	} else if finalized {
@@ -932,6 +936,9 @@ func (s *AttendanceService) FinalizeAttendance(ctx context.Context, courseID, in
 		Result:      result,
 	}, failedEvents)
 	if err != nil {
+		if goerrors.Is(err, errors.ErrOpenSessionExists) {
+			return dto.FinalizeAttendanceResponse{}, errors.ErrOpenSessionExists
+		}
 		return dto.FinalizeAttendanceResponse{}, fmt.Errorf("save course finalization: %w", err)
 	}
 	if !saved {
@@ -1406,10 +1413,65 @@ func (s *AttendanceService) checkSemesterEnforcement(ctx context.Context, semest
 // GetSemesterActivity tells enrollment whether the student already has an
 // attendance record in the semester. Taking their approved program back
 // would leave those records off any roster.
+func (s *AttendanceService) checkSemesterHardDeadline(ctx context.Context, semester string) error {
+	if s.semesterClient == nil {
+		return nil
+	}
+	semesterInfo, err := s.semesterClient.GetSemesterInfo(ctx, semester)
+	if err != nil {
+		if goerrors.Is(err, client.ErrUnavailable) {
+			logger.Error("catalog unreachable, refusing to skip hard deadline check",
+				zap.String("semester", semester),
+				zap.Error(err),
+			)
+			return errors.ErrSemesterInfoUnavailable
+		}
+		logger.Warn("failed to fetch semester info, skipping hard deadline check",
+			zap.String("semester", semester),
+			zap.Error(err),
+		)
+		return nil
+	}
+	if !semesterInfo.HardDeadline.IsZero() && clock.Now().After(semesterInfo.HardDeadline) {
+		return errors.ErrSemesterEnded
+	}
+	return nil
+}
+
 func (s *AttendanceService) GetSemesterActivity(ctx context.Context, studentID uuid.UUID, semester string) (contracts.SemesterActivity, error) {
 	has, err := s.attendanceRepo.StudentHasRecordsInSemester(ctx, studentID, semester)
 	if err != nil {
 		return contracts.SemesterActivity{}, fmt.Errorf("read student's semester records: %w", err)
 	}
-	return contracts.SemesterActivity{HasActivity: has}, nil
+	if has {
+		return contracts.SemesterActivity{HasActivity: true}, nil
+	}
+
+	// Also inspect unflushed Redis QR scan buffers so a freshly scanned
+	// student cannot replace their approved enrollment before the flusher runs.
+	if s.redisService != nil && s.cacheRepo != nil && s.sessionRepo != nil {
+		enrollments, err := s.cacheRepo.GetStudentEnrollmentsBySemester(ctx, studentID, semester)
+		if err != nil {
+			return contracts.SemesterActivity{}, fmt.Errorf("read student's semester enrollments: %w", err)
+		}
+		studentKey := studentID.String()
+		for _, enr := range enrollments {
+			courseID := utils.PgUUIDToUUID(enr.CourseID)
+			sessions, err := s.sessionRepo.GetSessionsByCourse(ctx, courseID, semester)
+			if err != nil {
+				return contracts.SemesterActivity{}, fmt.Errorf("read course sessions for activity: %w", err)
+			}
+			for _, sess := range sessions {
+				buf, err := s.redisService.GetBuffer(ctx, utils.PgUUIDToUUID(sess.ID).String())
+				if err != nil {
+					return contracts.SemesterActivity{}, fmt.Errorf("read scan buffer for activity: %w", err)
+				}
+				if _, ok := buf[studentKey]; ok {
+					return contracts.SemesterActivity{HasActivity: true}, nil
+				}
+			}
+		}
+	}
+
+	return contracts.SemesterActivity{HasActivity: false}, nil
 }

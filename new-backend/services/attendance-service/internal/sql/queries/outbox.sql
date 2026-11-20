@@ -3,7 +3,7 @@ INSERT INTO attendance.outbox_events (event_type, routing_key, payload, correlat
 VALUES ($1, $2, $3, $4);
 
 -- name: GetPendingOutboxEvents :many
-SELECT id, event_type, routing_key, payload, retry_count, max_retries, correlation_id
+SELECT id, event_type, routing_key, payload, retry_count, max_retries, correlation_id, created_at
 FROM attendance.outbox_events
 WHERE status = 'pending'
 ORDER BY created_at ASC
@@ -19,14 +19,14 @@ WHERE id = $1;
 UPDATE attendance.outbox_events
 SET retry_count = retry_count + 1,
     status = CASE
-        WHEN retry_count + 1 >= max_retries THEN 'failed'::outbox_status_enum
-        ELSE 'pending'::outbox_status_enum
+        WHEN retry_count + 1 >= max_retries THEN 'failed'::attendance.outbox_status_enum
+        ELSE 'pending'::attendance.outbox_status_enum
     END,
     error_message = $2
 WHERE id = $1;
 
 -- name: GetFailedOutboxEvents :many
-SELECT id, event_type, routing_key, payload, retry_count, max_retries, correlation_id
+SELECT id, event_type, routing_key, payload, retry_count, max_retries, correlation_id, created_at
 FROM attendance.outbox_events
 WHERE status = 'failed'
 ORDER BY created_at ASC

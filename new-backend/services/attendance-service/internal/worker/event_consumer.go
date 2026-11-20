@@ -40,10 +40,23 @@ var (
 	_ processedEvents = (*repository.EventRepository)(nil)
 )
 
+type activeSessionRosterCleaner interface {
+	RemoveStudentFromActiveCourseSessions(ctx context.Context, courseID, studentID uuid.UUID) error
+}
+
+type studentCacheReader interface {
+	GetStudentCacheByID(ctx context.Context, studentID uuid.UUID) (db.StudentView, error)
+}
+
 type EventConsumer struct {
-	consumer  *rabbitmq.Consumer
-	cacheRepo cacheWriter
-	eventRepo processedEvents
+	consumer      *rabbitmq.Consumer
+	cacheRepo     cacheWriter
+	eventRepo     processedEvents
+	rosterCleaner activeSessionRosterCleaner
+}
+
+func (w *EventConsumer) SetActiveRosterCleaner(cleaner activeSessionRosterCleaner) {
+	w.rosterCleaner = cleaner
 }
 
 func NewEventConsumer(
@@ -189,6 +202,15 @@ func (w *EventConsumer) handleStudentUpdated(ctx context.Context, body []byte, e
 		return err
 	}
 
+	isActive := true
+	if eventData.Status != "" {
+		isActive = eventData.Status == "active"
+	} else if reader, ok := w.cacheRepo.(studentCacheReader); ok {
+		if existing, getErr := reader.GetStudentCacheByID(ctx, eventData.StudentID); getErr == nil && existing.IsActive.Valid {
+			isActive = existing.IsActive.Bool
+		}
+	}
+
 	// Upsert student to cache
 	err = w.cacheRepo.UpsertStudentCache(ctx, db.UpsertStudentCacheParams{
 		ID:            utils.UUIDToPgUUID(eventData.StudentID),
@@ -197,7 +219,7 @@ func (w *EventConsumer) handleStudentUpdated(ctx context.Context, body []byte, e
 		LastName:      utils.StringToPgText(eventData.LastName),
 		Email:         utils.StringToPgText(eventData.Email),
 		Department:    utils.StringToPgText(eventData.Department),
-		IsActive:      utils.BoolToPgBool(true),
+		IsActive:      utils.BoolToPgBool(isActive),
 	})
 	if err != nil {
 		log.Error("failed to upsert student cache", zap.Error(err))
@@ -380,6 +402,18 @@ func (w *EventConsumer) handleEnrollmentProgramCancelled(ctx context.Context, bo
 			zap.Error(err),
 		)
 		return err
+	}
+
+	if w.rosterCleaner != nil {
+		for _, courseID := range eventData.CourseIDs {
+			if cleanErr := w.rosterCleaner.RemoveStudentFromActiveCourseSessions(ctx, courseID, eventData.StudentID); cleanErr != nil {
+				log.Warn("failed to remove cancelled student from active session redis roster",
+					zap.String("course_id", courseID.String()),
+					zap.String("student_id", eventData.StudentID.String()),
+					zap.Error(cleanErr),
+				)
+			}
+		}
 	}
 
 	log.Info("cancelled program's enrollments removed",

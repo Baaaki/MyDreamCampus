@@ -15,6 +15,7 @@ import (
 	"github.com/baaaki/mydreamcampus/shared/platform/rabbitmq"
 	platformRepo "github.com/baaaki/mydreamcampus/shared/platform/repository"
 	"github.com/gin-gonic/gin"
+	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5/pgxpool"
 	"github.com/redis/go-redis/v9"
 )
@@ -81,7 +82,7 @@ func New(
 		semesterClient:    semesterClient,
 		attendanceService: attendanceSvc,
 		attendanceHandler: handler.NewAttendanceHandler(attendanceSvc),
-		eventConsumer:     worker.NewEventConsumer(rabbitmq.NewConsumer(rabbitConn), cacheRepo, eventRepo),
+		eventConsumer:     newWiredEventConsumer(rabbitConn, cacheRepo, eventRepo, sessionRepo, redisService),
 		periodConsumer:    worker.NewPeriodConsumer(rabbitmq.NewConsumer(rabbitConn), periodRepo),
 		bufferFlusher:     worker.NewBufferFlusher(attendanceRepo, redisService),
 		sessionExpiry:     worker.NewSessionExpiryHandler(sessionRepo, redisService),
@@ -153,4 +154,38 @@ func (m *Module) RegisterPublicRoutes(r *gin.Engine) {
 	{
 		internal.GET("/students/:id/semester-activity", m.attendanceHandler.GetSemesterActivity)
 	}
+}
+
+type activeSessionRosterCleaner struct {
+	sessionRepo  *repository.SessionRepository
+	redisService *service.RedisService
+}
+
+func (c *activeSessionRosterCleaner) RemoveStudentFromActiveCourseSessions(ctx context.Context, courseID, studentID uuid.UUID) error {
+	sessionIDs, err := c.sessionRepo.GetActiveSessionIDsByCourse(ctx, courseID)
+	if err != nil {
+		return err
+	}
+	var firstErr error
+	for _, sid := range sessionIDs {
+		if err := c.redisService.RemoveEnrolledStudent(ctx, sid.String(), studentID.String()); err != nil && firstErr == nil {
+			firstErr = err
+		}
+	}
+	return firstErr
+}
+
+func newWiredEventConsumer(
+	rabbitConn *rabbitmq.Connection,
+	cacheRepo *repository.CacheRepository,
+	eventRepo *repository.EventRepository,
+	sessionRepo *repository.SessionRepository,
+	redisService *service.RedisService,
+) *worker.EventConsumer {
+	ec := worker.NewEventConsumer(rabbitmq.NewConsumer(rabbitConn), cacheRepo, eventRepo)
+	ec.SetActiveRosterCleaner(&activeSessionRosterCleaner{
+		sessionRepo:  sessionRepo,
+		redisService: redisService,
+	})
+	return ec
 }
