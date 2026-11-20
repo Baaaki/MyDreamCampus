@@ -29,6 +29,7 @@ type staffMember struct {
 	ID         string `json:"id"`
 	FirstName  string `json:"first_name"`
 	LastName   string `json:"last_name"`
+	Role       string `json:"role"`
 	Department string `json:"department"`
 	Status     string `json:"status"`
 }
@@ -48,6 +49,9 @@ func (c *HTTPStaffClient) GetInstructor(ctx context.Context, instructorID uuid.U
 		return nil, err
 	}
 
+	if resp.Role != "teacher" {
+		return nil, catalogErrors.ErrInstructorNotFound
+	}
 	if resp.Status != "active" {
 		return nil, catalogErrors.ErrInstructorNotActive
 	}

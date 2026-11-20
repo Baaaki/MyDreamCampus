@@ -134,6 +134,7 @@ func (r *SemesterRepository) CreateSemesterCourse(ctx context.Context, params db
 		ID:                 row.ID,
 		Semester:           row.Semester,
 		CourseCode:         row.CourseCode,
+		Department:         row.Department,
 		Credits:            row.Credits,
 		ClassLevel:         row.ClassLevel,
 		InstructorID:       row.InstructorID,

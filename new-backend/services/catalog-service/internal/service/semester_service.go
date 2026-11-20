@@ -3,6 +3,7 @@ package service
 import (
 	"cmp"
 	"context"
+	"errors"
 	"fmt"
 	"regexp"
 	"slices"
@@ -20,6 +21,7 @@ import (
 	"github.com/baaaki/mydreamcampus/shared/platform/rules"
 	"github.com/baaaki/mydreamcampus/shared/platform/utils"
 	"github.com/google/uuid"
+	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgtype"
 	"go.uber.org/zap"
 )
@@ -117,10 +119,13 @@ func (s *SemesterService) CreateSemesterCourse(ctx context.Context, semester str
 	if s.semesterStatusRepo != nil {
 		status, err := s.semesterStatusRepo.GetSemesterStatus(ctx, semester)
 		if err != nil {
-			serviceLogger.Warn("semester status check failed, semester may not exist in status table",
-				zap.Error(err),
-			)
-		} else if status != db.CourseCatalogSemesterStatusPlanned {
+			if errors.Is(err, pgx.ErrNoRows) {
+				return dto.SemesterCourseResponse{}, sharedErrors.ErrNotFound
+			}
+			serviceLogger.Error("semester status check failed", zap.Error(err))
+			return dto.SemesterCourseResponse{}, sharedErrors.Wrap(sharedErrors.ErrInternal, err)
+		}
+		if status != db.CourseCatalogSemesterStatusPlanned {
 			serviceLogger.Warn("semester is not in planned status — course structure is frozen",
 				zap.String("semester", semester),
 				zap.String("status", string(status)),
@@ -131,6 +136,10 @@ func (s *SemesterService) CreateSemesterCourse(ctx context.Context, semester str
 
 	// Check deadline: is course creation period open?
 	period, periodErr := s.periodRepo.GetActivePeriodBySemester(ctx, semester)
+	if periodErr != nil && !errors.Is(periodErr, pgx.ErrNoRows) {
+		serviceLogger.Error("period lookup failed", zap.Error(periodErr))
+		return dto.SemesterCourseResponse{}, sharedErrors.Wrap(sharedErrors.ErrInternal, periodErr)
+	}
 	if periodErr == nil {
 		check := rules.IsWithinPeriod(period.PeriodStart, period.PeriodEnd)
 		if !check.Allowed {
@@ -419,7 +428,7 @@ func (s *SemesterService) ListSemesterCourses(ctx context.Context, semester stri
 	)
 
 	limit := utils.ClampToInt32(req.Limit)
-	offset := utils.ClampToInt32((req.Page - 1) * req.Limit)
+	offset := utils.ClampInt64ToInt32(max(int64(req.Page-1)*int64(req.Limit), 0))
 
 	// Build query params
 	params := db.ListSemesterCoursesParams{
@@ -565,7 +574,14 @@ func (s *SemesterService) DeleteSemesterCourse(ctx context.Context, semester, co
 	// Semester course offerings can only be deleted while semester is in 'planned' status.
 	if s.semesterStatusRepo != nil {
 		status, statusErr := s.semesterStatusRepo.GetSemesterStatus(ctx, semester)
-		if statusErr == nil && status != db.CourseCatalogSemesterStatusPlanned {
+		if statusErr != nil {
+			if errors.Is(statusErr, pgx.ErrNoRows) {
+				return dto.DeleteSemesterCourseResponse{}, sharedErrors.ErrNotFound
+			}
+			serviceLogger.Error("semester status check failed", zap.Error(statusErr))
+			return dto.DeleteSemesterCourseResponse{}, sharedErrors.Wrap(sharedErrors.ErrInternal, statusErr)
+		}
+		if status != db.CourseCatalogSemesterStatusPlanned {
 			serviceLogger.Warn("semester is not in planned status — course structure is frozen")
 			return dto.DeleteSemesterCourseResponse{}, catalogErrors.ErrSemesterCourseFrozen
 		}

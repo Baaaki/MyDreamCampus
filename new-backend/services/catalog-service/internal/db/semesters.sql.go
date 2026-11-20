@@ -96,13 +96,16 @@ func (q *Queries) CreateSemester(ctx context.Context, arg CreateSemesterParams) 
 	return i, err
 }
 
-const deletePlannedSemester = `-- name: DeletePlannedSemester :exec
+const deletePlannedSemester = `-- name: DeletePlannedSemester :execrows
 DELETE FROM course_catalog.semesters WHERE id = $1 AND status = 'planned'
 `
 
-func (q *Queries) DeletePlannedSemester(ctx context.Context, id pgtype.UUID) error {
-	_, err := q.db.Exec(ctx, deletePlannedSemester, id)
-	return err
+func (q *Queries) DeletePlannedSemester(ctx context.Context, id pgtype.UUID) (int64, error) {
+	result, err := q.db.Exec(ctx, deletePlannedSemester, id)
+	if err != nil {
+		return 0, err
+	}
+	return result.RowsAffected(), nil
 }
 
 const deleteSemesterCoursesBySemester = `-- name: DeleteSemesterCoursesBySemester :exec

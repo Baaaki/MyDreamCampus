@@ -46,11 +46,12 @@ func (l *DirectAuditLogger) Log(ctx context.Context, event audit.AuditEvent) err
 		Details:      details,
 	}
 
-	if event.ActorID != "" {
-		parsed, err := uuid.Parse(event.ActorID)
-		if err == nil {
-			params.ActorID = utils.UUIDToPgtype(parsed)
-		}
+	if parsed, err := uuid.Parse(event.ActorID); err == nil {
+		params.ActorID = utils.UUIDToPgtype(parsed)
+	} else {
+		// System-originated entries (e.g. semester.auto_completed) carry "system"
+		// rather than a user UUID; actor_id is UUID NOT NULL so map to uuid.Nil.
+		params.ActorID = utils.UUIDToPgtype(uuid.Nil)
 	}
 
 	if event.ResourceID != "" {

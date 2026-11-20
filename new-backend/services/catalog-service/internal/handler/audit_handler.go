@@ -141,11 +141,13 @@ func (h *AuditHandler) CreateAuditLog(c *gin.Context) {
 		Details:      details,
 	}
 
-	if event.ActorID != "" {
-		parsed, err := uuid.Parse(event.ActorID)
-		if err == nil {
-			params.ActorID = utils.UUIDToPgtype(parsed)
-		}
+	if event.ActorID == "system" {
+		params.ActorID = utils.UUIDToPgtype(uuid.Nil)
+	} else if parsed, err := uuid.Parse(event.ActorID); err == nil {
+		params.ActorID = utils.UUIDToPgtype(parsed)
+	} else {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Geçersiz aktör kimliği", "code": "INVALID_ACTOR_ID"})
+		return
 	}
 
 	if event.ResourceID != "" {

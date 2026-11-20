@@ -2,6 +2,7 @@ package service
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 	"regexp"
 
@@ -187,7 +188,7 @@ func (s *CatalogService) ListCourses(ctx context.Context, req dto.ListCoursesReq
 	)
 
 	limit := utils.ClampToInt32(req.Limit)
-	offset := utils.ClampToInt32((req.Page - 1) * req.Limit)
+	offset := utils.ClampInt64ToInt32(max(int64(req.Page-1)*int64(req.Limit), 0))
 
 	// Build query params
 	params := db.ListCoursesParams{
@@ -334,7 +335,7 @@ func (s *CatalogService) UpdateCourse(ctx context.Context, courseCode string, re
 		classLevel = *req.ClassLevel
 	}
 
-	// Validate prerequisites if provided
+	// Validate prerequisites if provided, or re-validate existing ones when class_level changes.
 	var prerequisitesJSON []byte
 	if req.Prerequisites != nil {
 		if err := s.validatePrerequisites(ctx, *req.Prerequisites, classLevel); err != nil {
@@ -344,6 +345,13 @@ func (s *CatalogService) UpdateCourse(ctx context.Context, courseCode string, re
 		if err != nil {
 			serviceLogger.Error("failed to convert prerequisites to JSON", zap.Error(err))
 			return dto.CourseResponse{}, sharedErrors.Wrap(sharedErrors.ErrInternal, err)
+		}
+	} else if req.ClassLevel != nil && *req.ClassLevel != existingCourse.ClassLevel && len(existingCourse.Prerequisites) > 0 {
+		var existingPrereqs []dto.Prerequisite
+		if err := json.Unmarshal(existingCourse.Prerequisites, &existingPrereqs); err == nil && len(existingPrereqs) > 0 {
+			if err := s.validatePrerequisites(ctx, existingPrereqs, classLevel); err != nil {
+				return dto.CourseResponse{}, err
+			}
 		}
 	}
 

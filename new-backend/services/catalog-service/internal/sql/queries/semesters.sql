@@ -34,7 +34,7 @@ SELECT EXISTS(SELECT 1 FROM course_catalog.semesters WHERE status = 'active') AS
 -- name: GetSemesterByID :one
 SELECT * FROM course_catalog.semesters WHERE id = $1;
 
--- name: DeletePlannedSemester :exec
+-- name: DeletePlannedSemester :execrows
 DELETE FROM course_catalog.semesters WHERE id = $1 AND status = 'planned';
 
 -- name: DeleteSemesterCoursesBySemester :exec

@@ -17,6 +17,7 @@ func main() {
 	rt := bootstrap.Init(bootstrap.Options{
 		Service:       "catalog",
 		NeedsDatabase: true,
+		RedisFatal:    true,
 	})
 
 	// Catalog owns audit_log; grades and meal publish their entries here

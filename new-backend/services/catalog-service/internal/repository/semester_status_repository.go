@@ -157,3 +157,30 @@ func (r *SemesterStatusRepository) GetSemesterInfo(ctx context.Context, semester
 		IsPastDeadline: isPast,
 	}, nil
 }
+
+// CanModifySemester implements shared/platform/handler.EditableSemesterChecker.
+// Periods may be managed for both planned and active semesters until
+// hard_deadline passes; completed semesters are immutable.
+func (r *SemesterStatusRepository) CanModifySemester(ctx context.Context, semesterName string) (bool, *time.Time, error) {
+	semester, err := r.queries.GetSemesterByName(ctx, semesterName)
+	if err != nil {
+		return false, nil, err
+	}
+
+	var hardDeadline *time.Time
+	if semester.HardDeadline.Valid {
+		t := semester.HardDeadline.Time
+		hardDeadline = &t
+	}
+
+	switch semester.Status {
+	case db.CourseCatalogSemesterStatusPlanned:
+		return true, hardDeadline, nil
+	case db.CourseCatalogSemesterStatusCompleted:
+		return false, hardDeadline, nil
+	default:
+		// active — delegate to IsSemesterActive so auto-completion on hard_deadline still runs.
+		active, err := r.IsSemesterActive(ctx, semesterName)
+		return active, hardDeadline, err
+	}
+}

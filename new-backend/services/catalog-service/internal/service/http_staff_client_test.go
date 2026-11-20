@@ -35,7 +35,7 @@ func TestHTTPStaffClient_GetInstructor_ReturnsInstructorInfo(t *testing.T) {
 		gotSecret = r.Header.Get("X-Internal-Secret")
 		_ = json.NewEncoder(w).Encode(staffMember{
 			ID: id.String(), FirstName: "Ada", LastName: "Lovelace",
-			Department: "Bilgisayar Muhendisligi", Status: "active",
+			Role: "teacher", Department: "Bilgisayar Muhendisligi", Status: "active",
 		})
 	})
 
@@ -60,7 +60,7 @@ func TestHTTPStaffClient_GetInstructor_NotFoundMapsToSentinel(t *testing.T) {
 func TestHTTPStaffClient_GetInstructor_InactiveMapsToSentinel(t *testing.T) {
 	id := uuid.New()
 	c := newStaffTestClient(t, func(w http.ResponseWriter, _ *http.Request) {
-		_ = json.NewEncoder(w).Encode(staffMember{ID: id.String(), Department: "Matematik", Status: "inactive"})
+		_ = json.NewEncoder(w).Encode(staffMember{ID: id.String(), Role: "teacher", Department: "Matematik", Status: "inactive"})
 	})
 
 	_, err := c.GetInstructor(context.Background(), id, "Matematik")
@@ -70,7 +70,7 @@ func TestHTTPStaffClient_GetInstructor_InactiveMapsToSentinel(t *testing.T) {
 func TestHTTPStaffClient_GetInstructor_OtherDepartmentMapsToSentinel(t *testing.T) {
 	id := uuid.New()
 	c := newStaffTestClient(t, func(w http.ResponseWriter, _ *http.Request) {
-		_ = json.NewEncoder(w).Encode(staffMember{ID: id.String(), Department: "Matematik", Status: "active"})
+		_ = json.NewEncoder(w).Encode(staffMember{ID: id.String(), Role: "teacher", Department: "Matematik", Status: "active"})
 	})
 
 	_, err := c.GetInstructor(context.Background(), id, "Fizik")
@@ -107,4 +107,14 @@ func TestHTTPStaffClient_GetInstructorsByDepartment_ReturnsList(t *testing.T) {
 	require.Len(t, list, 2, "unparsable rows are skipped, as in-process does")
 	assert.Equal(t, first, list[0].ID)
 	assert.Equal(t, "Grace H", list[1].FullName)
+}
+
+func TestHTTPStaffClient_GetInstructor_NonTeacherRejected(t *testing.T) {
+	id := uuid.New()
+	c := newStaffTestClient(t, func(w http.ResponseWriter, _ *http.Request) {
+		_ = json.NewEncoder(w).Encode(staffMember{ID: id.String(), Role: "admin", Department: "Matematik", Status: "active"})
+	})
+
+	_, err := c.GetInstructor(context.Background(), id, "Matematik")
+	assert.ErrorIs(t, err, catalogErrors.ErrInstructorNotFound)
 }

@@ -22,6 +22,7 @@ import (
 	"github.com/baaaki/mydreamcampus/shared/platform/utils"
 	"github.com/gin-gonic/gin"
 	"github.com/google/uuid"
+	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgconn"
 	"github.com/jackc/pgx/v5/pgxpool"
 	"go.uber.org/zap"
@@ -280,6 +281,10 @@ func acceptPeriodTargets(targets []periodTarget, hardDeadline time.Time) ([]peri
 		if t.pr == nil {
 			continue
 		}
+		if t.pr.End.Before(t.pr.Start) {
+			errs = append(errs, fmt.Sprintf("%s: period end must be after period start", t.periodType))
+			continue
+		}
 		if t.pr.End.After(hardDeadline) {
 			errs = append(errs, fmt.Sprintf("%s: period end exceeds hard_deadline", t.periodType))
 			continue
@@ -349,14 +354,24 @@ func (h *SemesterStatusHandler) updateDistributedPeriods(ctx context.Context, se
 
 	qtx := db.New(tx)
 	for _, t := range targets {
+		action := events.PeriodActionUpdated
 		period, err := h.periodRepo.UpdatePeriodBySemesterAndTypeTx(ctx, tx, semester, t.periodType, t.pr.Start, t.pr.End)
+		if errors.Is(err, pgx.ErrNoRows) {
+			action = events.PeriodActionCreated
+			period, err = h.periodRepo.CreatePeriodOfTypeTx(ctx, tx, sharedRepo.SimplePeriod{
+				Semester:    semester,
+				PeriodStart: t.pr.Start,
+				PeriodEnd:   t.pr.End,
+				IsActive:    true,
+			}, t.periodType)
+		}
 		if err != nil {
 			return append(errs, fmt.Sprintf("%s: %v", t.periodType, err))
 		}
 		if t.periodType == sharedRepo.PeriodTypeCatalog {
 			continue
 		}
-		if err := queuePeriodEvent(ctx, qtx, period, t.periodType, events.PeriodActionUpdated); err != nil {
+		if err := queuePeriodEvent(ctx, qtx, period, t.periodType, action); err != nil {
 			return append(errs, fmt.Sprintf("%s: %v", t.periodType, err))
 		}
 	}
@@ -853,6 +868,22 @@ func (h *SemesterStatusHandler) DeletePlannedSemester(c *gin.Context) {
 
 	qtx := db.New(tx)
 
+	// Delete planned semester FIRST inside the transaction so a concurrent
+	// ActivateSemester cannot leave an active semester with wiped courses/periods.
+	deletedRows, err := qtx.DeletePlannedSemester(ctx, utils.UUIDToPgtype(id))
+	if err != nil {
+		handlerLogger.Error("failed to delete semester", zap.Error(err))
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Beklenmeyen bir hata oluştu, lütfen tekrar deneyin", "code": "INTERNAL_ERROR"})
+		return
+	}
+	if deletedRows == 0 {
+		c.JSON(http.StatusConflict, gin.H{
+			"error": "Sadece planlanmış dönemler silinebilir",
+			"code":  "INVALID_STATE",
+		})
+		return
+	}
+
 	// Delete semester courses (CASCADE deletes schedule_sessions)
 	if err := qtx.DeleteSemesterCoursesBySemester(ctx, semester.Name); err != nil {
 		handlerLogger.Error("failed to delete semester courses", zap.Error(err))
@@ -877,13 +908,6 @@ func (h *SemesterStatusHandler) DeletePlannedSemester(c *gin.Context) {
 			c.JSON(http.StatusInternalServerError, gin.H{"error": "Beklenmeyen bir hata oluştu, lütfen tekrar deneyin", "code": "INTERNAL_ERROR"})
 			return
 		}
-	}
-
-	// Delete semester
-	if err := qtx.DeletePlannedSemester(ctx, utils.UUIDToPgtype(id)); err != nil {
-		handlerLogger.Error("failed to delete semester", zap.Error(err))
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "Beklenmeyen bir hata oluştu, lütfen tekrar deneyin", "code": "INTERNAL_ERROR"})
-		return
 	}
 
 	if err := tx.Commit(ctx); err != nil {
