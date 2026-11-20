@@ -262,7 +262,7 @@ func (q *Queries) SetSuperAdmin(ctx context.Context, email string) error {
 	return err
 }
 
-const updatePassword = `-- name: UpdatePassword :exec
+const updatePassword = `-- name: UpdatePassword :execrows
 UPDATE auth.users
 SET password_hash = $2,
     force_password_change = $3,
@@ -277,12 +277,15 @@ type UpdatePasswordParams struct {
 	ForcePasswordChange *bool       `json:"force_password_change"`
 }
 
-func (q *Queries) UpdatePassword(ctx context.Context, arg UpdatePasswordParams) error {
-	_, err := q.db.Exec(ctx, updatePassword, arg.ID, arg.PasswordHash, arg.ForcePasswordChange)
-	return err
+func (q *Queries) UpdatePassword(ctx context.Context, arg UpdatePasswordParams) (int64, error) {
+	result, err := q.db.Exec(ctx, updatePassword, arg.ID, arg.PasswordHash, arg.ForcePasswordChange)
+	if err != nil {
+		return 0, err
+	}
+	return result.RowsAffected(), nil
 }
 
-const updateUser = `-- name: UpdateUser :exec
+const updateUser = `-- name: UpdateUser :execrows
 UPDATE auth.users
 SET email = COALESCE($1, email),
     department = COALESCE($2, department),
@@ -296,7 +299,10 @@ type UpdateUserParams struct {
 	ID         pgtype.UUID `json:"id"`
 }
 
-func (q *Queries) UpdateUser(ctx context.Context, arg UpdateUserParams) error {
-	_, err := q.db.Exec(ctx, updateUser, arg.Email, arg.Department, arg.ID)
-	return err
+func (q *Queries) UpdateUser(ctx context.Context, arg UpdateUserParams) (int64, error) {
+	result, err := q.db.Exec(ctx, updateUser, arg.Email, arg.Department, arg.ID)
+	if err != nil {
+		return 0, err
+	}
+	return result.RowsAffected(), nil
 }

@@ -46,10 +46,23 @@ type UserUpdatedEvent struct {
 	Data UserUpdatedData `json:"data"`
 }
 
-// UserUpdatedData represents the data payload for user updates
+// UserUpdatedData represents the data payload for user updates.
+// Supports both canonical `id` + `changed_fields` (mixed-type map, e.g.
+// numeric class_level) and staff-service's `staff_id` + top-level fields.
 type UserUpdatedData struct {
-	ID            string            `json:"id"`
-	ChangedFields map[string]string `json:"changed_fields"`
+	ID            string         `json:"id"`
+	StaffID       string         `json:"staff_id,omitempty"`
+	ChangedFields map[string]any `json:"changed_fields,omitempty"`
+	Email         *string        `json:"email,omitempty"`
+	Department    *string        `json:"department,omitempty"`
+}
+
+// EffectiveID returns ID if set, otherwise falls back to StaffID.
+func (d UserUpdatedData) EffectiveID() string {
+	if d.ID != "" {
+		return d.ID
+	}
+	return d.StaffID
 }
 
 // UserDeactivatedEvent represents student.deactivated and staff.deactivated events
@@ -58,9 +71,19 @@ type UserDeactivatedEvent struct {
 	Data UserDeactivatedData `json:"data"`
 }
 
-// UserDeactivatedData represents the data payload for user deactivation
+// UserDeactivatedData represents the data payload for user deactivation.
+// Supports both `id` (student.deactivated) and `staff_id` (staff.deactivated).
 type UserDeactivatedData struct {
 	ID        string    `json:"id"`
+	StaffID   string    `json:"staff_id,omitempty"`
 	IsActive  bool      `json:"is_active"`
 	DeletedAt time.Time `json:"deleted_at"`
+}
+
+// EffectiveID returns ID if set, otherwise falls back to StaffID.
+func (d UserDeactivatedData) EffectiveID() string {
+	if d.ID != "" {
+		return d.ID
+	}
+	return d.StaffID
 }

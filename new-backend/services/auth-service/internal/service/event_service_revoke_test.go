@@ -166,7 +166,7 @@ func TestHandleUserUpdated_EmailChanged_RevokesWithNewTokenVersion(t *testing.T)
 		BaseEvent: dto.BaseEvent{EventID: "ev-4", EventType: "staff.updated"},
 		Data: dto.UserUpdatedData{
 			ID:            userID,
-			ChangedFields: map[string]string{"email": "new@uni.edu.tr"},
+			ChangedFields: map[string]any{"email": "new@uni.edu.tr"},
 		},
 	})
 
@@ -183,7 +183,7 @@ func TestHandleUserUpdated_DepartmentOnly_DoesNotRevoke(t *testing.T) {
 		BaseEvent: dto.BaseEvent{EventID: "ev-5", EventType: "staff.updated"},
 		Data: dto.UserUpdatedData{
 			ID:            uuid.NewString(),
-			ChangedFields: map[string]string{"department": "Fizik"},
+			ChangedFields: map[string]any{"department": "Fizik"},
 		},
 	})
 

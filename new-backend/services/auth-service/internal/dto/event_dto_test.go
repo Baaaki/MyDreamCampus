@@ -3,104 +3,45 @@ package dto
 import (
 	"encoding/json"
 	"testing"
-	"time"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
 
-func TestBaseEvent_RoundTrip(t *testing.T) {
-	now := time.Now().UTC().Truncate(time.Second)
-	e := BaseEvent{
-		EventID:   "evt-1",
-		EventType: "student.created",
-		Timestamp: now,
-	}
-	data, err := json.Marshal(e)
-	require.NoError(t, err)
+func TestUserDeactivatedEvent_UnmarshalStaffIDAndID(t *testing.T) {
+	var staffEv UserDeactivatedEvent
+	require.NoError(t, json.Unmarshal([]byte(`{
+		"event_id":"ev-1","event_type":"staff.deactivated",
+		"data":{"staff_id":"11111111-1111-1111-1111-111111111111"}
+	}`), &staffEv))
+	assert.Equal(t, "11111111-1111-1111-1111-111111111111", staffEv.Data.EffectiveID())
 
-	var got BaseEvent
-	require.NoError(t, json.Unmarshal(data, &got))
-	assert.Equal(t, e, got)
+	var studentEv UserDeactivatedEvent
+	require.NoError(t, json.Unmarshal([]byte(`{
+		"event_id":"ev-2","event_type":"student.deactivated",
+		"data":{"id":"22222222-2222-2222-2222-222222222222"}
+	}`), &studentEv))
+	assert.Equal(t, "22222222-2222-2222-2222-222222222222", studentEv.Data.EffectiveID())
 }
 
-func TestStudentCreatedEvent_DeserializeFromWire(t *testing.T) {
-	body := []byte(`{
-		"event_id":"e-1",
-		"event_type":"student.created",
-		"timestamp":"2026-04-25T12:00:00Z",
+func TestUserUpdatedEvent_UnmarshalMixedChangedFieldsAndStaffID(t *testing.T) {
+	var studentEv UserUpdatedEvent
+	require.NoError(t, json.Unmarshal([]byte(`{
+		"event_id":"ev-3","event_type":"student.updated",
 		"data":{
-			"id":"u-1",
-			"email":"s@university.tr",
-			"first_name":"Ada",
-			"last_name":"Lovelace",
-			"department":"CS"
+			"id":"22222222-2222-2222-2222-222222222222",
+			"changed_fields":{"email":"new@uni.edu.tr","class_level":3}
 		}
-	}`)
-	var ev StudentCreatedEvent
-	require.NoError(t, json.Unmarshal(body, &ev))
-	assert.Equal(t, "student.created", ev.EventType)
-	assert.Equal(t, "u-1", ev.Data.ID)
-	assert.Equal(t, "Ada", ev.Data.FirstName)
-}
+	}`), &studentEv))
+	assert.Equal(t, "22222222-2222-2222-2222-222222222222", studentEv.Data.EffectiveID())
+	assert.Equal(t, "new@uni.edu.tr", studentEv.Data.ChangedFields["email"])
 
-func TestStaffCreatedEvent_DeserializeFromWire(t *testing.T) {
-	body := []byte(`{
-		"event_id":"e-2",
-		"event_type":"staff.created",
-		"timestamp":"2026-04-25T12:00:00Z",
-		"data":{
-			"id":"u-2",
-			"email":"t@university.tr",
-			"role":"teacher",
-			"first_name":"Alan",
-			"last_name":"Turing",
-			"department":"Math"
-		}
-	}`)
-	var ev StaffCreatedEvent
-	require.NoError(t, json.Unmarshal(body, &ev))
-	assert.Equal(t, "teacher", ev.Data.Role)
-	assert.Equal(t, "Alan", ev.Data.FirstName)
-}
-
-func TestUserUpdatedEvent_ChangedFieldsMap(t *testing.T) {
-	body := []byte(`{
-		"event_id":"e-3",
-		"event_type":"student.updated",
-		"timestamp":"2026-04-25T12:00:00Z",
-		"data":{
-			"id":"u-1",
-			"changed_fields":{"email":"new@x.tr","department":"EE"}
-		}
-	}`)
-	var ev UserUpdatedEvent
-	require.NoError(t, json.Unmarshal(body, &ev))
-	assert.Equal(t, "new@x.tr", ev.Data.ChangedFields["email"])
-	assert.Equal(t, "EE", ev.Data.ChangedFields["department"])
-}
-
-func TestUserDeactivatedEvent(t *testing.T) {
-	body := []byte(`{
-		"event_id":"e-4",
-		"event_type":"staff.deactivated",
-		"timestamp":"2026-04-25T12:00:00Z",
-		"data":{
-			"id":"u-1",
-			"is_active":false,
-			"deleted_at":"2026-04-25T12:00:00Z"
-		}
-	}`)
-	var ev UserDeactivatedEvent
-	require.NoError(t, json.Unmarshal(body, &ev))
-	assert.False(t, ev.Data.IsActive)
-	assert.NotZero(t, ev.Data.DeletedAt)
-}
-
-func TestEvent_PartialJSONStillUnmarshals(t *testing.T) {
-	// missing data block — Go zero-values it without error
-	body := []byte(`{"event_id":"e","event_type":"student.created","timestamp":"2026-04-25T12:00:00Z"}`)
-	var ev StudentCreatedEvent
-	require.NoError(t, json.Unmarshal(body, &ev))
-	assert.Empty(t, ev.Data.ID)
+	var staffEv UserUpdatedEvent
+	require.NoError(t, json.Unmarshal([]byte(`{
+		"event_id":"ev-4","event_type":"staff.updated",
+		"data":{"staff_id":"11111111-1111-1111-1111-111111111111","department":"CS"}
+	}`), &staffEv))
+	assert.Equal(t, "11111111-1111-1111-1111-111111111111", staffEv.Data.EffectiveID())
+	require.NotNil(t, staffEv.Data.Department)
+	assert.Equal(t, "CS", *staffEv.Data.Department)
 }

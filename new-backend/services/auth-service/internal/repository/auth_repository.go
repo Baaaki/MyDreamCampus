@@ -79,28 +79,28 @@ func (r *AuthRepository) CreateOutboxEvent(ctx context.Context, params db.Create
 // UpdatePassword updates user password and increments token version
 func (r *AuthRepository) UpdatePassword(ctx context.Context, userID uuid.UUID, passwordHash string, forcePasswordChange bool) error {
 	forceChange := forcePasswordChange
-	err := r.queries.UpdatePassword(ctx, db.UpdatePasswordParams{
+	rows, err := r.queries.UpdatePassword(ctx, db.UpdatePasswordParams{
 		ID:                  utils.UUIDToPgtype(userID),
 		PasswordHash:        passwordHash,
 		ForcePasswordChange: &forceChange,
 	})
 	if err != nil {
-		if errors.Is(err, pgx.ErrNoRows) {
-			return fmt.Errorf("%w: user not found for password update", serviceErrors.ErrUserNotFoundRepo)
-		}
 		return fmt.Errorf("%w: failed to update password: %v", sharedErrors.ErrQueryFailed, err)
+	}
+	if rows == 0 {
+		return fmt.Errorf("%w: user not found for password update", serviceErrors.ErrUserNotFoundRepo)
 	}
 	return nil
 }
 
 // UpdateUser updates user information (email, department)
 func (r *AuthRepository) UpdateUser(ctx context.Context, params db.UpdateUserParams) error {
-	err := r.queries.UpdateUser(ctx, params)
+	rows, err := r.queries.UpdateUser(ctx, params)
 	if err != nil {
-		if errors.Is(err, pgx.ErrNoRows) {
-			return fmt.Errorf("%w: user not found for update", serviceErrors.ErrUserNotFoundRepo)
-		}
 		return fmt.Errorf("%w: failed to update user: %v", sharedErrors.ErrQueryFailed, err)
+	}
+	if rows == 0 {
+		return fmt.Errorf("%w: user not found for update", serviceErrors.ErrUserNotFoundRepo)
 	}
 	return nil
 }

@@ -70,12 +70,12 @@ func (r *SessionRepository) UpdateSessionLastUsed(ctx context.Context, jti strin
 
 // DeleteSession deletes a session by JTI
 func (r *SessionRepository) DeleteSession(ctx context.Context, jti string) error {
-	err := r.queries.DeleteSession(ctx, jti)
+	rows, err := r.queries.DeleteSession(ctx, jti)
 	if err != nil {
-		if errors.Is(err, pgx.ErrNoRows) {
-			return fmt.Errorf("%w: session not found for deletion", serviceErrors.ErrSessionNotFoundRepo)
-		}
 		return fmt.Errorf("%w: failed to delete session: %v", sharedErrors.ErrQueryFailed, err)
+	}
+	if rows == 0 {
+		return fmt.Errorf("%w: session not found for deletion", serviceErrors.ErrSessionNotFoundRepo)
 	}
 	return nil
 }
@@ -116,15 +116,15 @@ func (r *SessionRepository) RotateSession(ctx context.Context, oldJTI string, pa
 
 // DeleteSessionByID deletes a session by ID (for user-initiated deletion)
 func (r *SessionRepository) DeleteSessionByID(ctx context.Context, sessionID, userID uuid.UUID) error {
-	err := r.queries.DeleteSessionByID(ctx, db.DeleteSessionByIDParams{
+	rows, err := r.queries.DeleteSessionByID(ctx, db.DeleteSessionByIDParams{
 		ID:     utils.UUIDToPgtype(sessionID),
 		UserID: utils.UUIDToPgtype(userID),
 	})
 	if err != nil {
-		if errors.Is(err, pgx.ErrNoRows) {
-			return fmt.Errorf("%w: session not found for deletion", serviceErrors.ErrSessionNotFoundRepo)
-		}
 		return fmt.Errorf("%w: failed to delete session: %v", sharedErrors.ErrQueryFailed, err)
+	}
+	if rows == 0 {
+		return fmt.Errorf("%w: session not found for deletion", serviceErrors.ErrSessionNotFoundRepo)
 	}
 	return nil
 }

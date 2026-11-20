@@ -266,6 +266,24 @@ func (s *AuthService) Logout(ctx context.Context, refreshToken string, accessTok
 	}
 
 	if refreshToken == "" {
+		if accessToken != "" {
+			if tok, parseErr := jwt.Parse(accessToken, func(token *jwt.Token) (any, error) {
+				return []byte(s.config.JWT.Secret), nil
+			}, jwt.WithValidMethods(signingMethods)); parseErr == nil {
+				if claims, ok := tok.Claims.(jwt.MapClaims); ok {
+					tokUID, _ := claims["user_id"].(string)
+					sid, _ := claims["sid"].(string)
+					if tokUID == authenticatedUserID && sid != "" {
+						if delErr := s.sessionRepo.DeleteSession(ctx, sid); delErr != nil && !sharedErrors.Is(delErr, serviceErrors.ErrSessionNotFoundRepo) {
+							logger.Error("database error deleting session via sid fallback", zap.Error(delErr), zap.String("sid", sid))
+						} else {
+							logger.Info("user logged out via access token sid fallback", zap.String("sid", sid))
+						}
+						return nil
+					}
+				}
+			}
+		}
 		logger.Warn("logout without refresh token; session left to expire",
 			zap.String("user_id", authenticatedUserID),
 		)

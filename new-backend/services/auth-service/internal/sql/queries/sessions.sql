@@ -20,7 +20,7 @@ UPDATE auth.sessions
 SET last_used_at = NOW()
 WHERE refresh_token_jti = $1;
 
--- name: DeleteSession :exec
+-- name: DeleteSession :execrows
 DELETE FROM auth.sessions
 WHERE refresh_token_jti = $1;
 
@@ -30,7 +30,7 @@ WHERE refresh_token_jti = $1;
 DELETE FROM auth.sessions
 WHERE refresh_token_jti = $1;
 
--- name: DeleteSessionByID :exec
+-- name: DeleteSessionByID :execrows
 DELETE FROM auth.sessions
 WHERE id = $1 AND user_id = $2;
 

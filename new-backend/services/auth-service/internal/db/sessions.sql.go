@@ -67,17 +67,20 @@ func (q *Queries) DeleteAllUserSessions(ctx context.Context, userID pgtype.UUID)
 	return err
 }
 
-const deleteSession = `-- name: DeleteSession :exec
+const deleteSession = `-- name: DeleteSession :execrows
 DELETE FROM auth.sessions
 WHERE refresh_token_jti = $1
 `
 
-func (q *Queries) DeleteSession(ctx context.Context, refreshTokenJti string) error {
-	_, err := q.db.Exec(ctx, deleteSession, refreshTokenJti)
-	return err
+func (q *Queries) DeleteSession(ctx context.Context, refreshTokenJti string) (int64, error) {
+	result, err := q.db.Exec(ctx, deleteSession, refreshTokenJti)
+	if err != nil {
+		return 0, err
+	}
+	return result.RowsAffected(), nil
 }
 
-const deleteSessionByID = `-- name: DeleteSessionByID :exec
+const deleteSessionByID = `-- name: DeleteSessionByID :execrows
 DELETE FROM auth.sessions
 WHERE id = $1 AND user_id = $2
 `
@@ -87,9 +90,12 @@ type DeleteSessionByIDParams struct {
 	UserID pgtype.UUID `json:"user_id"`
 }
 
-func (q *Queries) DeleteSessionByID(ctx context.Context, arg DeleteSessionByIDParams) error {
-	_, err := q.db.Exec(ctx, deleteSessionByID, arg.ID, arg.UserID)
-	return err
+func (q *Queries) DeleteSessionByID(ctx context.Context, arg DeleteSessionByIDParams) (int64, error) {
+	result, err := q.db.Exec(ctx, deleteSessionByID, arg.ID, arg.UserID)
+	if err != nil {
+		return 0, err
+	}
+	return result.RowsAffected(), nil
 }
 
 const deleteSessionByJTI = `-- name: DeleteSessionByJTI :execrows

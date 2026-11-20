@@ -364,18 +364,21 @@ func (s *EventService) HandleUserUpdated(ctx context.Context, event dto.UserUpda
 	// Rollback after successful commit is a no-op returning ErrTxClosed — safe to discard.
 	defer func() { _ = tx.Rollback(ctx) }()
 
-	// Parse user ID
-	userID, err := uuid.Parse(event.Data.ID)
+	// Parse user ID (accepts both id and staff_id)
+	userID, err := uuid.Parse(event.Data.EffectiveID())
 	if err != nil {
 		return fmt.Errorf("invalid user ID: %w", err)
 	}
 
 	queries := db.New(tx)
 
+	email, hasEmail := extractStringField(event.Data.ChangedFields, "email", event.Data.Email)
+	department, hasDepartment := extractStringField(event.Data.ChangedFields, "department", event.Data.Department)
+
 	// The version bump has to run before UpdateUser: it only matches while
 	// the stored email still differs from the new one.
 	revokeVersion := 0
-	if email, ok := event.Data.ChangedFields["email"]; ok {
+	if hasEmail && email != "" {
 		version, err := queries.CheckEmailVersionSync(ctx, db.CheckEmailVersionSyncParams{
 			ID:    utils.UUIDToPgtype(userID),
 			Email: email,
@@ -398,15 +401,15 @@ func (s *EventService) HandleUserUpdated(ctx context.Context, event dto.UserUpda
 		ID: utils.UUIDToPgtype(userID),
 	}
 
-	if email, ok := event.Data.ChangedFields["email"]; ok {
+	if hasEmail && email != "" {
 		updateParams.Email = utils.StringToPointer(email)
 	}
 
-	if department, ok := event.Data.ChangedFields["department"]; ok {
+	if hasDepartment {
 		updateParams.Department = utils.StringToPointer(department)
 	}
 
-	err = queries.UpdateUser(ctx, updateParams)
+	_, err = queries.UpdateUser(ctx, updateParams)
 	if err != nil {
 		return fmt.Errorf("%w: failed to update user: %v", sharedErrors.ErrQueryFailed, err)
 	}
@@ -460,8 +463,8 @@ func (s *EventService) HandleUserDeactivated(ctx context.Context, event dto.User
 	// Rollback after successful commit is a no-op returning ErrTxClosed — safe to discard.
 	defer func() { _ = tx.Rollback(ctx) }()
 
-	// Parse user ID
-	userID, err := uuid.Parse(event.Data.ID)
+	// Parse user ID (accepts both id and staff_id)
+	userID, err := uuid.Parse(event.Data.EffectiveID())
 	if err != nil {
 		return fmt.Errorf("invalid user ID: %w", err)
 	}
@@ -538,4 +541,18 @@ func (s *EventService) HandleUserDeactivated(ctx context.Context, event dto.User
 	)
 
 	return nil
+}
+
+func extractStringField(changed map[string]any, key string, fallback *string) (string, bool) {
+	if changed != nil {
+		if raw, ok := changed[key]; ok {
+			if s, ok := raw.(string); ok {
+				return s, true
+			}
+		}
+	}
+	if fallback != nil {
+		return *fallback, true
+	}
+	return "", false
 }

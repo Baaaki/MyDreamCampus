@@ -26,7 +26,7 @@ SET is_superadmin = true,
     updated_at = NOW()
 WHERE email = $1 OR id = '00000000-0000-0000-0000-000000000001'::uuid;
 
--- name: UpdatePassword :exec
+-- name: UpdatePassword :execrows
 UPDATE auth.users
 SET password_hash = $2,
     force_password_change = $3,
@@ -34,7 +34,7 @@ SET password_hash = $2,
     updated_at = NOW()
 WHERE id = $1;
 
--- name: UpdateUser :exec
+-- name: UpdateUser :execrows
 UPDATE auth.users
 SET email = COALESCE(sqlc.narg('email'), email),
     department = COALESCE(sqlc.narg('department'), department),
