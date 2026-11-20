@@ -269,9 +269,23 @@ func EndpointRateLimit(group string) gin.HandlerFunc {
 			return
 		}
 
-		// Login and password-reset requests have no user yet and stay keyed
-		// by IP — that is what bounds credential stuffing from one address.
-		identifier := requestIdentity(c)
+		// Login and unauthenticated password-reset requests must stay keyed
+		// strictly by IP so a caller cannot multiply buckets by attaching an
+		// unrelated (or revoked) access token. Authenticated routes (e.g.
+		// change-password after JWTAuth) have user_id already set in context.
+		var identifier string
+		switch group {
+		case "login":
+			identifier = "ip:" + c.ClientIP()
+		case "password":
+			if userID := c.GetString("user_id"); userID != "" {
+				identifier = "user:" + userBucketID(c, userID, c.GetBool("is_demo"))
+			} else {
+				identifier = "ip:" + c.ClientIP()
+			}
+		default:
+			identifier = requestIdentity(c)
+		}
 
 		key := fmt.Sprintf("ratelimit:%s:endpoint:%s:%s", rl.config.ServiceName, group, identifier)
 		allowed, remaining, retryAfter, err := rl.store.CheckRateLimit(

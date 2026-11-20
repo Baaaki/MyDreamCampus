@@ -303,3 +303,15 @@ func TestJWTAuth_SessionIDClaim_SetInContext(t *testing.T) {
 	require.Equal(t, http.StatusOK, w.Code)
 	assert.JSONEq(t, `{"jti":"access-jti","sid":"refresh-jti"}`, w.Body.String())
 }
+
+func TestJWTAuth_FailClosedWhenBlacklistCheckerNil(t *testing.T) {
+	r := setupAuthTest(t, nil, WithFailClosed())
+	tok := issueToken(t, "user-fc-nil", "admin", 1)
+
+	req := httptest.NewRequest("GET", "/protected", nil)
+	req.Header.Set("Authorization", "Bearer "+tok)
+	w := httptest.NewRecorder()
+	r.ServeHTTP(w, req)
+
+	assert.Equal(t, http.StatusServiceUnavailable, w.Code)
+}

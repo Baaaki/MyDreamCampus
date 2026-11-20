@@ -91,3 +91,15 @@ func TestCanEditGrade_HappyPath(t *testing.T) {
 	assert.True(t, res.Allowed)
 	assert.Contains(t, res.Reason, "within")
 }
+
+func TestCanEditGrade_BeforePeriodStartRejectsTeacher(t *testing.T) {
+	clocktest.Freeze(t, time.Date(2026, 6, 1, 0, 0, 0, 0, time.UTC))
+
+	start := time.Date(2026, 6, 15, 0, 0, 0, 0, time.UTC)
+	res := CanEditGrade(GradeEditParams{
+		PeriodStart:    &start,
+		GlobalDeadline: time.Date(2026, 7, 1, 0, 0, 0, 0, time.UTC),
+	})
+	assert.False(t, res.Allowed)
+	assert.Contains(t, res.Reason, "not started")
+}

@@ -471,3 +471,29 @@ func TestIPRateLimit_RealUserFromTwoIPs_SharesOneBucket(t *testing.T) {
 	assert.Equal(t, http.StatusTooManyRequests, w.Code, "a real user's bucket follows the user, not the address")
 	assert.Equal(t, map[string]int{"ratelimit:public:user:student-a:global": 6}, store.counts)
 }
+
+func TestEndpointRateLimit_Login_AlwaysKeyedByIP(t *testing.T) {
+	require.NoError(t, logger.Init("test"))
+	gin.SetMode(gin.TestMode)
+	utils.InitJWTSecret(authTestSecret)
+
+	store := newFakeStore(true)
+	SetRateLimiter(NewRateLimiter(store, RateLimitConfig{
+		ServiceName: "public",
+		EndpointLimits: map[string]EndpointLimit{
+			"login": {Limit: 1, Window: time.Minute, FailClosed: true},
+		},
+	}))
+	t.Cleanup(func() { SetRateLimiter(nil) })
+
+	r := gin.New()
+	r.POST("/api/auth/login", EndpointRateLimit("login"), func(c *gin.Context) { c.Status(200) })
+
+	first := httptest.NewRecorder()
+	r.ServeHTTP(first, sameIPRequest("POST", "/api/auth/login", issueToken(t, "user-a", "student", 1), ""))
+	second := httptest.NewRecorder()
+	r.ServeHTTP(second, sameIPRequest("POST", "/api/auth/login", issueToken(t, "user-b", "student", 1), ""))
+
+	assert.Equal(t, 200, first.Code)
+	assert.Equal(t, http.StatusTooManyRequests, second.Code, "attaching unrelated tokens must not multiply login rate-limit buckets")
+}

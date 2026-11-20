@@ -118,7 +118,20 @@ func JWTAuth(opts ...AuthOption) gin.HandlerFunc {
 			return
 		}
 
-		// Check blacklist if checker is configured (Redis available)
+		// Check blacklist if checker is configured (Redis available).
+		// A fail-closed route must refuse traffic when Redis was unavailable at boot.
+		if blacklistChecker == nil && cfg.failClosed {
+			logger.Error("token blacklist checker unavailable on fail-closed route",
+				zap.String("user_id", claims.UserID),
+				zap.String("path", c.FullPath()),
+			)
+			c.JSON(http.StatusServiceUnavailable, gin.H{
+				"error":   "SERVICE_UNAVAILABLE",
+				"message": "Oturum doğrulanamadı, lütfen birazdan tekrar deneyin",
+			})
+			c.Abort()
+			return
+		}
 		if blacklistChecker != nil {
 			ctx := c.Request.Context()
 

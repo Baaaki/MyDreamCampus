@@ -3,7 +3,10 @@ package rabbitmq
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
+	"runtime/debug"
+	"time"
 
 	"github.com/baaaki/mydreamcampus/shared/platform/logger"
 	"github.com/baaaki/mydreamcampus/shared/platform/utils"
@@ -105,6 +108,24 @@ func (c *Consumer) subscribe(queueName string) (<-chan amqp.Delivery, error) {
 	)
 }
 
+var errConsumerShuttingDown = errors.New("rabbitmq: consumer shutting down")
+
+// invokeHandler runs handler with panic recovery so a malformed message or
+// nil-deref bug moves through retry/DLQ instead of crashing the service.
+func invokeHandler(queueName string, body []byte, handler MessageHandler) (err error) {
+	defer func() {
+		if r := recover(); r != nil {
+			logger.Error("panic recovered in rabbitmq consumer",
+				zap.Any("panic", r),
+				zap.String("queue", queueName),
+				zap.String("stack", string(debug.Stack())),
+			)
+			err = fmt.Errorf("consumer panic on %s: %v", queueName, r)
+		}
+	}()
+	return handler(body)
+}
+
 func (c *Consumer) handleDelivery(queueName string, msg amqp.Delivery, handler MessageHandler, maxRetries int) {
 	retryCount := getRetryCount(msg.Headers)
 
@@ -113,7 +134,14 @@ func (c *Consumer) handleDelivery(queueName string, msg amqp.Delivery, handler M
 		zap.Int("retry_count", retryCount),
 	)
 
-	if err := handler(msg.Body); err != nil {
+	if err := invokeHandler(queueName, msg.Body, handler); err != nil {
+		if errors.Is(err, errConsumerShuttingDown) {
+			// Requeue cleanly without burning retry budget or dead-lettering.
+			if nackErr := msg.Nack(false, true); nackErr != nil {
+				logger.Warn("nack during shutdown failed", zap.String("queue", queueName), zap.Error(nackErr))
+			}
+			return
+		}
 		logger.Error("message processing failed",
 			zap.Error(err),
 			zap.String("queue", queueName),
@@ -172,15 +200,25 @@ const MaxDeliveryAttempts = 3
 // the handler's context, so the consumer's log lines join the chain of the
 // HTTP request that produced the event. Solving it here rather than in each
 // consumer is what keeps the chain unbroken across nine services.
+const deliveryHandlerTimeout = 30 * time.Second
+
 func (c *Consumer) ConsumeEnvelope(ctx context.Context, queueName string, handler EnvelopeHandler) error {
 	return c.ConsumeWithDLQ(queueName, func(body []byte) error {
+		if ctx.Err() != nil {
+			return errConsumerShuttingDown
+		}
 		var env correlated
 		// A body that does not parse as an envelope is still the handler's
 		// call — it owns the drop-or-retry decision for malformed messages.
 		_ = json.Unmarshal(body, &env)
+		// Detach from shutdown cancellation once a delivery is in flight so a
+		// clean restart lets the current DB write + Ack finish instead of
+		// dead-lettering a valid event.
+		msgCtx, cancel := context.WithTimeout(context.WithoutCancel(ctx), deliveryHandlerTimeout)
+		defer cancel()
 		// WithRequestIDValue mints an ID when correlation_id is empty, which
 		// is the case for worker- and scheduler-driven events.
-		return handler(logger.WithRequestIDValue(ctx, env.CorrelationID), body)
+		return handler(logger.WithRequestIDValue(msgCtx, env.CorrelationID), body)
 	}, MaxDeliveryAttempts)
 }
 

@@ -242,15 +242,33 @@ func (r *SimplePeriodRepository) UpsertPeriod(ctx context.Context, p SimplePerio
 		return fmt.Errorf("upsert targets a projection table, not %s", r.table)
 	}
 
+	updatedAt := p.UpdatedAt
+	if updatedAt.IsZero() {
+		updatedAt = time.Now().UTC()
+	}
+
 	_, err := r.pool.Exec(ctx, fmt.Sprintf(`
-		INSERT INTO %s (id, semester, period_start, period_end, is_active)
-		VALUES ($1, $2, $3, $4, $5)
+		INSERT INTO %s (id, semester, period_start, period_end, is_active, updated_at)
+		VALUES ($1, $2, $3, $4, $5, $6)
 		ON CONFLICT (semester) DO UPDATE SET
+			id           = EXCLUDED.id,
 			period_start = EXCLUDED.period_start,
 			period_end   = EXCLUDED.period_end,
 			is_active    = EXCLUDED.is_active,
-			updated_at   = NOW()
-	`, r.table), p.ID, p.Semester, p.PeriodStart, p.PeriodEnd, p.IsActive)
+			updated_at   = EXCLUDED.updated_at
+		WHERE %s.updated_at <= EXCLUDED.updated_at
+	`, r.table, r.table), p.ID, p.Semester, p.PeriodStart, p.PeriodEnd, p.IsActive, updatedAt)
+	return err
+}
+
+// DeletePeriodBySemesterIfOlder removes a projected period row only if it has
+// not been superseded by a newer update (or unconditionally when eventTime is zero).
+func (r *SimplePeriodRepository) DeletePeriodBySemesterIfOlder(ctx context.Context, semester string, eventTime time.Time) error {
+	if eventTime.IsZero() {
+		return r.DeletePeriodBySemester(ctx, semester)
+	}
+	clause, args := r.scope(PeriodTypeCatalog, []any{semester, eventTime})
+	_, err := r.pool.Exec(ctx, fmt.Sprintf(`DELETE FROM %s WHERE semester = $1 AND updated_at <= $2%s`, r.table, clause), args...)
 	return err
 }
 

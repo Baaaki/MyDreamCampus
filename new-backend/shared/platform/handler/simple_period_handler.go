@@ -16,8 +16,16 @@ import (
 	"github.com/gin-gonic/gin"
 	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5"
+	"github.com/jackc/pgx/v5/pgconn"
 	"go.uber.org/zap"
 )
+
+// EditableSemesterChecker is an optional extension of semester.Checker for
+// services (like catalog) that allow managing periods on both planned and
+// active semesters and want period_end bounded by the semester's hard_deadline.
+type EditableSemesterChecker interface {
+	CanModifySemester(ctx context.Context, semesterName string) (allowed bool, hardDeadline *time.Time, err error)
+}
 
 // PeriodEventQueuer writes the projection event of a period change inside the
 // caller's transaction. The service owning the periods provides it: shared
@@ -96,18 +104,17 @@ func (h *SimplePeriodHandler) CreatePeriod(c *gin.Context) {
 		return
 	}
 
-	// Check semester is active
-	if h.semesterChecker != nil {
-		active, err := h.semesterChecker.IsSemesterActive(c.Request.Context(), req.Semester)
-		if err != nil {
-			logger.Warn("semester status check failed", zap.Error(err))
-		} else if !active {
-			c.JSON(http.StatusForbidden, gin.H{
-				"error": "semester is not active — modifications are not allowed",
-				"code":  "SEMESTER_NOT_ACTIVE",
-			})
-			return
-		}
+	// Verify semester exists, is modifiable, and period_end does not pass hard_deadline.
+	hardDeadline, ok := h.checkSemesterModifiable(c, req.Semester)
+	if !ok {
+		return
+	}
+	if hardDeadline != nil && req.PeriodEnd.After(*hardDeadline) {
+		c.JSON(http.StatusBadRequest, gin.H{
+			"error": "period_end cannot be after semester hard_deadline",
+			"code":  "VALIDATION_ERROR",
+		})
+		return
 	}
 
 	var period *repository.SimplePeriod
@@ -134,9 +141,16 @@ func (h *SimplePeriodHandler) CreatePeriod(c *gin.Context) {
 		}
 		if err != nil {
 			logger.Error("failed to create academic period", zap.Error(err))
-			c.JSON(http.StatusConflict, gin.H{
-				"error": "a period for this semester and type already exists",
-				"code":  "CONFLICT",
+			if isUniqueViolation(err) {
+				c.JSON(http.StatusConflict, gin.H{
+					"error": "a period for this semester and type already exists",
+					"code":  "CONFLICT",
+				})
+				return
+			}
+			c.JSON(http.StatusInternalServerError, gin.H{
+				"error": "failed to create period",
+				"code":  "INTERNAL_ERROR",
 			})
 			return
 		}
@@ -164,9 +178,16 @@ func (h *SimplePeriodHandler) CreatePeriod(c *gin.Context) {
 		})
 		if err != nil {
 			logger.Error("failed to create academic period", zap.Error(err))
-			c.JSON(http.StatusConflict, gin.H{
-				"error": "a period for this semester already exists",
-				"code":  "CONFLICT",
+			if isUniqueViolation(err) {
+				c.JSON(http.StatusConflict, gin.H{
+					"error": "a period for this semester already exists",
+					"code":  "CONFLICT",
+				})
+				return
+			}
+			c.JSON(http.StatusInternalServerError, gin.H{
+				"error": "failed to create period",
+				"code":  "INTERNAL_ERROR",
 			})
 			return
 		}
@@ -271,18 +292,25 @@ func (h *SimplePeriodHandler) UpdatePeriod(c *gin.Context) {
 		return
 	}
 
-	// Check semester is active
-	if h.semesterChecker != nil {
-		active, checkErr := h.semesterChecker.IsSemesterActive(c.Request.Context(), existing.Semester)
-		if checkErr != nil {
-			logger.Warn("semester status check failed", zap.Error(checkErr))
-		} else if !active {
-			c.JSON(http.StatusForbidden, gin.H{
-				"error": "semester is not active — modifications are not allowed",
-				"code":  "SEMESTER_NOT_ACTIVE",
-			})
-			return
-		}
+	// Validate updated period_end against existing period_start and hard_deadline.
+	if req.PeriodEnd != nil && req.PeriodEnd.Before(existing.PeriodStart) {
+		c.JSON(http.StatusBadRequest, gin.H{
+			"error": "period_end must be after period_start",
+			"code":  "VALIDATION_ERROR",
+		})
+		return
+	}
+
+	hardDeadline, ok := h.checkSemesterModifiable(c, existing.Semester)
+	if !ok {
+		return
+	}
+	if req.PeriodEnd != nil && hardDeadline != nil && req.PeriodEnd.After(*hardDeadline) {
+		c.JSON(http.StatusBadRequest, gin.H{
+			"error": "period_end cannot be after semester hard_deadline",
+			"code":  "VALIDATION_ERROR",
+		})
+		return
 	}
 
 	var period *repository.SimplePeriod
@@ -409,18 +437,8 @@ func (h *SimplePeriodHandler) DeletePeriod(c *gin.Context) {
 		return
 	}
 
-	// Check semester is active
-	if h.semesterChecker != nil {
-		active, checkErr := h.semesterChecker.IsSemesterActive(c.Request.Context(), existing.Semester)
-		if checkErr != nil {
-			logger.Warn("semester status check failed", zap.Error(checkErr))
-		} else if !active {
-			c.JSON(http.StatusForbidden, gin.H{
-				"error": "semester is not active — modifications are not allowed",
-				"code":  "SEMESTER_NOT_ACTIVE",
-			})
-			return
-		}
+	if _, ok := h.checkSemesterModifiable(c, existing.Semester); !ok {
+		return
 	}
 
 	if h.repo.HasPeriodType() {
@@ -550,4 +568,66 @@ func toSimplePeriodResponse(p *repository.SimplePeriod) dto.SimplePeriodResponse
 		UpdatedAt:   p.UpdatedAt,
 		PeriodType:  p.PeriodType,
 	}
+}
+
+func (h *SimplePeriodHandler) checkSemesterModifiable(c *gin.Context, semesterName string) (*time.Time, bool) {
+	if h.semesterChecker == nil {
+		return nil, true
+	}
+	if editable, ok := h.semesterChecker.(EditableSemesterChecker); ok {
+		allowed, hardDeadline, err := editable.CanModifySemester(c.Request.Context(), semesterName)
+		if err != nil {
+			if errors.Is(err, pgx.ErrNoRows) {
+				c.JSON(http.StatusNotFound, gin.H{
+					"error": "semester not found",
+					"code":  "NOT_FOUND",
+				})
+				return nil, false
+			}
+			logger.Error("semester status check failed", zap.Error(err))
+			c.JSON(http.StatusServiceUnavailable, gin.H{
+				"error": "semester status could not be verified",
+				"code":  "SERVICE_UNAVAILABLE",
+			})
+			return nil, false
+		}
+		if !allowed {
+			c.JSON(http.StatusForbidden, gin.H{
+				"error": "semester is not active — modifications are not allowed",
+				"code":  "SEMESTER_NOT_ACTIVE",
+			})
+			return nil, false
+		}
+		return hardDeadline, true
+	}
+
+	active, err := h.semesterChecker.IsSemesterActive(c.Request.Context(), semesterName)
+	if err != nil {
+		if errors.Is(err, pgx.ErrNoRows) {
+			c.JSON(http.StatusNotFound, gin.H{
+				"error": "semester not found",
+				"code":  "NOT_FOUND",
+			})
+			return nil, false
+		}
+		logger.Error("semester status check failed", zap.Error(err))
+		c.JSON(http.StatusServiceUnavailable, gin.H{
+			"error": "semester status could not be verified",
+			"code":  "SERVICE_UNAVAILABLE",
+		})
+		return nil, false
+	}
+	if !active {
+		c.JSON(http.StatusForbidden, gin.H{
+			"error": "semester is not active — modifications are not allowed",
+			"code":  "SEMESTER_NOT_ACTIVE",
+		})
+		return nil, false
+	}
+	return nil, true
+}
+
+func isUniqueViolation(err error) bool {
+	var pgErr *pgconn.PgError
+	return errors.As(err, &pgErr) && pgErr.Code == "23505"
 }

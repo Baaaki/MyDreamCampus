@@ -9,6 +9,7 @@ import (
 // GradeEditParams contains the inputs for the CanEditGrade decision.
 type GradeEditParams struct {
 	IsLocked         bool       // Current lock status of the score
+	PeriodStart      *time.Time // Global grading period start date (nullable)
 	GlobalDeadline   time.Time  // Global grading period end date
 	OverrideDeadline *time.Time // Course-specific override (nullable)
 	IsAdminAction    bool       // Whether the caller is an admin
@@ -68,7 +69,14 @@ func CanEditGrade(params GradeEditParams) GradeEditResult {
 		}
 	}
 
-	// Layer 2: Time-based deadline
+	// Layer 2: Time-based period window
+	if params.PeriodStart != nil && now.Before(*params.PeriodStart) {
+		return GradeEditResult{
+			Allowed:           false,
+			Reason:            "grading period has not started yet",
+			EffectiveDeadline: effectiveDeadline,
+		}
+	}
 	if now.After(effectiveDeadline) {
 		return GradeEditResult{
 			Allowed:           false,

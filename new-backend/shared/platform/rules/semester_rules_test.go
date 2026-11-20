@@ -117,3 +117,21 @@ func TestCanEnrollInSemester_StrictPeriodLock(t *testing.T) {
 		assert.Equal(t, "within_enrollment_period", res.Reason)
 	})
 }
+
+func TestSemesterRules_NilPeriodEndDoesNotPanic(t *testing.T) {
+	clocktest.Freeze(t, time.Date(2026, 6, 1, 0, 0, 0, 0, time.UTC))
+	start := time.Date(2026, 5, 1, 0, 0, 0, 0, time.UTC)
+
+	opRes := CanOperateInSemester(SemesterOperationParams{
+		HardDeadline: time.Date(2027, 1, 1, 0, 0, 0, 0, time.UTC),
+		PeriodStart:  &start,
+		PeriodEnd:    nil,
+	})
+	assert.True(t, opRes.Allowed)
+
+	enrollRes := CanEnrollInSemester(EnrollmentParams{
+		PeriodStart: &start,
+		PeriodEnd:   nil,
+	})
+	assert.False(t, enrollRes.Allowed)
+}

@@ -53,7 +53,7 @@ func CanOperateInSemester(params SemesterOperationParams) SemesterOperationResul
 	}
 
 	// Layer 3: if no period defined, allow by default
-	if params.PeriodStart == nil {
+	if params.PeriodStart == nil || params.PeriodEnd == nil {
 		return SemesterOperationResult{
 			Allowed: true,
 			Reason:  "no_period_defined",
@@ -96,7 +96,7 @@ func CanEnrollInSemester(params EnrollmentParams) SemesterOperationResult {
 	now := clock.Now()
 
 	// No period defined -> enrollment is closed
-	if params.PeriodStart == nil {
+	if params.PeriodStart == nil || params.PeriodEnd == nil {
 		return SemesterOperationResult{
 			Allowed: false,
 			Reason:  "enrollment_not_configured",

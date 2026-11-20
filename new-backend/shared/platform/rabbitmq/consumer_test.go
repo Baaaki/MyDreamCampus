@@ -4,7 +4,9 @@ import (
 	"testing"
 
 	amqp "github.com/rabbitmq/amqp091-go"
+	"github.com/baaaki/mydreamcampus/shared/platform/logger"
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
 
 func TestGetRetryCount_AcceptsAnyIntegerWidth(t *testing.T) {
@@ -28,4 +30,13 @@ func TestRetryQueueArgs_RouteBackToTheOwnQueueOnly(t *testing.T) {
 func TestRetryQueueName_IsDistinctFromDLQ(t *testing.T) {
 	assert.Equal(t, "q.retry", RetryQueueName("q"))
 	assert.NotEqual(t, DLQName("q"), RetryQueueName("q"))
+}
+
+func TestInvokeHandler_RecoversPanic(t *testing.T) {
+	require.NoError(t, logger.Init("test"))
+	err := invokeHandler("test.queue", []byte(`{}`), func([]byte) error {
+		panic("unexpected nil deref")
+	})
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "consumer panic")
 }

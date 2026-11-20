@@ -8,7 +8,10 @@ import (
 
 // DefaultMaxBodyBytes bounds request bodies; the largest legitimate
 // payload (monthly menu upload) stays well under 1 MB.
-const DefaultMaxBodyBytes int64 = 1 << 20
+const (
+	DefaultMaxBodyBytes int64 = 1 << 20
+	BulkImportMaxBytes  int64 = 10 << 20
+)
 
 // BodySizeLimit caps the request body size. Without a cap, Gin reads
 // arbitrarily large bodies into JSON binding — and login bodies feed
@@ -17,7 +20,11 @@ const DefaultMaxBodyBytes int64 = 1 << 20
 func BodySizeLimit(maxBytes int64) gin.HandlerFunc {
 	return func(c *gin.Context) {
 		if c.Request.Body != nil {
-			c.Request.Body = http.MaxBytesReader(c.Writer, c.Request.Body, maxBytes)
+			limit := maxBytes
+			if c.Request.URL.Path == "/api/students/bulk-import" && limit < BulkImportMaxBytes {
+				limit = BulkImportMaxBytes
+			}
+			c.Request.Body = http.MaxBytesReader(c.Writer, c.Request.Body, limit)
 		}
 		c.Next()
 	}
