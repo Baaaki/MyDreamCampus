@@ -74,9 +74,9 @@ type AdminAssignment struct {
 
 // UpdateTeacherProfileRequest represents the request for updating teacher profile
 type UpdateTeacherProfileRequest struct {
-	AcademicTitle    *string            `json:"academic_title"`
-	Faculty          *string            `json:"faculty"`
-	ProfileImageURL  *string            `json:"profile_image_url"`
+	AcademicTitle    *string            `json:"academic_title" binding:"omitempty,max=100"`
+	Faculty          *string            `json:"faculty" binding:"omitempty,max=150"`
+	ProfileImageURL  *string            `json:"profile_image_url" binding:"omitempty,http_url,max=2048"`
 	Education        *[]Education       `json:"education"`
 	Articles         *[]Article         `json:"articles"`
 	Bulletins        *[]Bulletin        `json:"bulletins"`

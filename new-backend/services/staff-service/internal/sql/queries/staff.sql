@@ -24,10 +24,10 @@ SET department = COALESCE($2, department),
 WHERE id = $1 AND is_active = true
 RETURNING id, email, first_name, last_name, role, department, phone, office_location, is_active, deleted_at, created_at, updated_at;
 
--- name: SoftDeleteStaff :exec
+-- name: SoftDeleteStaff :execrows
 UPDATE staff.staff
 SET is_active = false, deleted_at = NOW(), updated_at = NOW()
-WHERE id = $1;
+WHERE id = $1 AND is_active = true;
 
 -- name: ListStaff :many
 SELECT id, email, first_name, last_name, role, department, phone, office_location, is_active, deleted_at, created_at, updated_at

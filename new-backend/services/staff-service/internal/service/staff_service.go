@@ -323,7 +323,7 @@ func (s *StaffService) ListStaff(ctx context.Context, query dto.PaginationQuery)
 	)
 
 	limit := utils.ClampToInt32(query.Limit)
-	offset := utils.ClampToInt32((query.Page - 1) * query.Limit)
+	offset := utils.ClampInt64ToInt32(max(int64(query.Page-1)*int64(query.Limit), 0))
 
 	staffList, total, err := s.staffRepo.ListStaff(ctx, limit, offset)
 	if err != nil {

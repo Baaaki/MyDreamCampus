@@ -89,7 +89,9 @@ func TestBuildStaffUpdatedPayload_NilOptionalsArePreserved(t *testing.T) {
 func TestBuildStaffDeactivatedPayload_ContractKeys(t *testing.T) {
 	payload := buildStaffDeactivatedPayload("11111111-1111-1111-1111-111111111111")
 
+	require.Contains(t, payload, "id")
 	require.Contains(t, payload, "staff_id")
+	assert.Equal(t, "11111111-1111-1111-1111-111111111111", payload["id"])
 	assert.Equal(t, "11111111-1111-1111-1111-111111111111", payload["staff_id"])
-	assert.Len(t, payload, 1, "deactivation is a single-key event — adding fields here without coordinating with auth is a bug")
+	assert.Len(t, payload, 2)
 }

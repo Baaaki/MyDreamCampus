@@ -206,15 +206,18 @@ func (q *Queries) ListStaff(ctx context.Context, arg ListStaffParams) ([]Staff, 
 	return items, nil
 }
 
-const softDeleteStaff = `-- name: SoftDeleteStaff :exec
+const softDeleteStaff = `-- name: SoftDeleteStaff :execrows
 UPDATE staff.staff
 SET is_active = false, deleted_at = NOW(), updated_at = NOW()
-WHERE id = $1
+WHERE id = $1 AND is_active = true
 `
 
-func (q *Queries) SoftDeleteStaff(ctx context.Context, id pgtype.UUID) error {
-	_, err := q.db.Exec(ctx, softDeleteStaff, id)
-	return err
+func (q *Queries) SoftDeleteStaff(ctx context.Context, id pgtype.UUID) (int64, error) {
+	result, err := q.db.Exec(ctx, softDeleteStaff, id)
+	if err != nil {
+		return 0, err
+	}
+	return result.RowsAffected(), nil
 }
 
 const updateStaff = `-- name: UpdateStaff :one

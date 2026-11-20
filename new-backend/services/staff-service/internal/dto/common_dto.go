@@ -2,7 +2,7 @@ package dto
 
 // PaginationQuery represents pagination query parameters
 type PaginationQuery struct {
-	Page  int `form:"page,default=1" binding:"min=1"`
+	Page  int `form:"page,default=1" binding:"min=1,max=100000"`
 	Limit int `form:"limit,default=20" binding:"min=1,max=100"`
 }
 

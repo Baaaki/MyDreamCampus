@@ -170,12 +170,12 @@ func (r *StaffRepository) SoftDeleteStaffWithEvent(ctx context.Context, id uuid.
 	qtx := r.queries.WithTx(tx)
 
 	// Soft delete staff
-	err = qtx.SoftDeleteStaff(ctx, utils.UUIDToPgtype(id))
+	rows, err := qtx.SoftDeleteStaff(ctx, utils.UUIDToPgtype(id))
 	if err != nil {
-		if errors.Is(err, pgx.ErrNoRows) {
-			return fmt.Errorf("%w: staff with id %s not found for deletion", serviceErrors.ErrStaffNotFoundRepo, id)
-		}
 		return fmt.Errorf("%w: failed to delete staff: %v", sharedErrors.ErrQueryFailed, err)
+	}
+	if rows == 0 {
+		return fmt.Errorf("%w: staff with id %s not found for deletion", serviceErrors.ErrStaffNotFoundRepo, id)
 	}
 
 	// Create outbox event

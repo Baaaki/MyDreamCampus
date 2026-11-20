@@ -3,9 +3,11 @@ package handler
 import (
 	"context"
 	"net/http"
+	"strings"
 
 	sharedErrors "github.com/baaaki/mydreamcampus/shared/platform/errors"
 	"github.com/baaaki/mydreamcampus/shared/platform/logger"
+	"github.com/baaaki/mydreamcampus/shared/platform/utils"
 	"github.com/baaaki/mydreamcampus/staff/internal/dto"
 	"github.com/baaaki/mydreamcampus/staff/internal/service"
 	"github.com/gin-gonic/gin"
@@ -67,6 +69,10 @@ func (h *TeacherProfileHandler) GetTeacherProfileByStaffID(c *gin.Context) {
 			Code:  sharedErrors.ErrInternal.Code,
 		})
 		return
+	}
+
+	if !callerCanViewPrivateContact(c, staffID) {
+		response.Phone = ""
 	}
 
 	reqLogger.Info("teacher profile retrieved successfully")
@@ -134,4 +140,30 @@ func (h *TeacherProfileHandler) UpdateTeacherProfile(c *gin.Context) {
 
 	reqLogger.Info("teacher profile updated successfully")
 	c.JSON(http.StatusOK, response)
+}
+
+// callerCanViewPrivateContact returns true only when the request carries a
+// valid access token belonging to an admin or the teacher whose profile is
+// being requested. Keeps GET /api/staff/profile/:id public while preventing
+// unauthenticated harvesting of private phone numbers.
+func callerCanViewPrivateContact(c *gin.Context, targetStaffID string) bool {
+	tokenString := ""
+	if authHeader := c.GetHeader("Authorization"); authHeader != "" {
+		if parts := strings.SplitN(authHeader, " ", 2); len(parts) == 2 && parts[0] == "Bearer" {
+			tokenString = parts[1]
+		}
+	}
+	if tokenString == "" {
+		if cookie, err := c.Cookie("access_token"); err == nil {
+			tokenString = cookie
+		}
+	}
+	if tokenString == "" {
+		return false
+	}
+	claims, err := utils.ValidateAccessToken(tokenString)
+	if err != nil {
+		return false
+	}
+	return claims.Role == "admin" || claims.UserID == targetStaffID
 }

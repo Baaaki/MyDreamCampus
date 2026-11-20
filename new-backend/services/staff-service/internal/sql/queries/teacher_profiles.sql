@@ -29,6 +29,7 @@ SET academic_title = COALESCE($2, academic_title),
     admin_assignments = COALESCE($11, admin_assignments),
     updated_at = NOW()
 WHERE staff_id = $1
+  AND EXISTS (SELECT 1 FROM staff.staff s WHERE s.id = staff.teacher_profiles.staff_id AND s.is_active = true)
 RETURNING id, staff_id, academic_title, faculty, profile_image_url,
           education, articles, bulletins, projects, awards,
           scholarships, admin_assignments, created_at, updated_at;

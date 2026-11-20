@@ -35,19 +35,32 @@ type StaffUpdatedInputs struct {
 // optionals stay nil if not provided so the consumer can distinguish
 // "unchanged" from "explicitly cleared".
 func buildStaffUpdatedPayload(in StaffUpdatedInputs) map[string]any {
+	changedFields := map[string]any{}
+	if in.Department != nil {
+		changedFields["department"] = *in.Department
+	}
+	if in.Phone != nil {
+		changedFields["phone"] = *in.Phone
+	}
+	if in.OfficeLocation != nil {
+		changedFields["office_location"] = *in.OfficeLocation
+	}
 	return map[string]any{
+		"id":              in.ID,
 		"staff_id":        in.ID,
 		"department":      in.Department,
 		"phone":           in.Phone,
 		"office_location": in.OfficeLocation,
+		"changed_fields":  changedFields,
 	}
 }
 
 // buildStaffDeactivatedPayload assembles the outbox payload for
-// staff.deactivated. Single-key contract — but auth still relies on it to
-// disable the user; deletion of the key is an outage.
+// staff.deactivated. Carries both `id` (auth-service) and `staff_id`
+// (student-service) for wire compatibility.
 func buildStaffDeactivatedPayload(id string) map[string]any {
 	return map[string]any{
+		"id":       id,
 		"staff_id": id,
 	}
 }
