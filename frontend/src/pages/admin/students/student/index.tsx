@@ -392,9 +392,10 @@ export default function StudentPage() {
                             </span>
                           </TableCell>
                           <TableCell className="text-gray-500">
-                            {student.advisor
-                              ? `${student.advisor.first_name} ${student.advisor.last_name}`
-                              : "-"}
+                            {student.advisor_name ||
+                              (student.advisor
+                                ? `${student.advisor.first_name} ${student.advisor.last_name}`
+                                : "-")}
                           </TableCell>
                           <TableCell className="text-right">
                             <Button
@@ -563,9 +564,10 @@ export default function StudentPage() {
                         <Label className="text-gray-500">Danışman</Label>
                         <div className="flex items-center gap-2 font-medium">
                           <User className="h-4 w-4 text-gray-400" />
-                          {profile.advisor
-                            ? `${profile.advisor.first_name} ${profile.advisor.last_name}`
-                            : "Atanmamış"}
+                          {profile.advisor_name ||
+                            (profile.advisor
+                              ? `${profile.advisor.first_name} ${profile.advisor.last_name}`
+                              : "Atanmamış")}
                         </div>
                       </div>
                       <div className="space-y-2">

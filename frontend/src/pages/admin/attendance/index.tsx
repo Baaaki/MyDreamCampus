@@ -27,7 +27,10 @@ function getMonthRange(year: number, month: number) {
 }
 
 function formatDate(d: Date) {
-  return d.toISOString().split("T")[0]
+  const y = d.getFullYear()
+  const m = String(d.getMonth() + 1).padStart(2, "0")
+  const day = String(d.getDate()).padStart(2, "0")
+  return `${y}-${m}-${day}`
 }
 
 function getDaysInMonth(year: number, month: number) {
@@ -90,12 +93,33 @@ export default function AdminAttendancePage() {
       facultyFilter,
       departmentFilter,
     ],
-    queryFn: () =>
-      catalogService.listCourses({
+    queryFn: async () => {
+      const first = await catalogService.listCourses({
         faculty: facultyFilter,
         department: departmentFilter,
-        limit: 1000,
-      }),
+        page: 1,
+        limit: 100,
+      })
+      const totalPages = first.pagination?.total_pages ?? 1
+      if (totalPages <= 1) return first
+      const rest = await Promise.all(
+        Array.from({ length: totalPages - 1 }, (_, i) =>
+          catalogService.listCourses({
+            faculty: facultyFilter,
+            department: departmentFilter,
+            page: i + 2,
+            limit: 100,
+          })
+        )
+      )
+      return {
+        ...first,
+        courses: [
+          ...first.courses,
+          ...rest.flatMap((pageRes) => pageRes.courses),
+        ],
+      }
+    },
     enabled: !!facultyFilter,
   })
 

@@ -1,5 +1,6 @@
 import { useState, useCallback, useMemo, useEffect } from "react"
 import { useNavigate, useSearchParams } from "react-router"
+import { useQueryClient } from "@tanstack/react-query"
 import { format } from "date-fns"
 import { tr } from "date-fns/locale"
 import {
@@ -112,8 +113,25 @@ type PeriodRanges = Record<PeriodKey, PeriodRange>
 // step 2 will be done by department heads (not admin).
 // See: docs/semester-wizard-plan.md "Gelecek Uyumluluk"
 
+
+function toLocalDateTimeInput(iso: string): string {
+  const d = new Date(iso)
+  if (Number.isNaN(d.getTime())) return ""
+  const pad = (n: number) => String(n).padStart(2, "0")
+  return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`
+}
+
 export default function SemesterWizardPage() {
   const navigate = useNavigate()
+  const queryClient = useQueryClient()
+  const invalidateSemesterCaches = useCallback(() => {
+    void queryClient.invalidateQueries({ queryKey: ["system", "semesters"] })
+    void queryClient.invalidateQueries({ queryKey: ["planned-semester"] })
+    void queryClient.invalidateQueries({
+      queryKey: ["semesters", "active", "name"],
+    })
+    void queryClient.invalidateQueries({ queryKey: ["semesters", "open"] })
+  }, [queryClient])
   const [searchParams] = useSearchParams()
   const editId = searchParams.get("edit")
   const isEditMode = !!editId
@@ -173,7 +191,7 @@ export default function SemesterWizardPage() {
 
         setCreatedSemester(sem)
         setSemesterName(sem.name)
-        setHardDeadline(new Date(sem.hard_deadline).toISOString().slice(0, 16))
+        setHardDeadline(toLocalDateTimeInput(sem.hard_deadline))
 
         const [grades, enrollment, catalog, attendance, meals] =
           await Promise.allSettled([
@@ -198,8 +216,8 @@ export default function SemesterWizardPage() {
             const main = res.value.find((x) => !x.course_id) || res.value[0]
             if (main && main.period_start && main.period_end) {
               return {
-                start: new Date(main.period_start).toISOString().slice(0, 16),
-                end: new Date(main.period_end).toISOString().slice(0, 16),
+                start: toLocalDateTimeInput(main.period_start),
+                end: toLocalDateTimeInput(main.period_end),
               }
             }
           }
@@ -220,7 +238,7 @@ export default function SemesterWizardPage() {
           }
           setClosedDays(
             days.map((d) => ({
-              date: new Date(d.date).toISOString().split("T")[0],
+              date: d.date.slice(0, 10),
               reason: d.reason,
             }))
           )
@@ -289,6 +307,7 @@ export default function SemesterWizardPage() {
       })
 
       setCreatedSemester(semester)
+      invalidateSemesterCaches()
       showToast("Dönem ve servis tarihleri başarıyla oluşturuldu", "success")
       setStep(2)
     } catch (err) {
@@ -337,6 +356,7 @@ export default function SemesterWizardPage() {
       })
 
       setCreatedSemester(updated)
+      invalidateSemesterCaches()
       showToast("Dönem başarıyla güncellendi", "success")
       setStep(2)
     } catch (err) {
@@ -356,6 +376,7 @@ export default function SemesterWizardPage() {
     setLoading(true)
     try {
       await activateSemester(createdSemester.id)
+      invalidateSemesterCaches()
       showToast("Dönem başarıyla aktifleştirildi!", "success")
       setTimeout(() => navigate("/system/semesters"), 1500)
     } catch (err) {
@@ -376,13 +397,12 @@ export default function SemesterWizardPage() {
 
   const handleNext = () => {
     if (step === 1) {
-      if (isEditMode) {
+      if (isEditMode || createdSemester) {
         handleUpdateSemester()
         return
-      } else if (!createdSemester) {
-        handleCreateSemester()
-        return
       }
+      handleCreateSemester()
+      return
     }
     setStep((s) => Math.min(s + 1, 3))
   }
@@ -932,7 +952,7 @@ function ClosedDaysCard({
       {/* List of added closed days */}
       {closedDays.length > 0 && (
         <div className="divide-y divide-gray-200 rounded-md border border-gray-200 dark:divide-gray-700 dark:border-gray-700">
-          {closedDays
+          {[...closedDays]
             .sort((a, b) => a.date.localeCompare(b.date))
             .map((day) => (
               <div

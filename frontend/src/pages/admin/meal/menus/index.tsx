@@ -592,6 +592,31 @@ interface MenuChange {
   timestamp: Date
 }
 
+
+function escapeHtml(value: unknown): string {
+  return String(value ?? "")
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;")
+    .replace(/'/g, "&#39;")
+}
+
+function getMonthWeekCount(year: number, month1Based: number): number {
+  const firstDay = new Date(year, month1Based - 1, 1)
+  const daysInMonth = new Date(year, month1Based, 0).getDate()
+  const startOffset = (firstDay.getDay() + 6) % 7
+  return Math.max(5, Math.ceil((daysInMonth + startOffset) / 7))
+}
+
+function normalizeWeeks(weeks: WeeklyMenu[] | undefined, targetCount: number): WeeklyMenu[] {
+  const base = Array.isArray(weeks) ? [...weeks] : []
+  while (base.length < targetCount) {
+    base.push(getEmptyWeeklyMenu())
+  }
+  return base
+}
+
 export default function MenusPage() {
   const [activeTab, setActiveTab] = useState<string>("normal")
 
@@ -724,36 +749,32 @@ export default function MenusPage() {
 
   if (currentMenuKey !== prevMenuKey) {
     setPrevMenuKey(currentMenuKey)
-    if (existingMenu) {
+    const weekCount = getMonthWeekCount(
+      parseInt(selectedYear),
+      parseInt(selectedMonth)
+    )
+    if (existingMenu && existingMenu.menu_data) {
+      const normalWeeks = normalizeWeeks(
+        existingMenu.menu_data.normalMenus,
+        weekCount
+      )
+      const veganWeeks = normalizeWeeks(
+        existingMenu.menu_data.veganMenus,
+        weekCount
+      )
       // Veritabanından gelen menüyü form state'ine yükle
-      setWeeklyMenus(existingMenu.menu_data.normalMenus)
-      setVeganWeeklyMenus(existingMenu.menu_data.veganMenus)
-      setSavedWeeklyMenus(
-        JSON.parse(JSON.stringify(existingMenu.menu_data.normalMenus))
-      )
-      setSavedVeganWeeklyMenus(
-        JSON.parse(JSON.stringify(existingMenu.menu_data.veganMenus))
-      )
+      setWeeklyMenus(normalWeeks)
+      setVeganWeeklyMenus(veganWeeks)
+      setSavedWeeklyMenus(JSON.parse(JSON.stringify(normalWeeks)))
+      setSavedVeganWeeklyMenus(JSON.parse(JSON.stringify(veganWeeks)))
       setMenuStatus("saved")
       setIsEditMode(false)
       setIsCreatingNew(false)
       setPendingChanges([])
     } else {
       // Menü yoksa boş form göster
-      setWeeklyMenus([
-        getEmptyWeeklyMenu(),
-        getEmptyWeeklyMenu(),
-        getEmptyWeeklyMenu(),
-        getEmptyWeeklyMenu(),
-        getEmptyWeeklyMenu(),
-      ])
-      setVeganWeeklyMenus([
-        getEmptyWeeklyMenu(),
-        getEmptyWeeklyMenu(),
-        getEmptyWeeklyMenu(),
-        getEmptyWeeklyMenu(),
-        getEmptyWeeklyMenu(),
-      ])
+      setWeeklyMenus(normalizeWeeks(undefined, weekCount))
+      setVeganWeeklyMenus(normalizeWeeks(undefined, weekCount))
       setSavedWeeklyMenus(null)
       setSavedVeganWeeklyMenus(null)
       setMenuStatus("empty")
@@ -767,6 +788,9 @@ export default function MenusPage() {
   const saveMutation = useMutation({
     mutationFn: saveMonthlyMenu,
     onSuccess: () => {
+      queryClient.invalidateQueries({
+        queryKey: ["monthlyMenu", selectedYear, selectedMonth],
+      })
       showToast("Menü başarıyla kaydedildi!", "success")
     },
     onError: (error: Error) => {
@@ -1176,7 +1200,7 @@ export default function MenusPage() {
           <div class="header">
             <h1>MYDREAMCAMPUS ÜNİVERSİTESİ</h1>
             <h2>SAĞLIK KÜLTÜR VE SPOR DAİRE BAŞKANLIĞI</h2>
-            <h3>${selectedYear} ${selectedMonthLabel.toUpperCase()} AYI - ${menuType}</h3>
+            <h3>${escapeHtml(selectedYear)} ${escapeHtml(selectedMonthLabel.toUpperCase())} AYI - ${escapeHtml(menuType)}</h3>
           </div>
           <div class="weeks-container">
             ${currentMenus
@@ -1191,8 +1215,8 @@ export default function MenusPage() {
                           .map(
                             (day, idx) => `
                           <th>
-                            <div class="date">${weekDates[idx]}</div>
-                            <div class="day">${day.label}</div>
+                            <div class="date">${escapeHtml(weekDates[idx])}</div>
+                            <div class="day">${escapeHtml(day.label)}</div>
                           </th>
                         `
                           )
@@ -1207,7 +1231,7 @@ export default function MenusPage() {
                           ${dayNames
                             .map(
                               (day) => `
-                            <td class="meal-item">${weekMenu[day.key]?.items[rowIdx] || "-"}</td>
+                            <td class="meal-item">${escapeHtml(weekMenu[day.key]?.items[rowIdx] || "-")}</td>
                           `
                             )
                             .join("")}
@@ -1219,7 +1243,7 @@ export default function MenusPage() {
                         ${dayNames
                           .map(
                             (day) => `
-                          <td><span class="calories">${weekMenu[day.key]?.calories || 0}</span> kcal</td>
+                          <td><span class="calories">${escapeHtml(weekMenu[day.key]?.calories || 0)}</span> kcal</td>
                         `
                           )
                           .join("")}

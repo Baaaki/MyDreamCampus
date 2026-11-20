@@ -221,7 +221,7 @@ export function CheckoutDialog({
   }
 
   const submitCard = () => {
-    if (!checkout) return
+    if (!checkout || pay.isPending) return
     const errors = validateCardForm(form)
     setFormErrors(errors)
     setError(null)

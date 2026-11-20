@@ -1,6 +1,6 @@
 import { useState } from "react"
 import { useNavigate } from "react-router"
-import { useMutation } from "@tanstack/react-query"
+import { useMutation, useQueryClient } from "@tanstack/react-query"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Textarea } from "@/components/ui/textarea"
@@ -48,13 +48,44 @@ interface CreateCourseRequest {
   name: string
   faculty: string
   department: string
+  offering_unit?: string
   class_level: number
+  semester?: number
   credits: number
+  ects?: number
   theoretical_hours: number
   lab_hours: number
   course_type: string
+  education_level?: string
+  teaching_type?: string
+  language?: string
+  coordinator?: CourseCoordinator
+  purpose?: string
   description?: string
+  learning_outcomes?: string
+  learning_outcomes_list?: string[]
+  weekly_topics?: WeeklyTopic[]
+  recommended_sources?: string[]
   prerequisites?: string[]
+}
+
+const EDUCATION_LEVEL_MAP: Record<string, string> = {
+  Lisans: "undergraduate",
+  "Yüksek Lisans": "graduate",
+  Doktora: "doctorate",
+  undergraduate: "undergraduate",
+  graduate: "graduate",
+  doctorate: "doctorate",
+}
+
+const TEACHING_TYPE_MAP: Record<string, string> = {
+  "Örgün Öğretim": "on_campus",
+  "İkinci Öğretim": "on_campus",
+  "Uzaktan Öğretim": "online",
+  Hibrit: "hybrid",
+  on_campus: "on_campus",
+  online: "online",
+  hybrid: "hybrid",
 }
 
 // Create course via API
@@ -129,6 +160,7 @@ const initialFormData: FormData = {
 
 export default function AddCoursePage() {
   const navigate = useNavigate()
+  const queryClient = useQueryClient()
   const [formData, setFormData] = useState<FormData>(initialFormData)
 
   const {
@@ -147,6 +179,8 @@ export default function AddCoursePage() {
   const createMutation = useMutation({
     mutationFn: createCourse,
     onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["courses"] })
+      queryClient.invalidateQueries({ queryKey: ["catalog-courses"] })
       alert("Ders başarıyla eklendi!")
       navigate("/catalog")
     },
@@ -281,19 +315,51 @@ export default function AddCoursePage() {
       return
     }
 
+    const cleanedOutcomes = formData.learning_outcomes
+      .map((item) => item.trim())
+      .filter(Boolean)
+    const cleanedTopics = formData.weekly_topics
+      .map((t) => ({
+        week: t.week,
+        topic: t.topic.trim(),
+        description: t.description?.trim() || undefined,
+      }))
+      .filter((t) => t.topic !== "")
+    const cleanedSources = formData.recommended_sources
+      .map((src) => src.trim())
+      .filter(Boolean)
+    const hasCoordinator =
+      formData.coordinator.name.trim() !== "" ||
+      formData.coordinator.title.trim() !== ""
+
     // Prepare data for API
     const requestData: CreateCourseRequest = {
       course_code: formData.course_code,
       name: formData.name,
       faculty: faculty.name,
       department: department.name,
+      offering_unit: formData.offering_unit.trim() || undefined,
       class_level: formData.class_level,
+      semester: formData.semester || undefined,
       credits: formData.credits,
+      ects: formData.ects > 0 ? formData.ects : undefined,
       theoretical_hours: formData.theoretical_hours,
       lab_hours: formData.lab_hours,
       course_type:
         formData.course_type === "Zorunlu" ? "mandatory" : "elective",
-      description: formData.description || undefined,
+      education_level: EDUCATION_LEVEL_MAP[formData.education_level],
+      teaching_type: TEACHING_TYPE_MAP[formData.teaching_type],
+      language: formData.language.trim() || undefined,
+      coordinator: hasCoordinator ? formData.coordinator : undefined,
+      purpose: formData.purpose.trim() || undefined,
+      description: formData.description.trim() || undefined,
+      learning_outcomes:
+        cleanedOutcomes.length > 0 ? cleanedOutcomes.join("\n") : undefined,
+      learning_outcomes_list:
+        cleanedOutcomes.length > 0 ? cleanedOutcomes : undefined,
+      weekly_topics: cleanedTopics.length > 0 ? cleanedTopics : undefined,
+      recommended_sources:
+        cleanedSources.length > 0 ? cleanedSources : undefined,
     }
 
     console.log("Course Data:", requestData)

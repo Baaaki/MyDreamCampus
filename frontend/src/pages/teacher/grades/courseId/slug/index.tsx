@@ -1,4 +1,5 @@
-import { useState, useEffect, useCallback, useMemo, useRef } from "react"
+import { QueryClientContext } from "@tanstack/react-query"
+import { useContext, useState, useEffect, useCallback, useMemo, useRef } from "react"
 import { useParams } from "react-router"
 import { Link } from "react-router"
 import {
@@ -37,6 +38,7 @@ interface LocalScore {
 
 export default function GradeEntryPage() {
   const params = useParams<{ courseId: string; slug: string }>()
+  const queryClient = useContext(QueryClientContext)
   // Route guarantees both params; fall back to '' so a malformed URL fails
   // into the error state instead of crashing type-narrowing everywhere.
   const courseId = params.courseId ?? ""
@@ -228,6 +230,9 @@ export default function GradeEntryPage() {
         text: message,
       })
 
+      void queryClient?.invalidateQueries({
+        queryKey: ["courseStatus", courseId],
+      })
       // Refresh data
       const [statusRes, studentsRes] = await Promise.all([
         gradesService.getCourseStatus(courseId),
@@ -445,7 +450,7 @@ export default function GradeEntryPage() {
                           )
                         }
                         onKeyDown={(e) => handleKeyDown(e, index)}
-                        disabled={local.isAbsent || courseStatus?.is_finalized}
+                        disabled={saving || local.isAbsent || courseStatus?.is_finalized}
                         aria-invalid={scoreInvalid}
                         className={`h-9 w-24 text-center ${
                           scoreInvalid
@@ -471,7 +476,7 @@ export default function GradeEntryPage() {
                             checked === true
                           )
                         }
-                        disabled={courseStatus?.is_finalized}
+                        disabled={saving || courseStatus?.is_finalized}
                       />
                     )}
                   </TableCell>

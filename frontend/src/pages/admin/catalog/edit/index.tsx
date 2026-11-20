@@ -1,6 +1,6 @@
 import { useState, useMemo } from "react"
 import { useNavigate } from "react-router"
-import { useMutation, useQuery } from "@tanstack/react-query"
+import { useQueryClient, useMutation, useQuery } from "@tanstack/react-query"
 import type {
   CourseCatalog,
   Department,
@@ -145,6 +145,7 @@ const mapTeachingTypeToBackend = (type: string): string => {
 
 export default function EditCourseCatalogPage() {
   const navigate = useNavigate()
+  const queryClient = useQueryClient()
   const [expandedFaculties, setExpandedFaculties] = useState<string[]>([])
   const [selectedDepartment, setSelectedDepartment] = useState<{
     dept: Department
@@ -413,6 +414,8 @@ export default function EditCourseCatalogPage() {
       setFormData(null)
       setOriginalFormData(null)
       // Refresh courses
+      void queryClient.invalidateQueries({ queryKey: ["courses"] })
+      void queryClient.invalidateQueries({ queryKey: ["catalog-courses"] })
       refetchDepartmentCourses()
     },
     onError: (error: Error) => {

@@ -39,8 +39,8 @@ export default function ChangePasswordPage() {
 
       alert("Şifreniz başarıyla değiştirildi. Lütfen tekrar giriş yapın.")
 
-      // Clear UI state and redirect to login
-      // httpOnly cookies are managed by the backend
+      // Revoke httpOnly auth cookies on the backend before clearing local state
+      await authApi.post("logout").catch(() => {})
       clearUserSession(queryClient)
       navigate("/auth/login")
     } catch (err) {

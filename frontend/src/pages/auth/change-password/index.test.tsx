@@ -104,13 +104,13 @@ describe("ChangePasswordPage - happy path", () => {
   })
 
   it("posts old_password and new_password to the change-password endpoint", async () => {
-    let capturedUrl = ""
-    let capturedMethod = ""
-    let capturedBody = ""
+    const calls: Array<{ url: string; method: string; body: string }> = []
     const fetchSpy = vi.fn(async (input: Request) => {
-      capturedUrl = input.url
-      capturedMethod = input.method
-      capturedBody = await input.text()
+      calls.push({
+        url: input.url,
+        method: input.method,
+        body: await input.text(),
+      })
       return jsonResponse({ message: "ok" })
     })
     vi.stubGlobal("fetch", fetchSpy)
@@ -123,12 +123,14 @@ describe("ChangePasswordPage - happy path", () => {
 
     await screen.findByText("login-page")
 
-    expect(capturedUrl).toMatch(/\/api\/auth\/change-password$/)
-    expect(capturedMethod).toBe("POST")
-    expect(JSON.parse(capturedBody)).toEqual({
+    const changeCall = calls.find((c) => /\/api\/auth\/change-password$/.test(c.url))
+    expect(changeCall).toBeDefined()
+    expect(changeCall?.method).toBe("POST")
+    expect(JSON.parse(changeCall!.body)).toEqual({
       old_password: "Old1word",
       new_password: "NewPass1",
     })
+    expect(calls.some((c) => /\/api\/auth\/logout$/.test(c.url) && c.method === "POST")).toBe(true)
   })
 })
 

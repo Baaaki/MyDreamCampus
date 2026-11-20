@@ -123,7 +123,17 @@ export default function CafeteriaHistoryPage() {
     return reservations.filter((r) => r.status === "confirmed" && !r.is_used)
   }, [currentQuery.data?.reservations])
 
-  const pastReservations = pastQuery.data?.reservations || []
+  const currentInactiveReservations = useMemo(() => {
+    const reservations = currentQuery.data?.reservations || []
+    return reservations.filter((r) => !(r.status === "confirmed" && !r.is_used))
+  }, [currentQuery.data?.reservations])
+
+  const pastReservations = useMemo(() => {
+    const older = pastQuery.data?.reservations || []
+    return pastPage === 1
+      ? [...currentInactiveReservations, ...older]
+      : older
+  }, [currentInactiveReservations, pastQuery.data?.reservations, pastPage])
   const pastPagination = pastQuery.data?.pagination
 
   const goToNextPage = () => {
@@ -139,7 +149,16 @@ export default function CafeteriaHistoryPage() {
   }
 
   const getStatusBadge = (reservation: Reservation) => {
-    // Simplified status logic: Only "Used" or "Not Used"
+    if (reservation.status === "cancelled") {
+      return (
+        <Badge
+          variant="outline"
+          className="border-red-200 bg-red-50 text-red-700"
+        >
+          İptal Edildi
+        </Badge>
+      )
+    }
     if (reservation.is_used) {
       return (
         <Badge
@@ -178,7 +197,9 @@ export default function CafeteriaHistoryPage() {
   }
 
   const getDayName = (dateString: string) => {
-    const date = new Date(dateString)
+    const normalized =
+      dateString.length === 10 ? `${dateString}T00:00:00` : dateString
+    const date = new Date(normalized)
     return DAY_NAMES[date.getDay()]
   }
 

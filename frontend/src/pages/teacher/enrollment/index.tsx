@@ -24,7 +24,12 @@ export default function EnrollmentPage({
 }) {
   const queryClient = useQueryClient()
   const pendingKey = ["enrollment", "pending"]
-  const { data: enrollments = [], isLoading: loading } = useQuery({
+  const {
+    data: enrollments = [],
+    isLoading: loading,
+    isError,
+    refetch,
+  } = useQuery({
     queryKey: pendingKey,
     queryFn: async () =>
       (await enrollmentService.getPendingEnrollments()).programs,
@@ -61,6 +66,19 @@ export default function EnrollmentPage({
           <div className="mx-auto h-8 w-8 animate-spin rounded-full border-4 border-blue-600 border-t-transparent"></div>
           <p className="mt-2 text-gray-500">Yükleniyor...</p>
         </div>
+      </div>
+    )
+  }
+
+  if (isError) {
+    return (
+      <div className="flex h-full flex-col items-center justify-center gap-3 p-8 text-center">
+        <p className="text-red-600">
+          Onay bekleyen ders kayıtları yüklenemedi.
+        </p>
+        <Button variant="outline" onClick={() => void refetch()}>
+          Tekrar Dene
+        </Button>
       </div>
     )
   }

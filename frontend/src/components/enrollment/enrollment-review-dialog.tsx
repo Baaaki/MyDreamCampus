@@ -80,7 +80,16 @@ export function EnrollmentReviewDialog({
   )
 
   return (
-    <Dialog open={isOpen} onOpenChange={(open) => !open && onClose()}>
+    <Dialog
+      open={isOpen}
+      onOpenChange={(open) => {
+        if (!open) {
+          setIsRejecting(false)
+          setRejectReason("")
+          onClose()
+        }
+      }}
+    >
       <DialogContent className="max-h-[90vh] max-w-4xl overflow-y-auto">
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2 text-2xl font-bold">

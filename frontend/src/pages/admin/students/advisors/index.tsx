@@ -35,6 +35,7 @@ import {
   CardHeader,
   CardTitle,
 } from "@/components/ui/card"
+import { apiErrorMessage } from "@/lib/api-error"
 import { studentApi, staffApi } from "@/lib/api-client"
 import {
   ArrowLeft,
@@ -260,6 +261,7 @@ export default function AdvisorManagementPage() {
       }
     } catch (error) {
       console.error("Failed to assign advisor:", error)
+      alert(apiErrorMessage(error, "Danışman atama işlemi başarısız oldu."))
     }
   }
 
@@ -286,6 +288,9 @@ export default function AdvisorManagementPage() {
       }
     } catch (error) {
       console.error("Failed to bulk assign advisor:", error)
+      alert(
+        apiErrorMessage(error, "Toplu danışman atama işlemi başarısız oldu.")
+      )
     }
   }
 
@@ -598,15 +603,22 @@ export default function AdvisorManagementPage() {
                     <input
                       type="checkbox"
                       checked={
-                        selectedStudentIds.length === orphanedStudents.length
+                        orphanedStudents.length > 0 &&
+                        orphanedStudents.every((s) =>
+                          selectedStudentIds.includes(s.id)
+                        )
                       }
                       onChange={(e) => {
+                        const pageIds = orphanedStudents.map((s) => s.id)
                         if (e.target.checked) {
-                          setSelectedStudentIds(
-                            orphanedStudents.map((s) => s.id)
+                          setSelectedStudentIds((prev) =>
+                            Array.from(new Set([...prev, ...pageIds]))
                           )
                         } else {
-                          setSelectedStudentIds([])
+                          const pageSet = new Set(pageIds)
+                          setSelectedStudentIds((prev) =>
+                            prev.filter((id) => !pageSet.has(id))
+                          )
                         }
                       }}
                       className="cursor-pointer"

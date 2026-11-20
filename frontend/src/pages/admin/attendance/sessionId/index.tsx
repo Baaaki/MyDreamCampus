@@ -104,6 +104,9 @@ export default function AdminAttendanceSessionPage() {
         queryClient.invalidateQueries({
           queryKey: ["admin-session-students", sessionId],
         }),
+        queryClient.invalidateQueries({
+          queryKey: ["admin-attendance-sessions"],
+        }),
       ])
     } catch (err) {
       setMarkError(apiErrorMessage(err, "Öğrenci yoklamaya eklenemedi."))

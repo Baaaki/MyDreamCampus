@@ -243,6 +243,18 @@ const apiClient = ky.create({
         }
 
         const result = await refreshOn401(request, response)
+        if (result.response !== response) {
+          await trackSystemEditing(result.response)
+          if (await isForcedPasswordChange(result.response)) {
+            if (
+              typeof window !== "undefined" &&
+              window.location.pathname !== CHANGE_PASSWORD_PATH
+            ) {
+              window.location.href = CHANGE_PASSWORD_PATH
+            }
+            return result.response
+          }
+        }
         if (result.sessionEnded) redirectToLogin()
         return result.response
       },
@@ -295,7 +307,10 @@ const noRedirectClient = ky.create({
   prefix: API_BASE_URL,
   timeout: 30000,
   credentials: "include",
-  retry: { limit: 0 },
+  // limit: 1 with empty methods/statusCodes keeps ky v2 cloning the request
+  // body before fetch so refreshOn401 can replay POST/PUT requests without
+  // throwing "Body is unusable", while disabling automatic ky retries.
+  retry: { limit: 1, methods: [], statusCodes: [] },
   hooks: {
     beforeRequest: [
       async ({ request }) => {
@@ -307,7 +322,11 @@ const noRedirectClient = ky.create({
     afterResponse: [
       async ({ request, response }) => {
         await trackSystemEditing(response)
-        return (await refreshOn401(request, response)).response
+        const result = await refreshOn401(request, response)
+        if (result.response !== response) {
+          await trackSystemEditing(result.response)
+        }
+        return result.response
       },
     ],
   },

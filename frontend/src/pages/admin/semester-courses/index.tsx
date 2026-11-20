@@ -301,20 +301,21 @@ export default function SemesterCoursesPage() {
     const dept = departments.find((d) => d.id === deptId)
     return dept?.name || ""
   }
+  const selectedDepartmentName = getDepartmentName(formData.department_id)
 
   // TanStack Query - Fetch courses from catalog API
   const { data: courses = [], isLoading: isLoadingCourses } = useQuery({
-    queryKey: ["courses", formData.department_id],
-    queryFn: () => fetchCourses(getDepartmentName(formData.department_id)),
-    enabled: !!formData.department_id,
+    queryKey: ["courses", formData.department_id, selectedDepartmentName],
+    queryFn: () => fetchCourses(selectedDepartmentName),
+    enabled: !!selectedDepartmentName,
     staleTime: 10 * 60 * 1000,
   })
 
   // TanStack Query - Fetch instructors from staff API
   const { data: instructors = [], isLoading: isLoadingInstructors } = useQuery({
-    queryKey: ["instructors", formData.department_id],
-    queryFn: () => fetchInstructors(getDepartmentName(formData.department_id)),
-    enabled: !!formData.department_id,
+    queryKey: ["instructors", formData.department_id, selectedDepartmentName],
+    queryFn: () => fetchInstructors(selectedDepartmentName),
+    enabled: !!selectedDepartmentName,
     staleTime: 10 * 60 * 1000,
   })
 
@@ -323,10 +324,14 @@ export default function SemesterCoursesPage() {
 
   // TanStack Query - Fetch existing semester courses for the department
   const { data: existingSemesterCourses = [] } = useQuery({
-    queryKey: ["semesterCourses", semester, formData.department_id],
-    queryFn: () =>
-      fetchSemesterCourses(semester, getDepartmentName(formData.department_id)),
-    enabled: !!formData.department_id,
+    queryKey: [
+      "semesterCourses",
+      semester,
+      formData.department_id,
+      selectedDepartmentName,
+    ],
+    queryFn: () => fetchSemesterCourses(semester, selectedDepartmentName),
+    enabled: !!semester && !!selectedDepartmentName,
     staleTime: 5 * 60 * 1000,
   })
 
@@ -395,6 +400,8 @@ export default function SemesterCoursesPage() {
       createSemesterCourse(semester, data),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["semesterCourses", semester] })
+      queryClient.invalidateQueries({ queryKey: ["semester-courses"] })
+      queryClient.invalidateQueries({ queryKey: ["review-courses"] })
       setSuccessDialog(true)
       setFormData(initialFormData)
     },
@@ -437,11 +444,27 @@ export default function SemesterCoursesPage() {
 
   const isLoadingDepartmentData = isLoadingCourses || isLoadingInstructors
 
-  // Calculate occupied time slots from existing semester courses
+  // Filter courses that would conflict with the selected course's class level
+  // or the selected instructor's schedule (different class levels with different
+  // instructors can run in parallel).
+  const conflictingSemesterCourses = React.useMemo(() => {
+    return existingSemesterCourses.filter((course) => {
+      const sameInstructor =
+        !!formData.instructor_id &&
+        course.instructor_id === formData.instructor_id
+      const sameClassLevel =
+        selectedCourse != null &&
+        course.class_level === selectedCourse.class_level
+      if (!formData.instructor_id && !selectedCourse) return true
+      return sameInstructor || sameClassLevel
+    })
+  }, [existingSemesterCourses, formData.instructor_id, selectedCourse])
+
+  // Calculate occupied time slots from conflicting semester courses
   const occupiedSlots = React.useMemo(() => {
     const slots = new Set<string>() // Format: "day_slot" e.g., "monday_1"
 
-    existingSemesterCourses.forEach((course) => {
+    conflictingSemesterCourses.forEach((course) => {
       course.schedule_sessions.forEach((session) => {
         session.slot_numbers.forEach((slotNum) => {
           slots.add(`${session.day_of_week}_${slotNum}`)
@@ -450,7 +473,7 @@ export default function SemesterCoursesPage() {
     })
 
     return slots
-  }, [existingSemesterCourses])
+  }, [conflictingSemesterCourses])
 
   // Check if a specific slot is occupied
   const isSlotOccupied = (day: string, slot: number): boolean => {
@@ -459,7 +482,7 @@ export default function SemesterCoursesPage() {
 
   // Get course code for an occupied slot
   const getOccupiedSlotCourse = (day: string, slot: number): string | null => {
-    for (const course of existingSemesterCourses) {
+    for (const course of conflictingSemesterCourses) {
       for (const session of course.schedule_sessions) {
         if (
           session.day_of_week === day &&

@@ -299,6 +299,18 @@ function EnrollmentWorkspace({
         queryKey: rejectionKey,
         refetchType: "none",
       })
+      void queryClient.invalidateQueries({
+        queryKey: ["enrollment", "open-semesters"],
+        refetchType: "none",
+      })
+      void queryClient.invalidateQueries({
+        queryKey: ["enrollment", "programs", "approved"],
+        refetchType: "none",
+      })
+      void queryClient.invalidateQueries({
+        queryKey: ["enrollment", "available-courses", semester],
+        refetchType: "none",
+      })
       setPicked(null)
       setEditing(false)
       showToast(
@@ -326,6 +338,18 @@ function EnrollmentWorkspace({
     onSuccess: () => {
       queryClient.setQueryData(programKey, null)
       queryClient.setQueryData(rejectionKey, null)
+      void queryClient.invalidateQueries({
+        queryKey: ["enrollment", "open-semesters"],
+        refetchType: "none",
+      })
+      void queryClient.invalidateQueries({
+        queryKey: ["enrollment", "programs", "approved"],
+        refetchType: "none",
+      })
+      void queryClient.invalidateQueries({
+        queryKey: ["enrollment", "available-courses", semester],
+        refetchType: "none",
+      })
       setPicked(null)
       setEditing(false)
       setCourseColorMap({})

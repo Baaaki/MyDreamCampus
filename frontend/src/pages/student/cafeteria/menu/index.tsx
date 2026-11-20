@@ -35,6 +35,8 @@ interface DisplayDailyMenu {
   }
   totalNormalCalories: number
   totalVeganCalories: number
+  hasNormalItems: boolean
+  hasVeganItems: boolean
 }
 
 // Boş menü item
@@ -58,6 +60,8 @@ const emptyDailyMenu: DisplayDailyMenu = {
   },
   totalNormalCalories: 0,
   totalVeganCalories: 0,
+  hasNormalItems: false,
+  hasVeganItems: false,
 }
 
 // Backend verisinden günlük menüyü çıkar
@@ -68,35 +72,38 @@ const extractDailyMenu = (
   const normalDay = menuForDay(menuData, date, "normal")
   const veganDay = menuForDay(menuData, date, "vegan")
 
-  if (!normalDay || !veganDay) {
+  if (!normalDay && !veganDay) {
     return emptyDailyMenu
   }
 
-  // Kalori değerlerini hesapla (eğer items boşsa 0)
-  const hasNormalItems = normalDay.items.some(
-    (item) => item && item.trim() !== ""
+  const normalItems = normalDay?.items ?? []
+  const veganItems = veganDay?.items ?? []
+  const hasNormalItems = normalItems.some(
+    (item) => typeof item === "string" && item.trim() !== ""
   )
-  const hasVeganItems = veganDay.items.some(
-    (item) => item && item.trim() !== ""
+  const hasVeganItems = veganItems.some(
+    (item) => typeof item === "string" && item.trim() !== ""
   )
 
   return {
     normal: {
-      soup: { name: normalDay.items[0] || "-", calories: 0 },
-      main: { name: normalDay.items[1] || "-", calories: 0 },
-      side: { name: normalDay.items[2] || "-", calories: 0 },
-      dessert: { name: normalDay.items[3] || "-", calories: 0 },
-      other: { name: normalDay.items[4] || "-", calories: 0 },
+      soup: { name: normalItems[0] || "-", calories: 0 },
+      main: { name: normalItems[1] || "-", calories: 0 },
+      side: { name: normalItems[2] || "-", calories: 0 },
+      dessert: { name: normalItems[3] || "-", calories: 0 },
+      other: { name: normalItems[4] || "-", calories: 0 },
     },
     vegan: {
-      soup: { name: veganDay.items[0] || "-", calories: 0 },
-      main: { name: veganDay.items[1] || "-", calories: 0 },
-      side: { name: veganDay.items[2] || "-", calories: 0 },
-      dessert: { name: veganDay.items[3] || "-", calories: 0 },
-      other: { name: veganDay.items[4] || "-", calories: 0 },
+      soup: { name: veganItems[0] || "-", calories: 0 },
+      main: { name: veganItems[1] || "-", calories: 0 },
+      side: { name: veganItems[2] || "-", calories: 0 },
+      dessert: { name: veganItems[3] || "-", calories: 0 },
+      other: { name: veganItems[4] || "-", calories: 0 },
     },
-    totalNormalCalories: hasNormalItems ? normalDay.calories : 0,
-    totalVeganCalories: hasVeganItems ? veganDay.calories : 0,
+    totalNormalCalories: hasNormalItems ? (normalDay?.calories ?? 0) : 0,
+    totalVeganCalories: hasVeganItems ? (veganDay?.calories ?? 0) : 0,
+    hasNormalItems,
+    hasVeganItems,
   }
 }
 
@@ -340,7 +347,7 @@ export default function MealMenuPage() {
               </p>
             </CardHeader>
             <CardContent className="space-y-6 pt-6">
-              {isWeekend || dailyMenu.totalNormalCalories === 0 ? (
+              {isWeekend || !dailyMenu.hasNormalItems ? (
                 <div className="py-8 text-center text-gray-400">
                   <Utensils className="mx-auto mb-2 h-12 w-12 opacity-50" />
                   <p>Bu gün için menü bulunmuyor</p>
@@ -398,7 +405,7 @@ export default function MealMenuPage() {
               </p>
             </CardHeader>
             <CardContent className="space-y-6 pt-6">
-              {isWeekend || dailyMenu.totalVeganCalories === 0 ? (
+              {isWeekend || !dailyMenu.hasVeganItems ? (
                 <div className="py-8 text-center text-gray-400">
                   <Leaf className="mx-auto mb-2 h-12 w-12 opacity-50" />
                   <p>Bu gün için menü bulunmuyor</p>

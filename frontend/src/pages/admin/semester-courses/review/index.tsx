@@ -1,6 +1,6 @@
 import { useState, useMemo, useCallback } from "react"
 import { useNavigate } from "react-router"
-import { useQuery } from "@tanstack/react-query"
+import { useQuery, useQueryClient } from "@tanstack/react-query"
 import { format } from "date-fns"
 import { tr } from "date-fns/locale"
 import { useFaculties } from "@/lib/services/catalog-service"
@@ -191,6 +191,7 @@ const fetchAllPeriods = async (semester: string): Promise<PeriodInfo[]> => {
 
 export default function SemesterReviewPage() {
   const navigate = useNavigate()
+  const queryClient = useQueryClient()
   const [expandedFaculties, setExpandedFaculties] = useState<string[]>([])
   const [selectedDepartment, setSelectedDepartment] = useState<{
     dept: Department
@@ -289,6 +290,12 @@ export default function SemesterReviewPage() {
     setActivating(true)
     try {
       await activateSemester(semester.id)
+      void queryClient.invalidateQueries({ queryKey: ["system", "semesters"] })
+      void queryClient.invalidateQueries({ queryKey: ["planned-semester"] })
+      void queryClient.invalidateQueries({
+        queryKey: ["semesters", "active", "name"],
+      })
+      void queryClient.invalidateQueries({ queryKey: ["semesters", "open"] })
       showToast("Dönem başarıyla aktifleştirildi!", "success")
       setTimeout(() => navigate("/system/semesters"), 1500)
     } catch (err) {

@@ -96,6 +96,29 @@ describe("api-client - 401 refresh logic", () => {
     expect(refreshFetch).not.toHaveBeenCalled()
   })
 
+  it("replays body-carrying POST requests on *ApiSafe after 401 refresh", async () => {
+    let calls = 0
+    let replayBody = ""
+    const fetchSpy = vi.fn(async (input: Request | string) => {
+      const url = typeof input === "string" ? input : input.url
+      if (url.includes("/auth/refresh")) {
+        return new Response("{}", { status: 200 })
+      }
+      calls++
+      const text = typeof input === "string" ? "" : await input.text()
+      if (calls === 1) return new Response("{}", { status: 401 })
+      replayBody = text
+      return new Response('{"ok":true}', { status: 200 })
+    })
+    vi.stubGlobal("fetch", fetchSpy)
+
+    const { gradesApiSafe } = await loadClient()
+    const res = await gradesApiSafe.post("scores", { json: { score: 85 } })
+    expect(res.status).toBe(200)
+    expect(calls).toBe(2)
+    expect(JSON.parse(replayBody)).toEqual({ score: 85 })
+  })
+
   it("retries the original request once after a successful refresh", async () => {
     let originalCall = 0
     const fetchSpy = vi.fn(async (input: Request | string) => {

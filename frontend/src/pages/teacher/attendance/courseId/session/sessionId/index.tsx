@@ -134,8 +134,10 @@ export default function AttendanceSessionPage() {
   // polling once per rotation could keep a code on screen that the backend
   // drops a moment after a student captures it. Polling three times per
   // rotation leaves every code on screen at least two thirds of one.
+  const isExpired = timeRemaining === "Süre doldu"
+
   useEffect(() => {
-    if (!sessionInfo || !sessionInfo.is_active) return
+    if (!sessionInfo || !sessionInfo.is_active || isExpired) return
 
     const interval = setInterval(
       () => {
@@ -145,18 +147,18 @@ export default function AttendanceSessionPage() {
     )
 
     return () => clearInterval(interval)
-  }, [sessionInfo, fetchQRCode])
+  }, [sessionInfo, fetchQRCode, isExpired])
 
   // Attendance records auto-refresh (every 5 seconds)
   useEffect(() => {
-    if (!sessionInfo || !sessionInfo.is_active) return
+    if (!sessionInfo || !sessionInfo.is_active || isExpired) return
 
     const interval = setInterval(() => {
       fetchRecords()
     }, 5000)
 
     return () => clearInterval(interval)
-  }, [sessionInfo, fetchRecords])
+  }, [sessionInfo, fetchRecords, isExpired])
 
   // Time remaining countdown
   useEffect(() => {

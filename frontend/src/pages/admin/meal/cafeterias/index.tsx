@@ -120,6 +120,7 @@ export default function CafeteriasPage() {
     mutationFn: createCafeteria,
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["cafeterias"] })
+      queryClient.invalidateQueries({ queryKey: ["meals", "cafeterias"] })
       setIsDialogOpen(false)
       setFormData(initialFormData)
     },
@@ -133,6 +134,7 @@ export default function CafeteriasPage() {
     mutationFn: updateCafeteria,
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["cafeterias"] })
+      queryClient.invalidateQueries({ queryKey: ["meals", "cafeterias"] })
       setIsDialogOpen(false)
       setFormData(initialFormData)
       setEditingCafeteria(null)
@@ -147,6 +149,7 @@ export default function CafeteriasPage() {
     mutationFn: deleteCafeteria,
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["cafeterias"] })
+      queryClient.invalidateQueries({ queryKey: ["meals", "cafeterias"] })
       setIsDeleteDialogOpen(false)
       setDeletingCafeteria(null)
     },

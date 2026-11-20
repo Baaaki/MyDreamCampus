@@ -1853,7 +1853,17 @@ export default function StaffProfilePage() {
                                 adminProfile.profileImage
                               )
                               if (url !== null) {
-                                handleAdminInfoChange("profileImage", url)
+                                const trimmed = url.trim()
+                                if (
+                                  trimmed === "" ||
+                                  /^https?:\/\//i.test(trimmed)
+                                ) {
+                                  handleAdminInfoChange("profileImage", trimmed)
+                                } else {
+                                  alert(
+                                    "Geçerli bir http:// veya https:// URL girin."
+                                  )
+                                }
                               }
                             }}
                           >
@@ -2225,7 +2235,17 @@ export default function StaffProfilePage() {
                                 profile.profileImage
                               )
                               if (url !== null) {
-                                handleBasicInfoChange("profileImage", url)
+                                const trimmed = url.trim()
+                                if (
+                                  trimmed === "" ||
+                                  /^https?:\/\//i.test(trimmed)
+                                ) {
+                                  handleBasicInfoChange("profileImage", trimmed)
+                                } else {
+                                  alert(
+                                    "Geçerli bir http:// veya https:// URL girin."
+                                  )
+                                }
                               }
                             }}
                           >

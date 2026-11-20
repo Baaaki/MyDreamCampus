@@ -153,6 +153,9 @@ export default function AdminGradesPage() {
 
   const handleCourseSelect = async (course: AdminCourseRow) => {
     setSelectedCourse(course)
+    setCourseStatus(null)
+    setStudents([])
+    setError(null)
     setView("STUDENTS")
     setLoading(true)
     try {
