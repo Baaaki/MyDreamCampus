@@ -52,10 +52,10 @@ RETURNING id, student_number, first_name, last_name, email, faculty, department,
           enrollment_year, class_level, advisor_id, advisor_name, status, is_active, deleted_at,
           created_at, updated_at;
 
--- name: SoftDeleteStudent :exec
+-- name: SoftDeleteStudent :execrows
 UPDATE student.students
 SET is_active = false, deleted_at = NOW(), updated_at = NOW()
-WHERE id = $1;
+WHERE id = $1 AND is_active = true;
 
 -- name: ListStudents :many
 SELECT id, student_number, first_name, last_name, email, faculty, department,
@@ -115,10 +115,11 @@ WHERE is_active = true
 -- name: CountOrphanedStudents :one
 SELECT COUNT(*) FROM student.students WHERE advisor_id IS NULL AND is_active = true;
 
--- name: BulkAssignAdvisor :exec
+-- name: BulkAssignAdvisor :many
 UPDATE student.students
 SET advisor_id = $2, advisor_name = $3, updated_at = NOW()
-WHERE id = ANY($1::UUID[]) AND is_active = true;
+WHERE id = ANY($1::UUID[]) AND is_active = true
+RETURNING id, student_number, first_name, last_name, email, department, class_level, status;
 
 -- name: UnassignAdvisorByStaffID :exec
 UPDATE student.students
@@ -132,11 +133,21 @@ SELECT id, student_number, first_name, last_name, email, faculty, department,
 FROM student.students
 WHERE is_active = true
   AND (sqlc.narg('query')::TEXT IS NULL OR to_tsvector('english', first_name || ' ' || last_name || ' ' || student_number) @@ plainto_tsquery('english', sqlc.narg('query')))
-  AND (sqlc.narg('department')::TEXT IS NULL OR department = sqlc.narg('department'))
-  AND (sqlc.narg('class_level')::SMALLINT IS NULL OR class_level = sqlc.narg('class_level'))
-  AND (sqlc.narg('status')::TEXT IS NULL OR status = sqlc.narg('status'))
+  AND (cardinality(sqlc.arg('departments')::TEXT[]) = 0 OR department = ANY(sqlc.arg('departments')::TEXT[]))
+  AND (cardinality(sqlc.arg('class_levels')::SMALLINT[]) = 0 OR class_level = ANY(sqlc.arg('class_levels')::SMALLINT[]))
+  AND (cardinality(sqlc.arg('statuses')::TEXT[]) = 0 OR status = ANY(sqlc.arg('statuses')::TEXT[]))
+  AND (cardinality(sqlc.arg('enrollment_years')::INT[]) = 0 OR enrollment_year = ANY(sqlc.arg('enrollment_years')::INT[]))
   AND (sqlc.narg('advisor_id')::UUID IS NULL OR advisor_id = sqlc.narg('advisor_id'))
-ORDER BY last_name ASC
+ORDER BY
+  CASE WHEN sqlc.arg('sort_by') = 'student_number' AND sqlc.arg('sort_order') = 'asc' THEN student_number END ASC,
+  CASE WHEN sqlc.arg('sort_by') = 'student_number' AND sqlc.arg('sort_order') = 'desc' THEN student_number END DESC,
+  CASE WHEN sqlc.arg('sort_by') = 'last_name' AND sqlc.arg('sort_order') = 'asc' THEN last_name END ASC,
+  CASE WHEN sqlc.arg('sort_by') = 'last_name' AND sqlc.arg('sort_order') = 'desc' THEN last_name END DESC,
+  CASE WHEN sqlc.arg('sort_by') = 'enrollment_year' AND sqlc.arg('sort_order') = 'asc' THEN enrollment_year END ASC,
+  CASE WHEN sqlc.arg('sort_by') = 'enrollment_year' AND sqlc.arg('sort_order') = 'desc' THEN enrollment_year END DESC,
+  CASE WHEN sqlc.arg('sort_by') = 'class_level' AND sqlc.arg('sort_order') = 'asc' THEN class_level END ASC,
+  CASE WHEN sqlc.arg('sort_by') = 'class_level' AND sqlc.arg('sort_order') = 'desc' THEN class_level END DESC,
+  last_name ASC, id ASC
 LIMIT sqlc.arg('limit') OFFSET sqlc.arg('offset');
 
 -- name: ListStudentsByDepartment :many

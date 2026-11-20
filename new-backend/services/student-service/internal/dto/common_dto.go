@@ -4,7 +4,7 @@ import "github.com/google/uuid"
 
 // PaginationQuery represents pagination query parameters with filters and sorting
 type PaginationQuery struct {
-	Page       int        `form:"page,default=1" binding:"min=1"`
+	Page       int        `form:"page,default=1" binding:"min=1,max=100000"`
 	Limit      int        `form:"limit,default=20" binding:"min=1,max=100"`
 	Department *string    `form:"department"`
 	ClassLevel *int16     `form:"class_level" binding:"omitempty,min=1,max=6"`

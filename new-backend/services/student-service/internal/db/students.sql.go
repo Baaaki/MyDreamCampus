@@ -11,10 +11,11 @@ import (
 	"github.com/jackc/pgx/v5/pgtype"
 )
 
-const bulkAssignAdvisor = `-- name: BulkAssignAdvisor :exec
+const bulkAssignAdvisor = `-- name: BulkAssignAdvisor :many
 UPDATE student.students
 SET advisor_id = $2, advisor_name = $3, updated_at = NOW()
 WHERE id = ANY($1::UUID[]) AND is_active = true
+RETURNING id, student_number, first_name, last_name, email, department, class_level, status
 `
 
 type BulkAssignAdvisorParams struct {
@@ -23,9 +24,44 @@ type BulkAssignAdvisorParams struct {
 	AdvisorName pgtype.Text   `json:"advisor_name"`
 }
 
-func (q *Queries) BulkAssignAdvisor(ctx context.Context, arg BulkAssignAdvisorParams) error {
-	_, err := q.db.Exec(ctx, bulkAssignAdvisor, arg.Column1, arg.AdvisorID, arg.AdvisorName)
-	return err
+type BulkAssignAdvisorRow struct {
+	ID            pgtype.UUID `json:"id"`
+	StudentNumber string      `json:"student_number"`
+	FirstName     string      `json:"first_name"`
+	LastName      string      `json:"last_name"`
+	Email         string      `json:"email"`
+	Department    string      `json:"department"`
+	ClassLevel    int16       `json:"class_level"`
+	Status        pgtype.Text `json:"status"`
+}
+
+func (q *Queries) BulkAssignAdvisor(ctx context.Context, arg BulkAssignAdvisorParams) ([]BulkAssignAdvisorRow, error) {
+	rows, err := q.db.Query(ctx, bulkAssignAdvisor, arg.Column1, arg.AdvisorID, arg.AdvisorName)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	items := []BulkAssignAdvisorRow{}
+	for rows.Next() {
+		var i BulkAssignAdvisorRow
+		if err := rows.Scan(
+			&i.ID,
+			&i.StudentNumber,
+			&i.FirstName,
+			&i.LastName,
+			&i.Email,
+			&i.Department,
+			&i.ClassLevel,
+			&i.Status,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
 }
 
 const countOrphanedStudents = `-- name: CountOrphanedStudents :one
@@ -624,22 +660,35 @@ SELECT id, student_number, first_name, last_name, email, faculty, department,
 FROM student.students
 WHERE is_active = true
   AND ($1::TEXT IS NULL OR to_tsvector('english', first_name || ' ' || last_name || ' ' || student_number) @@ plainto_tsquery('english', $1))
-  AND ($2::TEXT IS NULL OR department = $2)
-  AND ($3::SMALLINT IS NULL OR class_level = $3)
-  AND ($4::TEXT IS NULL OR status = $4)
-  AND ($5::UUID IS NULL OR advisor_id = $5)
-ORDER BY last_name ASC
-LIMIT $7 OFFSET $6
+  AND (cardinality($2::TEXT[]) = 0 OR department = ANY($2::TEXT[]))
+  AND (cardinality($3::SMALLINT[]) = 0 OR class_level = ANY($3::SMALLINT[]))
+  AND (cardinality($4::TEXT[]) = 0 OR status = ANY($4::TEXT[]))
+  AND (cardinality($5::INT[]) = 0 OR enrollment_year = ANY($5::INT[]))
+  AND ($6::UUID IS NULL OR advisor_id = $6)
+ORDER BY
+  CASE WHEN $7 = 'student_number' AND $8 = 'asc' THEN student_number END ASC,
+  CASE WHEN $7 = 'student_number' AND $8 = 'desc' THEN student_number END DESC,
+  CASE WHEN $7 = 'last_name' AND $8 = 'asc' THEN last_name END ASC,
+  CASE WHEN $7 = 'last_name' AND $8 = 'desc' THEN last_name END DESC,
+  CASE WHEN $7 = 'enrollment_year' AND $8 = 'asc' THEN enrollment_year END ASC,
+  CASE WHEN $7 = 'enrollment_year' AND $8 = 'desc' THEN enrollment_year END DESC,
+  CASE WHEN $7 = 'class_level' AND $8 = 'asc' THEN class_level END ASC,
+  CASE WHEN $7 = 'class_level' AND $8 = 'desc' THEN class_level END DESC,
+  last_name ASC, id ASC
+LIMIT $10 OFFSET $9
 `
 
 type SearchStudentsParams struct {
-	Query      pgtype.Text `json:"query"`
-	Department pgtype.Text `json:"department"`
-	ClassLevel pgtype.Int2 `json:"class_level"`
-	Status     pgtype.Text `json:"status"`
-	AdvisorID  pgtype.UUID `json:"advisor_id"`
-	Offset     int32       `json:"offset"`
-	Limit      int32       `json:"limit"`
+	Query           pgtype.Text `json:"query"`
+	Departments     []string    `json:"departments"`
+	ClassLevels     []int16     `json:"class_levels"`
+	Statuses        []string    `json:"statuses"`
+	EnrollmentYears []int32     `json:"enrollment_years"`
+	AdvisorID       pgtype.UUID `json:"advisor_id"`
+	SortBy          interface{} `json:"sort_by"`
+	SortOrder       interface{} `json:"sort_order"`
+	Offset          int32       `json:"offset"`
+	Limit           int32       `json:"limit"`
 }
 
 type SearchStudentsRow struct {
@@ -664,10 +713,13 @@ type SearchStudentsRow struct {
 func (q *Queries) SearchStudents(ctx context.Context, arg SearchStudentsParams) ([]SearchStudentsRow, error) {
 	rows, err := q.db.Query(ctx, searchStudents,
 		arg.Query,
-		arg.Department,
-		arg.ClassLevel,
-		arg.Status,
+		arg.Departments,
+		arg.ClassLevels,
+		arg.Statuses,
+		arg.EnrollmentYears,
 		arg.AdvisorID,
+		arg.SortBy,
+		arg.SortOrder,
 		arg.Offset,
 		arg.Limit,
 	)
@@ -706,15 +758,18 @@ func (q *Queries) SearchStudents(ctx context.Context, arg SearchStudentsParams) 
 	return items, nil
 }
 
-const softDeleteStudent = `-- name: SoftDeleteStudent :exec
+const softDeleteStudent = `-- name: SoftDeleteStudent :execrows
 UPDATE student.students
 SET is_active = false, deleted_at = NOW(), updated_at = NOW()
-WHERE id = $1
+WHERE id = $1 AND is_active = true
 `
 
-func (q *Queries) SoftDeleteStudent(ctx context.Context, id pgtype.UUID) error {
-	_, err := q.db.Exec(ctx, softDeleteStudent, id)
-	return err
+func (q *Queries) SoftDeleteStudent(ctx context.Context, id pgtype.UUID) (int64, error) {
+	result, err := q.db.Exec(ctx, softDeleteStudent, id)
+	if err != nil {
+		return 0, err
+	}
+	return result.RowsAffected(), nil
 }
 
 const unassignAdvisorByStaffID = `-- name: UnassignAdvisorByStaffID :exec

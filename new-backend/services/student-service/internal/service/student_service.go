@@ -2,6 +2,7 @@ package service
 
 import (
 	"context"
+	"strconv"
 	"strings"
 
 	"github.com/baaaki/mydreamcampus/shared/config"
@@ -28,7 +29,7 @@ type StudentRepositoryInterface interface {
 	CountStudentsFiltered(ctx context.Context, params db.CountStudentsFilteredParams) (int64, error)
 	ListStudentsByAdvisor(ctx context.Context, advisorID uuid.UUID) ([]db.Student, error)
 	ListOrphanedStudents(ctx context.Context, limit, offset int32) ([]db.Student, int64, error)
-	BulkAssignAdvisor(ctx context.Context, studentIDs []uuid.UUID, advisorID uuid.UUID, advisorName string, eventPayloads []map[string]any) error
+	BulkAssignAdvisor(ctx context.Context, studentIDs []uuid.UUID, advisorID uuid.UUID, advisorName string) ([]db.BulkAssignAdvisorRow, error)
 	SearchStudents(ctx context.Context, params db.SearchStudentsParams) ([]db.Student, error)
 }
 
@@ -352,6 +353,10 @@ func (s *StudentService) UpdateStudent(ctx context.Context, id string, req dto.U
 			)
 			return dto.StudentResponse{}, serviceErrors.ErrStudentNotFound
 		}
+		if sharedErrors.Is(err, serviceErrors.ErrStudentEmailExistsRepo) {
+			serviceLogger.Warn("duplicate student email during update", zap.Error(err))
+			return dto.StudentResponse{}, serviceErrors.ErrStudentEmailExists
+		}
 
 		// Check for transaction or query failures - wrap and return, handler will log
 		if sharedErrors.Is(err, sharedErrors.ErrTransactionFailed) || sharedErrors.Is(err, sharedErrors.ErrQueryFailed) {
@@ -448,7 +453,7 @@ func (s *StudentService) DeleteStudent(ctx context.Context, id string) error {
 // ListStudents lists students with pagination, filtering, and sorting
 func (s *StudentService) ListStudents(ctx context.Context, query dto.PaginationQuery) (dto.StudentListResponse, error) {
 	limit := utils.ClampToInt32(query.Limit)
-	offset := utils.ClampToInt32((query.Page - 1) * query.Limit)
+	offset := utils.ClampInt64ToInt32(max(int64(query.Page-1)*int64(query.Limit), 0))
 
 	// Set default sort if not provided
 	sortBy := "created_at"
@@ -555,8 +560,18 @@ func (s *StudentService) ListAdviseesPage(ctx context.Context, advisorID uuid.UU
 		return dto.StudentListResponse{}, sharedErrors.Wrap(sharedErrors.ErrInternal, err)
 	}
 
+	if page < 1 {
+		page = 1
+	}
+	if limit < 1 {
+		limit = 20
+	}
 	total := len(students)
-	start := min((page-1)*limit, total)
+	start64 := max(int64(page-1)*int64(limit), 0)
+	start := total
+	if start64 < int64(total) {
+		start = int(start64)
+	}
 	end := min(start+limit, total)
 
 	studentResponses := make([]dto.StudentResponse, 0, end-start)
@@ -601,7 +616,7 @@ func (s *StudentService) ListStudentsWithoutAdvisor(ctx context.Context) ([]dto.
 // ListOrphanedStudents lists students without advisor
 func (s *StudentService) ListOrphanedStudents(ctx context.Context, query dto.PaginationQuery) (dto.OrphanedStudentsResponse, error) {
 	limit := utils.ClampToInt32(query.Limit)
-	offset := utils.ClampToInt32((query.Page - 1) * query.Limit)
+	offset := utils.ClampInt64ToInt32(max(int64(query.Page-1)*int64(query.Limit), 0))
 
 	students, total, err := s.studentRepo.ListOrphanedStudents(ctx, limit, offset)
 	if err != nil {
@@ -643,48 +658,27 @@ func (s *StudentService) BulkAssignAdvisor(ctx context.Context, req dto.BulkAdvi
 		return dto.BulkAdvisorAssignResponse{}, serviceErrors.ErrAdvisorNotFound
 	}
 
-	// Create event payloads for each student
-	eventPayloads := make([]map[string]any, len(req.StudentIDs))
-	for i, studentID := range req.StudentIDs {
-		eventPayloads[i] = map[string]any{
-			"id":             studentID.String(),
-			"student_number": "", // Will be filled from DB if needed
-			"changed_fields": map[string]any{
-				"advisor_id":   req.AdvisorID.String(),
-				"advisor_name": advisorInfo.Name,
-			},
-		}
-	}
-
-	// Bulk assign
-	err = s.studentRepo.BulkAssignAdvisor(ctx, req.StudentIDs, req.AdvisorID, advisorInfo.Name, eventPayloads)
+	updatedRows, err := s.studentRepo.BulkAssignAdvisor(ctx, req.StudentIDs, req.AdvisorID, advisorInfo.Name)
 	if err != nil {
-		// Check for transaction or query failures - wrap and return, handler will log
-		if sharedErrors.Is(err, sharedErrors.ErrTransactionFailed) || sharedErrors.Is(err, sharedErrors.ErrQueryFailed) {
-			return dto.BulkAdvisorAssignResponse{}, sharedErrors.Wrap(sharedErrors.ErrInternal, err)
-		}
-
-		// Unexpected error - wrap and return, handler will log
 		return dto.BulkAdvisorAssignResponse{}, sharedErrors.Wrap(sharedErrors.ErrInternal, err)
 	}
 
-	// Build response
-	studentBasicInfos := make([]dto.StudentBasicInfo, len(req.StudentIDs))
-	for i, id := range req.StudentIDs {
-		studentBasicInfos[i] = dto.StudentBasicInfo{
-			ID:            id.String(),
-			StudentNumber: "", // Could be fetched if needed
-		}
+	studentBasicInfos := make([]dto.StudentBasicInfo, 0, len(updatedRows))
+	for _, row := range updatedRows {
+		studentBasicInfos = append(studentBasicInfos, dto.StudentBasicInfo{
+			ID:            utils.PgtypeToUUIDString(row.ID),
+			StudentNumber: row.StudentNumber,
+		})
 	}
 
 	logger.Info("bulk advisor assignment completed",
-		zap.Int("student_count", len(req.StudentIDs)),
+		zap.Int("student_count", len(updatedRows)),
 		zap.String("advisor_id", req.AdvisorID.String()),
 	)
 
 	return dto.BulkAdvisorAssignResponse{
 		Message:      "Danışman atandı",
-		UpdatedCount: len(req.StudentIDs),
+		UpdatedCount: len(updatedRows),
 		Advisor: dto.AdvisorInfo{
 			AdvisorID:   req.AdvisorID.String(),
 			AdvisorName: advisorInfo.Name,
@@ -704,60 +698,76 @@ func (s *StudentService) SearchStudents(ctx context.Context, req dto.SearchStude
 		limit = 100
 	}
 
-	// For now, use simple SQL query with basic filters
-	// Extract first filter values for simple implementation
-	var department *string
-	if len(req.Filters.Department) > 0 {
-		department = &req.Filters.Department[0]
+	offset := int32(0)
+	if req.Pagination.Cursor != "" {
+		if parsed, err := strconv.ParseInt(req.Pagination.Cursor, 10, 32); err == nil && parsed >= 0 {
+			offset = int32(parsed)
+		}
 	}
 
-	var classLevel *int16
-	if len(req.Filters.ClassLevel) > 0 {
-		classLevel = &req.Filters.ClassLevel[0]
-	}
-
-	var status *string
-	if len(req.Filters.Status) > 0 {
-		status = &req.Filters.Status[0]
-	}
-
-	// Prepare search parameters using existing SearchStudents query
 	var query *string
 	if req.Query != "" {
 		query = &req.Query
 	}
 
+	departments := req.Filters.Department
+	if departments == nil {
+		departments = []string{}
+	}
+	classLevels := req.Filters.ClassLevel
+	if classLevels == nil {
+		classLevels = []int16{}
+	}
+	statuses := req.Filters.Status
+	if statuses == nil {
+		statuses = []string{}
+	}
+	enrollmentYears := make([]int32, 0, len(req.Filters.EnrollmentYear))
+	for _, y := range req.Filters.EnrollmentYear {
+		enrollmentYears = append(enrollmentYears, utils.ClampToInt32(y))
+	}
+
+	sortBy := req.Sort.Field
+	if sortBy == "" {
+		sortBy = "last_name"
+	}
+	sortOrder := req.Sort.Order
+	if sortOrder == "" {
+		sortOrder = "asc"
+	}
+
+	// Fetch limit+1 rows so has_more is exact without an extra query.
 	params := db.SearchStudentsParams{
-		Query:      utils.PointerStringToPgText(query),
-		Department: utils.PointerStringToPgText(department),
-		ClassLevel: utils.PointerInt16ToPgInt2(classLevel),
-		Status:     utils.PointerStringToPgText(status),
-		AdvisorID:  utils.PointerUUIDToPgtype(req.Filters.AdvisorID),
-		Limit:      utils.ClampToInt32(limit),
-		Offset:     0, // For cursor-based pagination, always start from 0
+		Query:           utils.PointerStringToPgText(query),
+		Departments:     departments,
+		ClassLevels:     classLevels,
+		Statuses:        statuses,
+		EnrollmentYears: enrollmentYears,
+		AdvisorID:       utils.PointerUUIDToPgtype(req.Filters.AdvisorID),
+		SortBy:          sortBy,
+		SortOrder:       sortOrder,
+		Limit:           utils.ClampToInt32(limit + 1),
+		Offset:          offset,
 	}
 
 	students, err := s.studentRepo.SearchStudents(ctx, params)
 	if err != nil {
-		// Check for query failures - wrap and return, handler will log
-		if sharedErrors.Is(err, sharedErrors.ErrQueryFailed) {
-			return dto.SearchStudentsResponse{}, sharedErrors.Wrap(sharedErrors.ErrInternal, err)
-		}
-
-		// Unexpected error - wrap and return, handler will log
 		return dto.SearchStudentsResponse{}, sharedErrors.Wrap(sharedErrors.ErrInternal, err)
 	}
 
-	studentResponses := make([]dto.StudentResponse, 0)
+	hasMore := len(students) > limit
+	if hasMore {
+		students = students[:limit]
+	}
+
+	studentResponses := make([]dto.StudentResponse, 0, len(students))
 	for _, student := range students {
 		studentResponses = append(studentResponses, s.toStudentResponse(student))
 	}
 
-	hasMore := len(studentResponses) >= limit
 	nextCursor := ""
-	if hasMore && len(studentResponses) > 0 {
-		// In real implementation, use actual cursor (e.g., last student's ID or timestamp)
-		nextCursor = studentResponses[len(studentResponses)-1].ID
+	if hasMore {
+		nextCursor = strconv.FormatInt(int64(offset)+int64(len(studentResponses)), 10)
 	}
 
 	logger.Info("search completed",

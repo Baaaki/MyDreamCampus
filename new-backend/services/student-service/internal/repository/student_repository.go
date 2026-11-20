@@ -372,6 +372,10 @@ func (r *StudentRepository) UpdateStudentWithEvent(ctx context.Context, id uuid.
 		if errors.Is(err, pgx.ErrNoRows) {
 			return db.Student{}, fmt.Errorf("%w: student with id %s not found for update", serviceErrors.ErrStudentNotFoundRepo, id)
 		}
+		var pgErr *pgconn.PgError
+		if errors.As(err, &pgErr) && pgErr.Code == "23505" {
+			return db.Student{}, fmt.Errorf("%w: duplicate student email", serviceErrors.ErrStudentEmailExistsRepo)
+		}
 		return db.Student{}, fmt.Errorf("%w: failed to update student: %v", sharedErrors.ErrQueryFailed, err)
 	}
 
@@ -409,12 +413,12 @@ func (r *StudentRepository) SoftDeleteStudentWithEvent(ctx context.Context, id u
 	qtx := r.queries.WithTx(tx)
 
 	// Soft delete student
-	err = qtx.SoftDeleteStudent(ctx, utils.UUIDToPgtype(id))
+	rows, err := qtx.SoftDeleteStudent(ctx, utils.UUIDToPgtype(id))
 	if err != nil {
-		if errors.Is(err, pgx.ErrNoRows) {
-			return fmt.Errorf("%w: student with id %s not found for deletion", serviceErrors.ErrStudentNotFoundRepo, id)
-		}
 		return fmt.Errorf("%w: failed to delete student: %v", sharedErrors.ErrQueryFailed, err)
+	}
+	if rows == 0 {
+		return fmt.Errorf("%w: student with id %s not found for deletion", serviceErrors.ErrStudentNotFoundRepo, id)
 	}
 
 	// Create outbox event
@@ -496,38 +500,51 @@ func (r *StudentRepository) ListOrphanedStudents(ctx context.Context, limit, off
 	return listOrphanedStudentsRowsToStudents(students), total, nil
 }
 
-// BulkAssignAdvisor assigns advisor to multiple students with event
-func (r *StudentRepository) BulkAssignAdvisor(ctx context.Context, studentIDs []uuid.UUID, advisorID uuid.UUID, advisorName string, eventPayloads []map[string]any) error {
+// BulkAssignAdvisor assigns advisor to active students and emits one
+// student.updated outbox event per row actually updated.
+func (r *StudentRepository) BulkAssignAdvisor(ctx context.Context, studentIDs []uuid.UUID, advisorID uuid.UUID, advisorName string) ([]db.BulkAssignAdvisorRow, error) {
 	tx, err := r.pool.Begin(ctx)
 	if err != nil {
-		return fmt.Errorf("%w: failed to begin transaction: %v", sharedErrors.ErrTransactionFailed, err)
+		return nil, fmt.Errorf("%w: failed to begin transaction: %v", sharedErrors.ErrTransactionFailed, err)
 	}
 	// Rollback after successful commit is a no-op returning ErrTxClosed — safe to discard.
 	defer func() { _ = tx.Rollback(ctx) }()
 
 	qtx := r.queries.WithTx(tx)
 
-	// Convert UUIDs to pgtype
 	pgStudentIDs := make([]pgtype.UUID, len(studentIDs))
 	for i, id := range studentIDs {
 		pgStudentIDs[i] = utils.UUIDToPgtype(id)
 	}
 
-	// Bulk assign advisor
-	err = qtx.BulkAssignAdvisor(ctx, db.BulkAssignAdvisorParams{
+	updated, err := qtx.BulkAssignAdvisor(ctx, db.BulkAssignAdvisorParams{
 		Column1:     pgStudentIDs,
 		AdvisorID:   utils.UUIDToPgtype(advisorID),
 		AdvisorName: utils.StringToPgText(advisorName),
 	})
 	if err != nil {
-		return fmt.Errorf("%w: failed to bulk assign advisor: %v", sharedErrors.ErrQueryFailed, err)
+		return nil, fmt.Errorf("%w: failed to bulk assign advisor: %v", sharedErrors.ErrQueryFailed, err)
 	}
 
-	// Create outbox events for each student
-	for _, eventPayload := range eventPayloads {
+	for _, row := range updated {
+		eventPayload := map[string]any{
+			"id":             utils.PgtypeToUUIDString(row.ID),
+			"student_number": row.StudentNumber,
+			"first_name":     row.FirstName,
+			"last_name":      row.LastName,
+			"email":          row.Email,
+			"department":     row.Department,
+			"class_level":    row.ClassLevel,
+			"status":         utils.PgTextToString(row.Status),
+			"advisor_id":     advisorID.String(),
+			"changed_fields": map[string]any{
+				"advisor_id":   advisorID.String(),
+				"advisor_name": advisorName,
+			},
+		}
 		payload, err := json.Marshal(eventPayload)
 		if err != nil {
-			return fmt.Errorf("%w: failed to marshal event payload: %v", sharedErrors.ErrQueryFailed, err)
+			return nil, fmt.Errorf("%w: failed to marshal event payload: %v", sharedErrors.ErrQueryFailed, err)
 		}
 		_, err = qtx.CreateOutboxEvent(ctx, db.CreateOutboxEventParams{
 			CorrelationID: utils.CorrelationIDFromContext(ctx),
@@ -536,15 +553,15 @@ func (r *StudentRepository) BulkAssignAdvisor(ctx context.Context, studentIDs []
 			Payload:       payload,
 		})
 		if err != nil {
-			return fmt.Errorf("%w: failed to create outbox event: %v", sharedErrors.ErrQueryFailed, err)
+			return nil, fmt.Errorf("%w: failed to create outbox event: %v", sharedErrors.ErrQueryFailed, err)
 		}
 	}
 
 	if err := tx.Commit(ctx); err != nil {
-		return fmt.Errorf("%w: failed to commit transaction: %v", sharedErrors.ErrTransactionFailed, err)
+		return nil, fmt.Errorf("%w: failed to commit transaction: %v", sharedErrors.ErrTransactionFailed, err)
 	}
 
-	return nil
+	return updated, nil
 }
 
 // UnassignAdvisorByStaffID removes advisor assignment for all students of a staff member

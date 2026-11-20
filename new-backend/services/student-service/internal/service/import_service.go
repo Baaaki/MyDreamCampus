@@ -342,7 +342,7 @@ func (s *ImportService) ListImportJobs(ctx context.Context, userID uuid.UUID, qu
 	}
 
 	jobs, total, err := s.importRepo.ListImportJobsByUser(ctx, userID,
-		utils.ClampToInt32(limit), utils.ClampToInt32((page-1)*limit))
+		utils.ClampToInt32(limit), utils.ClampInt64ToInt32(max(int64(page-1)*int64(limit), 0)))
 	if err != nil {
 		log.Error("failed to list import jobs",
 			zap.Error(err),

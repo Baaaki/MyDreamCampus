@@ -118,11 +118,18 @@ func (m *mockCRUDStudentRepo) SoftDeleteStudentWithEvent(ctx context.Context, id
 	return nil
 }
 
-func (m *mockCRUDStudentRepo) BulkAssignAdvisor(ctx context.Context, studentIDs []uuid.UUID, advisorID uuid.UUID, advisorName string, eventPayloads []map[string]any) error {
+func (m *mockCRUDStudentRepo) BulkAssignAdvisor(ctx context.Context, studentIDs []uuid.UUID, advisorID uuid.UUID, advisorName string) ([]db.BulkAssignAdvisorRow, error) {
 	if m.bulkAssignErr != nil {
-		return m.bulkAssignErr
+		return nil, m.bulkAssignErr
 	}
-	return nil
+	rows := make([]db.BulkAssignAdvisorRow, 0, len(studentIDs))
+	for _, id := range studentIDs {
+		rows = append(rows, db.BulkAssignAdvisorRow{
+			ID:            utils.UUIDToPgtype(id),
+			StudentNumber: "2024001",
+		})
+	}
+	return rows, nil
 }
 
 type mockStaffSvc struct {

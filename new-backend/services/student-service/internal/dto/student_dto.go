@@ -88,7 +88,7 @@ type SearchPaginationResponse struct {
 
 // BulkAdvisorAssignRequest represents bulk advisor assignment request
 type BulkAdvisorAssignRequest struct {
-	StudentIDs []uuid.UUID `json:"student_ids" binding:"required,min=1"`
+	StudentIDs []uuid.UUID `json:"student_ids" binding:"required,min=1,max=500"`
 	AdvisorID  uuid.UUID   `json:"advisor_id" binding:"required"`
 }
 

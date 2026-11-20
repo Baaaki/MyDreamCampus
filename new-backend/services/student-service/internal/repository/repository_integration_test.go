@@ -89,7 +89,9 @@ func TestStudentRepository_Advisor_AssignSkipsInactiveAndUnassignMarksTheEvent(t
 	require.NoError(t, repo.SoftDeleteStudentWithEvent(ctx, utils.PgtypeToUUID(inactive.ID), map[string]any{}))
 	advisor := uuid.New()
 
-	require.NoError(t, repo.BulkAssignAdvisor(ctx, []uuid.UUID{utils.PgtypeToUUID(active.ID), utils.PgtypeToUUID(inactive.ID)}, advisor, "Ahmet Yılmaz", []map[string]any{{}}))
+	updated, err := repo.BulkAssignAdvisor(ctx, []uuid.UUID{utils.PgtypeToUUID(active.ID), utils.PgtypeToUUID(inactive.ID)}, advisor, "Ahmet Yılmaz")
+	require.NoError(t, err)
+	assert.Len(t, updated, 1)
 
 	advised, err := repo.ListStudentsByAdvisor(ctx, advisor)
 	require.NoError(t, err)

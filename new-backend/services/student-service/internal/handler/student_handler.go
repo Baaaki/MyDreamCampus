@@ -683,6 +683,9 @@ func (h *StudentHandler) BulkImport(c *gin.Context) {
 	ctx, cancel := context.WithTimeout(c.Request.Context(), 30*time.Second)
 	defer cancel()
 
+	// Limit upload size to 10MB BEFORE parsing multipart form
+	c.Request.Body = http.MaxBytesReader(c.Writer, c.Request.Body, 10<<20)
+
 	// Get uploaded file
 	file, header, err := c.Request.FormFile("file")
 	if err != nil {
@@ -696,9 +699,6 @@ func (h *StudentHandler) BulkImport(c *gin.Context) {
 		return
 	}
 	defer func() { _ = file.Close() }()
-
-	// Limit upload size to 10MB
-	c.Request.Body = http.MaxBytesReader(c.Writer, c.Request.Body, 10<<20)
 
 	// Validate file extension
 	fileName := header.Filename
