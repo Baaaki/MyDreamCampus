@@ -1,5 +1,5 @@
 import { useState, useRef, useEffect, useMemo } from "react"
-import { useMutation, useQuery } from "@tanstack/react-query"
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query"
 import { mealApi } from "@/lib/api-client"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
@@ -618,6 +618,7 @@ function normalizeWeeks(weeks: WeeklyMenu[] | undefined, targetCount: number): W
 }
 
 export default function MenusPage() {
+  const queryClient = useQueryClient()
   const [activeTab, setActiveTab] = useState<string>("normal")
 
   // Bilgisayar tarihinden ay ve yılı otomatik belirle

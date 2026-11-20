@@ -155,7 +155,7 @@ export default function AdminGradesPage() {
     setSelectedCourse(course)
     setCourseStatus(null)
     setStudents([])
-    setError(null)
+    setError("")
     setView("STUDENTS")
     setLoading(true)
     try {
