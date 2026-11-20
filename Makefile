@@ -207,7 +207,7 @@ deploy-down:
 # `make deploy-meal` is what everyone types — and it failed with a bare
 # "no such service: meal". Resolve the short form here; anything else (caddy,
 # postgres, rabbitmq) passes through untouched.
-GO_SERVICES := auth staff student catalog enrollment attendance grades meal payment notification
+GO_SERVICES := auth staff student catalog enrollment attendance grades meal payment
 compose_service = $(if $(filter $1,$(GO_SERVICES)),$1-service,$1)
 
 # Rebuild and restart one service, leaving the other 15 running.
