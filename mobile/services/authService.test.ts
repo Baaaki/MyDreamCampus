@@ -6,6 +6,7 @@ jest.mock("./api", () => {
       post: jest.fn(),
       get: jest.fn(),
     },
+    bumpAuthEpoch: jest.fn(),
   };
 });
 

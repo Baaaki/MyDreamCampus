@@ -14,6 +14,7 @@ import { AuthProvider, useAuthContext } from '@/contexts/AuthContext';
 import { ThemeProvider, useTheme } from '@/contexts/ThemeContext';
 import { NAV_THEME } from '@/lib/theme';
 import { setOnForcePasswordChange } from '@/services/api';
+import { authService } from '@/services/authService';
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -62,7 +63,7 @@ export default function RootLayout() {
 }
 
 function AuthGuard({ children }: { children: React.ReactNode }) {
-  const { isAuthenticated, isLoading, setUser } = useAuthContext();
+  const { user, isAuthenticated, isLoading, setUser } = useAuthContext();
   const segments = useSegments();
   const router = useRouter();
 
@@ -70,16 +71,22 @@ function AuthGuard({ children }: { children: React.ReactNode }) {
     if (isLoading) return;
 
     const inAuthGroup = segments[0] === '(auth)';
+    const onChangePassword = segments[0] === 'change-password';
 
     if (!isAuthenticated && !inAuthGroup) {
       router.replace('/(auth)/login');
+    } else if (isAuthenticated && user?.force_password_change === true) {
+      if (!onChangePassword) {
+        router.replace('/change-password');
+      }
     } else if (isAuthenticated && inAuthGroup) {
       router.replace('/(tabs)');
     }
-  }, [isAuthenticated, isLoading, segments]);
+  }, [isAuthenticated, isLoading, segments, user?.force_password_change, router]);
 
   useEffect(() => {
     setOnForcePasswordChange(() => {
+      void authService.setForcePasswordChange(true);
       setUser((current) => (current ? { ...current, force_password_change: true } : current));
       if (segments[0] !== 'change-password') {
         router.replace('/change-password');

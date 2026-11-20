@@ -20,6 +20,8 @@ import {
   type CardFormErrors,
 } from '@/lib/payment-card';
 import { COLORS } from '@/lib/theme';
+import { newIdempotencyKey } from '@/services/api';
+import { paymentService } from '@/services/paymentService';
 import type { Payment } from '@/types/payment.types';
 
 /**
@@ -37,6 +39,8 @@ export interface Checkout {
   confirmedAt?: number;
   /** Why the payment can no longer be completed (it expired or was settled). */
   rejection?: string;
+  /** Stable idempotency key for the active confirmation attempt. */
+  idempotencyKey?: string;
 }
 
 function isConflict(err: unknown): boolean {
@@ -115,6 +119,9 @@ export function CardCheckout({
   const update = (field: keyof CardForm, value: string) => {
     setForm((prev) => ({ ...prev, [field]: value }));
     setFormErrors((prev) => ({ ...prev, [field]: undefined }));
+    if (checkout.idempotencyKey) {
+      onChange({ ...checkout, idempotencyKey: undefined });
+    }
   };
 
   const fillTestCard = (number: string) => {
@@ -126,9 +133,13 @@ export function CardCheckout({
       holder: prev.holder,
     }));
     setFormErrors({});
+    if (checkout.idempotencyKey) {
+      onChange({ ...checkout, idempotencyKey: undefined });
+    }
   };
 
   const submit = () => {
+    if (confirm.isPending) return;
     const errors = validateCardForm(form);
     setFormErrors(errors);
     setError(null);
@@ -136,21 +147,44 @@ export function CardCheckout({
       haptic.error();
       return;
     }
+    const idempotencyKey = checkout.idempotencyKey ?? newIdempotencyKey();
+    if (!checkout.idempotencyKey) {
+      onChange({ ...checkout, idempotencyKey });
+    }
     haptic.medium();
     confirm.mutate(
-      { paymentId: checkout.paymentId, card: toConfirmRequest(form) },
+      { paymentId: checkout.paymentId, card: toConfirmRequest(form), idempotencyKey },
       {
         onSuccess: (result) => {
           // The card data has done its job; do not keep it around.
           setForm(EMPTY_CARD_FORM);
-          onChange({ ...checkout, payment: result, confirmedAt: Date.now() });
+          onChange({
+            ...checkout,
+            idempotencyKey,
+            payment: result,
+            confirmedAt: Date.now(),
+          });
         },
-        onError: (err) => {
+        onError: async (err) => {
           haptic.error();
-          // 409: the payment expired or was settled elsewhere — this checkout
-          // is over. Anything else (a mistyped card) can be fixed and retried.
+          // 409: reconcile with backend — a prior attempt may have actually
+          // succeeded before timing out on the client.
           if (isConflict(err)) {
             setForm(EMPTY_CARD_FORM);
+            try {
+              const latest = await paymentService.get(checkout.paymentId);
+              if (latest.status === 'completed') {
+                onChange({
+                  ...checkout,
+                  idempotencyKey,
+                  payment: latest,
+                  confirmedAt: Date.now(),
+                });
+                return;
+              }
+            } catch {
+              // Fall back to reporting the conflict below.
+            }
             onChange({
               ...checkout,
               rejection: apiErrorMessage(err, 'Bu ödeme artık tamamlanamaz'),

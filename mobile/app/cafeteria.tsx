@@ -1,5 +1,5 @@
 import Ionicons from '@expo/vector-icons/Ionicons';
-import React, { useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import { ActivityIndicator, Alert, Modal, Pressable, RefreshControl, ScrollView, View } from 'react-native';
 import Animated, { FadeInDown } from 'react-native-reanimated';
 import { SafeAreaView } from 'react-native-safe-area-context';
@@ -74,7 +74,7 @@ function ReservationCard({
   const { isDark } = useTheme();
   const colors = COLORS[isDark ? 'dark' : 'light'];
   const active = reservation.status === 'confirmed' || reservation.status === 'pending';
-  const cancellable = active && !reservation.is_used && isCancellable(reservation.date);
+  const cancellable = reservation.status === 'confirmed' && !reservation.is_used && isCancellable(reservation.date);
   // A used reservation stays `confirmed`; only is_used tells it apart.
   const shownStatus = reservation.is_used ? 'used' : reservation.status;
 
@@ -198,7 +198,7 @@ function ReservationWizard({
   const colors = COLORS[isDark ? 'dark' : 'light'];
   const batchMutation = useCreateBatchReservation();
 
-  const days = useMemo(() => nextWeekWeekdays(), []);
+  const days = useMemo(() => nextWeekWeekdays(), [visible]);
 
   const [step, setStep] = useState(0);
   const [cafeteriaId, setCafeteriaId] = useState(cafeterias[0]?.id ?? '');
@@ -244,10 +244,22 @@ function ReservationWizard({
     setCheckout(null);
   };
 
+  useEffect(() => {
+    if (visible && !checkout && days.length > 0) {
+      const valid = new Set(days.map(toISODate));
+      setDates((prev) => {
+        const kept = prev.filter((d) => valid.has(d));
+        return kept.length > 0 ? kept : [toISODate(days[0])];
+      });
+    }
+  }, [visible, checkout, days]);
+
   // A reserved but unpaid batch is kept, so reopening the wizard resumes its
-  // payment instead of reserving the same meals again.
+  // payment instead of reserving the same meals again. Terminal checkouts are reset.
   const close = () => {
-    if (!checkout) reset();
+    if (!checkout || checkout.confirmedAt != null || Boolean(checkout.rejection)) {
+      reset();
+    }
     onClose();
   };
 
@@ -593,7 +605,7 @@ export default function CafeteriaScreen() {
   );
 
   const cancellableIds = reservations
-    .filter((r) => (r.status === 'confirmed' || r.status === 'pending') && !r.is_used && isCancellable(r.date))
+    .filter((r) => r.status === 'confirmed' && !r.is_used && isCancellable(r.date))
     .map((r) => r.id);
 
   const toggleSelect = (id: string) =>
@@ -605,8 +617,24 @@ export default function CafeteriaScreen() {
   };
 
   const handleSingleCancel = (id: string) => {
-    haptic.medium();
-    cancelMutation.mutate(id);
+    Alert.alert('Randevuyu iptal et', 'Bu randevu iptal edilecek. Emin misin?', [
+      { text: 'Vazgeç', style: 'cancel' },
+      {
+        text: 'İptal Et',
+        style: 'destructive',
+        onPress: () => {
+          haptic.medium();
+          cancelMutation.mutate(id, {
+            onError: (err) => {
+              Alert.alert(
+                'İptal edilemedi',
+                apiErrorMessage(err, 'Randevu iptal edilemedi. Tekrar dene.')
+              );
+            },
+          });
+        },
+      },
+    ]);
   };
 
   const handleBulkCancel = () => {
@@ -648,8 +676,11 @@ export default function CafeteriaScreen() {
         contentContainerClassName="px-5 pb-28 pt-1"
         refreshControl={
           <RefreshControl
-            refreshing={reservationsQuery.isRefetching}
-            onRefresh={() => reservationsQuery.refetch()}
+            refreshing={reservationsQuery.isRefetching || cafeteriasQuery.isRefetching}
+            onRefresh={() => {
+              void reservationsQuery.refetch();
+              void cafeteriasQuery.refetch();
+            }}
             tintColor={colors.primary}
           />
         }
@@ -657,6 +688,22 @@ export default function CafeteriaScreen() {
         {reservationsQuery.isLoading ? (
           <View className="items-center py-16">
             <ActivityIndicator size="large" color={colors.primary} />
+          </View>
+        ) : reservationsQuery.isError || cafeteriasQuery.isError ? (
+          <View className="items-center gap-3 py-16">
+            <Ionicons name="alert-circle-outline" size={44} color={colors.destructive} />
+            <Text className="text-center text-muted-foreground">
+              Yemekhane bilgileri yüklenemedi.
+            </Text>
+            <Button
+              variant="outline"
+              onPress={() => {
+                void reservationsQuery.refetch();
+                void cafeteriasQuery.refetch();
+              }}
+            >
+              <Text>Tekrar Dene</Text>
+            </Button>
           </View>
         ) : reservations.length > 0 ? (
           <Animated.View entering={FadeInDown.duration(400)}>

@@ -65,8 +65,11 @@ export function cancelDeadline(iso: string): Date {
   const monday = mondayOf(new Date(y, m - 1, d));
   const friday = new Date(monday);
   friday.setDate(monday.getDate() - 3); // onceki haftanin cumasi
-  friday.setHours(23, 59, 59, 0);
-  return friday;
+  const fy = friday.getFullYear();
+  const fm = String(friday.getMonth() + 1).padStart(2, '0');
+  const fd = String(friday.getDate()).padStart(2, '0');
+  // Campus timezone is fixed UTC+3 (Europe/Istanbul).
+  return new Date(`${fy}-${fm}-${fd}T23:59:59+03:00`);
 }
 
 // Randevu su an iptal edilebilir mi? (cuma kilidinden once mi)

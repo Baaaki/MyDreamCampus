@@ -1,4 +1,4 @@
-import api from './api';
+import api, { bumpAuthEpoch } from './api';
 import * as SecureStore from 'expo-secure-store';
 import type {
   LoginRequest,
@@ -51,12 +51,17 @@ export const authService = {
     }
     await persistTokens(response.data.access_token, response.data.refresh_token);
     if (response.data.user) {
-      await SecureStore.setItemAsync(USER_KEY, JSON.stringify(response.data.user));
+      const storedUser: User =
+        response.data.force_password_change !== undefined
+          ? { ...response.data.user, force_password_change: response.data.force_password_change }
+          : response.data.user;
+      await SecureStore.setItemAsync(USER_KEY, JSON.stringify(storedUser));
     }
     return response.data;
   },
 
   async logout(): Promise<void> {
+    bumpAuthEpoch?.();
     try {
       // Sent in the body because there is no cookie to carry it; without it
       // the server cannot end the session and the refresh token outlives
@@ -64,7 +69,15 @@ export const authService = {
       const refreshToken = await SecureStore.getItemAsync(REFRESH_TOKEN_KEY);
       await api.post('/auth/logout', refreshToken ? { refresh_token: refreshToken } : {});
     } catch (error) {
-      console.error('Logout API error:', error);
+      const status =
+        typeof error === 'object' &&
+        error !== null &&
+        'response' in error &&
+        typeof (error as { response?: { status?: unknown } }).response?.status === 'number'
+          ? (error as { response: { status: number } }).response.status
+          : undefined;
+      const message = error instanceof Error ? error.message : 'unknown error';
+      console.error('Logout API error:', { status, message });
     } finally {
       await SecureStore.deleteItemAsync(TOKEN_KEY);
       await SecureStore.deleteItemAsync(REFRESH_TOKEN_KEY);
@@ -75,7 +88,17 @@ export const authService = {
   async changePassword(data: ChangePasswordRequest): Promise<ChangePasswordResponse> {
     const response = await api.post<ChangePasswordResponse>('/auth/change-password', data);
     await persistTokens(response.data.access_token, response.data.refresh_token);
+    await authService.setForcePasswordChange(false);
     return response.data;
+  },
+
+  async setForcePasswordChange(force: boolean): Promise<void> {
+    const existing = await authService.getStoredUser();
+    if (!existing) return;
+    await SecureStore.setItemAsync(
+      USER_KEY,
+      JSON.stringify({ ...existing, force_password_change: force })
+    );
   },
 
   // Calls /auth/refresh with the stored refresh token (in body, since
@@ -144,6 +167,7 @@ export const authService = {
     }
   },
   async clearAuth(): Promise<void> {
+    bumpAuthEpoch?.();
     await SecureStore.deleteItemAsync(TOKEN_KEY);
     await SecureStore.deleteItemAsync(REFRESH_TOKEN_KEY);
     await SecureStore.deleteItemAsync(USER_KEY);

@@ -52,7 +52,7 @@ export function menuForDate(
   if (isWebMenu(menu)) {
     const items = webMenuForDay(menu, date, menuType)?.items ?? [];
     // The editor leaves an unused course as an empty string.
-    const dishes = items.filter((item) => item.trim() !== '');
+    const dishes = items.filter((item) => typeof item === 'string' && item.trim() !== '');
     if (dishes.length === 0) return {};
     // The week format has no lunch/dinner split; the web shows the day's
     // menu for both meals, and so does the app.

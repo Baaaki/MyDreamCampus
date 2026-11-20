@@ -1,4 +1,5 @@
 import React, { createContext, useContext, useState, useEffect, useCallback } from 'react';
+import { useQueryClient } from '@tanstack/react-query';
 import { authService } from '@/services/authService';
 import { setOnUnauthorized } from '@/services/api';
 import type { User } from '@/types/auth.types';
@@ -14,6 +15,7 @@ interface AuthContextType {
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
 export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
+  const queryClient = useQueryClient();
   const [user, setUser] = useState<User | null>(null);
   const [isLoading, setIsLoading] = useState(true);
 
@@ -38,13 +40,17 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
   // Register 401 callback so interceptor can clear auth state
   useEffect(() => {
-    setOnUnauthorized(() => setUser(null));
-  }, []);
+    setOnUnauthorized(() => {
+      queryClient.clear();
+      setUser(null);
+    });
+  }, [queryClient]);
 
   const logout = useCallback(async () => {
     await authService.logout();
+    queryClient.clear();
     setUser(null);
-  }, []);
+  }, [queryClient]);
 
   const value = {
     user,

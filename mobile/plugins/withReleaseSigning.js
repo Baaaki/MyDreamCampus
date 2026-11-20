@@ -9,11 +9,15 @@ const MARKER = 'MDC_UPLOAD_STORE_FILE';
 
 const RELEASE_SIGNING_CONFIG = `
         release {
-            if (findProperty('MDC_UPLOAD_STORE_FILE')) {
-                storeFile file(findProperty('MDC_UPLOAD_STORE_FILE'))
-                storePassword findProperty('MDC_UPLOAD_STORE_PASSWORD')
-                keyAlias findProperty('MDC_UPLOAD_KEY_ALIAS')
-                keyPassword findProperty('MDC_UPLOAD_KEY_PASSWORD')
+            def storeFileProp = findProperty('MDC_UPLOAD_STORE_FILE')
+            def storePasswordProp = findProperty('MDC_UPLOAD_STORE_PASSWORD')
+            def keyAliasProp = findProperty('MDC_UPLOAD_KEY_ALIAS')
+            def keyPasswordProp = findProperty('MDC_UPLOAD_KEY_PASSWORD')
+            if (storeFileProp && storePasswordProp && keyAliasProp && keyPasswordProp) {
+                storeFile file(storeFileProp)
+                storePassword storePasswordProp
+                keyAlias keyAliasProp
+                keyPassword keyPasswordProp
             }
         }`;
 
@@ -26,7 +30,14 @@ function applyReleaseSigning(contents) {
   );
   const withBuildType = withConfig.replace(
     /(release \{\n(?:\s*\/\/.*\n)*\s*)signingConfig signingConfigs\.debug/,
-    "$1signingConfig findProperty('MDC_UPLOAD_STORE_FILE') ? signingConfigs.release : signingConfigs.debug",
+    [
+      "$1if (!findProperty('MDC_UPLOAD_STORE_FILE') || !findProperty('MDC_UPLOAD_STORE_PASSWORD') || !findProperty('MDC_UPLOAD_KEY_ALIAS') || !findProperty('MDC_UPLOAD_KEY_PASSWORD')) {",
+      "                if (gradle.startParameter.taskNames.any { it.toLowerCase().contains('release') }) {",
+      "                    throw new GradleException('Missing MDC_UPLOAD_* signing properties for release build')",
+      "                }",
+      "            }",
+      "            signingConfig signingConfigs.release",
+    ].join('\n'),
   );
 
   // Fail the prebuild instead of silently shipping a debug-signed APK when

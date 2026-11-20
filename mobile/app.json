@@ -18,7 +18,13 @@
         "foregroundImage": "./assets/images/adaptive-icon.png",
         "backgroundColor": "#ffffff"
       },
-      "predictiveBackGestureEnabled": false
+      "predictiveBackGestureEnabled": false,
+      "blockedPermissions": [
+        "android.permission.SYSTEM_ALERT_WINDOW",
+        "android.permission.READ_EXTERNAL_STORAGE",
+        "android.permission.WRITE_EXTERNAL_STORAGE",
+        "android.permission.RECORD_AUDIO"
+      ]
     },
     "web": {
       "bundler": "metro",
@@ -38,14 +44,16 @@
       [
         "expo-camera",
         {
-          "cameraPermission": "Yoklama icin QR kod tarayabilmek icin kameraya erisim gerekli."
+          "cameraPermission": "Yoklama icin QR kod tarayabilmek icin kameraya erisim gerekli.",
+          "recordAudioAndroid": false
         }
       ],
       "expo-font",
       "expo-secure-store",
       "expo-status-bar",
       "expo-web-browser",
-      "./plugins/withReleaseSigning"
+      "./plugins/withReleaseSigning",
+      "./plugins/withAndroidHardening"
     ],
     "experiments": {
       "typedRoutes": true

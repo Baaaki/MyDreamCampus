@@ -64,8 +64,16 @@ export const useCreateBatchReservation = () => {
 export const useConfirmPayment = () => {
   const queryClient = useQueryClient();
   return useMutation({
-    mutationFn: ({ paymentId, card }: { paymentId: string; card: ConfirmPaymentRequest }) =>
-      paymentService.confirm(paymentId, card),
+    gcTime: 0,
+    mutationFn: ({
+      paymentId,
+      card,
+      idempotencyKey,
+    }: {
+      paymentId: string;
+      card: ConfirmPaymentRequest;
+      idempotencyKey?: string;
+    }) => paymentService.confirm(paymentId, card, idempotencyKey),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['my-reservations'] });
     },

@@ -21,7 +21,11 @@ export function ScreenHeader({ title, subtitle }: { title: string; subtitle?: st
       <Pressable
         onPress={() => {
           haptic.light();
-          router.back();
+          if (router.canGoBack()) {
+            router.back();
+          } else {
+            router.replace('/(tabs)');
+          }
         }}
         accessibilityRole="button"
         accessibilityLabel="Geri"

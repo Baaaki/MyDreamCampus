@@ -10,7 +10,7 @@ import {
   DAYS_OF_WEEK,
   SESSION_TYPE_LABEL,
   WEEK_DAYS,
-  slotRange,
+  slotRanges,
   timeToMinutes,
 } from '@/constants/schedule';
 import { useTheme } from '@/contexts/ThemeContext';
@@ -39,15 +39,15 @@ export default function ScheduleScreen() {
     const map: Partial<Record<DayOfWeek, DaySlot[]>> = {};
     for (const course of courses) {
       for (const session of course.schedule_sessions ?? []) {
-        const range = slotRange(session.slot_numbers ?? []);
-        if (!range) continue;
-        (map[session.day_of_week] ??= []).push({
-          course,
-          type: session.session_type,
-          start: range.start,
-          end: range.end,
-          startMin: timeToMinutes(range.start),
-        });
+        for (const range of slotRanges(session.slot_numbers ?? [])) {
+          (map[session.day_of_week] ??= []).push({
+            course,
+            type: session.session_type,
+            start: range.start,
+            end: range.end,
+            startMin: timeToMinutes(range.start),
+          });
+        }
       }
     }
     for (const day of WEEK_DAYS) {

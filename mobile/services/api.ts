@@ -13,7 +13,16 @@ const LOOPBACK_HOSTS = new Set(['localhost', '127.0.0.1']);
 // itself; the emulator reaches the host's loopback as 10.0.2.2.
 export const getBaseURL = () => {
   const envUrl = process.env.EXPO_PUBLIC_API_URL;
-  if (envUrl) return envUrl;
+  const isProd = typeof __DEV__ !== 'undefined' && !__DEV__;
+  if (envUrl) {
+    if (isProd && !envUrl.startsWith('https://')) {
+      throw new Error('Release builds require an HTTPS EXPO_PUBLIC_API_URL');
+    }
+    return envUrl;
+  }
+  if (isProd) {
+    throw new Error('Release builds require EXPO_PUBLIC_API_URL to be configured');
+  }
   const devHost = Constants.expoConfig?.hostUri?.split(':')[0];
   if (devHost && !(Platform.OS === 'android' && LOOPBACK_HOSTS.has(devHost))) {
     return `http://${devHost}/api`;
@@ -63,13 +72,15 @@ api.interceptors.request.use(
     ) {
       config.headers['Idempotency-Key'] = newIdempotencyKey();
     }
-    try {
-      const token = await SecureStore.getItemAsync('jwt_token');
-      if (token) {
-        config.headers.Authorization = `Bearer ${token}`;
+    if (!config.headers.Authorization) {
+      try {
+        const token = await SecureStore.getItemAsync('jwt_token');
+        if (token) {
+          config.headers.Authorization = `Bearer ${token}`;
+        }
+      } catch (error) {
+        console.error('Error getting token from SecureStore:', error);
       }
-    } catch (error) {
-      console.error('Error getting token from SecureStore:', error);
     }
     return config;
   },
@@ -116,14 +127,22 @@ function httpStatus(err: unknown): number | undefined {
 
 // Single-flight refresh: avoid stampeding /auth/refresh when many requests
 // hit 401 simultaneously. All concurrent 401s wait on the same promise.
+// Monotonic counter bumped on logout/clearAuth so an in-flight refresh that
+// resolves after logout never re-persists stale tokens.
+let authEpoch = 0;
+export const bumpAuthEpoch = () => {
+  authEpoch += 1;
+};
+
 let refreshInFlight: Promise<RefreshOutcome> | null = null;
 
 async function refreshOnce(): Promise<RefreshOutcome> {
   if (refreshInFlight) return refreshInFlight;
+  const startEpoch = authEpoch;
   refreshInFlight = (async (): Promise<RefreshOutcome> => {
     try {
       const refreshToken = await SecureStore.getItemAsync('refresh_token');
-      if (!refreshToken) return { status: 'ended' };
+      if (!refreshToken || authEpoch !== startEpoch) return { status: 'ended' };
       // Bypass the configured `api` instance to avoid the 401 interceptor
       // running recursively if /auth/refresh itself returns 401.
       const res = await axios.post<{ access_token: string; refresh_token: string }>(
@@ -131,6 +150,7 @@ async function refreshOnce(): Promise<RefreshOutcome> {
         { refresh_token: refreshToken },
         { timeout: 15000, headers: { ...CLIENT_HEADERS } }
       );
+      if (authEpoch !== startEpoch) return { status: 'ended' };
       await SecureStore.setItemAsync('jwt_token', res.data.access_token);
       await SecureStore.setItemAsync('refresh_token', res.data.refresh_token);
       return { status: 'refreshed', accessToken: res.data.access_token };
@@ -163,7 +183,11 @@ api.interceptors.response.use(
 
     // Don't try to refresh on auth endpoints — 401 there means creds/refresh are invalid.
     const url = original.url ?? '';
-    if (url.includes('/auth/login') || url.includes('/auth/refresh')) {
+    if (
+      url.includes('/auth/login') ||
+      url.includes('/auth/refresh') ||
+      url.includes('/auth/logout')
+    ) {
       return Promise.reject(error);
     }
 

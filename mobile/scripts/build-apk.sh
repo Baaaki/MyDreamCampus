@@ -8,6 +8,10 @@ set -euo pipefail
 cd "$(dirname "$0")/.."
 
 API_URL="${API_URL:-https://mydreamcampus.madebybaki.com/api}"
+if [[ "$API_URL" != https://* ]]; then
+  echo "error: release API_URL must use https:// (got: $API_URL)" >&2
+  exit 1
+fi
 GRADLE_PROPS="${GRADLE_USER_HOME:-$HOME/.gradle}/gradle.properties"
 OUT_DIR="dist"
 OUT_APK="$OUT_DIR/mydreamcampus.apk"

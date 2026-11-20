@@ -56,3 +56,23 @@ export function timeToMinutes(time: string): number {
   const [h, m] = time.split(':').map(Number);
   return h * 60 + m;
 }
+
+// Splits non-contiguous slot numbers (e.g. [1, 2, 6, 7]) into contiguous blocks.
+export function slotRanges(slotNumbers: number[]): Array<{ start: string; end: string }> {
+  const valid = [...new Set(slotNumbers)]
+    .filter((n) => Boolean(TIME_SLOTS[n]))
+    .sort((a, b) => a - b);
+  if (valid.length === 0) return [];
+  const ranges: Array<{ start: string; end: string }> = [];
+  let blockStart = valid[0];
+  let prev = valid[0];
+  for (let i = 1; i < valid.length; i++) {
+    if (valid[i] !== prev + 1) {
+      ranges.push({ start: TIME_SLOTS[blockStart].start, end: TIME_SLOTS[prev].end });
+      blockStart = valid[i];
+    }
+    prev = valid[i];
+  }
+  ranges.push({ start: TIME_SLOTS[blockStart].start, end: TIME_SLOTS[prev].end });
+  return ranges;
+}

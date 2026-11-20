@@ -3,8 +3,16 @@ import type { ConfirmPaymentRequest, Payment } from '@/types/payment.types';
 
 export const paymentService = {
   // Reddedilen kart hata degildir: odeme status "failed" ve bir sebeple doner.
-  async confirm(paymentId: string, data: ConfirmPaymentRequest): Promise<Payment> {
-    const response = await api.post<Payment>(`/payments/${paymentId}/confirm`, data);
+  async confirm(
+    paymentId: string,
+    data: ConfirmPaymentRequest,
+    idempotencyKey?: string
+  ): Promise<Payment> {
+    const response = idempotencyKey
+      ? await api.post<Payment>(`/payments/${paymentId}/confirm`, data, {
+          headers: { 'Idempotency-Key': idempotencyKey },
+        })
+      : await api.post<Payment>(`/payments/${paymentId}/confirm`, data);
     return response.data;
   },
 

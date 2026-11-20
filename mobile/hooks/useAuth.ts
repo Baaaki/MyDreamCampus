@@ -9,8 +9,10 @@ export const useLogin = () => {
   const queryClient = useQueryClient();
 
   return useMutation({
+    gcTime: 0,
     mutationFn: (data: LoginRequest) => authService.login(data),
     onSuccess: (data) => {
+      queryClient.clear();
       queryClient.setQueryData(['user'], data.user);
     },
   });
@@ -35,6 +37,7 @@ export const useLogout = () => {
  */
 export const useChangePassword = () => {
   return useMutation({
+    gcTime: 0,
     mutationFn: (data: ChangePasswordRequest) => authService.changePassword(data),
   });
 };

@@ -2,7 +2,7 @@ import Ionicons from '@expo/vector-icons/Ionicons';
 import { useIsFocused } from 'expo-router/react-navigation';
 import { CameraView, useCameraPermissions } from 'expo-camera';
 import React, { useCallback, useEffect, useRef, useState } from 'react';
-import { Modal, StyleSheet, View } from 'react-native';
+import { Linking, Modal, StyleSheet, View } from 'react-native';
 import Animated, {
   Easing,
   FadeIn,
@@ -64,16 +64,26 @@ export default function ScanScreen() {
   const [invalid, setInvalid] = useState(false);
   const [result, setResult] = useState<ScanResult | null>(null);
   const gateRef = useRef(createScanGate());
+  const invalidTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const scanMutation = useScanQR();
   const mealMutation = useUseReservation();
 
-  // Sekme her odaklandiginda temiz durumla basla.
+  const clearInvalidTimer = useCallback(() => {
+    if (invalidTimerRef.current !== null) {
+      clearTimeout(invalidTimerRef.current);
+      invalidTimerRef.current = null;
+    }
+  }, []);
+
+  // Sekme odak degisiminde ve unmount'ta temiz durumla basla.
   useEffect(() => {
+    clearInvalidTimer();
     if (isFocused) {
       gateRef.current.release();
       setInvalid(false);
     }
-  }, [isFocused]);
+    return () => clearInvalidTimer();
+  }, [isFocused, clearInvalidTimer]);
 
   // Tarama cizgisi: cerceve icinde asagi-yukari supurme.
   const sweep = useSharedValue(0);
@@ -99,13 +109,17 @@ export default function ScanScreen() {
         setInvalid(true);
         // Kisa kilit: ayni bozuk QR her karede tekrar tetiklenmesin,
         // kullanici modal kapatmadan yeniden nisan alabilsin.
-        setTimeout(() => {
+        clearInvalidTimer();
+        invalidTimerRef.current = setTimeout(() => {
+          invalidTimerRef.current = null;
           setInvalid(false);
           gateRef.current.release();
         }, 1500);
         return;
       }
 
+      clearInvalidTimer();
+      setInvalid(false);
       haptic.medium();
 
       if (scanned.kind === 'meal') {
@@ -147,7 +161,7 @@ export default function ScanScreen() {
         }
       );
     },
-    [haptic, scanMutation, mealMutation]
+    [haptic, scanMutation, mealMutation, clearInvalidTimer]
   );
 
   const closeResult = () => {
@@ -169,9 +183,15 @@ export default function ScanScreen() {
               Dersteki QR kodu tarayip yoklamani alabilmen icin kameraya erisim gerekiyor.
             </Text>
             {permission ? (
-              <Button onPress={requestPermission} accessibilityLabel="Kamera izni ver">
-                <Text>Izin Ver</Text>
-              </Button>
+              permission.canAskAgain === false ? (
+                <Button onPress={() => void Linking.openSettings()} accessibilityLabel="Ayarlari ac">
+                  <Text>Ayarlari Ac</Text>
+                </Button>
+              ) : (
+                <Button onPress={requestPermission} accessibilityLabel="Kamera izni ver">
+                  <Text>Izin Ver</Text>
+                </Button>
+              )
             ) : (
               <Text className="text-sm text-muted-foreground">Kamera hazirlaniyor...</Text>
             )}
@@ -249,7 +269,7 @@ export default function ScanScreen() {
       </SafeAreaView>
 
       {/* Sonuc modali */}
-      <Modal visible={result !== null} transparent animationType="fade" onRequestClose={closeResult}>
+      <Modal visible={isFocused && result !== null} transparent animationType="fade" onRequestClose={closeResult}>
         <View className="flex-1 items-center justify-center bg-black/70 px-8">
           {result?.type === 'success' && (
             <Animated.View
