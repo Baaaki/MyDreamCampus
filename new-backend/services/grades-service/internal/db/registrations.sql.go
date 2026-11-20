@@ -375,7 +375,7 @@ func (q *Queries) GetRegistrationsByIDs(ctx context.Context, dollar_1 []uuid.UUI
 	return items, nil
 }
 
-const markAttendanceFailed = `-- name: MarkAttendanceFailed :exec
+const markAttendanceFailed = `-- name: MarkAttendanceFailed :execrows
 UPDATE grades.student_course_registrations
 SET is_attendance_failed = true
 WHERE student_id = $1 AND course_id = $2
@@ -386,9 +386,12 @@ type MarkAttendanceFailedParams struct {
 	CourseID  uuid.UUID `json:"course_id"`
 }
 
-func (q *Queries) MarkAttendanceFailed(ctx context.Context, arg MarkAttendanceFailedParams) error {
-	_, err := q.db.Exec(ctx, markAttendanceFailed, arg.StudentID, arg.CourseID)
-	return err
+func (q *Queries) MarkAttendanceFailed(ctx context.Context, arg MarkAttendanceFailedParams) (int64, error) {
+	result, err := q.db.Exec(ctx, markAttendanceFailed, arg.StudentID, arg.CourseID)
+	if err != nil {
+		return 0, err
+	}
+	return result.RowsAffected(), nil
 }
 
 const studentHasGradesInSemester = `-- name: StudentHasGradesInSemester :one

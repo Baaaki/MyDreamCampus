@@ -100,7 +100,10 @@ func (s *GradeService) SubmitScore(ctx context.Context, instructorID uuid.UUID, 
 		return nil, errors.ErrRegistrationNotFound
 	}
 
-	// 2. Verify instructor authorization
+	// 2. Verify course ownership and instructor authorization
+	if registration.CourseID != courseID {
+		return nil, errors.ErrRegistrationNotFound
+	}
 	if registration.InstructorID != instructorID {
 		return nil, errors.ErrNotCourseInstructor
 	}
@@ -132,9 +135,13 @@ func (s *GradeService) SubmitScore(ctx context.Context, instructorID uuid.UUID, 
 		return nil, errors.ErrGradingPeriodEnded
 	}
 
-	// 6. Validate score
-	if req.Score != nil {
-		if *req.Score < 0 || *req.Score > 100 {
+	// 6. Validate score & absence pairing
+	if req.IsAbsent {
+		if req.Score != nil {
+			return nil, errors.ErrInvalidScore
+		}
+	} else {
+		if req.Score == nil || *req.Score < 0 || *req.Score > 100 {
 			return nil, errors.ErrInvalidScore
 		}
 	}
@@ -204,11 +211,40 @@ func (s *GradeService) SubmitScore(ctx context.Context, instructorID uuid.UUID, 
 }
 
 func (s *GradeService) BulkSubmitScores(ctx context.Context, instructorID uuid.UUID, courseID uuid.UUID, req dto.BulkSubmitScoresRequest) (*dto.BulkSubmitScoresResponse, error) {
+	// 1. Load target course and verify instructor ownership before touching registrations.
+	course, err := s.cacheRepo.GetCourseCacheByID(ctx, courseID)
+	if err != nil {
+		logger.Error("failed to get course", zap.Error(err))
+		return nil, errors.ErrCourseNotFound
+	}
+	if course.InstructorID != instructorID {
+		return nil, errors.ErrNotCourseInstructor
+	}
+
+	// 2. Validate slug against the target course's assessment schema.
+	var schema []AssessmentSchemaItem
+	if err := json.Unmarshal(course.AssessmentSchema, &schema); err != nil {
+		logger.Error("failed to unmarshal assessment schema", zap.Error(err))
+		return nil, err
+	}
+	if !isValidSlug(schema, req.Slug) {
+		return nil, errors.ErrInvalidSlug
+	}
+
 	if len(req.Scores) == 0 {
 		return &dto.BulkSubmitScoresResponse{Slug: req.Slug}, nil
 	}
 
-	// 1. Batch-fetch every registration in one roundtrip.
+	// 3. Grading-period check against the target course's semester.
+	editResult, err := s.checkCanEditGrade(ctx, course.Semester, &courseID, false, false)
+	if err != nil {
+		return nil, err
+	}
+	if !editResult.Allowed {
+		return nil, errors.ErrGradingPeriodEnded
+	}
+
+	// Batch-fetch every registration in one roundtrip.
 	regIDs := make([]uuid.UUID, 0, len(req.Scores))
 	for _, e := range req.Scores {
 		regIDs = append(regIDs, e.RegistrationID)
@@ -218,35 +254,12 @@ func (s *GradeService) BulkSubmitScores(ctx context.Context, instructorID uuid.U
 		logger.Error("failed to batch-fetch registrations", zap.Error(err))
 		return nil, err
 	}
-
-	regByID := make(map[uuid.UUID]db.GetRegistrationsByIDsRow, len(registrations))
-	for _, r := range registrations {
-		regByID[r.ID] = r
-	}
-
-	// 2. Validate slug against the assessment schema once (all registrations
-	//    share the same course, so the schema is identical).
 	if len(registrations) == 0 {
 		return &dto.BulkSubmitScoresResponse{Slug: req.Slug}, nil
 	}
-	var schema []AssessmentSchemaItem
-	if err := json.Unmarshal(registrations[0].AssessmentSchema, &schema); err != nil {
-		logger.Error("failed to unmarshal assessment schema", zap.Error(err))
-		return nil, err
-	}
-	if !isValidSlug(schema, req.Slug) {
-		return nil, errors.ErrInvalidSlug
-	}
-
-	// 3. Grading-period check once — all entries share the same course+semester.
-	//    We pass isLocked=false here because per-row lock is evaluated below.
-	semester := registrations[0].Semester
-	editResult, err := s.checkCanEditGrade(ctx, semester, &courseID, false, false)
-	if err != nil {
-		return nil, err
-	}
-	if !editResult.Allowed {
-		return nil, errors.ErrGradingPeriodEnded
+	regByID := make(map[uuid.UUID]db.GetRegistrationsByIDsRow, len(registrations))
+	for _, r := range registrations {
+		regByID[r.ID] = r
 	}
 
 	// 4-6 run under the course lock: whether a row is locked is read in the
@@ -293,7 +306,12 @@ func (s *GradeService) BulkSubmitScores(ctx context.Context, instructorID uuid.U
 				skippedLocked++
 				continue
 			}
-			if e.Score != nil && (*e.Score < 0 || *e.Score > 100) {
+			if e.IsAbsent {
+				if e.Score != nil {
+					logger.Warn("bulk: absent entry must not carry score", zap.String("registration_id", e.RegistrationID.String()))
+					continue
+				}
+			} else if e.Score == nil || *e.Score < 0 || *e.Score > 100 {
 				logger.Warn("bulk: invalid score range", zap.String("registration_id", e.RegistrationID.String()))
 				continue
 			}
@@ -373,9 +391,28 @@ func (s *GradeService) AutoFinalize(ctx context.Context, courseID uuid.UUID, ins
 	registrationQtx := s.registrationRepo.WithTx(tx)
 	scoreQtx := s.scoreRepo.WithTx(tx)
 
+	// Enforce semester hard deadline before finalizing.
+	editResult, err := s.checkCanEditGrade(ctx, course.Semester, &courseID, false, true)
+	if err != nil {
+		return nil, err
+	}
+	if !editResult.Allowed {
+		return nil, errors.ErrGradingPeriodEnded
+	}
+
 	if err := scoreQtx.LockCourseGrading(ctx, courseID); err != nil {
 		logger.Error("failed to take course grading lock", zap.Error(err))
 		return nil, err
+	}
+
+	// Guard against duplicate finalization under the course lock.
+	existingCompleted, err := completedQtx.GetCompletedCoursesByCourse(ctx, courseID)
+	if err != nil {
+		logger.Error("failed to check existing completed courses", zap.Error(err))
+		return nil, err
+	}
+	if len(existingCompleted) > 0 {
+		return nil, errors.ErrAlreadyFinalized
 	}
 
 	// 2. Get all registrations
@@ -388,6 +425,17 @@ func (s *GradeService) AutoFinalize(ctx context.Context, courseID uuid.UUID, ins
 	if len(registrations) == 0 {
 		logger.Warn("no registrations found for course", zap.String("course_id", courseID.String()))
 		return nil, fmt.Errorf("no registrations found")
+	}
+
+	// 2b. Re-verify all eligible scores remain locked under the course lock
+	// (an admin may have unlocked a score after finalize.requested was queued).
+	allLocked, err := s.checkAllScoresLocked(ctx, registrationQtx, scoreQtx, courseID)
+	if err != nil {
+		logger.Error("failed to verify all scores locked before finalize", zap.Error(err))
+		return nil, err
+	}
+	if !allLocked {
+		return nil, errors.ErrIncompleteAssessment
 	}
 
 	// 3. Parse assessment schema
@@ -421,7 +469,10 @@ func (s *GradeService) AutoFinalize(ctx context.Context, courseID uuid.UUID, ins
 			return nil, fmt.Errorf("get scores for registration %s: %w", reg.ID, err)
 		}
 
-		scoreMap := make(map[string]float64)
+		scoreMap := make(map[string]float64, len(schema))
+		for _, item := range schema {
+			scoreMap[item.Slug] = 0.0
+		}
 		for _, score := range scores {
 			if score.Score.Valid && !utils.PgBoolToBool(score.IsAbsent) {
 				scoreFloat, err := utils.PgNumericToFloat64(score.Score)
@@ -569,6 +620,7 @@ func (s *GradeService) AutoFinalize(ctx context.Context, courseID uuid.UUID, ins
 			isPrereq, err := s.cacheRepo.IsPrerequisiteCourse(ctx, course.CourseCode)
 			if err != nil {
 				logger.Error("failed to check prerequisite", zap.Error(err))
+				return nil, fmt.Errorf("check prerequisite course: %w", err)
 			} else if isPrereq {
 				// Publish prerequisite passed event
 				prereqEvent := dto.GradeStudentPrerequisitePassedEvent{
@@ -673,10 +725,15 @@ func (s *GradeService) GetCourseStatus(ctx context.Context, instructorID uuid.UU
 		return nil, err
 	}
 
-	// Count total students
+	// Count total and eligible (non-attendance-failed) students
 	totalStudents, err := s.registrationRepo.CountRegistrationsByCourse(ctx, courseID)
 	if err != nil {
 		logger.Error("failed to count registrations", zap.Error(err))
+		return nil, err
+	}
+	eligibleStudents, err := s.registrationRepo.CountEligibleRegistrationsByCourse(ctx, courseID)
+	if err != nil {
+		logger.Error("failed to count eligible registrations", zap.Error(err))
 		return nil, err
 	}
 
@@ -692,13 +749,17 @@ func (s *GradeService) GetCourseStatus(ctx context.Context, instructorID uuid.UU
 			gradedCount = 0
 		}
 
+		pending := int(eligibleStudents) - int(gradedCount)
+		if pending < 0 {
+			pending = 0
+		}
 		assessments = append(assessments, dto.AssessmentStatus{
 			Slug:         item.Slug,
 			Name:         item.Name,
 			Weight:       item.Weight,
 			GradedCount:  int(gradedCount),
-			PendingCount: int(totalStudents) - int(gradedCount),
-			IsComplete:   gradedCount >= totalStudents,
+			PendingCount: pending,
+			IsComplete:   gradedCount >= eligibleStudents,
 		})
 	}
 
@@ -876,7 +937,11 @@ func (s *GradeService) checkAllScoresLocked(ctx context.Context, regs registrati
 	}
 
 	if eligibleStudents == 0 {
-		return false, nil
+		totalRegs, err := regs.CountRegistrationsByCourse(ctx, courseID)
+		if err != nil {
+			return false, err
+		}
+		return totalRegs > 0, nil
 	}
 
 	for _, item := range schema {
@@ -973,158 +1038,150 @@ func buildGradeSubmittedEventParams(ctx context.Context, studentID uuid.UUID, co
 
 func (s *GradeService) ProcessAppeal(ctx context.Context, req dto.AppealScoreRequest) (*dto.AppealScoreResponse, error) {
 	// A pointer so that 0 is a real score; binding guarantees it over HTTP.
-	if req.NewScore == nil {
+	if req.NewScore == nil || *req.NewScore < 0 || *req.NewScore > 100 {
 		return nil, errors.ErrInvalidScore
 	}
 	newScore := *req.NewScore
 
-	// 1. Get the student's completed course record (contains frozen statistics)
-	completedCourse, err := s.completedRepo.GetCompletedCourseByStudentAndCourse(ctx, req.StudentID, req.CourseID)
-	if err != nil {
-		logger.Error("failed to get completed course", zap.Error(err))
-		return nil, errors.ErrCourseNotFound
-	}
-
-	// Hard deadline check — admin appeal is still blocked after semester ends
-	editResult, err := s.checkCanEditGrade(ctx, completedCourse.Semester, nil, false, true)
-	if err != nil {
-		return nil, err
-	}
-	if !editResult.Allowed {
-		return nil, errors.ErrGradingPeriodEnded
-	}
-
-	// 2. Parse existing assessment scores
-	var scores map[string]float64
-	if err := json.Unmarshal(completedCourse.AssessmentScores, &scores); err != nil {
-		logger.Error("failed to unmarshal assessment scores", zap.Error(err))
-		return nil, err
-	}
-
-	// 3. Check if the slug exists
-	oldScore, exists := scores[req.Slug]
-	if !exists {
-		return nil, errors.ErrInvalidSlug
-	}
-
-	// 4. Parse frozen class statistics
-	var frozenStats struct {
-		Mean   float64 `json:"mean"`
-		StdDev float64 `json:"stddev"`
-		Min    float64 `json:"min"`
-		Max    float64 `json:"max"`
-		Count  int     `json:"total_students"`
-	}
-	if err := json.Unmarshal(completedCourse.ClassStatistics, &frozenStats); err != nil {
-		logger.Error("failed to unmarshal class statistics", zap.Error(err))
-		return nil, err
-	}
-
-	// 5. Get course to parse assessment schema for weight calculation
+	// Get course metadata once (needed for assessment schema weights).
 	course, err := s.cacheRepo.GetCourseCacheByID(ctx, req.CourseID)
 	if err != nil {
 		logger.Error("failed to get course", zap.Error(err))
 		return nil, errors.ErrCourseNotFound
 	}
-
 	var schema []AssessmentSchemaItem
 	if err := json.Unmarshal(course.AssessmentSchema, &schema); err != nil {
 		logger.Error("failed to unmarshal assessment schema", zap.Error(err))
 		return nil, err
 	}
 
-	// 6. Update the score
-	scores[req.Slug] = newScore
+	var (
+		completedCourse db.GradesStudentCompletedCourse
+		oldScore        float64
+		oldWeightedAvg  float64
+		newWeightedAvg  float64
+		newGradePoint   db.GradesGradePointEnum
+		frozenStats     struct {
+			Mean   float64 `json:"mean"`
+			StdDev float64 `json:"stddev"`
+			Min    float64 `json:"min"`
+			Max    float64 `json:"max"`
+			Count  int     `json:"total_students"`
+		}
+	)
 
-	// 7. Recalculate weighted average
-	oldWeightedAvg, _ := utils.PgNumericToFloat64(completedCourse.WeightedAverage)
-	newWeightedAvg := calculateWeightedAverage(scores, schema)
+	// Serialize the entire appeal read-modify-write under the course lock so
+	// concurrent appeals for the same student cannot overwrite each other.
+	err = s.withCourseLock(ctx, req.CourseID, func(tx pgx.Tx) error {
+		completedQtx := s.completedRepo.WithTx(tx)
 
-	// 8. Recalculate grade point using FROZEN statistics
-	var newGradePoint db.GradesGradePointEnum
-	var newZScore float64
+		var err error
+		completedCourse, err = completedQtx.GetCompletedCourseByStudentAndCourse(ctx, req.StudentID, req.CourseID)
+		if err != nil {
+			logger.Error("failed to get completed course", zap.Error(err))
+			return errors.ErrCourseNotFound
+		}
 
-	if completedCourse.GradingType == db.GradesGradingTypeEnumAbsolute {
-		newGradePoint = calculateAbsoluteGradePoint(newWeightedAvg)
-	} else {
-		newGradePoint, newZScore = calculateZScoreGradePoint(newWeightedAvg, frozenStats.Mean, frozenStats.StdDev)
-	}
+		if utils.PgBoolToBool(completedCourse.IsAttendanceFailed) {
+			return errors.ErrAttendanceFailed
+		}
 
-	// 9. Marshal updated scores
-	updatedScoresJSON, err := json.Marshal(scores)
-	if err != nil {
-		logger.Error("failed to marshal updated scores", zap.Error(err))
-		return nil, err
-	}
+		// Hard deadline check — admin appeal is still blocked after semester ends
+		editResult, err := s.checkCanEditGrade(ctx, completedCourse.Semester, nil, false, true)
+		if err != nil {
+			return err
+		}
+		if !editResult.Allowed {
+			return errors.ErrGradingPeriodEnded
+		}
 
-	// 10. Update grading config with new z-score if relative
-	gradingConfig := make(map[string]any)
-	if completedCourse.GradingType == db.GradesGradingTypeEnumRelative {
-		gradingConfig["class_mean"] = frozenStats.Mean
-		gradingConfig["class_stddev"] = frozenStats.StdDev
-		gradingConfig["student_z_score"] = newZScore
-	}
-	gradingConfigJSON, _ := json.Marshal(gradingConfig)
+		var scores map[string]float64
+		if err := json.Unmarshal(completedCourse.AssessmentScores, &scores); err != nil {
+			logger.Error("failed to unmarshal assessment scores", zap.Error(err))
+			return err
+		}
 
-	// 11. Update the completed course record. Same tx as the prerequisite
-	// outbox write below — an appeal can flip a failing grade to passing,
-	// and enrollment learns about that only through the event; committing
-	// one without the other would strand the student's prerequisite state.
-	tx, err := s.pool.Begin(ctx)
-	if err != nil {
-		logger.Error("failed to begin appeal transaction", zap.Error(err))
-		return nil, err
-	}
-	// Rollback after successful commit is a no-op returning ErrTxClosed — safe to discard.
-	defer func() { _ = tx.Rollback(ctx) }()
+		var exists bool
+		oldScore, exists = scores[req.Slug]
+		if !exists {
+			return errors.ErrInvalidSlug
+		}
 
-	err = s.completedRepo.WithTx(tx).UpdateCompletedCourseAfterAppeal(ctx, db.UpdateCompletedCourseAfterAppealParams{
-		StudentID:        req.StudentID,
-		CourseID:         req.CourseID,
-		AssessmentScores: updatedScoresJSON,
-		WeightedAverage:  utils.Float64ToPgNumeric(newWeightedAvg),
-		GradePoint:       newGradePoint,
-		GradingConfig:    gradingConfigJSON,
+		if err := json.Unmarshal(completedCourse.ClassStatistics, &frozenStats); err != nil {
+			logger.Error("failed to unmarshal class statistics", zap.Error(err))
+			return err
+		}
+
+		scores[req.Slug] = newScore
+
+		oldWeightedAvg, _ = utils.PgNumericToFloat64(completedCourse.WeightedAverage)
+		newWeightedAvg = calculateWeightedAverage(scores, schema)
+
+		var newZScore float64
+		if completedCourse.GradingType == db.GradesGradingTypeEnumAbsolute {
+			newGradePoint = calculateAbsoluteGradePoint(newWeightedAvg)
+		} else {
+			newGradePoint, newZScore = calculateZScoreGradePoint(newWeightedAvg, frozenStats.Mean, frozenStats.StdDev)
+		}
+
+		updatedScoresJSON, err := json.Marshal(scores)
+		if err != nil {
+			logger.Error("failed to marshal updated scores", zap.Error(err))
+			return err
+		}
+
+		gradingConfig := make(map[string]any)
+		if completedCourse.GradingType == db.GradesGradingTypeEnumRelative {
+			gradingConfig["class_mean"] = frozenStats.Mean
+			gradingConfig["class_stddev"] = frozenStats.StdDev
+			gradingConfig["student_z_score"] = newZScore
+		}
+		gradingConfigJSON, _ := json.Marshal(gradingConfig)
+
+		if err := completedQtx.UpdateCompletedCourseAfterAppeal(ctx, db.UpdateCompletedCourseAfterAppealParams{
+			StudentID:        req.StudentID,
+			CourseID:         req.CourseID,
+			AssessmentScores: updatedScoresJSON,
+			WeightedAverage:  utils.Float64ToPgNumeric(newWeightedAvg),
+			GradePoint:       newGradePoint,
+			GradingConfig:    gradingConfigJSON,
+		}); err != nil {
+			logger.Error("failed to update completed course after appeal", zap.Error(err))
+			return err
+		}
+
+		if !isPassing(completedCourse.GradePoint) && isPassing(newGradePoint) {
+			isPrereq, err := s.cacheRepo.IsPrerequisiteCourse(ctx, completedCourse.CourseCode)
+			if err != nil {
+				logger.Error("failed to check prerequisite after appeal", zap.Error(err))
+				return err
+			}
+			if isPrereq {
+				prereqEvent := dto.GradeStudentPrerequisitePassedEvent{
+					EventType: "grade.student.prerequisite.passed",
+					Timestamp: clock.Now(),
+				}
+				prereqEvent.Data.StudentID = req.StudentID
+				prereqEvent.Data.CourseID = req.CourseID
+				prereqEvent.Data.CourseCode = completedCourse.CourseCode
+				prereqEvent.Data.Semester = completedCourse.Semester
+				prereqEvent.Data.GradePoint = string(newGradePoint)
+
+				prereqPayload, _ := json.Marshal(prereqEvent)
+				if _, err := s.outboxRepo.WithTx(tx).CreateOutboxEvent(ctx, db.CreateOutboxEventParams{
+					CorrelationID: utils.CorrelationIDFromContext(ctx),
+					EventType:     "grade.student.prerequisite.passed",
+					RoutingKey:    "grade.student.prerequisite.passed",
+					Payload:       prereqPayload,
+				}); err != nil {
+					logger.Error("failed to create prerequisite passed outbox event after appeal", zap.Error(err))
+					return err
+				}
+			}
+		}
+		return nil
 	})
 	if err != nil {
-		logger.Error("failed to update completed course after appeal", zap.Error(err))
-		return nil, err
-	}
-
-	// 12. Fail -> pass flip on a prerequisite course: publish the same event
-	// the finalize path publishes, so enrollment's projection catches up.
-	if !isPassing(completedCourse.GradePoint) && isPassing(newGradePoint) {
-		isPrereq, err := s.cacheRepo.IsPrerequisiteCourse(ctx, completedCourse.CourseCode)
-		if err != nil {
-			logger.Error("failed to check prerequisite after appeal", zap.Error(err))
-			return nil, err
-		}
-		if isPrereq {
-			prereqEvent := dto.GradeStudentPrerequisitePassedEvent{
-				EventType: "grade.student.prerequisite.passed",
-				Timestamp: clock.Now(),
-			}
-			prereqEvent.Data.StudentID = req.StudentID
-			prereqEvent.Data.CourseID = req.CourseID
-			prereqEvent.Data.CourseCode = completedCourse.CourseCode
-			prereqEvent.Data.Semester = completedCourse.Semester
-			prereqEvent.Data.GradePoint = string(newGradePoint)
-
-			prereqPayload, _ := json.Marshal(prereqEvent)
-			if _, err := s.outboxRepo.WithTx(tx).CreateOutboxEvent(ctx, db.CreateOutboxEventParams{
-				CorrelationID: utils.CorrelationIDFromContext(ctx),
-				EventType:     "grade.student.prerequisite.passed",
-				RoutingKey:    "grade.student.prerequisite.passed",
-				Payload:       prereqPayload,
-			}); err != nil {
-				logger.Error("failed to create prerequisite passed outbox event after appeal", zap.Error(err))
-				return nil, err
-			}
-		}
-	}
-
-	if err := tx.Commit(ctx); err != nil {
-		logger.Error("failed to commit appeal transaction", zap.Error(err))
 		return nil, err
 	}
 
@@ -1308,6 +1365,14 @@ func (s *GradeService) LockAssessmentBySlug(ctx context.Context, instructorID, c
 	// count sees its scores and the lock covers them.
 	var response *dto.LockAssessmentResponse
 	err = s.withCourseLock(ctx, courseID, func(tx pgx.Tx) error {
+		existingCompleted, err := s.completedRepo.WithTx(tx).GetCompletedCoursesByCourse(ctx, courseID)
+		if err != nil {
+			logger.Error("failed to check finalized status", zap.Error(err))
+			return err
+		}
+		if len(existingCompleted) > 0 {
+			return errors.ErrAlreadyFinalized
+		}
 		regs, scores := s.registrationRepo.WithTx(tx), s.scoreRepo.WithTx(tx)
 		eligibleStudents, err := regs.CountEligibleRegistrationsByCourse(ctx, courseID)
 		if err != nil {
@@ -1459,8 +1524,13 @@ func (s *GradeService) checkCanEditGrade(ctx context.Context, semester string, c
 		}), nil
 	}
 
+	var periodStart *time.Time
+	if !period.PeriodStart.IsZero() {
+		periodStart = &period.PeriodStart
+	}
 	return rules.CanEditGrade(rules.GradeEditParams{
 		IsLocked:         isLocked,
+		PeriodStart:      periodStart,
 		GlobalDeadline:   period.PeriodEnd,
 		OverrideDeadline: nil,
 		IsAdminAction:    isAdmin,

@@ -38,8 +38,8 @@ func (f *fakeRegistrationWriter) DeleteProgramRegistrations(_ context.Context, p
 	return int64(len(courseIDs)), nil
 }
 
-func (f *fakeRegistrationWriter) MarkAttendanceFailed(context.Context, db.MarkAttendanceFailedParams) error {
-	return nil
+func (f *fakeRegistrationWriter) MarkAttendanceFailed(context.Context, db.MarkAttendanceFailedParams) (int64, error) {
+	return 1, nil
 }
 
 // programApprovedBody builds enrollment.program.approved the way it arrives:

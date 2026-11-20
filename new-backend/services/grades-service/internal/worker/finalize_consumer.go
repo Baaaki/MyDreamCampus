@@ -3,8 +3,10 @@ package worker
 import (
 	"context"
 	"encoding/json"
+	"errors"
 
 	"github.com/baaaki/mydreamcampus/grades/internal/dto"
+	gradeErrors "github.com/baaaki/mydreamcampus/grades/internal/errors"
 	"github.com/baaaki/mydreamcampus/grades/internal/repository"
 	"github.com/baaaki/mydreamcampus/grades/internal/service"
 	"github.com/baaaki/mydreamcampus/shared/platform/logger"
@@ -88,6 +90,11 @@ func (w *FinalizeConsumer) handleFinalizeRequested(ctx context.Context, body []b
 	)
 
 	if _, err := w.gradeService.AutoFinalize(ctx, event.Data.CourseID, event.Data.InstructorID); err != nil {
+		if errors.Is(err, gradeErrors.ErrAlreadyFinalized) || errors.Is(err, gradeErrors.ErrIncompleteAssessment) {
+			log.Info("auto-finalize skipped", zap.Error(err),
+				zap.String("course_id", event.Data.CourseID.String()))
+			return nil
+		}
 		log.Error("auto-finalize failed", zap.Error(err),
 			zap.String("course_id", event.Data.CourseID.String()))
 		return err

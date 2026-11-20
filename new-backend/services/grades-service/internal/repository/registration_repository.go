@@ -55,7 +55,7 @@ func (r *RegistrationRepository) GetRegistrationsByIDs(ctx context.Context, ids 
 	return r.queries.GetRegistrationsByIDs(ctx, ids)
 }
 
-func (r *RegistrationRepository) MarkAttendanceFailed(ctx context.Context, arg db.MarkAttendanceFailedParams) error {
+func (r *RegistrationRepository) MarkAttendanceFailed(ctx context.Context, arg db.MarkAttendanceFailedParams) (int64, error) {
 	return r.queries.MarkAttendanceFailed(ctx, arg)
 }
 

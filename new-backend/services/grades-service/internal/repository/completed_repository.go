@@ -56,6 +56,13 @@ func (r *CompletedRepository) UpdateCompletedCourseAfterAppeal(ctx context.Conte
 	return r.queries.UpdateCompletedCourseAfterAppeal(ctx, arg)
 }
 
+func (r *CompletedRepository) MarkCompletedCourseAttendanceFailed(ctx context.Context, studentID uuid.UUID, courseID uuid.UUID) (int64, error) {
+	return r.queries.MarkCompletedCourseAttendanceFailed(ctx, db.MarkCompletedCourseAttendanceFailedParams{
+		StudentID: studentID,
+		CourseID:  courseID,
+	})
+}
+
 // WithTx returns a copy of the repository whose queries run inside tx —
 // required by AutoFinalize so its multi-table writes commit atomically.
 func (r *CompletedRepository) WithTx(tx pgx.Tx) *CompletedRepository {

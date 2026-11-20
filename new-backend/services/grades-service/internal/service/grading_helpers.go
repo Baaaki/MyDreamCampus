@@ -64,9 +64,10 @@ func calculateAbsoluteGradePoint(average float64) db.GradesGradePointEnum {
 
 // Relative grading (Z-score when class mean < 60)
 func calculateZScoreGradePoint(average, mean, stddev float64) (db.GradesGradePointEnum, float64) {
-	// If stddev is 0, everyone has the same score
+	// If stddev is 0 (everyone has the same score), fall back to absolute grading
+	// so a class of all zeros does not receive a passing CC grade.
 	if stddev == 0 {
-		return db.GradesGradePointEnum200, 0.0 // CC
+		return calculateAbsoluteGradePoint(average), 0.0
 	}
 
 	zScore := (average - mean) / stddev

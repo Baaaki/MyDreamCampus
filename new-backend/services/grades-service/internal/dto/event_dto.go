@@ -23,6 +23,7 @@ type StudentCreatedEvent struct {
 		Email         string    `json:"email"`
 		Department    string    `json:"department"`
 		ClassLevel    int16     `json:"class_level"`
+		Status        string    `json:"status"`
 	} `json:"data"`
 }
 
@@ -38,6 +39,7 @@ type StudentUpdatedEvent struct {
 		Email         string    `json:"email"`
 		Department    string    `json:"department"`
 		ClassLevel    int16     `json:"class_level"`
+		Status        string    `json:"status"`
 	} `json:"data"`
 }
 

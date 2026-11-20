@@ -91,7 +91,7 @@ func New(
 		retentionStore:   repository.NewRetentionStore(pool),
 		gradeService:     gradeSvc,
 		gradeHandler:     handler.NewGradeHandler(gradeSvc, studentGradeSvc),
-		eventConsumer:    worker.NewEventConsumer(rabbitmq.NewConsumer(rabbitConn), cacheRepo, registrationRepo),
+		eventConsumer:    newGradesEventConsumer(rabbitConn, cacheRepo, registrationRepo, completedRepo),
 		finalizeConsumer: worker.NewFinalizeConsumer(rabbitmq.NewConsumer(rabbitConn), gradeSvc, completedRepo),
 		periodConsumer:   worker.NewPeriodConsumer(rabbitmq.NewConsumer(rabbitConn), periodRepo),
 	}
@@ -134,9 +134,10 @@ func (m *Module) RegisterRoutes(rg *gin.RouterGroup) {
 			teacher.GET("/courses/:course_id/students", m.gradeHandler.GetCourseStudents)
 			// A retried score write would overwrite or duplicate marks that
 			// the student has already been shown.
-			teacher.POST("/courses/:course_id/scores", platformMiddleware.Idempotency(), m.gradeHandler.SubmitScore)
-			teacher.POST("/courses/:course_id/scores/bulk", platformMiddleware.Idempotency(), m.gradeHandler.BulkSubmitScores)
-			teacher.POST("/courses/:course_id/assessments/:slug/lock", m.gradeHandler.LockAssessment)
+			failClosed := platformMiddleware.JWTAuth(platformMiddleware.WithFailClosed())
+			teacher.POST("/courses/:course_id/scores", failClosed, platformMiddleware.Idempotency(), m.gradeHandler.SubmitScore)
+			teacher.POST("/courses/:course_id/scores/bulk", failClosed, platformMiddleware.Idempotency(), m.gradeHandler.BulkSubmitScores)
+			teacher.POST("/courses/:course_id/assessments/:slug/lock", failClosed, m.gradeHandler.LockAssessment)
 			// A teacher sees only their advisees' transcripts; the service
 			// asks the student service who the advisor is.
 			teacher.GET("/students/:student_id/transcript", m.gradeHandler.GetStudentTranscript)
@@ -154,6 +155,7 @@ func (m *Module) RegisterRoutes(rg *gin.RouterGroup) {
 		// grade, so it must never sit behind RequireStudent — the handler
 		// double-checks the admin role itself.
 		admin := rg.Group("/admin")
+		admin.Use(platformMiddleware.JWTAuth(platformMiddleware.WithFailClosed()))
 		admin.Use(platformMiddleware.RequireAdmin())
 		{
 			admin.POST("/appeals", m.gradeHandler.ProcessAppeal)
@@ -176,4 +178,15 @@ func (m *Module) RegisterPublicRoutes(r *gin.Engine) {
 	{
 		internal.GET("/students/:id/semester-activity", m.gradeHandler.GetSemesterActivity)
 	}
+}
+
+func newGradesEventConsumer(
+	rabbitConn *rabbitmq.Connection,
+	cacheRepo *repository.CacheRepository,
+	registrationRepo *repository.RegistrationRepository,
+	completedRepo *repository.CompletedRepository,
+) *worker.EventConsumer {
+	ec := worker.NewEventConsumer(rabbitmq.NewConsumer(rabbitConn), cacheRepo, registrationRepo)
+	ec.SetCompletedRepo(completedRepo)
+	return ec
 }

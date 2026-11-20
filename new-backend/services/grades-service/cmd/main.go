@@ -16,6 +16,7 @@ func main() {
 	rt := bootstrap.Init(bootstrap.Options{
 		Service:       "grades",
 		NeedsDatabase: true,
+		RedisFatal:    true,
 	})
 
 	rt.DeclareQueues([]eventbus.DownstreamBinding{

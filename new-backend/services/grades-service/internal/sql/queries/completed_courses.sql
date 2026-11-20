@@ -67,3 +67,12 @@ SET
     grading_config = $6,
     finalized_at = NOW()
 WHERE student_id = $1 AND course_id = $2;
+
+-- name: MarkCompletedCourseAttendanceFailed :execrows
+UPDATE grades.student_completed_courses
+SET
+    is_attendance_failed = true,
+    weighted_average = 0,
+    grade_point = '0.00',
+    finalized_at = NOW()
+WHERE student_id = $1 AND course_id = $2;

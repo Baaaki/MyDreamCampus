@@ -16,7 +16,7 @@ const countLockedScoresBySlugAndCourse = `-- name: CountLockedScoresBySlugAndCou
 SELECT COUNT(DISTINCT sa.registration_id)
 FROM grades.student_assessment_scores sa
 JOIN grades.student_course_registrations r ON sa.registration_id = r.id
-WHERE r.course_id = $1 AND sa.slug = $2 AND sa.is_locked = TRUE
+WHERE r.course_id = $1 AND sa.slug = $2 AND sa.is_locked = TRUE AND COALESCE(r.is_attendance_failed, FALSE) = FALSE
 `
 
 type CountLockedScoresBySlugAndCourseParams struct {
@@ -35,7 +35,7 @@ const countScoresBySlugAndCourse = `-- name: CountScoresBySlugAndCourse :one
 SELECT COUNT(DISTINCT sa.registration_id)
 FROM grades.student_assessment_scores sa
 JOIN grades.student_course_registrations r ON sa.registration_id = r.id
-WHERE r.course_id = $1 AND sa.slug = $2
+WHERE r.course_id = $1 AND sa.slug = $2 AND COALESCE(r.is_attendance_failed, FALSE) = FALSE
 `
 
 type CountScoresBySlugAndCourseParams struct {

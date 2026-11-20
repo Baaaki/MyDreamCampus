@@ -334,6 +334,29 @@ func (q *Queries) GetTranscriptData(ctx context.Context, studentID uuid.UUID) ([
 	return items, nil
 }
 
+const markCompletedCourseAttendanceFailed = `-- name: MarkCompletedCourseAttendanceFailed :execrows
+UPDATE grades.student_completed_courses
+SET
+    is_attendance_failed = true,
+    weighted_average = 0,
+    grade_point = '0.00',
+    finalized_at = NOW()
+WHERE student_id = $1 AND course_id = $2
+`
+
+type MarkCompletedCourseAttendanceFailedParams struct {
+	StudentID uuid.UUID `json:"student_id"`
+	CourseID  uuid.UUID `json:"course_id"`
+}
+
+func (q *Queries) MarkCompletedCourseAttendanceFailed(ctx context.Context, arg MarkCompletedCourseAttendanceFailedParams) (int64, error) {
+	result, err := q.db.Exec(ctx, markCompletedCourseAttendanceFailed, arg.StudentID, arg.CourseID)
+	if err != nil {
+		return 0, err
+	}
+	return result.RowsAffected(), nil
+}
+
 const updateCompletedCourseAfterAppeal = `-- name: UpdateCompletedCourseAfterAppeal :exec
 UPDATE grades.student_completed_courses
 SET

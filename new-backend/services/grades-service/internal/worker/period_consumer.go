@@ -87,6 +87,7 @@ func (w *PeriodConsumer) handleMessage(ctx context.Context, body []byte) error {
 			PeriodStart: event.PeriodStart,
 			PeriodEnd:   event.PeriodEnd,
 			IsActive:    event.IsActive,
+			UpdatedAt:   env.Timestamp,
 		}); err != nil {
 			log.Error("failed to upsert academic period", zap.Error(err),
 				zap.String("semester", event.Semester))
@@ -96,7 +97,7 @@ func (w *PeriodConsumer) handleMessage(ctx context.Context, body []byte) error {
 		return nil
 
 	case events.PeriodActionDeleted:
-		if err := w.periodRepo.DeletePeriodBySemester(ctx, event.Semester); err != nil {
+		if err := w.periodRepo.DeletePeriodBySemesterIfOlder(ctx, event.Semester, env.Timestamp); err != nil {
 			log.Error("failed to delete academic period", zap.Error(err),
 				zap.String("semester", event.Semester))
 			return err

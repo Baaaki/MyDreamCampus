@@ -80,7 +80,7 @@ JOIN grades.students_view s ON r.student_id = s.id
 WHERE r.course_id = $1
 ORDER BY s.student_number;
 
--- name: MarkAttendanceFailed :exec
+-- name: MarkAttendanceFailed :execrows
 UPDATE grades.student_course_registrations
 SET is_attendance_failed = true
 WHERE student_id = $1 AND course_id = $2;

@@ -56,10 +56,13 @@ func TestCalculateAbsoluteGradePoint(t *testing.T) {
 }
 
 func TestCalculateZScoreGradePoint(t *testing.T) {
-	t.Run("zero stddev gives default CC", func(t *testing.T) {
+	t.Run("zero stddev falls back to absolute grading", func(t *testing.T) {
 		gp, z := calculateZScoreGradePoint(50, 50, 0)
-		assert.Equal(t, db.GradesGradePointEnum200, gp)
+		assert.Equal(t, db.GradesGradePointEnum050, gp)
 		assert.Equal(t, 0.0, z)
+
+		gpZero, _ := calculateZScoreGradePoint(0, 0, 0)
+		assert.Equal(t, db.GradesGradePointEnum000, gpZero)
 	})
 
 	t.Run("z=2 gets AA", func(t *testing.T) {

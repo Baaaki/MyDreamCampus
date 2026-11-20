@@ -234,10 +234,19 @@ func (v scoreView) GetLockedRegistrationsBySlug(_ context.Context, slug string, 
 	return out, nil
 }
 
+func (v scoreView) isAttendanceFailed(regID uuid.UUID) bool {
+	for _, r := range v.w.regs {
+		if r.ID == regID {
+			return r.IsAttendanceFailed.Bool
+		}
+	}
+	return false
+}
+
 func (v scoreView) CountScoresBySlugAndCourse(_ context.Context, arg db.CountScoresBySlugAndCourseParams) (int64, error) {
 	var n int64
 	for _, s := range v.w.scores {
-		if s.Slug == arg.Slug && v.courseOf(s.RegistrationID) == arg.CourseID {
+		if s.Slug == arg.Slug && v.courseOf(s.RegistrationID) == arg.CourseID && !v.isAttendanceFailed(s.RegistrationID) {
 			n++
 		}
 	}
@@ -247,7 +256,7 @@ func (v scoreView) CountScoresBySlugAndCourse(_ context.Context, arg db.CountSco
 func (v scoreView) CountLockedScoresBySlugAndCourse(_ context.Context, courseID uuid.UUID, slug string) (int64, error) {
 	var n int64
 	for _, s := range v.w.scores {
-		if s.Slug == slug && s.IsLocked.Bool && v.courseOf(s.RegistrationID) == courseID {
+		if s.Slug == slug && s.IsLocked.Bool && v.courseOf(s.RegistrationID) == courseID && !v.isAttendanceFailed(s.RegistrationID) {
 			n++
 		}
 	}
@@ -496,6 +505,16 @@ func (w *gradesWorld) enroll(courseID uuid.UUID, number string, vize, final floa
 	return reg
 }
 
+func (w *gradesWorld) lockAll(courseID uuid.UUID) {
+	for i, sc := range w.scores {
+		for _, r := range w.regs {
+			if r.ID == sc.RegistrationID && r.CourseID == courseID {
+				w.scores[i].IsLocked = pgtype.Bool{Bool: true, Valid: true}
+			}
+		}
+	}
+}
+
 func (w *gradesWorld) service(semesters SemesterClient) *GradeService {
 	return &GradeService{
 		pool:             w,
@@ -694,6 +713,7 @@ func TestAutoFinalize_HighMean_GradesAbsolutelyInOneTransaction(t *testing.T) {
 	ff := w.enroll(courseID, "5", 100, 100, true)     // attendance → FF regardless
 	// Class mean of the four regular students is 61.5: absolute grading.
 
+	w.lockAll(courseID)
 	res, err := w.service(openSemester()).AutoFinalize(context.Background(), courseID, instructorID)
 
 	require.NoError(t, err)
@@ -726,6 +746,7 @@ func TestAutoFinalize_LowMean_GradesOnTheCurve(t *testing.T) {
 	w.enroll(courseID, "2", 40, 40, false)
 	worst := w.enroll(courseID, "3", 20, 20, false)
 
+	w.lockAll(courseID)
 	res, err := w.service(openSemester()).AutoFinalize(context.Background(), courseID, instructorID)
 
 	require.NoError(t, err)
@@ -745,6 +766,7 @@ func TestAutoFinalize_RetakeReplacesEarlierRecord(t *testing.T) {
 	reg := w.enroll(courseID, "1", 90, 90, false)
 	w.completed = append(w.completed, db.GradesStudentCompletedCourse{StudentID: reg.StudentID, CourseCode: "BLM101", GradePoint: db.GradesGradePointEnum000})
 
+	w.lockAll(courseID)
 	_, err := w.service(openSemester()).AutoFinalize(context.Background(), courseID, instructorID)
 
 	require.NoError(t, err)
@@ -758,6 +780,7 @@ func TestAutoFinalize_WriteFails_NothingIsKept(t *testing.T) {
 	w.enroll(courseID, "2", 50, 50, false)
 	w.failCreateCompleted = true
 
+	w.lockAll(courseID)
 	_, err := w.service(openSemester()).AutoFinalize(context.Background(), courseID, instructorID)
 
 	require.Error(t, err)
@@ -776,6 +799,7 @@ func TestAutoFinalize_ScoresUnreadable_AbortsWithoutDeletingAnything(t *testing.
 	unreadable := w.enroll(courseID, "2", 80, 80, false)
 	w.failScoresFor = unreadable.ID
 
+	w.lockAll(courseID)
 	_, err := w.service(openSemester()).AutoFinalize(context.Background(), courseID, instructorID)
 
 	require.Error(t, err)
@@ -788,6 +812,7 @@ func TestAutoFinalize_ScoresUnreadable_AbortsWithoutDeletingAnything(t *testing.
 func TestAutoFinalize_NoRegistrationsOrCourse_Fails(t *testing.T) {
 	w, courseID := newGradesWorld(t)
 
+	w.lockAll(courseID)
 	_, err := w.service(openSemester()).AutoFinalize(context.Background(), courseID, instructorID)
 	assert.Error(t, err)
 
@@ -1046,7 +1071,8 @@ func TestGradingWrites_EachTakesTheCourseLockInItsTransaction(t *testing.T) {
 		"admin unlock": func(_ *gradesWorld, svc *GradeService, _ uuid.UUID, reg db.GetRegistrationByIDRow) error {
 			return svc.UnlockScore(ctx, reg.ID, "vize")
 		},
-		"finalize": func(_ *gradesWorld, svc *GradeService, courseID uuid.UUID, _ db.GetRegistrationByIDRow) error {
+		"finalize": func(w *gradesWorld, svc *GradeService, courseID uuid.UUID, _ db.GetRegistrationByIDRow) error {
+			w.lockAll(courseID)
 			_, err := svc.AutoFinalize(ctx, courseID, instructorID)
 			return err
 		},

@@ -3,6 +3,7 @@ package worker
 import (
 	"context"
 	"encoding/json"
+	"time"
 
 	"github.com/baaaki/mydreamcampus/grades/internal/db"
 	"github.com/baaaki/mydreamcampus/grades/internal/dto"
@@ -27,6 +28,7 @@ const QueueSyncEvents = "grades.sync_events"
 type outboxEnvelope struct {
 	EventID   string          `json:"event_id"`
 	EventType string          `json:"event_type"`
+	Timestamp time.Time       `json:"timestamp"`
 	Data      json.RawMessage `json:"data"`
 }
 
@@ -34,10 +36,23 @@ type outboxEnvelope struct {
 // Grades has no processed_events table — every handler is naturally
 // idempotent (upserts, ON CONFLICT DO NOTHING, boolean set), so redelivery
 // after a nack cannot corrupt state.
+type completedAttendanceMarker interface {
+	MarkCompletedCourseAttendanceFailed(ctx context.Context, studentID uuid.UUID, courseID uuid.UUID) (int64, error)
+}
+
+type studentCacheReader interface {
+	GetStudentCacheByID(ctx context.Context, id uuid.UUID) (db.GradesStudentsView, error)
+}
+
 type EventConsumer struct {
-	consumer  *rabbitmq.Consumer
-	cacheRepo cacheWriter
-	regRepo   registrationWriter
+	consumer      *rabbitmq.Consumer
+	cacheRepo     cacheWriter
+	regRepo       registrationWriter
+	completedRepo completedAttendanceMarker
+}
+
+func (w *EventConsumer) SetCompletedRepo(repo completedAttendanceMarker) {
+	w.completedRepo = repo
 }
 
 // cacheWriter and registrationWriter are the parts of the repositories the
@@ -52,7 +67,7 @@ type cacheWriter interface {
 type registrationWriter interface {
 	CreateRegistration(ctx context.Context, arg db.CreateRegistrationParams) (db.GradesStudentCourseRegistration, error)
 	DeleteProgramRegistrations(ctx context.Context, programID, studentID uuid.UUID, courseIDs []uuid.UUID) (int64, error)
-	MarkAttendanceFailed(ctx context.Context, arg db.MarkAttendanceFailedParams) error
+	MarkAttendanceFailed(ctx context.Context, arg db.MarkAttendanceFailedParams) (int64, error)
 }
 
 var (
@@ -129,6 +144,17 @@ func (w *EventConsumer) handleStudentUpsert(ctx context.Context, env outboxEnvel
 		return nil
 	}
 
+	isActive := true
+	if event.Data.Status != "" {
+		isActive = event.Data.Status == "active"
+	} else if env.EventType == "student.updated" {
+		if reader, ok := w.cacheRepo.(studentCacheReader); ok {
+			if existing, getErr := reader.GetStudentCacheByID(ctx, event.Data.ID); getErr == nil && existing.IsActive.Valid {
+				isActive = existing.IsActive.Bool
+			}
+		}
+	}
+
 	_, err := w.cacheRepo.UpsertStudentCache(ctx, db.UpsertStudentCacheParams{
 		ID:            event.Data.ID,
 		StudentNumber: event.Data.StudentNumber,
@@ -137,7 +163,7 @@ func (w *EventConsumer) handleStudentUpsert(ctx context.Context, env outboxEnvel
 		Email:         utils.StringToPgText(event.Data.Email),
 		Department:    utils.StringToPgText(event.Data.Department),
 		ClassLevel:    utils.Int16ToPgInt2(event.Data.ClassLevel),
-		IsActive:      utils.BoolToPgBool(true),
+		IsActive:      utils.BoolToPgBool(isActive),
 	})
 	if err != nil {
 		log.Error("failed to upsert student cache", zap.Error(err),
@@ -335,12 +361,21 @@ func (w *EventConsumer) handleAttendanceFailed(ctx context.Context, env outboxEn
 		return nil
 	}
 
-	if err := w.regRepo.MarkAttendanceFailed(ctx, db.MarkAttendanceFailedParams{
+	rows, err := w.regRepo.MarkAttendanceFailed(ctx, db.MarkAttendanceFailedParams{
 		StudentID: event.Data.StudentID,
 		CourseID:  event.Data.CourseID,
-	}); err != nil {
+	})
+	if err != nil {
 		log.Error("failed to mark attendance failed", zap.Error(err))
 		return err
+	}
+	if rows == 0 && w.completedRepo != nil {
+		// Course was finalized before the attendance-failure event arrived:
+		// retroactively mark the finalized record as attendance-failed (FF / 0.00).
+		if _, compErr := w.completedRepo.MarkCompletedCourseAttendanceFailed(ctx, event.Data.StudentID, event.Data.CourseID); compErr != nil {
+			log.Error("failed to retroactively mark completed course attendance-failed", zap.Error(compErr))
+			return compErr
+		}
 	}
 
 	log.Info("registration marked attendance-failed",
