@@ -3,6 +3,7 @@ package worker
 import (
 	"context"
 	"encoding/json"
+	"time"
 
 	"github.com/baaaki/mydreamcampus/enrollment/internal/dto"
 	"github.com/baaaki/mydreamcampus/enrollment/internal/repository"
@@ -22,6 +23,7 @@ const QueueSyncEvents = "enrollment.sync_events"
 type outboxEnvelope struct {
 	EventID   string          `json:"event_id"`
 	EventType string          `json:"event_type"`
+	Timestamp time.Time       `json:"timestamp"`
 	Data      json.RawMessage `json:"data"`
 }
 

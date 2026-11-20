@@ -219,6 +219,10 @@ func (s *EnrollmentService) RejectEnrollmentProgram(ctx context.Context, program
 	// Reject program
 	err = s.enrollmentRepo.RejectProgramWithEventAndLog(ctx, programID, rejectionLogParams, eventPayload)
 	if err != nil {
+		if sharedErrors.Is(err, serviceErrors.ErrProgramNotPending) {
+			serviceLogger.Warn("program no longer pending")
+			return err
+		}
 		return sharedErrors.Wrap(sharedErrors.ErrInternal, err)
 	}
 

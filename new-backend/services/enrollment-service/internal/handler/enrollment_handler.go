@@ -202,6 +202,10 @@ func (h *EnrollmentHandler) GetMyEnrollments(c *gin.Context) {
 
 	var status *string
 	if st := c.Query("status"); st != "" {
+		if st != "pending" && st != "approved" {
+			h.handleError(c, serviceErrors.ErrInvalidStatus)
+			return
+		}
 		status = &st
 	}
 

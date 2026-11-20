@@ -484,6 +484,10 @@ func (s *EnrollmentService) CancelMyEnrollment(ctx context.Context, studentID uu
 	// Cancel program (delete program, create event)
 	err = s.enrollmentRepo.CancelProgramWithEvent(ctx, utils.PgtypeToUUID(existingProgram.ID), cancelEventPayload)
 	if err != nil {
+		if sharedErrors.Is(err, serviceErrors.ErrProgramNotPending) {
+			serviceLogger.Warn("program no longer pending")
+			return err
+		}
 		serviceLogger.Error("failed to cancel program", zap.Error(err))
 		return sharedErrors.Wrap(sharedErrors.ErrInternal, err)
 	}

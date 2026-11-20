@@ -136,8 +136,14 @@ func (r *EnrollmentRepository) CreateProgramWithCoursesAndEvent(
 		}
 	}
 
-	// Create outbox event
-	payload, err := json.Marshal(eventPayload)
+	// Create outbox event (populate generated program_id without mutating caller's map)
+	outboxPayload := make(map[string]any, len(eventPayload)+1)
+	for k, v := range eventPayload {
+		outboxPayload[k] = v
+	}
+	outboxPayload["program_id"] = utils.PgtypeToUUID(program.ID).String()
+
+	payload, err := json.Marshal(outboxPayload)
 	if err != nil {
 		return db.EnrollmentProgram{}, fmt.Errorf("%w: failed to marshal submitted event payload: %v", sharedErrors.ErrInternal, err)
 	}
@@ -341,7 +347,10 @@ func (r *EnrollmentRepository) RejectProgramWithEventAndLog(
 
 	_, err = qtx.LockPendingProgram(ctx, utils.UUIDToPgtype(programID))
 	if err != nil {
-		return fmt.Errorf("%w: program not found or not pending: %v", sharedErrors.ErrNotFound, err)
+		if errors.Is(err, pgx.ErrNoRows) {
+			return serviceErrors.ErrProgramNotPending
+		}
+		return fmt.Errorf("%w: failed to lock program: %v", sharedErrors.ErrQueryFailed, err)
 	}
 
 	_, err = qtx.CreateRejectionLog(ctx, rejectionLogParams)
@@ -437,7 +446,10 @@ func (r *EnrollmentRepository) CancelProgramWithEvent(
 
 	_, err = qtx.LockPendingProgram(ctx, utils.UUIDToPgtype(programID))
 	if err != nil {
-		return fmt.Errorf("%w: program not found or not pending: %v", sharedErrors.ErrNotFound, err)
+		if errors.Is(err, pgx.ErrNoRows) {
+			return serviceErrors.ErrProgramNotPending
+		}
+		return fmt.Errorf("%w: failed to lock program: %v", sharedErrors.ErrQueryFailed, err)
 	}
 
 	err = qtx.DeleteEnrollmentProgram(ctx, utils.UUIDToPgtype(programID))
